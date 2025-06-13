@@ -1,0 +1,94 @@
+---
+# Centralized Logging Configuration
+# Handles Loki integration for all services
+
+- name: Create logging directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/logging/config"
+    - "{{ docker_dir }}/monitoring/logging/scripts"
+    - "{{ logs_dir }}/monitoring/logging"
+    - "{{ logs_dir }}/applications"
+    - "{{ logs_dir }}/system"
+    - "{{ logs_dir }}/containers"
+    - "{{ logs_dir }}/security"
+
+- name: Create Promtail configuration for all services
+  ansible.builtin.template:
+    src: promtail.yml.j2
+    dest: "{{ docker_dir }}/monitoring/promtail/config/promtail.yml"
+    mode: "0640"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  notify: restart promtail
+
+- name: Create log rotation configuration
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.d/homelab-logs
+    mode: "0644"
+  notify: restart logrotate
+
+- name: Configure Docker logging driver
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: restart docker
+
+- name: Create service-specific logging configurations
+  ansible.builtin.template:
+    src: "{{ item }}.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/logging/config/{{ item }}.yml"
+    mode: "0640"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - web_services
+    - databases
+    - monitoring
+    - containers
+    - system
+    - applications
+    - network
+    - storage
+  notify: restart promtail
+
+- name: Create logging health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh"
+    mode: "0755"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Create logging management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/manage.sh"
+    mode: "0755"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Setup logging monitoring
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ docker_dir }}/monitoring/prometheus/rules/logging.yml"
+    mode: "0640"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  notify: restart prometheus
+
+- name: Create logging dashboard
+  ansible.builtin.template:
+    src: dashboard.json.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/logging.json"
+    mode: "0640"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  notify: restart grafana 

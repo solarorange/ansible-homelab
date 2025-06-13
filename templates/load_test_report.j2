@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Test Report - {{ test_results.service }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #f4f4f4;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .summary {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .threshold {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .success {
+            color: #2ecc71;
+        }
+        .warning {
+            color: #f1c40f;
+        }
+        .critical {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Load Test Report - {{ test_results.service }}</h1>
+            <p>Timestamp: {{ test_results.timestamp }}</p>
+            <p>Duration: {{ test_results.duration }} seconds</p>
+            <p>Concurrent Users: {{ test_results.concurrent_users }}</p>
+        </div>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <h3>Average Latency</h3>
+                <p class="{% if test_results.metrics[0] | float > 500 %}critical{% elif test_results.metrics[0] | float > 200 %}warning{% else %}success{% endif %}">
+                    {{ test_results.metrics[0] }}ms
+                </p>
+            </div>
+            <div class="metric-card">
+                <h3>Requests per Second</h3>
+                <p class="{% if test_results.metrics[1] | float < 50 %}critical{% elif test_results.metrics[1] | float < 100 %}warning{% else %}success{% endif %}">
+                    {{ test_results.metrics[1] }}
+                </p>
+            </div>
+            <div class="metric-card">
+                <h3>Error Rate</h3>
+                <p class="{% if test_results.metrics[2] | float > 5 %}critical{% elif test_results.metrics[2] | float > 1 %}warning{% else %}success{% endif %}">
+                    {{ test_results.metrics[2] }}%
+                </p>
+            </div>
+        </div>
+
+        <div class="summary">
+            <h2>Test Summary</h2>
+            <pre>{{ test_results.summary }}</pre>
+        </div>
+
+        <div class="thresholds">
+            <h2>Thresholds</h2>
+            <ul>
+                <li>Latency: 
+                    <span class="warning">Warning > 200ms</span>, 
+                    <span class="critical">Critical > 500ms</span>
+                </li>
+                <li>Requests per Second: 
+                    <span class="warning">Warning < 100</span>, 
+                    <span class="critical">Critical < 50</span>
+                </li>
+                <li>Error Rate: 
+                    <span class="warning">Warning > 1%</span>, 
+                    <span class="critical">Critical > 5%</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

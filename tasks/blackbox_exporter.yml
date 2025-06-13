@@ -1,0 +1,159 @@
+---
+# Blackbox Exporter Configuration
+# Production-ready external service monitoring
+
+- name: Create Blackbox Exporter directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/blackbox/config"
+    - "{{ docker_dir }}/monitoring/blackbox/scripts"
+    - "{{ logs_dir }}/monitoring/blackbox"
+
+- name: Create Blackbox Exporter configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/blackbox/config/blackbox.yml"
+    content: |
+      modules:
+        http_2xx:
+          prober: http
+          timeout: 5s
+          http:
+            method: GET
+            preferred_ip_protocol: "ip4"
+            valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+            valid_status_codes: [200, 201, 202, 203, 204]
+            fail_if_ssl: false
+            fail_if_not_ssl: false
+            tls_config:
+              insecure_skip_verify: true
+            headers:
+              User-Agent: "Prometheus/Blackbox Exporter"
+        
+        http_post_2xx:
+          prober: http
+          timeout: 5s
+          http:
+            method: POST
+            preferred_ip_protocol: "ip4"
+            valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+            valid_status_codes: [200, 201, 202, 203, 204]
+            fail_if_ssl: false
+            fail_if_not_ssl: false
+            tls_config:
+              insecure_skip_verify: true
+            headers:
+              User-Agent: "Prometheus/Blackbox Exporter"
+            body: "{}"
+        
+        tcp_connect:
+          prober: tcp
+          timeout: 5s
+          tcp:
+            preferred_ip_protocol: "ip4"
+        
+        icmp:
+          prober: icmp
+          timeout: 5s
+          icmp:
+            preferred_ip_protocol: "ip4"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Blackbox Exporter management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/blackbox/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Blackbox Exporter Management Script
+      
+      function show_help {
+        echo "Blackbox Exporter Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Blackbox Exporter status"
+        echo "  logs      - Show Blackbox Exporter logs"
+        echo "  restart   - Restart Blackbox Exporter"
+        echo "  test      - Test a target"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          curl -s http://localhost:9115/-/healthy
+          ;;
+        logs)
+          docker logs blackbox-exporter --tail 100 -f
+          ;;
+        restart)
+          docker restart blackbox-exporter
+          ;;
+        test)
+          if [ -z "$2" ]; then
+            echo "Please specify target URL"
+            exit 1
+          fi
+          curl -s "http://localhost:9115/probe?target=$2&module=http_2xx"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Blackbox Exporter health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/blackbox/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Blackbox Exporter is responding
+      if ! curl -s http://localhost:9115/-/healthy > /dev/null; then
+        echo "Blackbox Exporter is not responding"
+        exit 1
+      fi
+      
+      # Check if we can access metrics
+      if ! curl -s http://localhost:9115/metrics > /dev/null; then
+        echo "Blackbox Exporter metrics endpoint is not responding"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Blackbox Exporter log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/blackbox/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/blackbox/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Blackbox Exporter log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Blackbox Exporter logs"
+    job: "logrotate {{ docker_dir }}/monitoring/blackbox/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}" 

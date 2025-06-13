@@ -1,0 +1,205 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: system
+        __path__: 
+          - /var/log/syslog
+          - /var/log/auth.log
+          - /var/log/kern.log
+          - /var/log/dmesg
+          - /var/log/daemon.log
+
+  # Docker container logs
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: docker
+        __path__: /var/lib/docker/containers/*/*-json.log
+
+  # Journal logs
+  - job_name: journal
+    journal:
+      max_age: 12h
+      path: /var/log/journal
+      labels:
+        job: systemd-journal
+        host: {{ inventory_hostname }}
+        environment: {{ environment | default('production') }}
+        service: systemd
+
+  # Web services logs
+  - job_name: web_services
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: web_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: web
+        __path__:
+          - /var/log/nginx/*.log
+          - /var/log/apache2/*.log
+          - {{ docker_dir }}/traefik/logs/*.log
+          - {{ docker_dir }}/nginx-proxy-manager/logs/*.log
+
+  # Database logs
+  - job_name: databases
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: databases
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: database
+        __path__:
+          - {{ docker_dir }}/postgres/logs/*.log
+          - {{ docker_dir }}/mysql/logs/*.log
+          - {{ docker_dir }}/redis/logs/*.log
+          - {{ docker_dir }}/influxdb/logs/*.log
+
+  # Monitoring stack logs
+  - job_name: monitoring
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: monitoring
+        __path__:
+          - {{ docker_dir }}/monitoring/prometheus/logs/*.log
+          - {{ docker_dir }}/monitoring/grafana/logs/*.log
+          - {{ docker_dir }}/monitoring/loki/logs/*.log
+          - {{ docker_dir }}/monitoring/alertmanager/logs/*.log
+          - {{ docker_dir }}/monitoring/node-exporter/logs/*.log
+          - {{ docker_dir }}/monitoring/cadvisor/logs/*.log
+
+  # Media services logs
+  - job_name: media_services
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: media
+        __path__:
+          - {{ docker_dir }}/sonarr/logs/*.log
+          - {{ docker_dir }}/radarr/logs/*.log
+          - {{ docker_dir }}/lidarr/logs/*.log
+          - {{ docker_dir }}/readarr/logs/*.log
+          - {{ docker_dir }}/bazarr/logs/*.log
+          - {{ docker_dir }}/prowlarr/logs/*.log
+          - {{ docker_dir }}/sabnzbd/logs/*.log
+          - {{ docker_dir }}/qbittorrent/logs/*.log
+          - {{ docker_dir }}/jellyfin/logs/*.log
+          - {{ docker_dir }}/emby/logs/*.log
+          - {{ docker_dir }}/overseerr/logs/*.log
+          - {{ docker_dir }}/tautulli/logs/*.log
+          - {{ docker_dir }}/tdarr/logs/*.log
+
+  # Security services logs
+  - job_name: security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: security
+        __path__:
+          - /var/log/fail2ban.log
+          - /var/log/crowdsec.log
+          - {{ docker_dir }}/authentik/logs/*.log
+          - {{ docker_dir }}/vault/logs/*.log
+          - /var/log/audit/audit.log
+
+  # Network services logs
+  - job_name: network
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: network
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: network
+        __path__:
+          - {{ docker_dir }}/pihole/logs/*.log
+          - /var/log/dnsmasq.log
+          - /var/log/dhcpd.log
+          - /var/log/iptables.log
+
+  # Storage services logs
+  - job_name: storage
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: storage
+        __path__:
+          - /var/log/samba/*.log
+          - /var/log/nfs/*.log
+          - {{ docker_dir }}/backup/logs/*.log
+          - /var/log/rsync.log
+          - {{ docker_dir }}/nextcloud/logs/*.log
+          - {{ docker_dir }}/syncthing/logs/*.log
+
+  # Application logs
+  - job_name: applications
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: applications
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: application
+        __path__: {{ logs_dir }}/applications/*.log
+
+  # Custom application logs
+  - job_name: custom_apps
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: custom_apps
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          service: custom
+        __path__: {{ logs_dir }}/custom/*.log 

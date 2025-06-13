@@ -1,0 +1,105 @@
+---
+# Integration tests for service deployments
+- name: Test service deployments
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    test_timeout: 300
+    test_retries: 3
+    test_delay: 10
+
+  tasks:
+    - name: Verify system prerequisites
+      ansible.builtin.include_tasks: ../tasks/validate.yml
+      vars:
+        service_name: "{{ item }}"
+      loop:
+        - docker
+        - traefik
+        - monitoring_infrastructure
+      tags: [prerequisites]
+
+    - name: Test service health endpoints
+      ansible.builtin.uri:
+        url: "{{ item.url }}"
+        method: GET
+        status_code: [200]
+        timeout: "{{ test_timeout }}"
+      loop: "{{ service_endpoints }}"
+      register: health_checks
+      retries: "{{ test_retries }}"
+      delay: "{{ test_delay }}"
+      until: health_checks is success
+      tags: [health]
+
+    - name: Verify service configurations
+      ansible.builtin.include_tasks: ../../tasks/validate/{{ item }}.yml
+      loop: "{{ enabled_services }}"
+      register: config_checks
+      tags: [config]
+
+    - name: Test service integrations
+      ansible.builtin.include_tasks: ../tasks/test_integrations.yml
+      vars:
+        service_name: "{{ item }}"
+      loop: "{{ enabled_services }}"
+      register: integration_checks
+      tags: [integration]
+
+    - name: Load test critical services
+      ansible.builtin.include_tasks: ../tasks/load_test.yml
+      vars:
+        service_name: "{{ item }}"
+        test_duration: 300
+        concurrent_users: 10
+      loop: "{{ critical_services }}"
+      register: load_tests
+      tags: [load]
+
+    - name: Verify security settings
+      ansible.builtin.include_tasks: ../tasks/security_test.yml
+      vars:
+        service_name: "{{ item }}"
+      loop: "{{ enabled_services }}"
+      register: security_checks
+      tags: [security]
+
+    - name: Test backup and restore
+      ansible.builtin.include_tasks: ../../tasks/backup.yml
+      register: backup_test
+      tags: [backup]
+
+    - name: Test rollback procedures
+      ansible.builtin.include_tasks: ../../tasks/rollback.yml
+      vars:
+        test_mode: true
+      register: rollback_test
+      tags: [rollback]
+
+    - name: Report test results
+      ansible.builtin.debug:
+        msg: |
+          Integration Test Results:
+          - Health Checks: {{ 'Passed' if health_checks is success else 'Failed' }}
+          - Configuration Checks: {{ 'Passed' if config_checks is success else 'Failed' }}
+          - Integration Tests: {{ 'Passed' if integration_checks is success else 'Failed' }}
+          - Load Tests: {{ 'Passed' if load_tests is success else 'Failed' }}
+          - Security Checks: {{ 'Passed' if security_checks is success else 'Failed' }}
+          - Backup Test: {{ 'Passed' if backup_test is success else 'Failed' }}
+          - Rollback Test: {{ 'Passed' if rollback_test is success else 'Failed' }}
+      tags: [report]
+
+    - name: Fail if any test failed
+      ansible.builtin.fail:
+        msg: "Integration tests failed. Check the test results for details."
+      when: >
+        health_checks is failed or
+        config_checks is failed or
+        integration_checks is failed or
+        load_tests is failed or
+        security_checks is failed or
+        backup_test is failed or
+        rollback_test is failed
+      tags: [report] 

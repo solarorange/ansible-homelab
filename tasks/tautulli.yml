@@ -1,0 +1,113 @@
+---
+# Tautulli - Plex Statistics and Monitoring
+# Production-ready configuration for Plex statistics and monitoring
+
+- name: Create Tautulli directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ docker_root }}/tautulli/config"
+    - "{{ docker_root }}/tautulli/logs"
+  tags: [media, tautulli]
+
+- name: Create Tautulli docker-compose configuration
+  ansible.builtin.template:
+    src: templates/tautulli/docker-compose.yml.j2
+    dest: "{{ docker_root }}/tautulli/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Create Tautulli environment file
+  ansible.builtin.template:
+    src: templates/tautulli/.env.j2
+    dest: "{{ docker_root }}/tautulli/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Create Traefik configuration for Tautulli
+  ansible.builtin.template:
+    src: templates/tautulli/traefik.yml.j2
+    dest: "{{ docker_root }}/tautulli/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Start Tautulli container
+  community.docker.docker_compose:
+    project_src: "{{ docker_root }}/tautulli"
+    state: present
+    build: false
+    remove_orphans: true
+    pull: true
+  register: tautulli_result
+  tags: [media, tautulli]
+
+- name: Wait for Tautulli to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: tautulli_status
+  until: tautulli_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [media, tautulli]
+
+- name: Configure Tautulli Plex server
+  ansible.builtin.uri:
+    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_plex_server"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_plex_servers }}"
+  when: tautulli_plex_servers is defined
+  tags: [media, tautulli]
+
+- name: Configure Tautulli notifications
+  ansible.builtin.uri:
+    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_notifications }}"
+  when: tautulli_notifications is defined
+  tags: [media, tautulli]
+
+- name: Configure Tautulli backup
+  ansible.builtin.uri:
+    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_backups }}"
+  when: tautulli_backups is defined
+  tags: [media, tautulli]
+
+- name: Verify Tautulli configuration
+  ansible.builtin.uri:
+    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    method: GET
+    status_code: 200
+    register: tautulli_verify
+  tags: [media, tautulli]
+
+- name: Display Tautulli deployment status
+  ansible.builtin.debug:
+    msg: |
+      Tautulli deployment completed successfully
+      URL: https://tautulli.{{ domain }}
+      Status: {{ tautulli_verify.json.response.data }}
+  tags: [media, tautulli] 

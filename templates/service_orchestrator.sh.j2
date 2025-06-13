@@ -1,0 +1,172 @@
+#!/bin/bash
+
+# Service Orchestrator Script
+# This script handles service startup order and dependencies
+
+LOG_FILE="/var/log/service_orchestration/orchestrator.log"
+DEPENDENCIES_FILE="/etc/ansible/service_management/orchestration/dependencies.json"
+STARTUP_ORDER_FILE="/etc/ansible/service_management/orchestration/startup_order.json"
+MAX_RETRIES=3
+RETRY_DELAY=10
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+get_service_dependencies() {
+    local service=$1
+    jq -r ".$service.depends_on[]" "$DEPENDENCIES_FILE" 2>/dev/null
+}
+
+get_service_startup_order() {
+    jq -r '.[]' "$STARTUP_ORDER_FILE" 2>/dev/null
+}
+
+start_docker_service() {
+    local service=$1
+    local retry_count=0
+    
+    while [ $retry_count -lt $MAX_RETRIES ]; do
+        log "Starting Docker service: $service (Attempt $((retry_count + 1))/$MAX_RETRIES)"
+        
+        cd /etc/ansible/service_management/docker-compose
+        if docker-compose up -d "$service"; then
+            # Wait for service to be healthy
+            local health_check_attempts=0
+            while [ $health_check_attempts -lt 30 ]; do
+                if /usr/local/bin/service_health_check.sh "$service"; then
+                    log "Docker service $service started successfully"
+                    return 0
+                fi
+                sleep 2
+                health_check_attempts=$((health_check_attempts + 1))
+            done
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $MAX_RETRIES ]; then
+            log "Waiting before retry..."
+            sleep $RETRY_DELAY
+        fi
+    done
+    
+    log "ERROR: Failed to start Docker service: $service after $MAX_RETRIES attempts"
+    return 1
+}
+
+start_systemd_service() {
+    local service=$1
+    local retry_count=0
+    
+    while [ $retry_count -lt $MAX_RETRIES ]; do
+        log "Starting systemd service: $service (Attempt $((retry_count + 1))/$MAX_RETRIES)"
+        
+        if systemctl start "$service"; then
+            # Wait for service to be active
+            local health_check_attempts=0
+            while [ $health_check_attempts -lt 30 ]; do
+                if systemctl is-active --quiet "$service"; then
+                    log "Systemd service $service started successfully"
+                    return 0
+                fi
+                sleep 2
+                health_check_attempts=$((health_check_attempts + 1))
+            done
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $MAX_RETRIES ]; then
+            log "Waiting before retry..."
+            sleep $RETRY_DELAY
+        fi
+    done
+    
+    log "ERROR: Failed to start systemd service: $service after $MAX_RETRIES attempts"
+    return 1
+}
+
+start_service() {
+    local service=$1
+    local service_type=$(jq -r ".$service.type" "$DEPENDENCIES_FILE" 2>/dev/null)
+    
+    # Check if service is already running
+    if [ "$service_type" = "docker" ]; then
+        if docker ps -qf "name=$service" | grep -q .; then
+            log "Docker service $service is already running"
+            return 0
+        fi
+    else
+        if systemctl is-active --quiet "$service"; then
+            log "Systemd service $service is already running"
+            return 0
+        fi
+    fi
+    
+    # Start dependencies first
+    local dependencies=$(get_service_dependencies "$service")
+    for dep in $dependencies; do
+        if [ ! -z "$dep" ]; then
+            log "Starting dependency: $dep for service: $service"
+            start_service "$dep"
+            if [ $? -ne 0 ]; then
+                log "ERROR: Failed to start dependency: $dep for service: $service"
+                return 1
+            fi
+        fi
+    done
+    
+    # Start the service
+    case $service_type in
+        "docker")
+            start_docker_service "$service"
+            ;;
+        "systemd")
+            start_systemd_service "$service"
+            ;;
+        *)
+            log "ERROR: Unknown service type: $service_type for service: $service"
+            return 1
+            ;;
+    esac
+}
+
+main() {
+    # Create log file if it doesn't exist
+    touch "$LOG_FILE"
+    
+    if [ ! -f "$DEPENDENCIES_FILE" ] || [ ! -f "$STARTUP_ORDER_FILE" ]; then
+        log "ERROR: Required configuration files not found"
+        exit 1
+    fi
+    
+    # Get startup order
+    local startup_order=$(get_service_startup_order)
+    if [ -z "$startup_order" ]; then
+        log "ERROR: Failed to get service startup order"
+        exit 1
+    fi
+    
+    local failed_services=()
+    
+    # Start services in order
+    for service in $startup_order; do
+        start_service "$service"
+        if [ $? -ne 0 ]; then
+            failed_services+=("$service")
+        fi
+    done
+    
+    if [ ${#failed_services[@]} -gt 0 ]; then
+        log "ERROR: Failed to start the following services: ${failed_services[*]}"
+        # Notify administrator
+        if [ -f /usr/local/bin/notify_admin.sh ]; then
+            /usr/local/bin/notify_admin.sh "Service Startup Failed" "Failed to start: ${failed_services[*]}"
+        fi
+        exit 1
+    fi
+    
+    log "INFO: All services started successfully"
+    exit 0
+}
+
+main 

@@ -1,0 +1,55 @@
+---
+# Backup procedures for critical operations
+- name: Create backup directory structure
+  ansible.builtin.file:
+    path: "{{ backup_dir }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - configs
+    - data
+    - state
+  when: backup_dir is defined
+
+- name: Backup configuration files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ backup_dir }}/configs/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop: "{{ config_files | default([]) }}"
+  when: config_files is defined
+
+- name: Backup service data
+  ansible.builtin.archive:
+    path: "{{ item }}"
+    dest: "{{ backup_dir }}/data/{{ ansible_date_time.date }}/{{ item | basename }}.tar.gz"
+    format: gz
+  loop: "{{ data_dirs | default([]) }}"
+  when: data_dirs is defined
+
+- name: Backup service state
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ backup_dir }}/state/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop: "{{ state_files | default([]) }}"
+  when: state_files is defined
+
+- name: Create backup manifest
+  ansible.builtin.copy:
+    content: |
+      Backup created: {{ ansible_date_time.iso8601 }}
+      Host: {{ inventory_hostname }}
+      Task: {{ ansible_failed_task.name }}
+      Configurations: {{ config_files | default([]) | length }}
+      Data directories: {{ data_dirs | default([]) | length }}
+      State files: {{ state_files | default([]) | length }}
+    dest: "{{ backup_dir }}/{{ ansible_date_time.date }}/manifest.txt"
+    mode: '0644'
+
+- name: Cleanup old backups
+  ansible.builtin.file:
+    path: "{{ backup_dir }}/{{ item }}"
+    state: absent
+  loop: "{{ backup_dir | listdir | sort | slice(0, -5) }}"
+  when: backup_dir is defined 

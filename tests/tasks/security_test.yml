@@ -1,0 +1,117 @@
+---
+# Security testing tasks for services
+- name: Install security testing tools
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - nmap
+    - nikto
+    - sslscan
+    - lynis
+  when: ansible_os_family == "Debian"
+
+- name: Check service ports
+  ansible.builtin.shell: |
+    nmap -sS -sV -p- {{ inventory_hostname }} | grep -E "^(PORT|{{ service_ports | join('|') }})"
+  register: port_scan
+  changed_when: false
+
+- name: Verify SSL/TLS configuration
+  ansible.builtin.shell: |
+    sslscan --no-colour {{ service_url }} | grep -E "^(SSL|TLS|Certificate)"
+  register: ssl_scan
+  changed_when: false
+  when: service_url is defined
+
+- name: Check security headers
+  ansible.builtin.uri:
+    url: "{{ service_url }}"
+    method: GET
+    return_content: yes
+    headers:
+      User-Agent: "Mozilla/5.0"
+  register: header_check
+  when: service_url is defined
+
+- name: Verify authentication
+  ansible.builtin.include_tasks: ../../tasks/validate/{{ service_name }}.yml
+  vars:
+    auth_test: true
+  register: auth_check
+  when: "'auth' in service_features | default([])"
+
+- name: Check file permissions
+  ansible.builtin.find:
+    paths: "{{ service_path | default('/opt/' + service_name) }}"
+    patterns: "*"
+    file_type: file
+  register: file_permissions
+
+- name: Verify network policies
+  ansible.builtin.shell: |
+    iptables -L | grep -E "{{ service_name }}|{{ service_ports | join('|') }}"
+  register: firewall_check
+  changed_when: false
+
+- name: Run security scan
+  ansible.builtin.shell: |
+    nikto -h {{ service_url }} -o /tmp/{{ service_name }}_nikto_scan.txt
+  register: nikto_scan
+  changed_when: false
+  when: service_url is defined
+
+- name: Check for vulnerabilities
+  ansible.builtin.shell: |
+    lynis audit system --quick
+  register: lynis_scan
+  changed_when: false
+
+- name: Generate security report
+  ansible.builtin.template:
+    src: templates/security_report.j2
+    dest: "/var/log/ansible/{{ service_name }}_security_{{ ansible_date_time.iso8601_basic_short }}.html"
+  vars:
+    security_results:
+      service: "{{ service_name }}"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      port_scan: "{{ port_scan.stdout_lines }}"
+      ssl_scan: "{{ ssl_scan.stdout_lines }}"
+      security_headers: "{{ header_check.headers }}"
+      auth_check: "{{ auth_check }}"
+      file_permissions: "{{ file_permissions.files }}"
+      firewall_rules: "{{ firewall_check.stdout_lines }}"
+      nikto_scan: "{{ nikto_scan.stdout_lines }}"
+      lynis_scan: "{{ lynis_scan.stdout_lines }}"
+
+- name: Send security notification
+  ansible.builtin.uri:
+    url: "{{ notification_webhook_url }}"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "status": "{{ 'warning' if (nikto_scan.stdout | regex_search('OSVDB-') or lynis_scan.stdout | regex_search('Warning')) else 'success' }}",
+        "message": "Security scan completed for {{ service_name }}",
+        "findings": {
+          "vulnerabilities": "{{ (nikto_scan.stdout | regex_search('OSVDB-') | list | length) + (lynis_scan.stdout | regex_search('Warning') | list | length) }}",
+          "security_headers": "{{ header_check.headers | dict2items | selectattr('key', 'match', '^X-') | list | length }}",
+          "open_ports": "{{ port_scan.stdout | regex_search('open') | list | length }}"
+        },
+        "host": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  when: notification_webhook_url is defined
+
+- name: Fail if critical vulnerabilities found
+  ansible.builtin.fail:
+    msg: |
+      Critical security issues found for {{ service_name }}:
+      - Vulnerabilities: {{ (nikto_scan.stdout | regex_search('OSVDB-') | list | length) + (lynis_scan.stdout | regex_search('Warning') | list | length) }}
+      - Missing Security Headers: {{ 5 - (header_check.headers | dict2items | selectattr('key', 'match', '^X-') | list | length) }}
+      - Unnecessary Open Ports: {{ port_scan.stdout | regex_search('open') | list | length - (service_ports | length) }}
+  when: >
+    (nikto_scan.stdout | regex_search('OSVDB-') | list | length) + 
+    (lynis_scan.stdout | regex_search('Warning') | list | length) > 0 or
+    (5 - (header_check.headers | dict2items | selectattr('key', 'match', '^X-') | list | length)) > 0 or
+    (port_scan.stdout | regex_search('open') | list | length - (service_ports | length)) > 0 

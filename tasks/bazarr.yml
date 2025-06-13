@@ -1,0 +1,146 @@
+---
+# Bazarr - Subtitle Management
+# Production-ready configuration for subtitle management
+
+- name: Create Bazarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ docker_root }}/bazarr/config"
+    - "{{ docker_root }}/bazarr/data"
+    - "{{ docker_root }}/bazarr/scripts"
+  tags: [media, bazarr]
+
+- name: Create Bazarr docker-compose configuration
+  ansible.builtin.template:
+    src: templates/bazarr/docker-compose.yml.j2
+    dest: "{{ docker_root }}/bazarr/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, bazarr]
+
+- name: Create Bazarr environment file
+  ansible.builtin.template:
+    src: templates/bazarr/.env.j2
+    dest: "{{ docker_root }}/bazarr/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, bazarr]
+
+- name: Create Traefik configuration for Bazarr
+  ansible.builtin.template:
+    src: templates/bazarr/traefik.yml.j2
+    dest: "{{ docker_root }}/bazarr/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, bazarr]
+
+- name: Start Bazarr container
+  community.docker.docker_compose:
+    project_src: "{{ docker_root }}/bazarr"
+    state: present
+    build: false
+    remove_orphans: true
+    pull: true
+  register: bazarr_result
+  tags: [media, bazarr]
+
+- name: Wait for Bazarr to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: bazarr_status
+  until: bazarr_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [media, bazarr]
+
+- name: Configure Bazarr Sonarr
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/sonarr"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ bazarr_api_key }}"
+  loop: "{{ bazarr_sonarr_servers }}"
+  when: bazarr_sonarr_servers is defined
+  tags: [media, bazarr]
+
+- name: Configure Bazarr Radarr
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/radarr"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ bazarr_api_key }}"
+  loop: "{{ bazarr_radarr_servers }}"
+  when: bazarr_radarr_servers is defined
+  tags: [media, bazarr]
+
+- name: Configure Bazarr subtitle providers
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/providers"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ bazarr_api_key }}"
+  loop: "{{ bazarr_providers }}"
+  when: bazarr_providers is defined
+  tags: [media, bazarr]
+
+- name: Configure Bazarr languages
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/languages"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ bazarr_api_key }}"
+  loop: "{{ bazarr_languages }}"
+  when: bazarr_languages is defined
+  tags: [media, bazarr]
+
+- name: Configure Bazarr notifications
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/notifications"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ bazarr_api_key }}"
+  loop: "{{ bazarr_notifications }}"
+  when: bazarr_notifications is defined
+  tags: [media, bazarr]
+
+- name: Verify Bazarr configuration
+  ansible.builtin.uri:
+    url: "http://localhost:6767/api/health"
+    method: GET
+    status_code: 200
+    register: bazarr_verify
+  tags: [media, bazarr]
+
+- name: Display Bazarr deployment status
+  ansible.builtin.debug:
+    msg: |
+      Bazarr deployment completed successfully
+      URL: https://bazarr.{{ domain }}
+      Status: {{ bazarr_verify.json.status }}
+  tags: [media, bazarr] 

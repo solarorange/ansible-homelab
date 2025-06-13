@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Logging infrastructure health check script
+# Checks the health of Loki, Promtail, and log collection
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Function to check service health
+check_service() {
+    local service=$1
+    local url=$2
+    local timeout=$3
+
+    if curl -s --max-time $timeout $url > /dev/null; then
+        echo -e "${GREEN}✓${NC} $service is healthy"
+        return 0
+    else
+        echo -e "${RED}✗${NC} $service is not responding"
+        return 1
+    fi
+}
+
+# Function to check log collection
+check_log_collection() {
+    local service=$1
+    local log_path=$2
+
+    if [ -f "$log_path" ] && [ -s "$log_path" ]; then
+        echo -e "${GREEN}✓${NC} $service logs are being collected"
+        return 0
+    else
+        echo -e "${RED}✗${NC} $service logs are not being collected"
+        return 1
+    fi
+}
+
+# Function to check log shipping
+check_log_shipping() {
+    local service=$1
+    local query="count_over_time({job=\"$service\"}[5m])"
+    
+    if curl -s "http://loki:3100/loki/api/v1/query?query=$query" | grep -q "result"; then
+        echo -e "${GREEN}✓${NC} $service logs are being shipped to Loki"
+        return 0
+    else
+        echo -e "${RED}✗${NC} $service logs are not being shipped to Loki"
+        return 1
+    fi
+}
+
+# Main health check
+echo "Starting logging infrastructure health check..."
+echo "----------------------------------------"
+
+# Check Loki
+check_service "Loki" "http://loki:3100/ready" 5
+loki_status=$?
+
+# Check Promtail
+check_service "Promtail" "http://localhost:9080/ready" 5
+promtail_status=$?
+
+# Check log collection for key services
+echo -e "\nChecking log collection:"
+check_log_collection "System" "/var/log/syslog"
+check_log_collection "Docker" "/var/lib/docker/containers/*/*-json.log"
+check_log_collection "Nginx" "/var/log/nginx/access.log"
+check_log_collection "Prometheus" "{{ docker_dir }}/monitoring/prometheus/logs/prometheus.log"
+
+# Check log shipping for key services
+echo -e "\nChecking log shipping to Loki:"
+check_log_shipping "system"
+check_log_shipping "docker"
+check_log_shipping "web_services"
+check_log_shipping "monitoring"
+
+# Check disk space
+echo -e "\nChecking disk space:"
+df -h {{ docker_dir }}/monitoring/loki | grep -v "Filesystem"
+
+# Check log rotation
+echo -e "\nChecking log rotation:"
+logrotate -d /etc/logrotate.d/homelab-logs
+
+# Final status
+echo -e "\n----------------------------------------"
+if [ $loki_status -eq 0 ] && [ $promtail_status -eq 0 ]; then
+    echo -e "${GREEN}Logging infrastructure is healthy${NC}"
+    exit 0
+else
+    echo -e "${RED}Logging infrastructure has issues${NC}"
+    exit 1
+fi 

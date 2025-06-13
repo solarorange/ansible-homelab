@@ -1,0 +1,44 @@
+---
+# Database Backup Tasks
+
+- name: Backup PostgreSQL databases
+  ansible.builtin.shell: |
+    pg_dump -U {{ item.user }} -h {{ item.host | default('localhost') }} -p {{ item.port | default('5432') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
+  loop: "{{ postgres_databases | default([]) }}"
+  environment:
+    PGPASSWORD: "{{ item.password }}"
+  tags: [backup, databases, postgres]
+
+- name: Backup MySQL/MariaDB databases
+  ansible.builtin.shell: |
+    mysqldump -u {{ item.user }} -p{{ item.password }} -h {{ item.host | default('localhost') }} -P {{ item.port | default('3306') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
+  loop: "{{ mysql_databases | default([]) }}"
+  tags: [backup, databases, mysql]
+
+- name: Backup MongoDB databases
+  ansible.builtin.shell: |
+    mongodump --uri="mongodb://{{ item.user }}:{{ item.password }}@{{ item.host | default('localhost') }}:{{ item.port | default('27017') }}/{{ item.name }}" --gzip --archive={{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.archive
+  loop: "{{ mongodb_databases | default([]) }}"
+  tags: [backup, databases, mongodb]
+
+- name: Backup Redis databases
+  ansible.builtin.shell: |
+    redis-cli -h {{ item.host | default('localhost') }} -p {{ item.port | default('6379') }} -a {{ item.password }} SAVE && cp {{ item.rdb_path | default('/var/lib/redis/dump.rdb') }} {{ backup_root_dir | default('/var/backups') }}/databases/redis-{{ ansible_date_time.iso8601_basic_short }}.rdb
+  loop: "{{ redis_instances | default([]) }}"
+  tags: [backup, databases, redis]
+
+- name: Verify database backups
+  ansible.builtin.shell: |
+    if [ -f "{{ item }}" ]; then
+      if [[ "{{ item }}" == *.gz ]]; then
+        gunzip -t "{{ item }}" && echo "{{ item }} is valid" || exit 1
+      elif [[ "{{ item }}" == *.archive ]]; then
+        mongorestore --dryRun --gzip --archive="{{ item }}" && echo "{{ item }} is valid" || exit 1
+      elif [[ "{{ item }}" == *.rdb ]]; then
+        redis-check-rdb "{{ item }}" && echo "{{ item }} is valid" || exit 1
+      fi
+    fi
+  loop: "{{ backup_root_dir | default('/var/backups') }}/databases/*"
+  register: backup_verification
+  changed_when: false
+  tags: [backup, databases, verification] 

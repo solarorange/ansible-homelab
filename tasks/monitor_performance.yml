@@ -1,0 +1,77 @@
+---
+# Performance monitoring tasks
+- name: Collect system metrics
+  ansible.builtin.shell: |
+    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}')%"
+    echo "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2 }')"
+    echo "Disk Usage: $(df -h / | awk 'NR==2{print $5}')"
+    echo "Load Average: $(cat /proc/loadavg | awk '{print $1, $2, $3}')"
+  register: system_metrics
+  changed_when: false
+
+- name: Check service resource usage
+  ansible.builtin.shell: |
+    for service in {{ enabled_services | join(' ') }}; do
+      if systemctl is-active --quiet $service; then
+        echo "$service: $(systemctl show $service -p CPUUsageNS,MemoryCurrent | tr '\n' ' ')"
+      fi
+    done
+  register: service_metrics
+  changed_when: false
+
+- name: Monitor network performance
+  ansible.builtin.shell: |
+    echo "Network Interfaces:"
+    ip -o link show | awk '{print $2}'
+    echo "Active Connections:"
+    netstat -tuln | grep LISTEN
+  register: network_metrics
+  changed_when: false
+
+- name: Check Docker container resources
+  ansible.builtin.shell: |
+    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"
+  register: docker_metrics
+  changed_when: false
+  when: "'docker' in enabled_services"
+
+- name: Report performance metrics
+  ansible.builtin.debug:
+    msg: |
+      Performance Metrics:
+      {{ system_metrics.stdout_lines | join('\n') }}
+      
+      Service Resource Usage:
+      {{ service_metrics.stdout_lines | join('\n') }}
+      
+      Network Status:
+      {{ network_metrics.stdout_lines | join('\n') }}
+      
+      {% if 'docker' in enabled_services %}
+      Docker Container Resources:
+      {{ docker_metrics.stdout_lines | join('\n') }}
+      {% endif %}
+
+- name: Alert on high resource usage
+  ansible.builtin.uri:
+    url: "{{ notification_webhook_url }}"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "status": "warning",
+        "message": "High resource usage detected",
+        "metrics": {
+          "cpu": "{{ system_metrics.stdout_lines[0] }}",
+          "memory": "{{ system_metrics.stdout_lines[1] }}",
+          "disk": "{{ system_metrics.stdout_lines[2] }}",
+          "load": "{{ system_metrics.stdout_lines[3] }}"
+        },
+        "host": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  when: 
+    - notification_webhook_url is defined
+    - system_metrics.stdout_lines[0] | regex_search('CPU Usage: ([0-9]+)%') | int > 80 or
+      system_metrics.stdout_lines[1] | regex_search('Memory Usage: ([0-9.]+)%') | float > 80 or
+      system_metrics.stdout_lines[2] | regex_search('Disk Usage: ([0-9]+)%') | int > 80 

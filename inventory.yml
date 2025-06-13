@@ -1,0 +1,109 @@
+# Enhanced Homelab Inventory
+# Configure your Proxmox VM details here
+
+[homelab_core]
+# Primary homelab server (main services)
+homelab-core ansible_host=192.168.1.100 ansible_user=homelab
+
+[homelab_monitoring]
+# Dedicated monitoring server
+homelab-mon ansible_host=192.168.1.101 ansible_user=homelab
+
+[homelab_automation]
+# Dedicated automation server
+homelab-auto ansible_host=192.168.1.102 ansible_user=homelab
+
+[homelab_security]
+# Dedicated security server
+homelab-sec ansible_host=192.168.1.103 ansible_user=homelab
+
+# Group all homelab servers
+[homelab:children]
+homelab_core
+homelab_monitoring
+homelab_automation
+homelab_security
+
+# Common variables for all homelab servers
+[homelab:vars]
+# SSH Configuration
+ansible_ssh_private_key_file=~/.ssh/homelab_key
+ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
+ansible_python_interpreter=/usr/bin/python3
+
+# Connection settings
+ansible_connection=ssh
+ansible_ssh_pipelining=true
+ansible_ssh_retries=3
+
+# Privilege escalation
+ansible_become=true
+ansible_become_method=sudo
+ansible_become_user=root
+
+# Performance tuning
+ansible_gather_timeout=30
+ansible_timeout=300
+
+# Network segmentation
+network_segments:
+  - name: homelab
+    subnet: 172.20.0.0/16
+    gateway: 172.20.0.1
+  - name: monitoring
+    subnet: 172.21.0.0/16
+    gateway: 172.21.0.1
+  - name: media
+    subnet: 172.22.0.0/16
+    gateway: 172.22.0.1
+  - name: security
+    subnet: 172.23.0.0/16
+    gateway: 172.23.0.1
+
+# Resource limits
+resource_limits:
+  cpu_shares: 1024
+  memory_limit: 2G
+  memory_swap: 4G
+  memory_reservation: 1G
+  cpus: 2
+
+# Service configuration
+enabled_services:
+  - traefik
+  - authentik
+  - portainer
+  - monitoring_stack
+  - media_stack
+  - security_stack
+  - automation_stack
+
+# Feature toggles
+monitoring_enabled: true
+media_enabled: true
+security_enhanced: true
+automation_enabled: true
+
+# Example configurations for different deployment scenarios:
+
+# Single VM deployment (recommended for most homelabs)
+# [homelab_all]
+# homelab ansible_host=192.168.1.100 ansible_user=homelab
+
+# Multi-VM deployment (for larger setups)
+# [homelab_core]
+# core ansible_host=192.168.1.100 ansible_user=homelab
+# 
+# [homelab_monitoring] 
+# monitoring ansible_host=192.168.1.101 ansible_user=homelab
+#
+# [homelab_automation]
+# automation ansible_host=192.168.1.102 ansible_user=homelab
+
+# Cloud deployment (VPS/dedicated servers)
+# [homelab_cloud]
+# homelab ansible_host=your.domain.com ansible_user=ubuntu ansible_port=22
+
+# Development/testing environment
+# [homelab_dev]
+# dev ansible_host=127.0.0.1 ansible_user=vagrant ansible_port=2222

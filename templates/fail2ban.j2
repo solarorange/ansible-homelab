@@ -1,0 +1,49 @@
+[DEFAULT]
+# Ban hosts for 1 hour
+bantime = 3600
+# Retry window of 10 minutes
+findtime = 600
+# Allow 3 retries
+maxretry = 3
+# Ban on all interfaces
+banaction = ufw
+# Log level
+loglevel = INFO
+# Log target
+logtarget = /var/log/fail2ban.log
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+findtime = 300
+bantime = 3600
+
+[sshd-ddos]
+enabled = true
+port = ssh
+filter = sshd-ddos
+logpath = /var/log/auth.log
+maxretry = 2
+findtime = 300
+bantime = 7200
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+port = http,https
+logpath = /var/log/nginx/error.log
+maxretry = 3
+findtime = 300
+bantime = 3600
+
+[traefik-auth]
+enabled = true
+filter = traefik-auth
+port = http,https
+logpath = /var/log/traefik/access.log
+maxretry = 3
+findtime = 300
+bantime = 3600 

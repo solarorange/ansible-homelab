@@ -1,0 +1,52 @@
+---
+# Pre-tasks to ensure prerequisites are met
+
+- name: Check if running as root
+  assert:
+    that: ansible_user_id == 'root'
+    fail_msg: "This playbook must be run as root"
+
+- name: Check required Python packages
+  pip:
+    name:
+      - cryptography
+      - passlib
+    state: present
+  become: true
+
+- name: Check required system packages
+  apt:
+    name:
+      - python3-pip
+      - python3-cryptography
+      - openssh-server
+      - ufw
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Ensure required directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/ssh/sshd_config.d
+    - /etc/fail2ban
+    - /etc/audit/rules.d
+    - /etc/sysctl.d
+  become: true
+
+- name: Backup existing configurations
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}.bak"
+    remote_src: yes
+    mode: preserve
+  loop:
+    - { src: '/etc/ssh/sshd_config', dest: '/etc/ssh/sshd_config' }
+    - { src: '/etc/fail2ban/jail.local', dest: '/etc/fail2ban/jail.local' }
+    - { src: '/etc/sysctl.conf', dest: '/etc/sysctl.conf' }
+  when: item.src is file
+  become: true
+  ignore_errors: yes 

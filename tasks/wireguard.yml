@@ -1,0 +1,278 @@
+---
+# Wireguard Configuration
+# Production-ready VPN solution
+# Adjust DNS to local DNS server
+
+- name: Create Wireguard directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/wireguard/config"
+    - "{{ docker_dir }}/wireguard/scripts"
+    - "{{ docker_dir }}/wireguard/clients"
+    - "{{ logs_dir }}/wireguard"
+
+- name: Create Wireguard server configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/config/wg0.conf"
+    content: |
+      [Interface]
+      Address = 10.0.0.1/24
+      ListenPort = 51820
+      PrivateKey = {{ wireguard_server_private_key }}
+      PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+      PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+      
+      # DNS
+      DNS = 1.1.1.1, 8.8.8.8
+      
+      # MTU
+      MTU = 1420
+      
+      # Keepalive
+      PersistentKeepalive = 25
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Wireguard client configuration template
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/config/client.conf.template"
+    content: |
+      [Interface]
+      PrivateKey = {{ client_private_key }}
+      Address = 10.0.0.{{ client_ip }}/24
+      DNS = 1.1.1.1, 8.8.8.8
+      MTU = 1420
+      
+      [Peer]
+      PublicKey = {{ wireguard_server_public_key }}
+      AllowedIPs = 0.0.0.0/0
+      Endpoint = {{ domain }}:51820
+      PersistentKeepalive = 25
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Wireguard client management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/scripts/manage_clients.sh"
+    content: |
+      #!/bin/bash
+      
+      # Wireguard Client Management Script
+      
+      CLIENT_DIR="{{ docker_dir }}/wireguard/clients"
+      CONFIG_DIR="{{ docker_dir }}/wireguard/config"
+      
+      function show_help {
+        echo "Wireguard Client Management Script"
+        echo "Usage: $0 [command] [client_name]"
+        echo ""
+        echo "Commands:"
+        echo "  add      - Add a new client"
+        echo "  remove   - Remove a client"
+        echo "  list     - List all clients"
+        echo "  config   - Show client configuration"
+        echo "  qr       - Generate QR code for client"
+        echo "  help     - Show this help"
+      }
+      
+      function generate_keys {
+        local client_name=$1
+        local client_dir="$CLIENT_DIR/$client_name"
+        
+        # Create client directory
+        mkdir -p "$client_dir"
+        
+        # Generate private key
+        wg genkey | tee "$client_dir/private.key" | wg pubkey > "$client_dir/public.key"
+        
+        # Get the next available IP
+        local last_ip=$(ls -1 "$CLIENT_DIR" 2>/dev/null | grep -o '[0-9]*$' | sort -n | tail -1)
+        local next_ip=$((last_ip + 1))
+        if [ -z "$next_ip" ]; then
+          next_ip=2
+        fi
+        
+        # Create client configuration
+        sed -e "s/{{ client_private_key }}/$(cat "$client_dir/private.key")/" \
+            -e "s/{{ client_ip }}/$next_ip/" \
+            -e "s/{{ wireguard_server_public_key }}/$(cat "$CONFIG_DIR/server.public.key")/" \
+            -e "s/{{ domain }}/{{ domain }}/" \
+            "$CONFIG_DIR/client.conf.template" > "$client_dir/wg0.conf"
+        
+        # Add client to server configuration
+        echo -e "\n# Client: $client_name" >> "$CONFIG_DIR/wg0.conf"
+        echo "[Peer]" >> "$CONFIG_DIR/wg0.conf"
+        echo "PublicKey = $(cat "$client_dir/public.key")" >> "$CONFIG_DIR/wg0.conf"
+        echo "AllowedIPs = 10.0.0.$next_ip/32" >> "$CONFIG_DIR/wg0.conf"
+        
+        # Restart Wireguard
+        docker restart wireguard
+        
+        echo "Client $client_name added with IP 10.0.0.$next_ip"
+      }
+      
+      function remove_client {
+        local client_name=$1
+        local client_dir="$CLIENT_DIR/$client_name"
+        
+        if [ ! -d "$client_dir" ]; then
+          echo "Client $client_name not found"
+          exit 1
+        fi
+        
+        # Remove client from server configuration
+        sed -i "/# Client: $client_name/,/^$/d" "$CONFIG_DIR/wg0.conf"
+        
+        # Remove client directory
+        rm -rf "$client_dir"
+        
+        # Restart Wireguard
+        docker restart wireguard
+        
+        echo "Client $client_name removed"
+      }
+      
+      case "$1" in
+        add)
+          if [ -z "$2" ]; then
+            echo "Please specify client name"
+            exit 1
+          fi
+          generate_keys "$2"
+          ;;
+        remove)
+          if [ -z "$2" ]; then
+            echo "Please specify client name"
+            exit 1
+          fi
+          remove_client "$2"
+          ;;
+        list)
+          echo "Clients:"
+          ls -1 "$CLIENT_DIR" 2>/dev/null
+          ;;
+        config)
+          if [ -z "$2" ]; then
+            echo "Please specify client name"
+            exit 1
+          fi
+          if [ ! -f "$CLIENT_DIR/$2/wg0.conf" ]; then
+            echo "Client $2 not found"
+            exit 1
+          fi
+          cat "$CLIENT_DIR/$2/wg0.conf"
+          ;;
+        qr)
+          if [ -z "$2" ]; then
+            echo "Please specify client name"
+            exit 1
+          fi
+          if [ ! -f "$CLIENT_DIR/$2/wg0.conf" ]; then
+            echo "Client $2 not found"
+            exit 1
+          fi
+          qrencode -t ansiutf8 < "$CLIENT_DIR/$2/wg0.conf"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Wireguard management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Wireguard Management Script
+      
+      function show_help {
+        echo "Wireguard Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Wireguard status"
+        echo "  logs      - Show Wireguard logs"
+        echo "  restart   - Restart Wireguard"
+        echo "  clients   - Manage clients"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          docker exec wireguard wg show
+          ;;
+        logs)
+          docker logs wireguard --tail 100 -f
+          ;;
+        restart)
+          docker restart wireguard
+          ;;
+        clients)
+          {{ docker_dir }}/wireguard/scripts/manage_clients.sh "${@:2}"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Wireguard health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Wireguard is running
+      if ! docker exec wireguard wg show > /dev/null; then
+        echo "Wireguard is not running"
+        exit 1
+      fi
+      
+      # Check if the interface is up
+      if ! docker exec wireguard ip link show wg0 > /dev/null; then
+        echo "Wireguard interface is not up"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Wireguard log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/wireguard/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/wireguard/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Wireguard log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Wireguard logs"
+    job: "logrotate {{ docker_dir }}/wireguard/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}" 

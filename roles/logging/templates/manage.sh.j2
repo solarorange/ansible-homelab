@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# Logging infrastructure management script
+# Provides commands for managing Loki, Promtail, and log collection
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Function to show help
+show_help() {
+    echo "Logging Infrastructure Management Script"
+    echo "Usage: $0 [command]"
+    echo ""
+    echo "Commands:"
+    echo "  status    - Show logging infrastructure status"
+    echo "  logs      - Show logs for a specific service"
+    echo "  restart   - Restart logging services"
+    echo "  backup    - Backup logging configuration and data"
+    echo "  restore   - Restore logging configuration and data"
+    echo "  clean     - Clean old logs"
+    echo "  query     - Query logs in Loki"
+    echo "  help      - Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 status"
+    echo "  $0 logs promtail"
+    echo "  $0 query '{job=\"system\"}'"
+}
+
+# Function to check service status
+check_status() {
+    echo "Checking logging infrastructure status..."
+    {{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh
+}
+
+# Function to show logs
+show_logs() {
+    local service=$1
+    case $service in
+        loki)
+            docker logs loki --tail 100 -f
+            ;;
+        promtail)
+            docker logs promtail --tail 100 -f
+            ;;
+        *)
+            echo "Available services: loki, promtail"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to restart services
+restart_services() {
+    echo "Restarting logging services..."
+    docker restart loki promtail
+    systemctl restart logrotate
+}
+
+# Function to backup logging data
+backup_logs() {
+    local backup_dir="{{ backup_dir }}/logging"
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    
+    echo "Creating backup of logging infrastructure..."
+    mkdir -p "$backup_dir"
+    
+    # Backup configurations
+    tar -czf "$backup_dir/config_$timestamp.tar.gz" \
+        {{ docker_dir }}/monitoring/loki/config \
+        {{ docker_dir }}/monitoring/promtail/config \
+        /etc/logrotate.d/homelab-logs
+    
+    # Backup data
+    tar -czf "$backup_dir/data_$timestamp.tar.gz" \
+        {{ docker_dir }}/monitoring/loki/data
+    
+    echo "Backup completed: $backup_dir"
+}
+
+# Function to restore logging data
+restore_logs() {
+    local backup_file=$1
+    if [ -z "$backup_file" ]; then
+        echo "Please specify backup file"
+        exit 1
+    fi
+    
+    echo "Restoring logging infrastructure from backup..."
+    tar -xzf "$backup_file" -C /
+    restart_services
+}
+
+# Function to clean old logs
+clean_logs() {
+    echo "Cleaning old logs..."
+    find {{ logs_dir }} -type f -name "*.log.*" -mtime +7 -delete
+    find {{ docker_dir }}/monitoring/loki/data -type f -mtime +30 -delete
+}
+
+# Function to query logs
+query_logs() {
+    local query=$1
+    if [ -z "$query" ]; then
+        echo "Please specify a query"
+        exit 1
+    fi
+    
+    echo "Querying logs in Loki..."
+    curl -s "http://loki:3100/loki/api/v1/query?query=$query" | jq .
+}
+
+# Main script
+case "$1" in
+    status)
+        check_status
+        ;;
+    logs)
+        show_logs "$2"
+        ;;
+    restart)
+        restart_services
+        ;;
+    backup)
+        backup_logs
+        ;;
+    restore)
+        restore_logs "$2"
+        ;;
+    clean)
+        clean_logs
+        ;;
+    query)
+        query_logs "$2"
+        ;;
+    help|*)
+        show_help
+        ;;
+esac 

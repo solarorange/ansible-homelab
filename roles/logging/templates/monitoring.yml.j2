@@ -1,0 +1,102 @@
+groups:
+  - name: logging
+    rules:
+      # Loki availability
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loki is down"
+          description: "Loki has been down for more than 5 minutes."
+
+      # Promtail availability
+      - alert: PromtailDown
+        expr: up{job="promtail"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promtail is down"
+          description: "Promtail has been down for more than 5 minutes."
+
+      # Log ingestion rate
+      - alert: HighLogIngestionRate
+        expr: rate(loki_log_entries_total[5m]) > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High log ingestion rate"
+          description: "Log ingestion rate is above 10k entries per second for 5 minutes."
+
+      # Log ingestion errors
+      - alert: LogIngestionErrors
+        expr: rate(loki_log_entries_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log ingestion errors"
+          description: "Log ingestion errors are occurring."
+
+      # Disk space for logs
+      - alert: LogDiskSpaceLow
+        expr: node_filesystem_avail_bytes{mountpoint="{{ docker_dir }}/monitoring/loki"} / node_filesystem_size_bytes{mountpoint="{{ docker_dir }}/monitoring/loki"} < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space for logs"
+          description: "Less than 10% disk space remaining for logs."
+
+      # Log rotation failures
+      - alert: LogRotationFailed
+        expr: logrotate_status{status="failed"} > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log rotation failed"
+          description: "Log rotation has failed for one or more services."
+
+      # Missing logs
+      - alert: MissingServiceLogs
+        expr: absent(up{job=~"system|docker|web_services|databases|monitoring|media_services|security|network|storage"})
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Missing service logs"
+          description: "No logs received from one or more services for 15 minutes."
+
+      # High log latency
+      - alert: HighLogLatency
+        expr: loki_log_entries_latency_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High log latency"
+          description: "Log processing latency is above 5 seconds."
+
+      # Log parsing errors
+      - alert: LogParsingErrors
+        expr: rate(loki_log_entries_parse_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log parsing errors"
+          description: "Errors occurred while parsing logs."
+
+      # Log shipping delays
+      - alert: LogShippingDelay
+        expr: loki_log_entries_delay_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log shipping delay"
+          description: "Logs are being shipped with a delay of more than 5 minutes." 

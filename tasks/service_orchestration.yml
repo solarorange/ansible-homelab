@@ -1,0 +1,88 @@
+---
+# Service Orchestration Tasks
+
+- name: Create service orchestration directory
+  ansible.builtin.file:
+    path: /etc/ansible/service_management/orchestration
+    state: directory
+    mode: '0755'
+  tags: [service_orchestration]
+
+- name: Create service dependency graph
+  ansible.builtin.template:
+    src: templates/service_dependencies.json.j2
+    dest: /etc/ansible/service_management/orchestration/dependencies.json
+    mode: '0644'
+  tags: [service_orchestration]
+
+- name: Create service startup order file
+  ansible.builtin.template:
+    src: templates/service_startup_order.json.j2
+    dest: /etc/ansible/service_management/orchestration/startup_order.json
+    mode: '0644'
+  tags: [service_orchestration]
+
+- name: Create service orchestration script
+  ansible.builtin.template:
+    src: templates/service_orchestrator.sh.j2
+    dest: /usr/local/bin/service_orchestrator.sh
+    mode: '0755'
+  tags: [service_orchestration]
+
+- name: Create systemd service for orchestration
+  ansible.builtin.template:
+    src: templates/service-orchestrator.service.j2
+    dest: /etc/systemd/system/service-orchestrator.service
+    mode: '0644'
+  tags: [service_orchestration]
+
+- name: Enable and start service orchestrator
+  ansible.builtin.systemd:
+    name: service-orchestrator
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags: [service_orchestration]
+
+- name: Create service orchestration monitoring
+  ansible.builtin.template:
+    src: templates/service_orchestration_monitor.sh.j2
+    dest: /usr/local/bin/service_orchestration_monitor.sh
+    mode: '0755'
+  tags: [service_orchestration]
+
+- name: Create systemd timer for orchestration monitoring
+  ansible.builtin.template:
+    src: templates/service-orchestration-monitor.timer.j2
+    dest: /etc/systemd/system/service-orchestration-monitor.timer
+    mode: '0644'
+  tags: [service_orchestration]
+
+- name: Create systemd service for orchestration monitoring
+  ansible.builtin.template:
+    src: templates/service-orchestration-monitor.service.j2
+    dest: /etc/systemd/system/service-orchestration-monitor.service
+    mode: '0644'
+  tags: [service_orchestration]
+
+- name: Enable and start orchestration monitoring
+  ansible.builtin.systemd:
+    name: service-orchestration-monitor.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags: [service_orchestration]
+
+- name: Create service orchestration logs directory
+  ansible.builtin.file:
+    path: /var/log/service_orchestration
+    state: directory
+    mode: '0755'
+  tags: [service_orchestration]
+
+- name: Setup log rotation for orchestration logs
+  ansible.builtin.template:
+    src: templates/service-orchestration-logs
+    dest: /etc/logrotate.d/service-orchestration-logs
+    mode: '0644'
+  tags: [service_orchestration] 

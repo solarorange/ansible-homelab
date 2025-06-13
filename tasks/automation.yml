@@ -1,0 +1,302 @@
+---
+# Automation tasks to ensure all manual steps are handled by Ansible
+
+- name: Create required directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ ansible_fact_caching_connection | dirname }}"
+    - "{{ ansible_inventory_cache_connection | dirname }}"
+    - "{{ ansible_fact_caching_connection | dirname }}/metrics"
+    - "{{ config_dir }}/scripts"
+    - "{{ backup_dir }}/scripts"
+    - "{{ logs_dir }}/ansible"
+  tags: [always]
+
+- name: Create automation scripts
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Automated system maintenance script
+      
+      # Set variables
+      CONFIG_DIR="{{ config_dir }}"
+      LOG_DIR="{{ logs_dir }}/ansible"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      
+      # Create log directory if it doesn't exist
+      mkdir -p "$LOG_DIR"
+      
+      # Function to log messages
+      log_message() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_DIR/maintenance_$DATE.log"
+      }
+      
+      # Run system optimization
+      log_message "Starting system optimization..."
+      "$CONFIG_DIR/optimize-system.sh" >> "$LOG_DIR/optimization_$DATE.log" 2>&1
+      
+      # Run Docker maintenance
+      log_message "Running Docker maintenance..."
+      docker system prune -f >> "$LOG_DIR/docker_$DATE.log" 2>&1
+      
+      # Run backup verification
+      log_message "Verifying backups..."
+      "$CONFIG_DIR/scripts/backup-monitor.sh" >> "$LOG_DIR/backup_$DATE.log" 2>&1
+      
+      # Run security checks
+      log_message "Running security checks..."
+      "$CONFIG_DIR/scripts/security-monitor.sh" >> "$LOG_DIR/security_$DATE.log" 2>&1
+      
+      # Run monitoring health check
+      log_message "Checking monitoring stack health..."
+      "$CONFIG_DIR/scripts/monitoring-health.sh" >> "$LOG_DIR/monitoring_$DATE.log" 2>&1
+      
+      log_message "Maintenance completed successfully!"
+    dest: "{{ config_dir }}/scripts/automated-maintenance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  tags: [automation]
+
+- name: Create systemd service for automated maintenance
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Automated Homelab Maintenance
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart={{ config_dir }}/scripts/automated-maintenance.sh
+      User={{ username }}
+      Group={{ username }}
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/homelab-maintenance.service
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Create systemd timer for automated maintenance
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Run Homelab Maintenance Daily
+
+      [Timer]
+      OnCalendar=*-*-* 03:00:00
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/homelab-maintenance.timer
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Enable and start maintenance timer
+  ansible.builtin.systemd:
+    name: homelab-maintenance.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [automation]
+
+- name: Create log rotation configuration
+  ansible.builtin.copy:
+    content: |
+      {{ logs_dir }}/ansible/*.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    dest: /etc/logrotate.d/homelab-ansible
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Create performance monitoring script
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Performance monitoring script
+      
+      METRICS_DIR="{{ ansible_fact_caching_connection | dirname }}/metrics"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      
+      # Collect system metrics
+      {
+          echo "=== System Metrics ==="
+          echo "CPU Usage:"
+          top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}'
+          echo "Memory Usage:"
+          free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2 }'
+          echo "Disk Usage:"
+          df -h {{ docker_dir }} {{ data_dir }} {{ backup_dir }} | grep -v "Filesystem"
+          echo "Docker Stats:"
+          docker stats --no-stream
+      } > "$METRICS_DIR/system_$DATE.log"
+      
+      # Archive old metrics
+      find "$METRICS_DIR" -name "system_*.log" -mtime +30 -delete
+    dest: "{{ config_dir }}/scripts/performance-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  tags: [automation]
+
+- name: Create performance monitoring service
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Homelab Performance Monitoring
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart={{ config_dir }}/scripts/performance-monitor.sh
+      User={{ username }}
+      Group={{ username }}
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/homelab-performance.service
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Create performance monitoring timer
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Run Homelab Performance Monitoring Every 5 Minutes
+
+      [Timer]
+      OnCalendar=*:*:0/5
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/homelab-performance.timer
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Enable and start performance monitoring timer
+  ansible.builtin.systemd:
+    name: homelab-performance.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [automation]
+
+- name: Create health check script
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Health check script for all services
+      
+      LOG_DIR="{{ logs_dir }}/ansible"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      
+      # Function to check service health
+      check_service() {
+          local service=$1
+          local status
+          
+          if docker ps | grep -q "$service"; then
+              status="healthy"
+          else
+              status="unhealthy"
+          fi
+          
+          echo "$service: $status"
+      }
+      
+      # Check all enabled services
+      {
+          echo "=== Service Health Check ==="
+          echo "Time: $(date)"
+          echo
+          
+          {% for service in enabled_services %}
+          check_service "{{ service }}"
+          {% endfor %}
+          
+          echo
+          echo "=== System Health ==="
+          echo "CPU Load: $(uptime | awk -F'load average:' '{ print $2 }')"
+          echo "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2 }')"
+          echo "Disk Usage:"
+          df -h {{ docker_dir }} {{ data_dir }} {{ backup_dir }} | grep -v "Filesystem"
+      } > "$LOG_DIR/health_check_$DATE.log"
+      
+      # Archive old health checks
+      find "$LOG_DIR" -name "health_check_*.log" -mtime +7 -delete
+    dest: "{{ config_dir }}/scripts/health-check.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  tags: [automation]
+
+- name: Create health check service
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Homelab Health Check
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart={{ config_dir }}/scripts/health-check.sh
+      User={{ username }}
+      Group={{ username }}
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/homelab-health.service
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Create health check timer
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Run Homelab Health Check Every 15 Minutes
+
+      [Timer]
+      OnCalendar=*:*:0/15
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/homelab-health.timer
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [automation]
+
+- name: Enable and start health check timer
+  ansible.builtin.systemd:
+    name: homelab-health.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [automation] 

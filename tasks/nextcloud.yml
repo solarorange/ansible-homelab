@@ -1,0 +1,122 @@
+---
+- name: Create Nextcloud directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - "{{ docker_data_root }}/nextcloud"
+    - "{{ docker_data_root }}/nextcloud/html"
+    - "{{ docker_data_root }}/nextcloud/data"
+    - "{{ docker_data_root }}/nextcloud/config"
+    - "{{ docker_data_root }}/nextcloud/custom_apps"
+    - "{{ docker_data_root }}/nextcloud/themes"
+
+- name: Create Nextcloud docker-compose service
+  blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Nextcloud"
+    block: |
+      nextcloud:
+        image: nextcloud:latest
+        container_name: nextcloud
+        volumes:
+          - {{ docker_data_root }}/nextcloud/html:/var/www/html
+          - {{ docker_data_root }}/nextcloud/data:/var/www/html/data
+          - {{ docker_data_root }}/nextcloud/config:/var/www/html/config
+          - {{ docker_data_root }}/nextcloud/custom_apps:/var/www/html/custom_apps
+          - {{ docker_data_root }}/nextcloud/themes:/var/www/html/themes
+        environment:
+          - MYSQL_HOST=nextcloud-db
+          - MYSQL_DATABASE=nextcloud
+          - MYSQL_USER=nextcloud
+          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+          - REDIS_HOST=nextcloud-redis
+          - NEXTCLOUD_TRUSTED_DOMAINS={{ domain_name }}
+          - NEXTCLOUD_ADMIN_USER={{ nextcloud_admin_user }}
+          - NEXTCLOUD_ADMIN_PASSWORD={{ nextcloud_admin_password }}
+        depends_on:
+          - nextcloud-db
+          - nextcloud-redis
+        restart: unless-stopped
+        networks:
+          - traefik_network
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.{{ domain_name }}`)"
+          - "traefik.http.routers.nextcloud.entrypoints=websecure"
+          - "traefik.http.routers.nextcloud.tls=true"
+          - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+
+      nextcloud-db:
+        image: mariadb:10.6
+        container_name: nextcloud-db
+        volumes:
+          - {{ docker_data_root }}/nextcloud/db:/var/lib/mysql
+        environment:
+          - MYSQL_ROOT_PASSWORD={{ nextcloud_db_root_password }}
+          - MYSQL_DATABASE=nextcloud
+          - MYSQL_USER=nextcloud
+          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+        command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+        restart: unless-stopped
+        networks:
+          - traefik_network
+
+      nextcloud-redis:
+        image: redis:alpine
+        container_name: nextcloud-redis
+        volumes:
+          - {{ docker_data_root }}/nextcloud/redis:/data
+        restart: unless-stopped
+        networks:
+          - traefik_network
+
+- name: Create Nextcloud health check script
+  copy:
+    dest: "{{ scripts_dir }}/health_check_nextcloud.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! curl -s -f "https://nextcloud.{{ domain_name }}/status.php" | grep -q '"installed":true'; then
+        echo "Nextcloud is not responding correctly"
+        exit 1
+      fi
+      exit 0
+
+- name: Create Nextcloud backup script
+  copy:
+    dest: "{{ scripts_dir }}/backup_nextcloud.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/nextcloud"
+      mkdir -p "$BACKUP_DIR"
+      
+      # Backup Nextcloud data
+      tar -czf "$BACKUP_DIR/nextcloud_data_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/nextcloud data config html/custom_apps html/themes
+      
+      # Backup database
+      docker exec nextcloud-db mysqldump -u root -p{{ nextcloud_db_root_password }} nextcloud > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
+
+- name: Add Nextcloud backup to crontab
+  cron:
+    name: "Backup Nextcloud"
+    job: "{{ scripts_dir }}/backup_nextcloud.sh"
+    hour: "3"
+    minute: "0"
+    state: present
+
+- name: Create Nextcloud log rotation configuration
+  copy:
+    dest: /etc/logrotate.d/nextcloud
+    content: |
+      {{ docker_data_root }}/nextcloud/data/nextcloud.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      } 

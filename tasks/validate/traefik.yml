@@ -1,0 +1,46 @@
+---
+# Traefik-specific validation tasks
+- name: Check Traefik API health
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api/health"
+    method: GET
+    status_code: [200]
+    timeout: 30
+  register: traefik_health
+  retries: 3
+  delay: 10
+  until: traefik_health is success
+
+- name: Verify Traefik configuration
+  ansible.builtin.shell: "traefik check /etc/traefik/traefik.yml"
+  register: traefik_config
+  changed_when: false
+  ignore_errors: yes
+
+- name: Check Traefik metrics
+  ansible.builtin.uri:
+    url: "http://localhost:8080/metrics"
+    method: GET
+    status_code: [200]
+    timeout: 30
+  register: traefik_metrics
+  when: traefik_health is success
+
+- name: Validate Traefik routes
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api/http/routers"
+    method: GET
+    status_code: [200]
+    timeout: 30
+  register: traefik_routes
+  when: traefik_health is success
+
+- name: Report Traefik status
+  ansible.builtin.debug:
+    msg: |
+      Traefik Validation Results:
+      - API Health: {{ 'Healthy' if traefik_health is success else 'Unhealthy' }}
+      - Configuration: {{ 'Valid' if traefik_config.rc == 0 else 'Invalid' }}
+      - Metrics Available: {{ 'Yes' if traefik_metrics is success else 'No' }}
+      - Active Routes: {{ traefik_routes.json | length if traefik_routes is success else 0 }}
+  when: traefik_health is defined 

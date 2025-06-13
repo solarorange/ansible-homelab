@@ -1,0 +1,171 @@
+---
+# Tdarr Configuration Tasks
+
+- name: Create Tdarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/tdarr/config"
+    - "{{ docker_dir }}/tdarr/data"
+    - "{{ docker_dir }}/tdarr/scripts"
+    - "{{ logs_dir }}/tdarr"
+
+- name: Create Tdarr configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/tdarr/config/config.json"
+    content: |
+      {
+        "serverPort": 8265,
+        "serverIP": "0.0.0.0",
+        "handbrakePath": "/usr/bin/HandBrakeCLI",
+        "ffmpegPath": "/usr/bin/ffmpeg",
+        "nodeID": "tdarr",
+        "nodeIP": "0.0.0.0",
+        "nodePort": 8266,
+        "logLevel": "info",
+        "maxLogSize": 5,
+        "maxLogFiles": 5,
+        "enableHealthChecks": true,
+        "healthCheckPort": 8267,
+        "enableWebUI": true,
+        "webUIPort": 8265,
+        "webUISecure": false,
+        "webUIPath": "/",
+        "webUILogin": true,
+        "webUIUsername": "{{ tdarr_username }}",
+        "webUIPassword": "{{ tdarr_password }}",
+        "enableAPI": true,
+        "apiPort": 8265,
+        "apiKey": "{{ tdarr_api_key }}",
+        "enableDatabaseBackups": true,
+        "databaseBackupInterval": 24,
+        "databaseBackupRetention": 7,
+        "databasePath": "{{ docker_dir }}/tdarr/data/database",
+        "tempPath": "{{ docker_dir }}/tdarr/data/temp",
+        "logPath": "{{ logs_dir }}/tdarr"
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Tdarr management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/tdarr/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Tdarr Management Script
+      
+      function show_help {
+          echo "Tdarr Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Tdarr status"
+          echo "  logs      - View Tdarr logs"
+          echo "  restart   - Restart Tdarr"
+          echo "  backup    - Backup Tdarr data"
+          echo "  restore   - Restore Tdarr data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Tdarr data..."
+          tar -czf "{{ docker_dir }}/tdarr/backup/tdarr_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/tdarr" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Tdarr data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/tdarr"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep tdarr
+              ;;
+          logs)
+              docker logs -f tdarr
+              ;;
+          restart)
+              docker restart tdarr
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Tdarr healthcheck script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/tdarr/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Tdarr is running
+      if ! docker ps | grep -q tdarr; then
+          echo "Tdarr is not running"
+          exit 1
+      fi
+      
+      # Check if Tdarr is responding
+      if ! curl -s http://localhost:8265/api/v2/status | grep -q "status"; then
+          echo "Tdarr is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Tdarr logrotate configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/tdarr/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/tdarr/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Tdarr log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Tdarr logs"
+    job: "logrotate {{ docker_dir }}/tdarr/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Tdarr backup cron job
+  ansible.builtin.cron:
+    name: "Backup Tdarr data"
+    job: "{{ docker_dir }}/tdarr/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

@@ -1,0 +1,95 @@
+---
+# Setup and Prerequisites Tasks
+# Handles collection installation and variable validation
+
+- name: Install required collections
+  ansible.builtin.command:
+    cmd: "ansible-galaxy collection install {{ item }}"
+  loop:
+    - community.general:>=5.0.0
+    - community.docker:>=3.0.0
+    - ansible.posix:>=1.4.0
+    - community.crypto:>=2.0.0
+    - community.network:>=4.0.0
+    - community.proxmox:>=1.0.0
+  register: collection_install
+  changed_when: collection_install.rc == 0
+  failed_when: collection_install.rc != 0
+  tags: [setup, always]
+
+- name: Install required roles
+  ansible.builtin.command:
+    cmd: "ansible-galaxy role install {{ item }}"
+  loop:
+    - geerlingguy.docker:>=6.0.0
+    - geerlingguy.pip:>=2.0.0
+    - geerlingguy.security:>=1.0.0
+    - geerlingguy.ntp:>=1.0.0
+    - geerlingguy.firewall:>=2.0.0
+    - geerlingguy.mysql:>=3.0.0
+    - geerlingguy.redis:>=1.0.0
+    - geerlingguy.nginx:>=3.0.0
+    - geerlingguy.certbot:>=3.0.0
+    - geerlingguy.backup:>=1.0.0
+    - geerlingguy.monitoring:>=1.0.0
+  register: role_install
+  changed_when: role_install.rc == 0
+  failed_when: role_install.rc != 0
+  tags: [setup, always]
+
+- name: Create Proxmox vault file if not exists
+  ansible.builtin.copy:
+    dest: "group_vars/all/proxmox_vault.yml"
+    content: |
+      ---
+      # Proxmox API Configuration
+      proxmox_host: "{{ proxmox_host | default('proxmox.local') }}"
+      proxmox_user: "{{ proxmox_user | default('root@pam') }}"
+      proxmox_password: "{{ proxmox_password | default('') }}"
+      proxmox_token_id: "{{ proxmox_token_id | default('') }}"
+      proxmox_token_secret: "{{ proxmox_token_secret | default('') }}"
+      proxmox_validate_certs: "{{ proxmox_validate_certs | default(true) }}"
+    mode: '0600'
+  when: not proxmox_vault_file.stat.exists
+  register: proxmox_vault_creation
+  tags: [setup, always]
+
+- name: Generate Proxmox API token if not exists
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    node: "{{ proxmox_node }}"
+    api_token_name: "ansible-token"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    state: present
+  register: proxmox_token
+  when: not proxmox_token_id is defined or not proxmox_token_secret is defined
+  delegate_to: localhost
+  tags: [setup, always]
+
+- name: Update Proxmox vault with token
+  ansible.builtin.copy:
+    dest: "group_vars/all/proxmox_vault.yml"
+    content: |
+      ---
+      # Proxmox API Configuration
+      proxmox_host: "{{ proxmox_host }}"
+      proxmox_user: "{{ proxmox_user }}"
+      proxmox_password: "{{ proxmox_password }}"
+      proxmox_token_id: "{{ proxmox_token.tokenid }}"
+      proxmox_token_secret: "{{ proxmox_token.token }}"
+      proxmox_validate_certs: "{{ proxmox_validate_certs }}"
+    mode: '0600'
+  when: proxmox_token.changed
+  tags: [setup, always]
+
+- name: Validate Proxmox configuration
+  ansible.builtin.assert:
+    that:
+      - proxmox_host is defined
+      - proxmox_user is defined
+      - proxmox_password is defined or (proxmox_token_id is defined and proxmox_token_secret is defined)
+    fail_msg: "Required Proxmox variables are not defined. Check group_vars/all/proxmox_vault.yml"
+  tags: [setup, always] 

@@ -1,0 +1,223 @@
+---
+# Immich Photo Management Deployment
+# Production-ready configuration with Traefik/Authentik integration
+
+- name: Create Immich directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/immich"
+    - "{{ docker_dir }}/immich/server"
+    - "{{ docker_dir }}/immich/web"
+    - "{{ docker_dir }}/immich/postgres"
+    - "{{ docker_dir }}/immich/redis"
+    - "{{ docker_dir }}/immich/ml"
+    - "{{ data_dir }}/media/photos"
+    - "{{ logs_dir }}/immich"
+    - "{{ logs_dir }}/immich/server"
+    - "{{ logs_dir }}/immich/web"
+    - "{{ logs_dir }}/immich/postgres"
+    - "{{ logs_dir }}/immich/redis"
+    - "{{ logs_dir }}/immich/ml"
+
+- name: Generate secure JWT secret
+  ansible.builtin.shell: openssl rand -base64 32
+  register: jwt_secret
+  changed_when: false
+  no_log: true
+
+- name: Create Immich docker-compose file
+  ansible.builtin.template:
+    src: templates/immich/docker-compose.yml.j2
+    dest: "{{ docker_dir }}/immich/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Immich Traefik configuration
+  ansible.builtin.template:
+    src: templates/immich/traefik.yml.j2
+    dest: "{{ docker_dir }}/immich/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Immich management script
+  ansible.builtin.copy:
+    dest: "{{ config_dir }}/immich-manage.sh"
+    content: |
+      #!/bin/bash
+      # Immich management script
+      
+      IMMICH_DIR="{{ docker_dir }}/immich"
+      
+      usage() {
+          echo "Usage: $0 {start|stop|restart|status|logs|update|backup|restore}"
+          echo ""
+          echo "Commands:"
+          echo "  start     - Start Immich"
+          echo "  stop      - Stop Immich"
+          echo "  restart   - Restart Immich"
+          echo "  status    - Show service status"
+          echo "  logs      - Show service logs"
+          echo "  update    - Update Immich images"
+          echo "  backup    - Backup Immich data"
+          echo "  restore   - Restore Immich data"
+      }
+      
+      start_immich() {
+          echo "Starting Immich..."
+          cd "$IMMICH_DIR"
+          docker-compose up -d
+          echo "Immich started!"
+      }
+      
+      stop_immich() {
+          echo "Stopping Immich..."
+          cd "$IMMICH_DIR"
+          docker-compose down
+          echo "Immich stopped!"
+      }
+      
+      restart_immich() {
+          echo "Restarting Immich..."
+          cd "$IMMICH_DIR"
+          docker-compose restart
+          echo "Immich restarted!"
+      }
+      
+      show_status() {
+          echo "Immich status:"
+          cd "$IMMICH_DIR"
+          docker-compose ps
+      }
+      
+      show_logs() {
+          echo "Immich logs:"
+          cd "$IMMICH_DIR"
+          docker-compose logs -f --tail=50
+      }
+      
+      update_immich() {
+          echo "Updating Immich images..."
+          cd "$IMMICH_DIR"
+          docker-compose pull
+          docker-compose up -d
+          echo "Immich updated!"
+      }
+      
+      backup_immich() {
+          echo "Backing up Immich data..."
+          local backup_file="{{ backup_dir }}/immich-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+          
+          # Stop services
+          cd "$IMMICH_DIR"
+          docker-compose stop
+          
+          # Create backup
+          tar -czf "$backup_file" \
+              -C "$(dirname $IMMICH_DIR)" \
+              "$(basename $IMMICH_DIR)" \
+              --exclude="*/logs/*" \
+              --exclude="*/cache/*"
+          
+          # Restart services
+          docker-compose start
+          
+          echo "Immich backup created: $backup_file"
+      }
+      
+      restore_immich() {
+          local backup_file="$2"
+          
+          if [ -z "$backup_file" ]; then
+              echo "ERROR: Backup file not specified"
+              echo "Usage: $0 restore <backup_file>"
+              exit 1
+          fi
+          
+          if [ ! -f "$backup_file" ]; then
+              echo "ERROR: Backup file not found: $backup_file"
+              exit 1
+          fi
+          
+          echo "Restoring Immich data from: $backup_file"
+          
+          # Stop services
+          cd "$IMMICH_DIR"
+          docker-compose down
+          
+          # Backup current data
+          mv "$IMMICH_DIR" "$IMMICH_DIR.backup.$(date +%Y%m%d-%H%M%S)"
+          
+          # Restore from backup
+          tar -xzf "$backup_file" -C "$(dirname $IMMICH_DIR)"
+          
+          # Start services
+          docker-compose up -d
+          
+          echo "Immich data restored successfully!"
+      }
+      
+      case "$1" in
+          start)
+              start_immich
+              ;;
+          stop)
+              stop_immich
+              ;;
+          restart)
+              restart_immich
+              ;;
+          status)
+              show_status
+              ;;
+          logs)
+              show_logs
+              ;;
+          update)
+              update_immich
+              ;;
+          backup)
+              backup_immich
+              ;;
+          restore)
+              restore_immich "$@"
+              ;;
+          *)
+              usage
+              exit 1
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Display Immich deployment summary
+  ansible.builtin.debug:
+    msg: |
+      Immich Photo Management Setup Complete:
+      
+      Components Deployed:
+      - Immich Server (Backend)
+      - Immich Web (Frontend)
+      - PostgreSQL Database
+      - Redis Cache
+      - Machine Learning Service
+      
+      Management Scripts:
+      - Management: {{ config_dir }}/immich-manage.sh
+      
+      Access URL:
+      - Immich: https://immich.{{ domain }}
+      
+      Next Steps:
+      1. Start Immich: {{ config_dir }}/immich-manage.sh start
+      2. Access the web interface at https://immich.{{ domain }}
+      3. Create your first user account
+      4. Configure photo upload settings
+      5. Set up mobile app connection 

@@ -1,0 +1,118 @@
+---
+- name: Post-deployment Health Checks
+  hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Check Docker container health
+      block:
+        - name: Get running containers
+          ansible.builtin.command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}"
+          register: running_containers
+          changed_when: false
+
+        - name: Verify essential containers are running
+          ansible.builtin.assert:
+            that: >
+              item in running_containers.stdout_lines
+            fail_msg: "Container {{ item }} is not running"
+          loop:
+            - traefik
+            - portainer
+            - watchtower
+            - uptime-kuma
+
+    - name: Check service endpoints
+      block:
+        - name: Verify Traefik dashboard
+          ansible.builtin.uri:
+            url: "https://traefik.{{ domain }}/dashboard/"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: traefik_check
+          failed_when: false
+
+        - name: Assert Traefik dashboard
+          ansible.builtin.assert:
+            that: traefik_check.status == 200
+            fail_msg: "Traefik dashboard is not accessible"
+
+    - name: Check monitoring stack
+      block:
+        - name: Verify Grafana
+          ansible.builtin.uri:
+            url: "https://grafana.{{ domain }}"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: grafana_check
+          failed_when: false
+          when: monitoring_enabled | default(true)
+
+        - name: Assert Grafana
+          ansible.builtin.assert:
+            that: grafana_check.status == 200
+            fail_msg: "Grafana is not accessible"
+          when: monitoring_enabled | default(true)
+
+        - name: Verify Prometheus
+          ansible.builtin.uri:
+            url: "https://prometheus.{{ domain }}/-/healthy"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: prometheus_check
+          failed_when: false
+          when: monitoring_enabled | default(true)
+
+        - name: Assert Prometheus
+          ansible.builtin.assert:
+            that: prometheus_check.status == 200
+            fail_msg: "Prometheus is not accessible"
+          when: monitoring_enabled | default(true)
+
+    - name: Check media services
+      block:
+        - name: Verify media service endpoints
+          ansible.builtin.uri:
+            url: "https://{{ item }}.{{ domain }}"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: service_check
+          failed_when: false
+          loop: "{{ enabled_services | select('match', '^(sonarr|radarr|jellyfin|emby)$') | list }}"
+          when: media_enabled | default(true)
+
+        - name: Assert media services
+          ansible.builtin.assert:
+            that: service_check.status == 200
+            fail_msg: "Media service {{ item }} is not accessible"
+          loop: "{{ enabled_services | select('match', '^(sonarr|radarr|jellyfin|emby)$') | list }}"
+          when: media_enabled | default(true)
+
+    - name: Check system metrics
+      block:
+        - name: Get system metrics
+          ansible.builtin.command: docker stats --no-stream
+          register: docker_stats
+          changed_when: false
+
+        - name: Verify system resource usage
+          ansible.builtin.assert:
+            that: >
+              ansible_memtotal_mb - ansible_memfree_mb < ansible_memtotal_mb * 0.9
+            fail_msg: "System memory usage is too high"
+
+        - name: Check disk space
+          ansible.builtin.command: df -h /
+          register: disk_space
+          changed_when: false
+
+        - name: Assert disk space
+          ansible.builtin.assert:
+            that: >
+              disk_space.stdout_lines[1].split()[4] | regex_replace('%', '') | int < 90
+            fail_msg: "Disk space usage is too high" 

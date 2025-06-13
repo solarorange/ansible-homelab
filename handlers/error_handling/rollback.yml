@@ -1,0 +1,57 @@
+---
+# Rollback procedures for failed deployments
+- name: Determine rollback scope
+  ansible.builtin.set_fact:
+    rollback_scope: "{{ ansible_failed_task.tags | default([]) }}"
+
+- name: Execute rollback procedures
+  block:
+    - name: Stop affected services
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+      loop: "{{ affected_services | default([]) }}"
+      when: affected_services is defined
+
+    - name: Restore previous configuration
+      ansible.builtin.copy:
+        src: "{{ backup_dir }}/{{ item }}/{{ ansible_date_time.date }}"
+        dest: "{{ item }}"
+        remote_src: true
+      loop: "{{ config_files | default([]) }}"
+      when: config_files is defined
+
+    - name: Restore previous state
+      ansible.builtin.include_tasks: "rollback/{{ item }}.yml"
+      loop: "{{ rollback_scope }}"
+      when: rollback_scope is defined
+
+    - name: Verify rollback
+      ansible.builtin.include_tasks: verify_rollback.yml
+      register: rollback_verification
+
+    - name: Set rollback status
+      ansible.builtin.set_fact:
+        rollback_successful: "{{ rollback_verification is success }}"
+
+- name: Handle rollback failure
+  block:
+    - name: Log rollback failure
+      ansible.builtin.debug:
+        msg: "Rollback failed for task: {{ ansible_failed_task.name }}"
+
+    - name: Notify rollback failure
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "Rollback failed on {{ inventory_hostname }} for task: {{ ansible_failed_task.name }}"
+          }
+        status_code: [200, 201, 202]
+      when: notification_webhook_url is defined
+
+    - name: Set emergency mode
+      ansible.builtin.set_fact:
+        emergency_mode: true 

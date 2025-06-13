@@ -1,0 +1,243 @@
+---
+# AlertManager Configuration
+# Production-ready alert management and routing system
+
+- name: Create AlertManager directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/alertmanager/config"
+    - "{{ docker_dir }}/monitoring/alertmanager/templates"
+    - "{{ docker_dir }}/monitoring/alertmanager/scripts"
+    - "{{ logs_dir }}/monitoring/alertmanager"
+
+- name: Create AlertManager configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/config/alertmanager.yml"
+    content: |
+      global:
+        resolve_timeout: 5m
+        http_config:
+          follow_redirects: true
+      
+      route:
+        group_by: ['alertname', 'job', 'severity']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: 'default'
+        routes:
+          - match:
+              severity: critical
+            receiver: 'critical'
+            continue: true
+          - match:
+              severity: warning
+            receiver: 'warning'
+            continue: true
+      
+      receivers:
+        - name: 'default'
+          email_configs:
+            - to: '{{ admin_email }}'
+              from: 'alertmanager@{{ domain }}'
+              smarthost: 'smtp.{{ domain }}:587'
+              auth_username: '{{ smtp_username }}'
+              auth_password: '{{ smtp_password }}'
+              send_resolved: true
+          
+        - name: 'critical'
+          email_configs:
+            - to: '{{ admin_email }}'
+              from: 'alertmanager@{{ domain }}'
+              smarthost: 'smtp.{{ domain }}:587'
+              auth_username: '{{ smtp_username }}'
+              auth_password: '{{ smtp_password }}'
+              send_resolved: true
+          webhook_configs:
+            - url: 'http://telegram-bot:8080/alert'
+              send_resolved: true
+          
+        - name: 'warning'
+          email_configs:
+            - to: '{{ admin_email }}'
+              from: 'alertmanager@{{ domain }}'
+              smarthost: 'smtp.{{ domain }}:587'
+              auth_username: '{{ smtp_username }}'
+              auth_password: '{{ smtp_password }}'
+              send_resolved: true
+      
+      templates:
+        - '/etc/alertmanager/templates/*.tmpl'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create AlertManager email template
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/templates/email.tmpl"
+    content: |
+      {{ define "email.default.html" }}
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>{{ .GroupLabels.alertname }}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              color: #333;
+            }
+            .alert {
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              padding: 15px;
+              margin-bottom: 15px;
+            }
+            .critical {
+              border-left: 4px solid #dc3545;
+            }
+            .warning {
+              border-left: 4px solid #ffc107;
+            }
+            .info {
+              border-left: 4px solid #17a2b8;
+            }
+            .header {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .details {
+              margin-top: 10px;
+            }
+            .label {
+              font-weight: bold;
+            }
+            .value {
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+          <p><strong>Status:</strong> {{ .Status }}</p>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          
+          {{ range .Alerts }}
+          <div class="alert {{ .Labels.severity }}">
+            <div class="header">{{ .Annotations.summary }}</div>
+            <div class="details">
+              <p><span class="label">Description:</span> <span class="value">{{ .Annotations.description }}</span></p>
+              <p><span class="label">Start Time:</span> <span class="value">{{ .StartsAt }}</span></p>
+              {{ if .EndsAt }}
+              <p><span class="label">End Time:</span> <span class="value">{{ .EndsAt }}</span></p>
+              {{ end }}
+              <p><span class="label">Job:</span> <span class="value">{{ .Labels.job }}</span></p>
+              <p><span class="label">Instance:</span> <span class="value">{{ .Labels.instance }}</span></p>
+            </div>
+          </div>
+          {{ end }}
+          
+          <p>View in Grafana: <a href="https://grafana.{{ domain }}/d/system-overview">System Overview Dashboard</a></p>
+        </body>
+      </html>
+      {{ end }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create AlertManager management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # AlertManager Management Script
+      
+      function show_help {
+        echo "AlertManager Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show AlertManager status"
+        echo "  logs      - Show AlertManager logs"
+        echo "  restart   - Restart AlertManager"
+        echo "  reload    - Reload configuration"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          curl -s http://localhost:9093/-/healthy
+          ;;
+        logs)
+          docker logs alertmanager --tail 100 -f
+          ;;
+        restart)
+          docker restart alertmanager
+          ;;
+        reload)
+          curl -X POST http://localhost:9093/-/reload
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create AlertManager health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if AlertManager is responding
+      if ! curl -s http://localhost:9093/-/healthy > /dev/null; then
+        echo "AlertManager is not responding"
+        exit 1
+      fi
+      
+      # Check if we can access the API
+      if ! curl -s http://localhost:9093/api/v2/status > /dev/null; then
+        echo "AlertManager API is not responding"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create AlertManager log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/alertmanager/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add AlertManager log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate AlertManager logs"
+    job: "logrotate {{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}" 

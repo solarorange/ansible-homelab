@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  pulsarr:
+    image: ghcr.io/pulsarr/pulsarr:latest
+    container_name: pulsarr
+    environment:
+      - PUID={{ ansible_user_id }}
+      - PGID={{ ansible_user_gid }}
+      - TZ={{ timezone | default('UTC') }}
+      - NODE_ENV=production
+      - PORT=8080
+      - HOST=0.0.0.0
+    volumes:
+      - {{ docker_root }}/pulsarr/config:/config
+      - {{ docker_root }}/pulsarr/data:/data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pulsarr.rule=Host(`pulsarr.{{ domain }}`)"
+      - "traefik.http.routers.pulsarr.entrypoints=websecure"
+      - "traefik.http.routers.pulsarr.tls=true"
+      - "traefik.http.routers.pulsarr.tls.certresolver=cloudflare"
+      - "traefik.http.services.pulsarr.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.pulsarr-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.pulsarr-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.pulsarr.middlewares=pulsarr-auth"
+      - "traefik.http.middlewares.pulsarr-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.pulsarr-headers.headers.customrequestheaders.X-Forwarded-Host=pulsarr.{{ domain }}"
+      - "traefik.http.routers.pulsarr.middlewares=pulsarr-headers"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  traefik_network:
+    external: true 

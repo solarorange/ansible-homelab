@@ -1,0 +1,110 @@
+---
+- name: Automated Test Runner
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    test_results_dir: "{{ playbook_dir }}/../test_results"
+    timestamp: "{{ ansible_date_time.iso8601 }}"
+
+  tasks:
+    - name: Create test results directory
+      ansible.builtin.file:
+        path: "{{ test_results_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Run pre-flight validation
+      ansible.builtin.import_playbook:
+        playbook: ../preflight/validate_prerequisites.yml
+      register: preflight_results
+
+    - name: Save pre-flight results
+      ansible.builtin.copy:
+        content: |
+          Pre-flight Validation Results
+          ===========================
+          Timestamp: {{ timestamp }}
+          Status: {{ 'PASSED' if preflight_results.failed == 0 else 'FAILED' }}
+          Failed Tasks: {{ preflight_results.failed_tasks | default([]) | length }}
+          {% if preflight_results.failed_tasks %}
+          Failed Tasks Details:
+          {% for task in preflight_results.failed_tasks %}
+          - {{ task.task_name }}: {{ task.msg | default('No message') }}
+          {% endfor %}
+          {% endif %}
+        dest: "{{ test_results_dir }}/preflight_results_{{ timestamp }}.txt"
+        mode: '0644'
+
+    - name: Run post-deployment health checks
+      ansible.builtin.import_playbook:
+        playbook: ../post_deployment/health_checks.yml
+      register: health_check_results
+      when: preflight_results.failed == 0
+
+    - name: Save health check results
+      ansible.builtin.copy:
+        content: |
+          Post-deployment Health Check Results
+          ===================================
+          Timestamp: {{ timestamp }}
+          Status: {{ 'PASSED' if health_check_results.failed == 0 else 'FAILED' }}
+          Failed Tasks: {{ health_check_results.failed_tasks | default([]) | length }}
+          {% if health_check_results.failed_tasks %}
+          Failed Tasks Details:
+          {% for task in health_check_results.failed_tasks %}
+          - {{ task.task_name }}: {{ task.msg | default('No message') }}
+          {% endfor %}
+          {% endif %}
+        dest: "{{ test_results_dir }}/health_check_results_{{ timestamp }}.txt"
+        mode: '0644'
+      when: preflight_results.failed == 0
+
+    - name: Run service validation tests
+      ansible.builtin.import_playbook:
+        playbook: ../service_validation/service_tests.yml
+      register: service_test_results
+      when: preflight_results.failed == 0 and health_check_results.failed == 0
+
+    - name: Save service test results
+      ansible.builtin.copy:
+        content: |
+          Service Validation Test Results
+          ==============================
+          Timestamp: {{ timestamp }}
+          Status: {{ 'PASSED' if service_test_results.failed == 0 else 'FAILED' }}
+          Failed Tasks: {{ service_test_results.failed_tasks | default([]) | length }}
+          {% if service_test_results.failed_tasks %}
+          Failed Tasks Details:
+          {% for task in service_test_results.failed_tasks %}
+          - {{ task.task_name }}: {{ task.msg | default('No message') }}
+          {% endfor %}
+          {% endif %}
+        dest: "{{ test_results_dir }}/service_test_results_{{ timestamp }}.txt"
+        mode: '0644'
+      when: preflight_results.failed == 0 and health_check_results.failed == 0
+
+    - name: Generate summary report
+      ansible.builtin.copy:
+        content: |
+          Test Execution Summary
+          =====================
+          Timestamp: {{ timestamp }}
+          
+          Pre-flight Validation: {{ 'PASSED' if preflight_results.failed == 0 else 'FAILED' }}
+          Health Checks: {{ 'PASSED' if health_check_results.failed == 0 else 'FAILED' }}
+          Service Tests: {{ 'PASSED' if service_test_results.failed == 0 else 'FAILED' }}
+          
+          Overall Status: {{ 'PASSED' if (preflight_results.failed == 0 and health_check_results.failed == 0 and service_test_results.failed == 0) else 'FAILED' }}
+          
+          Detailed results can be found in:
+          - {{ test_results_dir }}/preflight_results_{{ timestamp }}.txt
+          - {{ test_results_dir }}/health_check_results_{{ timestamp }}.txt
+          - {{ test_results_dir }}/service_test_results_{{ timestamp }}.txt
+        dest: "{{ test_results_dir }}/test_summary_{{ timestamp }}.txt"
+        mode: '0644'
+
+    - name: Display test summary
+      ansible.builtin.debug:
+        msg: "Test execution completed. Results saved in {{ test_results_dir }}" 

@@ -1,0 +1,381 @@
+---
+# Enhanced Homelab Setup with Comprehensive Monitoring and Automation
+# Production-ready Ansible playbook for Proxmox VM deployment
+- name: Enhanced Homelab Setup
+  hosts: all
+  become: true
+  gather_facts: true
+  serial: "{{ serial | default(0) }}"  # Control parallel execution
+  max_fail_percentage: 25  # Allow some failures in parallel execution
+
+  vars:
+    backup_dir: "/var/backups/ansible"
+    notification_webhook_url: "{{ notification_webhook_url | default('') }}"
+    critical_services:
+      - docker
+      - traefik
+      - monitoring_infrastructure
+    validation_timeout: 300
+    validation_retries: 3
+
+  pre_tasks:
+    - name: Setup prerequisites
+      ansible.builtin.include_tasks: tasks/setup.yml
+      tags: [setup, always]
+
+    - name: Create backup before deployment
+      ansible.builtin.include_tasks: tasks/backup.yml
+      tags: [always, backup]
+
+    - name: Deploy Proxmox VM
+      ansible.builtin.include_tasks: tasks/proxmox.yml
+      when: deploy_proxmox_vm | default(false)
+      tags: [proxmox, always]
+
+    - name: Setup error handling
+      ansible.builtin.include_tasks: handlers/error_handling/main.yml
+      tags: always
+
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - username is defined
+          - domain is defined
+          - cloudflare_email is defined
+          - cloudflare_api_key is defined
+        fail_msg: "Required variables are not defined. Check group_vars/all/vars.yml"
+      tags: [always, critical]
+
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg: |
+          Starting Enhanced Homelab Deployment
+          Target Host: {{ inventory_hostname }}
+          Domain: {{ domain }}
+          Services: {{ enabled_services | length }} services enabled
+      tags: always
+
+    - name: Create cache directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ ansible_fact_caching_connection | dirname }}"
+        - "{{ ansible_inventory_cache_connection | dirname }}"
+      tags: always
+
+    - name: Setup automation infrastructure
+      ansible.builtin.include_tasks: tasks/automation.yml
+      tags: [automation]
+      register: automation_result
+      rescue:
+        - name: Handle automation failure
+          ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+          vars:
+            failed_config_files: "{{ automation_result.failed_config_files | default([]) }}"
+            config_verification_commands: "{{ automation_result.verification_commands | default([]) }}"
+
+    - name: Setup service management
+      ansible.builtin.include_tasks: tasks/service_management.yml
+      tags: [service_management]
+
+  tasks:
+    # Phase 1: Infrastructure Foundation
+    - name: System essentials and hardening
+      ansible.builtin.include_tasks: tasks/essential.yml
+      tags: [foundation, essential]
+      async: 300
+      poll: 0
+
+    - name: Configure Docker environment
+      ansible.builtin.include_tasks: tasks/docker.yml
+      tags: [foundation, docker]
+      async: 300
+      poll: 0
+
+    - name: Setup network configuration
+      ansible.builtin.include_tasks: tasks/network.yml
+      tags: [foundation, network]
+      async: 300
+      poll: 0
+
+    - name: Configure storage systems
+      ansible.builtin.include_tasks: tasks/storage.yml
+      tags: [foundation, storage]
+      async: 300
+      poll: 0
+
+    - name: Apply security hardening
+      ansible.builtin.include_tasks: tasks/security.yml
+      tags: [foundation, security]
+      async: 300
+      poll: 0
+
+    # Phase 2: Core Infrastructure Services
+    - name: Deploy core infrastructure services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - traefik
+        - authentik
+        - monitoring_infrastructure
+      when: 
+        - item in enabled_services
+        - item != 'monitoring_infrastructure' or monitoring_enabled | default(true)
+      tags: [infrastructure]
+      async: 300
+      poll: 0
+      register: core_services_result
+
+    - name: Validate core services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ core_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: core_services_result is success
+      tags: [infrastructure, validation]
+
+    # Phase 3: Monitoring Stack (TIG + Prometheus)
+    - name: Deploy monitoring services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - influxdb
+        - telegraf
+        - prometheus
+        - grafana
+        - loki
+        - promtail
+        - alertmanager
+        - blackbox_exporter
+      when: 
+        - monitoring_enabled | default(true)
+        - item in enabled_services
+      tags: [monitoring]
+      async: 300
+      poll: 0
+      register: monitoring_services_result
+
+    - name: Validate monitoring services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ monitoring_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: monitoring_services_result is success
+      tags: [monitoring, validation]
+
+    - name: Configure enhanced monitoring
+      ansible.builtin.include_tasks: tasks/monitoring_enhancements.yml
+      when: monitoring_enabled | default(true)
+      tags: [monitoring]
+      async: 300
+      poll: 0
+
+    # Phase 4: Security Services
+    - name: Deploy security services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - crowdsec
+        - fail2ban
+        - vault
+        - wireguard
+      when: item in enabled_services
+      tags: [security]
+      async: 300
+      poll: 0
+      register: security_services_result
+
+    - name: Validate security services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ security_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: security_services_result is success
+      tags: [security, validation]
+
+    # Phase 5: Network Services
+    - name: Deploy network services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - pihole
+        - nginx_proxy_manager
+      when: item in enabled_services
+      tags: [network]
+      async: 300
+      poll: 0
+      register: network_services_result
+
+    - name: Validate network services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ network_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: network_services_result is success
+      tags: [network, validation]
+
+    # Phase 6: Media Stack
+    - name: Deploy media services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - sabnzbd
+        - qbittorrent
+        - sonarr
+        - radarr
+        - lidarr
+        - readarr
+        - prowlarr
+        - bazarr
+        - jellyfin
+        - emby
+        - tdarr
+        - overseerr
+        - tautulli
+        - immich
+        - calibre-web
+        - audiobookshelf
+        - komga
+      when: 
+        - media_enabled | default(true)
+        - item in enabled_services
+      tags: [media]
+      async: 300
+      poll: 0
+      register: media_services_result
+
+    - name: Validate media services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ media_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: media_services_result is success
+      tags: [media, validation]
+
+    # Phase 7: File Services
+    - name: Deploy file services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - nextcloud
+        - samba
+        - syncthing
+      when: item in enabled_services
+      tags: [storage]
+      async: 300
+      poll: 0
+      register: file_services_result
+
+    - name: Validate file services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ file_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: file_services_result is success
+      tags: [storage, validation]
+
+    # Phase 8: Development & Storage
+    - name: Deploy development and storage services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - gitlab
+        - harbor
+        - minio
+        - paperless
+        - bookstack
+        - immich
+        - filebrowser
+      when: item in enabled_services
+      tags: [development, storage]
+      async: 300
+      poll: 0
+      register: dev_services_result
+
+    - name: Validate development services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ dev_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: dev_services_result is success
+      tags: [development, storage, validation]
+
+    # Phase 9: Automation & Smart Home
+    - name: Deploy automation services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - mosquitto
+        - zigbee2mqtt
+        - home_assistant
+        - nodered
+        - n8n
+      when: 
+        - automation_enabled | default(true)
+        - item in enabled_services
+      tags: [automation]
+      async: 300
+      poll: 0
+      register: automation_services_result
+
+    - name: Validate automation services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ automation_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: automation_services_result is success
+      tags: [automation, validation]
+
+    # Phase 10: Backup & Maintenance
+    - name: Deploy backup services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop:
+        - backup
+        - kopia
+      when: item in enabled_services
+      tags: [backup]
+      async: 300
+      poll: 0
+      register: backup_services_result
+
+    - name: Validate backup services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ backup_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: backup_services_result is success
+      tags: [backup, validation]
+
+  post_tasks:
+    - name: Verify all critical services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ critical_services }}"
+      loop_control:
+        loop_var: service_name
+      tags: [always, validation]
+
+    - name: Send deployment notification
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "status": "{{ 'success' if critical_services | length == 0 else 'warning' }}",
+            "message": "Deployment completed with {{ critical_services | length }} critical services requiring attention",
+            "host": "{{ inventory_hostname }}",
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+      when: notification_webhook_url is defined
+      tags: [always, notification]
+
+# Handlers for service management
+  handlers:
+    - name: restart docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        enabled: true
+
+    - name: reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: restart networking
+      ansible.builtin.systemd:
+        name: networking
+        state: restarted

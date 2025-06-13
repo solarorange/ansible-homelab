@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "{{ homepage_port | default('3000') }}:3000"
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PUID={{ homepage_puid | default('1000') }}
+      - PGID={{ homepage_pgid | default('1000') }}
+      - TZ={{ homepage_timezone | default('America/New_York') }}
+    networks:
+      - {{ homepage_network | default('homelab') }}
+
+networks:
+  {{ homepage_network | default('homelab') }}:
+    external: true 

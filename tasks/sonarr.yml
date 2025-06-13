@@ -1,0 +1,218 @@
+---
+# Sonarr Configuration
+# TV Show Management
+
+- name: Create Sonarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/sonarr/config"
+    - "{{ docker_dir }}/sonarr/data"
+    - "{{ docker_dir }}/sonarr/scripts"
+    - "{{ media_dir }}/tv"
+    - "{{ media_dir }}/downloads/tv"
+    - "{{ logs_dir }}/sonarr"
+
+- name: Create Sonarr configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sonarr/config/config.xml"
+    content: |
+      <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+      <Config>
+        <LogLevel>info</LogLevel>
+        <Port>8989</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>False</LaunchBrowser>
+        <AuthenticationMethod>forms</AuthenticationMethod>
+        <AuthenticationRequired>enabled</AuthenticationRequired>
+        <Branch>main</Branch>
+        <ApiKey>{{ sonarr_api_key }}</ApiKey>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <UpdateMechanism>builtIn</UpdateMechanism>
+        <UpdateAutomatically>True</UpdateAutomatically>
+        <UpdateScriptPath></UpdateScriptPath>
+        <ProxyEnabled>False</ProxyEnabled>
+        <ProxyType>http</ProxyType>
+        <ProxyHostname></ProxyHostname>
+        <ProxyPort>8080</ProxyPort>
+        <ProxyUsername></ProxyUsername>
+        <ProxyPassword></ProxyPassword>
+        <ProxyBypassFilter></ProxyBypassFilter>
+        <ProxyBypassLocalAddresses>True</ProxyBypassLocalAddresses>
+        <CertificateValidation>Enabled</CertificateValidation>
+        <BackupFolder>{{ docker_dir }}/sonarr/backup</BackupFolder>
+        <BackupInterval>7</BackupInterval>
+        <BackupRetention>28</BackupRetention>
+        <AnalyticsEnabled>True</AnalyticsEnabled>
+        <InstanceName>Sonarr</InstanceName>
+        <ApplicationUrl></ApplicationUrl>
+        <PostgresUser>{{ postgres_user }}</PostgresUser>
+        <PostgresPassword>{{ postgres_password }}</PostgresPassword>
+        <PostgresPort>5432</PostgresPort>
+        <PostgresHost>postgres</PostgresHost>
+        <PostgresMainDb>sonarr</PostgresMainDb>
+        <PostgresLogDb>sonarr_logs</PostgresLogDb>
+      </Config>
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Sonarr management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sonarr/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Sonarr Management Script
+      
+      function show_help {
+        echo "Sonarr Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Sonarr status"
+        echo "  logs      - Show Sonarr logs"
+        echo "  restart   - Restart Sonarr"
+        echo "  backup    - Backup Sonarr data"
+        echo "  restore   - Restore Sonarr data"
+        echo "  help      - Show this help"
+      }
+      
+      function backup_data {
+        local backup_dir="{{ docker_dir }}/sonarr/backup"
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local backup_file="$backup_dir/sonarr_backup_$timestamp.tar.gz"
+        
+        # Create backup directory if it doesn't exist
+        mkdir -p "$backup_dir"
+        
+        # Stop Sonarr
+        docker stop sonarr
+        
+        # Create backup
+        tar -czf "$backup_file" -C "{{ docker_dir }}/sonarr" config/ data/
+        
+        # Start Sonarr
+        docker start sonarr
+        
+        echo "Backup created: $backup_file"
+      }
+      
+      function restore_data {
+        if [ -z "$1" ]; then
+          echo "Please specify backup file"
+          exit 1
+        fi
+      
+        local backup_file="$1"
+        if [ ! -f "$backup_file" ]; then
+          echo "Backup file not found: $backup_file"
+          exit 1
+        fi
+      
+        # Stop Sonarr
+        docker stop sonarr
+      
+        # Restore backup
+        tar -xzf "$backup_file" -C "{{ docker_dir }}/sonarr"
+      
+        # Start Sonarr
+        docker start sonarr
+      
+        echo "Backup restored from: $backup_file"
+      }
+      
+      case "$1" in
+        status)
+          docker ps -f name=sonarr
+          curl -s http://localhost:8989/api/v3/health
+          ;;
+        logs)
+          docker logs sonarr --tail 100 -f
+          ;;
+        restart)
+          docker restart sonarr
+          ;;
+        backup)
+          backup_data
+          ;;
+        restore)
+          restore_data "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Sonarr health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sonarr/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Sonarr is running
+      if ! docker ps -f name=sonarr -f status=running | grep -q sonarr; then
+        echo "Sonarr is not running"
+        exit 1
+      fi
+      
+      # Check if Sonarr is responding
+      if ! curl -s -f http://localhost:8989/api/v3/health > /dev/null; then
+        echo "Sonarr is not responding"
+        exit 1
+      fi
+      
+      # Check Sonarr status
+      STATUS=$(curl -s http://localhost:8989/api/v3/health | jq -r .status)
+      if [ "$STATUS" != "ok" ]; then
+        echo "Sonarr status is $STATUS"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Sonarr log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sonarr/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/sonarr/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Sonarr log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Sonarr logs"
+    job: "logrotate {{ docker_dir }}/sonarr/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Sonarr backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Sonarr data"
+    job: "{{ docker_dir }}/sonarr/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

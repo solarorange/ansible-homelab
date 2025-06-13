@@ -1,0 +1,1192 @@
+---
+# Media Stack Configuration
+# Following TRaSH Guides conventions for maximum compatibility
+
+- name: Deploy Media Stack
+  block:
+    - name: Pre-deployment checks
+      block:
+        - name: Check available disk space
+          ansible.builtin.shell: df -h {{ data_dir }} | awk 'NR==2 {print $4}'
+          register: available_space
+          changed_when: false
+
+        - name: Verify minimum disk space
+          ansible.builtin.fail:
+            msg: "Insufficient disk space. Required: 100GB, Available: {{ available_space.stdout }}"
+          when: available_space.stdout | regex_replace('G', '') | int < 100
+
+        - name: Check Docker network
+          community.docker.docker_network_info:
+            name: media
+          register: media_network
+          ignore_errors: true
+
+        - name: Create media network if not exists
+          community.docker.docker_network:
+            name: media
+            driver: bridge
+          when: media_network.network is not defined
+
+        - name: Backup existing media stack configuration
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "{{ ansible_backup_dir }}/media/{{ ansible_date_time.date }}/{{ item | basename }}"
+            remote_src: true
+          loop:
+            - "{{ docker_dir }}/media/docker-compose.yml"
+            - "{{ docker_dir }}/media/config"
+          when: item is file
+          register: config_backup
+
+    - name: Create media directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        # Media directories
+        - "{{ data_dir }}/media"
+        - "{{ data_dir }}/media/movies"
+        - "{{ data_dir }}/media/tv"
+        - "{{ data_dir }}/media/anime"
+        - "{{ data_dir }}/media/music"
+        - "{{ data_dir }}/media/books"
+        - "{{ data_dir }}/media/audiobooks"
+        - "{{ data_dir }}/media/comics"
+        - "{{ data_dir }}/media/podcasts"
+        
+        # Download directories
+        - "{{ data_dir }}/downloads"
+        - "{{ data_dir }}/downloads/usenet"
+        - "{{ data_dir }}/downloads/usenet/incomplete"
+        - "{{ data_dir }}/downloads/usenet/complete"
+        - "{{ data_dir }}/downloads/torrents"
+        - "{{ data_dir }}/downloads/torrents/incomplete"
+        - "{{ data_dir }}/downloads/torrents/complete"
+        
+        # Service-specific directories
+        - "{{ data_dir }}/downloads/sabnzbd"
+        - "{{ data_dir }}/downloads/qbittorrent"
+        - "{{ data_dir }}/downloads/sonarr"
+        - "{{ data_dir }}/downloads/radarr"
+        - "{{ data_dir }}/downloads/lidarr"
+        - "{{ data_dir }}/downloads/readarr"
+        - "{{ data_dir }}/downloads/prowlarr"
+        - "{{ data_dir }}/downloads/bazarr"
+        
+        # Log directories
+        - "{{ logs_dir }}/media"
+        - "{{ logs_dir }}/media/health"
+        - "{{ logs_dir }}/media/backup"
+      register: dir_creation
+
+    - name: Create media stack docker-compose file
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/media/docker-compose.yml"
+        content: |
+          version: '3.8'
+          
+          networks:
+            media:
+              name: media
+              external: true
+            homelab:
+              name: homelab
+              external: true
+          
+          services:
+            # SABnzbd - Usenet Downloader
+            sabnzbd:
+              image: linuxserver/sabnzbd:latest
+              container_name: sabnzbd
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/sabnzbd/config:/config
+                - {{ data_dir }}/downloads/usenet:/downloads
+                - {{ data_dir }}/downloads/usenet/incomplete:/incomplete-downloads
+                - {{ data_dir }}/downloads/usenet/complete:/complete-downloads
+                - {{ logs_dir }}/sabnzbd:/logs
+              ports:
+                - "8080:8080"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.{{ domain }}`)"
+                - "traefik.http.routers.sabnzbd.entrypoints=https"
+                - "traefik.http.routers.sabnzbd.tls=true"
+                - "traefik.http.routers.sabnzbd.middlewares=authentik@docker"
+                - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8080/api?mode=version"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+              deploy:
+                resources:
+                  limits:
+                    cpus: '1'
+                    memory: 1G
+                  reservations:
+                    cpus: '0.25'
+                    memory: 512M
+              logging:
+                driver: "json-file"
+                options:
+                  max-size: "10m"
+                  max-file: "3"
+
+            # qBittorrent - Torrent Client
+            qbittorrent:
+              image: linuxserver/qbittorrent:latest
+              container_name: qbittorrent
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+                - WEBUI_PORT=8080
+              volumes:
+                - {{ docker_dir }}/qbittorrent/config:/config
+                - {{ data_dir }}/downloads/torrents:/downloads
+                - {{ data_dir }}/downloads/torrents/incomplete:/incomplete-downloads
+                - {{ data_dir }}/downloads/torrents/complete:/complete-downloads
+                - {{ logs_dir }}/qbittorrent:/logs
+              ports:
+                - "8081:8080"
+                - "6881:6881"
+                - "6881:6881/udp"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.{{ domain }}`)"
+                - "traefik.http.routers.qbittorrent.entrypoints=https"
+                - "traefik.http.routers.qbittorrent.tls=true"
+                - "traefik.http.routers.qbittorrent.middlewares=authentik@docker"
+                - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/app/version"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Prowlarr - Indexer Management
+            prowlarr:
+              image: linuxserver/prowlarr:latest
+              container_name: prowlarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/prowlarr/config:/config
+                - {{ logs_dir }}/prowlarr:/logs
+              ports:
+                - "9696:9696"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.{{ domain }}`)"
+                - "traefik.http.routers.prowlarr.entrypoints=https"
+                - "traefik.http.routers.prowlarr.tls=true"
+                - "traefik.http.routers.prowlarr.middlewares=authentik@docker"
+                - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:9696/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Sonarr - TV Show Management
+            sonarr:
+              image: linuxserver/sonarr:latest
+              container_name: sonarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/sonarr/config:/config
+                - {{ data_dir }}/media/tv:/tv
+                - {{ data_dir }}/downloads:/downloads
+                - {{ logs_dir }}/sonarr:/logs
+              ports:
+                - "8989:8989"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.sonarr.rule=Host(`sonarr.{{ domain }}`)"
+                - "traefik.http.routers.sonarr.entrypoints=https"
+                - "traefik.http.routers.sonarr.tls=true"
+                - "traefik.http.routers.sonarr.middlewares=authentik@docker"
+                - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8989/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Radarr - Movie Management
+            radarr:
+              image: linuxserver/radarr:latest
+              container_name: radarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/radarr/config:/config
+                - {{ data_dir }}/media/movies:/movies
+                - {{ data_dir }}/downloads:/downloads
+                - {{ logs_dir }}/radarr:/logs
+              ports:
+                - "7878:7878"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.radarr.rule=Host(`radarr.{{ domain }}`)"
+                - "traefik.http.routers.radarr.entrypoints=https"
+                - "traefik.http.routers.radarr.tls=true"
+                - "traefik.http.routers.radarr.middlewares=authentik@docker"
+                - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:7878/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Lidarr - Music Management
+            lidarr:
+              image: linuxserver/lidarr:latest
+              container_name: lidarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/lidarr/config:/config
+                - {{ data_dir }}/media/music:/music
+                - {{ data_dir }}/downloads:/downloads
+                - {{ logs_dir }}/lidarr:/logs
+              ports:
+                - "8686:8686"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.lidarr.rule=Host(`lidarr.{{ domain }}`)"
+                - "traefik.http.routers.lidarr.entrypoints=https"
+                - "traefik.http.routers.lidarr.tls=true"
+                - "traefik.http.routers.lidarr.middlewares=authentik@docker"
+                - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8686/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Readarr - Book Management
+            readarr:
+              image: linuxserver/readarr:latest
+              container_name: readarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/readarr/config:/config
+                - {{ data_dir }}/media/books:/books
+                - {{ data_dir }}/downloads:/downloads
+                - {{ logs_dir }}/readarr:/logs
+              ports:
+                - "8787:8787"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.readarr.rule=Host(`readarr.{{ domain }}`)"
+                - "traefik.http.routers.readarr.entrypoints=https"
+                - "traefik.http.routers.readarr.tls=true"
+                - "traefik.http.routers.readarr.middlewares=authentik@docker"
+                - "traefik.http.services.readarr.loadbalancer.server.port=8787"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Bazarr - Subtitle Management
+            bazarr:
+              image: linuxserver/bazarr:latest
+              container_name: bazarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/bazarr/config:/config
+                - {{ data_dir }}/media:/media
+                - {{ logs_dir }}/bazarr:/logs
+              ports:
+                - "6767:6767"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.bazarr.rule=Host(`bazarr.{{ domain }}`)"
+                - "traefik.http.routers.bazarr.entrypoints=https"
+                - "traefik.http.routers.bazarr.tls=true"
+                - "traefik.http.routers.bazarr.middlewares=authentik@docker"
+                - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:6767/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Pulsarr - ARR Service Status Dashboard
+            pulsarr:
+              image: jamcalli/pulsarr:latest
+              container_name: pulsarr
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+                - DOCKER_MODS=linuxserver/mods:universal-docker
+              volumes:
+                - {{ docker_dir }}/pulsarr/config:/config
+                - {{ docker_dir }}/pulsarr/data:/data
+                - {{ logs_dir }}/pulsarr:/logs
+              ports:
+                - "8088:8088"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.pulsarr.rule=Host(`pulsarr.{{ domain }}`)"
+                - "traefik.http.routers.pulsarr.entrypoints=https"
+                - "traefik.http.routers.pulsarr.tls=true"
+                - "traefik.http.routers.pulsarr.middlewares=authentik@docker"
+                - "traefik.http.services.pulsarr.loadbalancer.server.port=8088"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+              depends_on:
+                - sonarr
+                - radarr
+                - lidarr
+                - readarr
+                - prowlarr
+                - bazarr
+
+            # Jellyfin - Media Server
+            jellyfin:
+              image: jellyfin/jellyfin:latest
+              container_name: jellyfin
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+              volumes:
+                - {{ docker_dir }}/jellyfin/config:/config
+                - {{ docker_dir }}/jellyfin/cache:/cache
+                - {{ docker_dir }}/jellyfin/metadata:/metadata
+                - {{ data_dir }}/media:/media
+                - {{ logs_dir }}/jellyfin:/logs
+              ports:
+                - "8096:8096"
+                - "8920:8920"
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.{{ domain }}`)"
+                - "traefik.http.routers.jellyfin.entrypoints=https"
+                - "traefik.http.routers.jellyfin.tls=true"
+                - "traefik.http.routers.jellyfin.middlewares=authentik@docker"
+                - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            # Immich - Photo Management
+            immich-server:
+              image: ghcr.io/immich-app/immich-server:latest
+              container_name: immich-server
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+                - DB_HOSTNAME=immich-postgres
+                - DB_USERNAME=postgres
+                - DB_PASSWORD=postgres
+                - DB_DATABASE_NAME=immich
+                - REDIS_HOSTNAME=immich-redis
+                - REDIS_PORT=6379
+                - REDIS_DBINDEX=0
+                - REDIS_PASSWORD=redis
+                - JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters
+                - NODE_ENV=production
+              volumes:
+                - {{ docker_dir }}/immich/server:/config
+                - {{ data_dir }}/media/photos:/photos
+                - {{ logs_dir }}/immich/server:/logs
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.immich-server.rule=Host(`immich.{{ domain }}`)"
+                - "traefik.http.routers.immich-server.entrypoints=https"
+                - "traefik.http.routers.immich-server.tls=true"
+                - "traefik.http.routers.immich-server.middlewares=authentik@docker"
+                - "traefik.http.services.immich-server.loadbalancer.server.port=3001"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+              depends_on:
+                - immich-postgres
+                - immich-redis
+
+            immich-web:
+              image: ghcr.io/immich-app/immich-web:latest
+              container_name: immich-web
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+                - NODE_ENV=production
+              volumes:
+                - {{ docker_dir }}/immich/web:/config
+                - {{ logs_dir }}/immich/web:/logs
+              restart: unless-stopped
+              networks:
+                - media
+                - homelab
+              labels:
+                - "traefik.enable=true"
+                - "traefik.docker.network=homelab"
+                - "traefik.http.routers.immich-web.rule=Host(`immich.{{ domain }}`)"
+                - "traefik.http.routers.immich-web.entrypoints=https"
+                - "traefik.http.routers.immich-web.tls=true"
+                - "traefik.http.routers.immich-web.middlewares=authentik@docker"
+                - "traefik.http.services.immich-web.loadbalancer.server.port=3000"
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+              depends_on:
+                - immich-server
+
+            immich-postgres:
+              image: postgres:14-alpine
+              container_name: immich-postgres
+              environment:
+                - POSTGRES_USER=postgres
+                - POSTGRES_PASSWORD=postgres
+                - POSTGRES_DB=immich
+              volumes:
+                - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
+                - {{ logs_dir }}/immich/postgres:/logs
+              restart: unless-stopped
+              networks:
+                - media
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U postgres"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            immich-redis:
+              image: redis:alpine
+              container_name: immich-redis
+              command: redis-server --requirepass redis
+              volumes:
+                - {{ docker_dir }}/immich/redis:/data
+                - {{ logs_dir }}/immich/redis:/logs
+              restart: unless-stopped
+              networks:
+                - media
+              healthcheck:
+                test: ["CMD", "redis-cli", "ping"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+
+            immich-machine-learning:
+              image: ghcr.io/immich-app/immich-machine-learning:latest
+              container_name: immich-machine-learning
+              environment:
+                - PUID={{ user_id }}
+                - PGID={{ group_id }}
+                - TZ={{ timezone }}
+                - NODE_ENV=production
+              volumes:
+                - {{ docker_dir }}/immich/ml:/config
+                - {{ logs_dir }}/immich/ml:/logs
+              restart: unless-stopped
+              networks:
+                - media
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+              depends_on:
+                - immich-server
+
+    - name: Create media stack management script
+      ansible.builtin.copy:
+        dest: "{{ config_dir }}/media-manage.sh"
+        content: |
+          #!/bin/bash
+          # Media stack management script
+          
+          MEDIA_DIR="{{ docker_dir }}/media"
+          LOG_DIR="{{ logs_dir }}/media"
+          BACKUP_DIR="{{ backup_dir }}/media"
+          
+          # Error handling
+          set -e
+          trap 'handle_error $? $LINENO' ERR
+          
+          handle_error() {
+              local exit_code=$1
+              local line_number=$2
+              echo "Error occurred in script at line $line_number with exit code $exit_code"
+              echo "Error details: $(tail -n 1 $LOG_DIR/error.log 2>/dev/null || echo 'No error log available')"
+              exit $exit_code
+          }
+          
+          log() {
+              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/operation.log"
+          }
+          
+          usage() {
+              echo "Usage: $0 {start|stop|restart|status|logs|update|backup|restore|health|cleanup}"
+              echo ""
+              echo "Commands:"
+              echo "  start     - Start media stack"
+              echo "  stop      - Stop media stack"
+              echo "  restart   - Restart media stack"
+              echo "  status    - Show service status"
+              echo "  logs      - Show service logs"
+              echo "  update    - Update media images"
+              echo "  backup    - Backup media data"
+              echo "  restore   - Restore media data"
+              echo "  health    - Run health checks"
+              echo "  cleanup   - Clean up old files"
+          }
+          
+          start_media() {
+              log "Starting media stack..."
+              cd "$MEDIA_DIR"
+              
+              # Check disk space
+              local available_space=$(df -h "$MEDIA_DIR" | awk 'NR==2 {print $4}' | sed 's/G//')
+              if [ "$available_space" -lt 100 ]; then
+                  log "WARNING: Low disk space ($available_space GB available)"
+              fi
+              
+              # Start services
+              docker-compose up -d
+              
+              # Wait for services to be healthy
+              log "Waiting for services to be healthy..."
+              sleep 30
+              
+              # Verify services
+              if ! docker-compose ps | grep -q "healthy"; then
+                  log "WARNING: Some services may not be healthy"
+                  docker-compose ps
+              fi
+              
+              log "Media stack started!"
+          }
+          
+          stop_media() {
+              log "Stopping media stack..."
+              cd "$MEDIA_DIR"
+              
+              # Check for active downloads
+              if docker-compose exec -T sabnzbd python3 -c "import json; print(json.load(open('/config/sabnzbd.ini'))['misc']['download_dir'])" | grep -q "active"; then
+                  log "WARNING: Active downloads detected. Consider waiting for completion."
+                  read -p "Continue stopping? (y/N) " -n 1 -r
+                  echo
+                  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                      log "Stop cancelled by user"
+                      return 1
+                  fi
+              fi
+              
+              docker-compose down
+              log "Media stack stopped!"
+          }
+          
+          restart_media() {
+              log "Restarting media stack..."
+              cd "$MEDIA_DIR"
+              
+              # Restart services one by one
+              for service in $(docker-compose config --services); do
+                  log "Restarting $service..."
+                  docker-compose restart "$service"
+                  sleep 10
+                  
+                  # Verify service health
+                  if ! docker-compose ps "$service" | grep -q "healthy"; then
+                      log "WARNING: $service may not be healthy after restart"
+                  fi
+              done
+              
+              log "Media stack restarted!"
+          }
+          
+          show_status() {
+              log "Media stack status:"
+              cd "$MEDIA_DIR"
+              docker-compose ps
+              
+              # Show resource usage
+              echo
+              echo "Resource Usage:"
+              docker stats --no-stream
+          }
+          
+          show_logs() {
+              log "Media stack logs:"
+              cd "$MEDIA_DIR"
+              docker-compose logs -f --tail=50
+          }
+          
+          update_media() {
+              log "Updating media images..."
+              cd "$MEDIA_DIR"
+              
+              # Backup before update
+              backup_media
+              
+              # Pull new images
+              docker-compose pull
+              
+              # Update services
+              docker-compose up -d
+              
+              # Verify update
+              if ! docker-compose ps | grep -q "healthy"; then
+                  log "WARNING: Some services may not be healthy after update"
+                  docker-compose ps
+              fi
+              
+              log "Media stack updated!"
+          }
+          
+          backup_media() {
+              log "Backing up media data..."
+              local backup_file="$BACKUP_DIR/media-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+              
+              # Create backup directory if it doesn't exist
+              mkdir -p "$BACKUP_DIR"
+              
+              # Stop services
+              cd "$MEDIA_DIR"
+              docker-compose stop
+              
+              # Create backup
+              tar -czf "$backup_file" \
+                  -C "$(dirname $MEDIA_DIR)" \
+                  "$(basename $MEDIA_DIR)" \
+                  --exclude="*/logs/*" \
+                  --exclude="*/cache/*"
+              
+              # Verify backup
+              if ! tar -tzf "$backup_file" >/dev/null; then
+                  log "ERROR: Backup verification failed"
+                  rm "$backup_file"
+                  return 1
+              fi
+              
+              # Restart services
+              docker-compose start
+              
+              # Cleanup old backups
+              find "$BACKUP_DIR" -name "media-backup-*.tar.gz" -mtime +7 -delete
+              
+              log "Media backup created: $backup_file"
+          }
+          
+          restore_media() {
+              local backup_file="$2"
+              
+              if [ -z "$backup_file" ]; then
+                  log "ERROR: Backup file not specified"
+                  echo "Usage: $0 restore <backup_file>"
+                  return 1
+              fi
+              
+              if [ ! -f "$backup_file" ]; then
+                  log "ERROR: Backup file not found: $backup_file"
+                  return 1
+              fi
+              
+              log "Restoring media data from: $backup_file"
+              
+              # Verify backup
+              if ! tar -tzf "$backup_file" >/dev/null; then
+                  log "ERROR: Backup verification failed"
+                  return 1
+              fi
+              
+              # Stop services
+              cd "$MEDIA_DIR"
+              docker-compose down
+              
+              # Backup current data
+              mv "$MEDIA_DIR" "$MEDIA_DIR.backup.$(date +%Y%m%d-%H%M%S)"
+              
+              # Restore from backup
+              tar -xzf "$backup_file" -C "$(dirname $MEDIA_DIR)"
+              
+              # Start services
+              docker-compose up -d
+              
+              # Verify services
+              sleep 30
+              if ! docker-compose ps | grep -q "healthy"; then
+                  log "WARNING: Some services may not be healthy after restore"
+                  docker-compose ps
+              fi
+              
+              log "Media data restored successfully!"
+          }
+          
+          check_health() {
+              log "Running health checks..."
+              cd "$MEDIA_DIR"
+              
+              local failed_services=()
+              
+              # Check each service
+              for service in $(docker-compose config --services); do
+                  if ! docker-compose ps "$service" | grep -q "healthy"; then
+                      failed_services+=("$service")
+                  fi
+              done
+              
+              # Report results
+              if [ ${#failed_services[@]} -eq 0 ]; then
+                  log "All services are healthy"
+              else
+                  log "Failed services: ${failed_services[*]}"
+                  
+                  # Try to restart failed services
+                  for service in "${failed_services[@]}"; do
+                      log "Attempting to restart $service..."
+                      docker-compose restart "$service"
+                      sleep 10
+                      
+                      if ! docker-compose ps "$service" | grep -q "healthy"; then
+                          log "ERROR: $service failed to recover"
+                      fi
+                  done
+              fi
+          }
+          
+          cleanup() {
+              log "Cleaning up old files..."
+              
+              # Cleanup old logs
+              find "$LOG_DIR" -type f -mtime +30 -delete
+              
+              # Cleanup old backups
+              find "$BACKUP_DIR" -type f -mtime +7 -delete
+              
+              # Cleanup incomplete downloads
+              find "{{ data_dir }}/downloads" -type f -name "*.incomplete" -mtime +7 -delete
+              
+              log "Cleanup completed"
+          }
+          
+          case "$1" in
+              start)
+                  start_media
+                  ;;
+              stop)
+                  stop_media
+                  ;;
+              restart)
+                  restart_media
+                  ;;
+              status)
+                  show_status
+                  ;;
+              logs)
+                  show_logs
+                  ;;
+              update)
+                  update_media
+                  ;;
+              backup)
+                  backup_media
+                  ;;
+              restore)
+                  restore_media "$@"
+                  ;;
+              health)
+                  check_health
+                  ;;
+              cleanup)
+                  cleanup
+                  ;;
+              *)
+                  usage
+                  exit 1
+                  ;;
+          esac
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create media stack health check script
+      ansible.builtin.copy:
+        dest: "{{ config_dir }}/media-health.sh"
+        content: |
+          #!/bin/bash
+          # Media stack health check script
+          
+          MEDIA_DIR="{{ docker_dir }}/media"
+          LOG_DIR="{{ logs_dir }}/media/health"
+          ALERT_EMAIL="{{ alert_email }}"
+          
+          # Create log directory if it doesn't exist
+          mkdir -p "$LOG_DIR"
+          
+          # Error handling
+          set -e
+          trap 'handle_error $? $LINENO' ERR
+          
+          handle_error() {
+              local exit_code=$1
+              local line_number=$2
+              echo "Error occurred in script at line $line_number with exit code $exit_code" | tee -a "$LOG_DIR/error.log"
+              exit $exit_code
+          }
+          
+          log() {
+              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/health-check-$(date +%Y%m%d).log"
+          }
+          
+          send_alert() {
+              local subject="$1"
+              local message="$2"
+              
+              if [ -n "$ALERT_EMAIL" ]; then
+                  echo "$message" | mail -s "$subject" "$ALERT_EMAIL"
+              fi
+              
+              log "ALERT: $subject - $message"
+          }
+          
+          check_service() {
+              local service="$1"
+              local port="$2"
+              local path="${3:-/}"
+              local retries=3
+              local delay=5
+              
+              for ((i=1; i<=retries; i++)); do
+                  if curl -f -s "http://localhost:$port$path" >/dev/null 2>&1; then
+                      log "✓ $service is healthy"
+                      return 0
+                  fi
+                  
+                  if [ $i -lt $retries ]; then
+                      log "Retrying $service (attempt $i of $retries)..."
+                      sleep $delay
+                  fi
+              done
+              
+              log "✗ $service is unhealthy"
+              return 1
+          }
+          
+          check_disk_space() {
+              local threshold=90
+              local usage=$(df -h "{{ data_dir }}" | awk 'NR==2 {print $5}' | sed 's/%//')
+              
+              if [ "$usage" -gt "$threshold" ]; then
+                  send_alert "High Disk Usage" "Disk usage is at ${usage}% on {{ data_dir }}"
+              fi
+          }
+          
+          check_memory_usage() {
+              local threshold=85
+              local usage=$(free | awk 'NR==2 {print $3/$2 * 100.0}' | cut -d. -f1)
+              
+              if [ "$usage" -gt "$threshold" ]; then
+                  send_alert "High Memory Usage" "Memory usage is at ${usage}%"
+              fi
+          }
+          
+          check_download_speed() {
+              local service="$1"
+              local threshold=1000  # KB/s
+              
+              local speed=$(docker-compose exec -T "$service" curl -s "http://localhost:8080/api?mode=diskspace" | jq -r '.diskspace[].speed' 2>/dev/null || echo "0")
+              
+              if [ "$speed" -lt "$threshold" ]; then
+                  send_alert "Low Download Speed" "$service download speed is ${speed}KB/s"
+              fi
+          }
+          
+          main() {
+              log "Starting media stack health check"
+              
+              # Check system resources
+              check_disk_space
+              check_memory_usage
+              
+              local failed_services=()
+              
+              # Check core services
+              check_service "SABnzbd" "8080" "/api?mode=version" || failed_services+=("sabnzbd")
+              check_service "qBittorrent" "8081" "/api/v2/app/version" || failed_services+=("qbittorrent")
+              check_service "Prowlarr" "9696" "/health" || failed_services+=("prowlarr")
+              check_service "Sonarr" "8989" "/health" || failed_services+=("sonarr")
+              check_service "Radarr" "7878" "/health" || failed_services+=("radarr")
+              check_service "Lidarr" "8686" "/health" || failed_services+=("lidarr")
+              check_service "Readarr" "8787" "/health" || failed_services+=("readarr")
+              check_service "Bazarr" "6767" "/health" || failed_services+=("bazarr")
+              check_service "Pulsarr" "8088" "/health" || failed_services+=("pulsarr")
+              check_service "Jellyfin" "8096" "/health" || failed_services+=("jellyfin")
+              check_service "Immich Server" "3001" "/api/health" || failed_services+=("immich-server")
+              check_service "Immich Web" "3000" "/health" || failed_services+=("immich-web")
+              check_service "Immich ML" "3003" "/health" || failed_services+=("immich-machine-learning")
+              
+              # Check download speeds
+              check_download_speed "sabnzbd"
+              check_download_speed "qbittorrent"
+              
+              # Report results
+              if [ ${#failed_services[@]} -eq 0 ]; then
+                  log "All media services are healthy"
+                  exit 0
+              else
+                  log "Failed services: ${failed_services[*]}"
+                  send_alert "Media Stack Health Check Failed" "Failed services: ${failed_services[*]}"
+                  
+                  # Try to restart failed services
+                  log "Attempting to restart failed services..."
+                  cd "$MEDIA_DIR"
+                  for service in "${failed_services[@]}"; do
+                      log "Restarting $service..."
+                      docker-compose restart "$service"
+                      sleep 10
+                      
+                      # Verify service recovery
+                      if ! check_service "$service" "$(docker-compose port $service | cut -d: -f2)" "/health"; then
+                          send_alert "Service Recovery Failed" "$service failed to recover after restart"
+                      fi
+                  done
+                  
+                  exit 1
+              fi
+          }
+          
+          main
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule media stack health checks
+      ansible.builtin.cron:
+        name: "Media stack health check"
+        minute: "*/15"
+        job: "{{ config_dir }}/media-health.sh"
+        user: "{{ username }}"
+
+    - name: Schedule media stack cleanup
+      ansible.builtin.cron:
+        name: "Media stack cleanup"
+        hour: "3"
+        minute: "0"
+        job: "{{ config_dir }}/media-manage.sh cleanup"
+        user: "{{ username }}"
+
+    - name: Verify media stack deployment
+      block:
+        - name: Check service health
+          ansible.builtin.command: "{{ config_dir }}/media-health.sh"
+          register: health_check
+          changed_when: false
+          retries: 3
+          delay: 30
+          until: health_check.rc == 0
+
+        - name: Verify service connectivity
+          ansible.builtin.uri:
+            url: "http://localhost:{{ item.port }}{{ item.path }}"
+            method: GET
+            status_code: 200
+          loop:
+            - { service: "sabnzbd", port: 8080, path: "/api?mode=version" }
+            - { service: "qbittorrent", port: 8081, path: "/api/v2/app/version" }
+            - { service: "prowlarr", port: 9696, path: "/health" }
+            - { service: "sonarr", port: 8989, path: "/health" }
+            - { service: "radarr", port: 7878, path: "/health" }
+            - { service: "lidarr", port: 8686, path: "/health" }
+            - { service: "readarr", port: 8787, path: "/health" }
+            - { service: "bazarr", port: 6767, path: "/health" }
+            - { service: "pulsarr", port: 8088, path: "/health" }
+            - { service: "jellyfin", port: 8096, path: "/health" }
+          register: connectivity_check
+          changed_when: false
+
+  rescue:
+    - name: Log media stack deployment failure
+      ansible.builtin.debug:
+        msg: |
+          Media stack deployment failed:
+          - Directory creation: {{ dir_creation | default('N/A') }}
+          - Config backup: {{ config_backup | default('N/A') }}
+          - Health check: {{ health_check | default('N/A') }}
+          - Connectivity check: {{ connectivity_check | default('N/A') }}
+
+    - name: Attempt media stack recovery
+      ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+      vars:
+        failed_config_files:
+          - "{{ docker_dir }}/media/docker-compose.yml"
+        config_verification_commands:
+          - "{{ config_dir }}/media-health.sh"
+        critical_services:
+          - sabnzbd
+          - qbittorrent
+          - prowlarr
+          - sonarr
+          - radarr
+          - lidarr
+          - readarr
+          - bazarr
+          - jellyfin
+          - immich-server
+
+    - name: Rollback if recovery failed
+      ansible.builtin.include_tasks: handlers/error_handling/rollback.yml
+      when: recovery_complete | default(false) | bool == false
+      vars:
+        affected_services:
+          - sabnzbd
+          - qbittorrent
+          - prowlarr
+          - sonarr
+          - radarr
+          - lidarr
+          - readarr
+          - bazarr
+          - jellyfin
+          - immich-server
+        config_files:
+          - "{{ docker_dir }}/media/docker-compose.yml"
+
+  always:
+    - name: Cleanup temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ temp_dirs | default([]) }}"
+      when: temp_dirs is defined
+
+    - name: Display media stack summary
+      ansible.builtin.debug:
+        msg: |
+          Media Stack Setup Complete:
+          
+          Components Configured:
+          - SABnzbd (Usenet Downloader)
+          - qBittorrent (Torrent Client)
+          - Prowlarr (Indexer Management)
+          - Sonarr (TV Show Management)
+          - Radarr (Movie Management)
+          - Lidarr (Music Management)
+          - Readarr (Book Management)
+          - Bazarr (Subtitle Management)
+          - Pulsarr (ARR Service Status Dashboard)
+          - Jellyfin (Media Server)
+          - Immich (Photo Management)
+          
+          Management Scripts:
+          - Health Check: {{ config_dir }}/media-health.sh
+          - Management: {{ config_dir }}/media-manage.sh
+          
+          Access URLs:
+          - SABnzbd: https://sabnzbd.{{ domain }}
+          - qBittorrent: https://qbittorrent.{{ domain }}
+          - Prowlarr: https://prowlarr.{{ domain }}
+          - Sonarr: https://sonarr.{{ domain }}
+          - Radarr: https://radarr.{{ domain }}
+          - Lidarr: https://lidarr.{{ domain }}
+          - Readarr: https://readarr.{{ domain }}
+          - Bazarr: https://bazarr.{{ domain }}
+          - Pulsarr: https://pulsarr.{{ domain }}
+          - Jellyfin: https://jellyfin.{{ domain }}
+          - Immich: https://immich.{{ domain }}
+          
+          Next Steps:
+          1. Start media stack: {{ config_dir }}/media-manage.sh start
+          2. Configure individual media services
+          3. Set up indexers in Prowlarr
+          4. Configure download clients
+          5. Import media libraries
+          
+          Files Created:
+          - Docker Compose: {{ docker_dir }}/media/docker-compose.yml
+          - Management Tools: {{ config_dir }}/media-*.sh 

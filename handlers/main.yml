@@ -1,0 +1,24 @@
+---
+# Security service handlers
+
+- name: restart sshd
+  systemd:
+    name: sshd
+    state: restarted
+    daemon_reload: yes
+
+- name: restart fail2ban
+  systemd:
+    name: fail2ban
+    state: restarted
+    daemon_reload: yes
+
+- name: restart auditd
+  systemd:
+    name: auditd
+    state: restarted
+    daemon_reload: yes
+
+- name: reload sysctl
+  command: sysctl -p /etc/sysctl.d/99-security.conf
+  changed_when: false 

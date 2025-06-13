@@ -1,0 +1,218 @@
+---
+# Fail2ban Configuration
+# Production-ready intrusion prevention
+
+- name: Create Fail2ban directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/fail2ban/config"
+    - "{{ docker_dir }}/fail2ban/data"
+    - "{{ docker_dir }}/fail2ban/scripts"
+    - "{{ logs_dir }}/fail2ban"
+
+- name: Create Fail2ban configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/jail.local"
+    content: |
+      [DEFAULT]
+      # Ban hosts for 24 hours
+      bantime = 86400
+      # Retry window of 10 minutes
+      findtime = 600
+      # Allow 5 retries
+      maxretry = 5
+      # Ban on all interfaces
+      banaction = iptables-allports
+      # Send email notifications
+      destemail = {{ admin_email }}
+      sender = fail2ban@{{ domain }}
+      action = %(action_mwl)s
+      # Log level
+      loglevel = INFO
+      # Log target
+      logtarget = /var/log/fail2ban/fail2ban.log
+      # Socket file
+      socket = /var/run/fail2ban/fail2ban.sock
+      # PID file
+      pidfile = /var/run/fail2ban/fail2ban.pid
+      # Database
+      dbfile = /var/lib/fail2ban/fail2ban.sqlite3
+      # Database purge
+      dbpurgeage = 86400
+      
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [nginx-http-auth]
+      enabled = true
+      filter = nginx-http-auth
+      port = http,https
+      logpath = /var/log/nginx/error.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [nginx-botsearch]
+      enabled = true
+      filter = nginx-botsearch
+      port = http,https
+      logpath = /var/log/nginx/access.log
+      maxretry = 2
+      findtime = 300
+      bantime = 3600
+      
+      [nginx-badbots]
+      enabled = true
+      filter = nginx-badbots
+      port = http,https
+      logpath = /var/log/nginx/access.log
+      maxretry = 2
+      findtime = 300
+      bantime = 3600
+      
+      [traefik-auth]
+      enabled = true
+      filter = traefik-auth
+      port = http,https
+      logpath = /var/log/traefik/access.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [authentik]
+      enabled = true
+      filter = authentik
+      port = http,https
+      logpath = /var/log/authentik/authentik.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban filter for Traefik
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/filter.d/traefik-auth.conf"
+    content: |
+      [Definition]
+      failregex = ^.*"ClientIP":"<HOST>".*"Status":(401|403).*$
+      ignoreregex =
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban filter for Authentik
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/filter.d/authentik.conf"
+    content: |
+      [Definition]
+      failregex = ^.*"client_ip":"<HOST>".*"status":(401|403).*$
+      ignoreregex =
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Fail2ban Management Script
+      
+      function show_help {
+        echo "Fail2ban Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Fail2ban status"
+        echo "  logs      - Show Fail2ban logs"
+        echo "  restart   - Restart Fail2ban"
+        echo "  unban     - Unban an IP"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          docker exec fail2ban fail2ban-client status
+          ;;
+        logs)
+          docker logs fail2ban --tail 100 -f
+          ;;
+        restart)
+          docker restart fail2ban
+          ;;
+        unban)
+          if [ -z "$2" ]; then
+            echo "Please specify IP address"
+            exit 1
+          fi
+          docker exec fail2ban fail2ban-client unban "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Fail2ban health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Fail2ban is responding
+      if ! docker exec fail2ban fail2ban-client status > /dev/null; then
+        echo "Fail2ban is not responding"
+        exit 1
+      fi
+      
+      # Check if we can access the socket
+      if ! docker exec fail2ban fail2ban-client ping > /dev/null; then
+        echo "Fail2ban socket is not accessible"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Fail2ban log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/fail2ban/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Fail2ban log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Fail2ban logs"
+    job: "logrotate {{ docker_dir }}/fail2ban/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}" 

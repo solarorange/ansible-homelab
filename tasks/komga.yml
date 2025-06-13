@@ -1,0 +1,156 @@
+---
+# Komga Configuration Tasks
+
+- name: Create Komga directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/komga/config"
+    - "{{ docker_dir }}/komga/data"
+    - "{{ docker_dir }}/komga/scripts"
+    - "{{ logs_dir }}/komga"
+
+- name: Create Komga configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/komga/config/application.yml"
+    content: |
+      server:
+        port: 8080
+      komga:
+        database:
+          file: /data/database.sqlite
+        logging:
+          file:
+            name: {{ logs_dir }}/komga/app.log
+            max-size: 5MB
+            max-history: 5
+        security:
+          remember-me:
+            key: {{ komga_remember_me_key }}
+          jwt:
+            secret: {{ komga_jwt_secret }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Komga management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/komga/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Komga Management Script
+      
+      function show_help {
+          echo "Komga Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Komga status"
+          echo "  logs      - View Komga logs"
+          echo "  restart   - Restart Komga"
+          echo "  backup    - Backup Komga data"
+          echo "  restore   - Restore Komga data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Komga data..."
+          tar -czf "{{ docker_dir }}/komga/backup/komga_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/komga" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Komga data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/komga"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep komga
+              ;;
+          logs)
+              docker logs -f komga
+              ;;
+          restart)
+              docker restart komga
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Komga health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/komga/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Komga is running
+      if ! docker ps | grep -q komga; then
+          echo "Komga is not running"
+          exit 1
+      fi
+      
+      # Check if Komga is responding
+      if ! curl -s http://localhost:8080 | grep -q "Komga"; then
+          echo "Komga is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Komga log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/komga/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/komga/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Komga log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Komga logs"
+    job: "logrotate {{ docker_dir }}/komga/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Komga backup cron job
+  ansible.builtin.cron:
+    name: "Backup Komga data"
+    job: "{{ docker_dir }}/komga/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

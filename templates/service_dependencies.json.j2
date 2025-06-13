@@ -1,0 +1,247 @@
+{
+    "docker": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": ["traefik", "monitoring_infrastructure"]
+    },
+    "traefik": {
+        "type": "docker",
+        "depends_on": ["docker"],
+        "required_by": ["authentik", "monitoring_infrastructure", "nginx_proxy_manager"]
+    },
+    "monitoring_infrastructure": {
+        "type": "docker",
+        "depends_on": ["docker", "traefik"],
+        "required_by": []
+    },
+    "authentik": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "prometheus": {
+        "type": "docker",
+        "depends_on": ["monitoring_infrastructure"],
+        "required_by": ["grafana", "alertmanager"]
+    },
+    "grafana": {
+        "type": "docker",
+        "depends_on": ["prometheus"],
+        "required_by": []
+    },
+    "alertmanager": {
+        "type": "docker",
+        "depends_on": ["prometheus"],
+        "required_by": []
+    },
+    "loki": {
+        "type": "docker",
+        "depends_on": ["monitoring_infrastructure"],
+        "required_by": ["promtail"]
+    },
+    "promtail": {
+        "type": "docker",
+        "depends_on": ["loki"],
+        "required_by": []
+    },
+    "nginx_proxy_manager": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "pihole": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "fail2ban": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": []
+    },
+    "crowdsec": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": []
+    },
+    "vault": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "wireguard": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": []
+    },
+    "sabnzbd": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": ["sonarr", "radarr"]
+    },
+    "qbittorrent": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": ["sonarr", "radarr"]
+    },
+    "sonarr": {
+        "type": "docker",
+        "depends_on": ["sabnzbd", "qbittorrent"],
+        "required_by": []
+    },
+    "radarr": {
+        "type": "docker",
+        "depends_on": ["sabnzbd", "qbittorrent"],
+        "required_by": []
+    },
+    "lidarr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "readarr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "prowlarr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": ["sonarr", "radarr", "lidarr", "readarr"]
+    },
+    "bazarr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "jellyfin": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "emby": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "tdarr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "overseerr": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "tautulli": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "immich": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "calibre-web": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "audiobookshelf": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "komga": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "nextcloud": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "samba": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": []
+    },
+    "syncthing": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "gitlab": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "harbor": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "minio": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "paperless": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "bookstack": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "filebrowser": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "mosquitto": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": ["zigbee2mqtt", "home_assistant", "nodered"]
+    },
+    "zigbee2mqtt": {
+        "type": "docker",
+        "depends_on": ["mosquitto"],
+        "required_by": ["home_assistant"]
+    },
+    "home_assistant": {
+        "type": "docker",
+        "depends_on": ["mosquitto", "zigbee2mqtt"],
+        "required_by": []
+    },
+    "nodered": {
+        "type": "docker",
+        "depends_on": ["mosquitto"],
+        "required_by": []
+    },
+    "n8n": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "backup": {
+        "type": "systemd",
+        "depends_on": [],
+        "required_by": []
+    },
+    "kopia": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    },
+    "duplicati": {
+        "type": "docker",
+        "depends_on": ["traefik"],
+        "required_by": []
+    }
+} 

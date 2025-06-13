@@ -1,0 +1,152 @@
+version: '3.8'
+
+networks:
+  media:
+    name: media
+    external: true
+  homelab:
+    name: homelab
+    external: true
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:latest
+    container_name: immich-server
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - DB_HOSTNAME=immich-postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE_NAME=immich
+      - REDIS_HOSTNAME=immich-redis
+      - REDIS_PORT=6379
+      - REDIS_DBINDEX=0
+      - REDIS_PASSWORD=redis
+      - JWT_SECRET={{ jwt_secret.stdout }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/server:/config
+      - {{ data_dir }}/media/photos:/photos
+      - {{ logs_dir }}/immich/server:/logs
+    restart: unless-stopped
+    networks:
+      - media
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.immich-server.rule=Host(`immich.{{ domain }}`)"
+      - "traefik.http.routers.immich-server.entrypoints=websecure"
+      - "traefik.http.routers.immich-server.tls=true"
+      - "traefik.http.routers.immich-server.tls.certresolver=cloudflare"
+      - "traefik.http.services.immich-server.loadbalancer.server.port=3001"
+      - "traefik.http.middlewares.immich-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.immich-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.immich-server.middlewares=immich-auth"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
+      - "traefik.http.routers.immich-server.middlewares=immich-headers"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-postgres
+      - immich-redis
+
+  immich-web:
+    image: ghcr.io/immich-app/immich-web:latest
+    container_name: immich-web
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/web:/config
+      - {{ logs_dir }}/immich/web:/logs
+    restart: unless-stopped
+    networks:
+      - media
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.immich-web.rule=Host(`immich.{{ domain }}`)"
+      - "traefik.http.routers.immich-web.entrypoints=websecure"
+      - "traefik.http.routers.immich-web.tls=true"
+      - "traefik.http.routers.immich-web.tls.certresolver=cloudflare"
+      - "traefik.http.services.immich-web.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.immich-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.immich-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.immich-web.middlewares=immich-auth"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
+      - "traefik.http.routers.immich-web.middlewares=immich-headers"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-server
+
+  immich-postgres:
+    image: postgres:14-alpine
+    container_name: immich-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=immich
+    volumes:
+      - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
+      - {{ logs_dir }}/immich/postgres:/logs
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  immich-redis:
+    image: redis:alpine
+    container_name: immich-redis
+    command: redis-server --requirepass redis
+    volumes:
+      - {{ docker_dir }}/immich/redis:/data
+      - {{ logs_dir }}/immich/redis:/logs
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:latest
+    container_name: immich-machine-learning
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/ml:/config
+      - {{ logs_dir }}/immich/ml:/logs
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-server 

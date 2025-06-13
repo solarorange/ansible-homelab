@@ -1,0 +1,48 @@
+---
+# Service deployment validation tasks
+- name: Check service status
+  ansible.builtin.systemd:
+    name: "{{ service_name }}"
+    state: started
+    enabled: yes
+  register: service_status
+  ignore_errors: yes
+
+- name: Verify service health
+  ansible.builtin.uri:
+    url: "{{ service_health_url | default('http://localhost:8080/health') }}"
+    method: GET
+    status_code: [200, 201, 202]
+    timeout: 30
+  register: health_check
+  when: service_health_url is defined
+  retries: 3
+  delay: 10
+  until: health_check is success
+
+- name: Check service logs
+  ansible.builtin.shell: "journalctl -u {{ service_name }} --no-pager -n 50"
+  register: service_logs
+  changed_when: false
+  when: service_status is success
+
+- name: Validate service configuration
+  ansible.builtin.include_tasks: "validate/{{ service_name }}.yml"
+  when: service_name in enabled_services
+  ignore_errors: yes
+
+- name: Report service status
+  ansible.builtin.debug:
+    msg: |
+      Service: {{ service_name }}
+      Status: {{ 'Running' if service_status is success else 'Failed' }}
+      Health Check: {{ 'Passed' if health_check is success else 'Failed' }}
+      Last Logs: {{ service_logs.stdout_lines[-5:] | default([]) | join('\n') }}
+  when: service_status is defined
+
+- name: Fail if service validation unsuccessful
+  ansible.builtin.fail:
+    msg: "Service {{ service_name }} validation failed. Check logs for details."
+  when: 
+    - service_status is failed or 
+    - (service_health_url is defined and health_check is failed) 

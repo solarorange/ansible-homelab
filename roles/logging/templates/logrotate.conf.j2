@@ -1,0 +1,150 @@
+# Log rotation configuration for homelab services
+
+# System logs
+/var/log/syslog
+/var/log/auth.log
+/var/log/kern.log
+/var/log/dmesg
+/var/log/daemon.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 syslog adm
+    sharedscripts
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+
+# Docker logs
+/var/lib/docker/containers/*/*-json.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+
+# Web services logs
+/var/log/nginx/*.log
+/var/log/apache2/*.log
+{{ docker_dir }}/traefik/logs/*.log
+{{ docker_dir }}/nginx-proxy-manager/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+}
+
+# Database logs
+{{ docker_dir }}/postgres/logs/*.log
+{{ docker_dir }}/mysql/logs/*.log
+{{ docker_dir }}/redis/logs/*.log
+{{ docker_dir }}/influxdb/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+}
+
+# Monitoring stack logs
+{{ docker_dir }}/monitoring/prometheus/logs/*.log
+{{ docker_dir }}/monitoring/grafana/logs/*.log
+{{ docker_dir }}/monitoring/loki/logs/*.log
+{{ docker_dir }}/monitoring/alertmanager/logs/*.log
+{{ docker_dir }}/monitoring/node-exporter/logs/*.log
+{{ docker_dir }}/monitoring/cadvisor/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+}
+
+# Media services logs
+{{ docker_dir }}/sonarr/logs/*.log
+{{ docker_dir }}/radarr/logs/*.log
+{{ docker_dir }}/lidarr/logs/*.log
+{{ docker_dir }}/readarr/logs/*.log
+{{ docker_dir }}/bazarr/logs/*.log
+{{ docker_dir }}/prowlarr/logs/*.log
+{{ docker_dir }}/sabnzbd/logs/*.log
+{{ docker_dir }}/qbittorrent/logs/*.log
+{{ docker_dir }}/jellyfin/logs/*.log
+{{ docker_dir }}/emby/logs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+}
+
+# Security services logs
+/var/log/fail2ban.log
+/var/log/crowdsec.log
+{{ docker_dir }}/authentik/logs/*.log
+{{ docker_dir }}/vault/logs/*.log
+/var/log/audit/audit.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+
+# Network services logs
+{{ docker_dir }}/pihole/logs/*.log
+/var/log/dnsmasq.log
+/var/log/dhcpd.log
+/var/log/iptables.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+
+# Storage services logs
+/var/log/samba/*.log
+/var/log/nfs/*.log
+{{ docker_dir }}/backup/logs/*.log
+/var/log/rsync.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+
+# Application logs
+{{ logs_dir }}/applications/*.log
+{{ logs_dir }}/custom/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+} 

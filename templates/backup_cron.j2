@@ -1,0 +1,14 @@
+# Ansible managed backup schedule
+# DO NOT EDIT MANUALLY
+
+# Daily full backup at 2 AM
+0 2 * * * {{ backup_user | default('root') }} ansible-playbook {{ playbook_path | default('/etc/ansible/playbooks/main.yml') }} --tags backup > {{ backup_root_dir | default('/var/backups') }}/logs/daily-backup-$(date +\%Y\%m\%d).log 2>&1
+
+# Weekly full backup with verification at 3 AM on Sunday
+0 3 * * 0 {{ backup_user | default('root') }} ansible-playbook {{ playbook_path | default('/etc/ansible/playbooks/main.yml') }} --tags "backup,verification" > {{ backup_root_dir | default('/var/backups') }}/logs/weekly-backup-$(date +\%Y\%m\%d).log 2>&1
+
+# Monthly full backup with retention policy at 4 AM on the 1st
+0 4 1 * * {{ backup_user | default('root') }} ansible-playbook {{ playbook_path | default('/etc/ansible/playbooks/main.yml') }} --tags "backup,retention" > {{ backup_root_dir | default('/var/backups') }}/logs/monthly-backup-$(date +\%Y\%m\%d).log 2>&1
+
+# Cleanup old backup logs (keep last 30 days)
+0 5 * * * {{ backup_user | default('root') }} find {{ backup_root_dir | default('/var/backups') }}/logs -name "*.log" -mtime +30 -delete 

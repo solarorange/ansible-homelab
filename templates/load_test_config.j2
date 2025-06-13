@@ -1,0 +1,58 @@
+{
+  "service": "{{ test_config.service }}",
+  "duration": {{ test_config.duration }},
+  "concurrent_users": {{ test_config.users }},
+  "endpoints": [
+    {% for endpoint in test_config.endpoints %}
+    {
+      "url": "{{ endpoint.url }}",
+      "method": "{{ endpoint.method | default('GET') }}",
+      "headers": {
+        {% for key, value in endpoint.headers | default({}) | dictsort %}
+        "{{ key }}": "{{ value }}"{% if not loop.last %},{% endif %}
+        {% endfor %}
+      },
+      "body": {{ endpoint.body | default('null') | to_json }},
+      "expected_status": {{ endpoint.expected_status | default(200) }},
+      "timeout": {{ endpoint.timeout | default(30) }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "thresholds": {
+    "latency": {
+      "warning": 200,
+      "critical": 500
+    },
+    "requests_per_second": {
+      "warning": 100,
+      "critical": 50
+    },
+    "error_rate": {
+      "warning": 1,
+      "critical": 5
+    }
+  },
+  "monitoring": {
+    "enabled": true,
+    "metrics": [
+      "response_time",
+      "throughput",
+      "error_rate",
+      "resource_usage"
+    ],
+    "alerting": {
+      "enabled": true,
+      "channels": [
+        "webhook",
+        "email",
+        "slack"
+      ]
+    }
+  },
+  "reporting": {
+    "format": "html",
+    "include_metrics": true,
+    "include_graphs": true,
+    "save_raw_data": true
+  }
+} 

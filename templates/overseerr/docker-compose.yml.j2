@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  overseerr:
+    image: linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID={{ ansible_user_id }}
+      - PGID={{ ansible_user_gid }}
+      - TZ={{ timezone | default('UTC') }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_root }}/overseerr/config:/config
+      - {{ docker_root }}/overseerr/data:/data
+    ports:
+      - "5055:5055"
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.overseerr.rule=Host(`overseerr.{{ domain }}`)"
+      - "traefik.http.routers.overseerr.entrypoints=websecure"
+      - "traefik.http.routers.overseerr.tls=true"
+      - "traefik.http.routers.overseerr.tls.certresolver=cloudflare"
+      - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
+      - "traefik.http.middlewares.overseerr-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.overseerr-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.overseerr.middlewares=overseerr-auth"
+      - "traefik.http.middlewares.overseerr-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.overseerr-headers.headers.customrequestheaders.X-Forwarded-Host=overseerr.{{ domain }}"
+      - "traefik.http.routers.overseerr.middlewares=overseerr-headers"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  traefik_network:
+    external: true 

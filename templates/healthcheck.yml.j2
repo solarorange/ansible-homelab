@@ -1,0 +1,65 @@
+---
+# Health check endpoints configuration
+endpoints:
+  - name: "{{ inventory_hostname }}_system"
+    url: "http://localhost:9100/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_docker"
+    url: "http://localhost:9323/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_traefik"
+    url: "http://localhost:8080/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_prometheus"
+    url: "http://localhost:9090/-/healthy"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_grafana"
+    url: "http://localhost:3000/api/health"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_influxdb"
+    url: "http://localhost:8086/health"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_alertmanager"
+    url: "http://localhost:9093/-/healthy"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_loki"
+    url: "http://localhost:3100/ready"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_blackbox"
+    url: "http://localhost:9115/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+notifications:
+  email:
+    smtp_host: "{{ smtp_host | default('smtp.gmail.com') }}"
+    smtp_port: "{{ smtp_port | default(587) }}"
+    smtp_username: "{{ smtp_username }}"
+    smtp_password: "{{ smtp_password }}"
+    from_address: "{{ monitoring_email }}"
+    to_address: "{{ admin_email }}" 

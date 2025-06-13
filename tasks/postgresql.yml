@@ -1,0 +1,276 @@
+---
+# PostgreSQL Configuration
+# Production-ready database management
+
+- name: Create PostgreSQL directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/postgresql/data"
+    - "{{ docker_dir }}/postgresql/config"
+    - "{{ docker_dir }}/postgresql/scripts"
+    - "{{ docker_dir }}/postgresql/backup"
+    - "{{ logs_dir }}/postgresql"
+
+- name: Create PostgreSQL configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/config/postgresql.conf"
+    content: |
+      # Connection Settings
+      listen_addresses = '*'
+      max_connections = 100
+      superuser_reserved_connections = 3
+      
+      # Memory Settings
+      shared_buffers = '1GB'
+      work_mem = '16MB'
+      maintenance_work_mem = '256MB'
+      effective_cache_size = '3GB'
+      
+      # Write Ahead Log
+      wal_level = replica
+      max_wal_senders = 10
+      max_wal_size = '1GB'
+      min_wal_size = '80MB'
+      
+      # Query Planning
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      
+      # Background Writer
+      bgwriter_delay = '200ms'
+      bgwriter_lru_maxpages = 100
+      bgwriter_lru_multiplier = 2.0
+      
+      # Asynchronous Behavior
+      synchronous_commit = off
+      
+      # Logging
+      log_destination = 'stderr'
+      logging_collector = on
+      log_directory = '/var/log/postgresql'
+      log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+      log_rotation_age = 1d
+      log_rotation_size = 100MB
+      log_min_duration_statement = 1000
+      log_checkpoints = on
+      log_connections = on
+      log_disconnections = on
+      log_lock_waits = on
+      log_temp_files = 0
+      log_autovacuum_min_duration = 0
+      
+      # Autovacuum
+      autovacuum = on
+      autovacuum_max_workers = 3
+      autovacuum_naptime = '1min'
+      autovacuum_vacuum_threshold = 50
+      autovacuum_analyze_threshold = 50
+      autovacuum_vacuum_scale_factor = 0.2
+      autovacuum_analyze_scale_factor = 0.1
+      autovacuum_vacuum_cost_delay = '20ms'
+      autovacuum_vacuum_cost_limit = 200
+      
+      # Client Connection Defaults
+      statement_timeout = '60s'
+      lock_timeout = '60s'
+      idle_in_transaction_session_timeout = '60s'
+      
+      # Locale and Formatting
+      datestyle = 'iso, mdy'
+      timezone = 'UTC'
+      lc_messages = 'en_US.utf8'
+      lc_monetary = 'en_US.utf8'
+      lc_numeric = 'en_US.utf8'
+      lc_time = 'en_US.utf8'
+      
+      # Other Defaults
+      default_text_search_config = 'pg_catalog.english'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create PostgreSQL access configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/config/pg_hba.conf"
+    content: |
+      # TYPE  DATABASE        USER            ADDRESS                 METHOD
+      local   all            postgres                                peer
+      local   all            all                                     md5
+      host    all            all             127.0.0.1/32           md5
+      host    all            all             ::1/128                 md5
+      host    all            all             0.0.0.0/0              md5
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create PostgreSQL backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+      
+      # PostgreSQL Backup Script
+      
+      BACKUP_DIR="{{ docker_dir }}/postgresql/backup"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="$BACKUP_DIR/postgresql_backup_$TIMESTAMP.sql.gz"
+      
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+      
+      # Perform backup
+      docker exec postgresql pg_dumpall -U postgres | gzip > "$BACKUP_FILE"
+      
+      # Remove backups older than 7 days
+      find "$BACKUP_DIR" -name "postgresql_backup_*.sql.gz" -mtime +7 -delete
+      
+      echo "Backup created: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create PostgreSQL restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+      
+      # PostgreSQL Restore Script
+      
+      if [ -z "$1" ]; then
+        echo "Please specify backup file"
+        exit 1
+      fi
+      
+      BACKUP_FILE="$1"
+      if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Backup file not found: $BACKUP_FILE"
+        exit 1
+      fi
+      
+      # Restore backup
+      gunzip -c "$BACKUP_FILE" | docker exec -i postgresql psql -U postgres
+      
+      echo "Backup restored from: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create PostgreSQL management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # PostgreSQL Management Script
+      
+      function show_help {
+        echo "PostgreSQL Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show PostgreSQL status"
+        echo "  logs      - Show PostgreSQL logs"
+        echo "  restart   - Restart PostgreSQL"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  vacuum    - Run VACUUM ANALYZE"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          docker ps -f name=postgresql
+          docker exec postgresql pg_isready
+          ;;
+        logs)
+          docker logs postgresql --tail 100 -f
+          ;;
+        restart)
+          docker restart postgresql
+          ;;
+        backup)
+          {{ docker_dir }}/postgresql/scripts/backup.sh
+          ;;
+        restore)
+          {{ docker_dir }}/postgresql/scripts/restore.sh "$2"
+          ;;
+        vacuum)
+          docker exec postgresql psql -U postgres -c "VACUUM ANALYZE;"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create PostgreSQL health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if PostgreSQL is running
+      if ! docker ps -f name=postgresql -f status=running | grep -q postgresql; then
+        echo "PostgreSQL is not running"
+        exit 1
+      fi
+      
+      # Check if PostgreSQL is accepting connections
+      if ! docker exec postgresql pg_isready > /dev/null; then
+        echo "PostgreSQL is not accepting connections"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create PostgreSQL log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/postgresql/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add PostgreSQL log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate PostgreSQL logs"
+    job: "logrotate {{ docker_dir }}/postgresql/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add PostgreSQL backup to crontab
+  ansible.builtin.cron:
+    name: "Backup PostgreSQL database"
+    job: "{{ docker_dir }}/postgresql/scripts/backup.sh"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add PostgreSQL vacuum to crontab
+  ansible.builtin.cron:
+    name: "Vacuum PostgreSQL database"
+    job: "{{ docker_dir }}/postgresql/scripts/manage.sh vacuum"
+    hour: "4"
+    minute: "0"
+    user: "{{ username }}" 

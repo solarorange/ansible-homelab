@@ -1,0 +1,77 @@
+# Telegraf Configuration
+
+[agent]
+  interval = "10s"
+  round_interval = true
+  metric_batch_size = 1000
+  metric_buffer_limit = 10000
+  collection_jitter = "0s"
+  flush_interval = "10s"
+  flush_jitter = "0s"
+  precision = ""
+  hostname = "{{ inventory_hostname }}"
+  omit_hostname = false
+
+# Input Plugins
+[[inputs.cpu]]
+  percpu = true
+  totalcpu = true
+  collect_cpu_time = false
+  report_active = false
+
+[[inputs.disk]]
+  ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
+
+[[inputs.diskio]]
+  devices = ["sda", "sdb", "sdc", "sdd", "sde", "sdf", "sdg", "sdh", "sdi", "sdj", "sdk", "sdl", "sdm", "sdn", "sdo", "sdp", "sdq", "sdr", "sds", "sdt", "sdu", "sdv", "sdw", "sdx", "sdy", "sdz"]
+
+[[inputs.mem]]
+  # No additional configuration needed
+
+[[inputs.net]]
+  interfaces = ["eth0", "eth1", "eth2", "eth3", "eth4", "eth5", "eth6", "eth7", "eth8", "eth9", "eth10"]
+
+[[inputs.docker]]
+  endpoint = "unix:///var/run/docker.sock"
+  gather_services = true
+  container_names = []
+  timeout = "5s"
+  perdevice = true
+  total = true
+
+[[inputs.prometheus]]
+  urls = ["http://localhost:9100/metrics", "http://localhost:9323/metrics", "http://localhost:8080/metrics"]
+  response_timeout = "5s"
+
+[[inputs.system]]
+  # No additional configuration needed
+
+[[inputs.swap]]
+  # No additional configuration needed
+
+[[inputs.processes]]
+  # No additional configuration needed
+
+[[inputs.netstat]]
+  # No additional configuration needed
+
+[[inputs.interrupts]]
+  # No additional configuration needed
+
+[[inputs.linux_sysctl_fs]]
+  # No additional configuration needed
+
+# Output Plugins
+[[outputs.influxdb]]
+  urls = ["http://localhost:8086"]
+  database = "homelab"
+  retention_policy = ""
+  write_consistency = "any"
+  timeout = "5s"
+  username = "{{ influxdb_username }}"
+  password = "{{ influxdb_password }}"
+
+[[outputs.prometheus_client]]
+  listen = ":9273"
+  path = "/metrics"
+  expiration_interval = "60s" 

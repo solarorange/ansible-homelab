@@ -1,0 +1,64 @@
+---
+# Ansible managed backup configuration
+# DO NOT EDIT MANUALLY
+
+backup:
+  root_dir: "{{ backup_root_dir | default('/var/backups') }}"
+  user: "{{ backup_user | default(ansible_user) }}"
+  group: "{{ backup_group | default(ansible_user) }}"
+  
+  retention:
+    daily: {{ backup_retention.daily | default(7) }}  # days
+    weekly: {{ backup_retention.weekly | default(30) }}  # days
+    monthly: {{ backup_retention.monthly | default(365) }}  # days
+
+  databases:
+    postgres:
+      enabled: {{ postgres_backup_enabled | default(true) }}
+      compression: gzip
+      parallel_jobs: {{ postgres_parallel_jobs | default(4) }}
+    
+    mysql:
+      enabled: {{ mysql_backup_enabled | default(true) }}
+      compression: gzip
+      parallel_jobs: {{ mysql_parallel_jobs | default(4) }}
+    
+    mongodb:
+      enabled: {{ mongodb_backup_enabled | default(true) }}
+      compression: gzip
+      parallel_jobs: {{ mongodb_parallel_jobs | default(4) }}
+    
+    redis:
+      enabled: {{ redis_backup_enabled | default(true) }}
+      compression: none
+      parallel_jobs: {{ redis_parallel_jobs | default(1) }}
+
+  docker:
+    enabled: {{ docker_backup_enabled | default(true) }}
+    volumes: {{ docker_volumes | default([]) }}
+    compression: gzip
+    parallel_jobs: {{ docker_parallel_jobs | default(4) }}
+
+  verification:
+    enabled: {{ backup_verification_enabled | default(true) }}
+    check_integrity: {{ backup_check_integrity | default(true) }}
+    check_permissions: {{ backup_check_permissions | default(true) }}
+    check_size: {{ backup_check_size | default(true) }}
+
+  notification:
+    enabled: {{ backup_notification_enabled | default(true) }}
+    webhook_url: "{{ notification_webhook_url | default('') }}"
+    email: "{{ backup_notification_email | default('') }}"
+    slack: "{{ backup_notification_slack | default('') }}"
+
+  encryption:
+    enabled: {{ backup_encryption_enabled | default(false) }}
+    key_file: "{{ backup_encryption_key_file | default('/etc/ansible/backup/encryption.key') }}"
+    algorithm: "{{ backup_encryption_algorithm | default('aes-256-gcm') }}"
+
+  scheduling:
+    daily_time: "{{ backup_daily_time | default('02:00') }}"
+    weekly_day: "{{ backup_weekly_day | default('0') }}"  # 0 = Sunday
+    weekly_time: "{{ backup_weekly_time | default('03:00') }}"
+    monthly_day: "{{ backup_monthly_day | default('1') }}"
+    monthly_time: "{{ backup_monthly_time | default('04:00') }}" 

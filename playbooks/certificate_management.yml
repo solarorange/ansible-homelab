@@ -1,0 +1,64 @@
+---
+- name: Apply certificate management enhancements
+  hosts: all
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../roles/certificate_management/vars/main.yml
+
+  pre_tasks:
+    - name: Install required packages
+      package:
+        name:
+          - openssl
+          - jq
+          - curl
+        state: present
+
+  roles:
+    - certificate_management
+
+  tasks:
+    - name: Generate internal CA and service certificates
+      shell: "{{ docker_dir }}/certificate_management/scripts/generate_mtls_certs.sh {{ item }} {{ domain }}"
+      with_items:
+        - traefik
+        - prometheus
+        - grafana
+        - loki
+        - blackbox
+      register: cert_generation
+      changed_when: cert_generation.rc == 0
+
+    - name: Update Traefik configuration
+      include_tasks: ../tasks/traefik.yml
+
+    - name: Restart Traefik
+      docker_container:
+        name: traefik
+        state: restarted
+      register: traefik_restart
+
+    - name: Wait for Traefik to be ready
+      uri:
+        url: "http://localhost:8080/api/health"
+        method: GET
+        status_code: [200]
+        timeout: 30
+      register: traefik_health
+      retries: 3
+      delay: 10
+      until: traefik_health is success
+
+    - name: Verify certificate configuration
+      shell: "{{ docker_dir }}/traefik/scripts/healthcheck.sh"
+      register: health_check
+      changed_when: false
+      retries: 3
+      delay: 10
+      until: health_check.rc == 0
+
+    - name: Display certificate status
+      shell: "{{ docker_dir }}/traefik/scripts/manage.sh certs"
+      register: cert_status
+      changed_when: false 

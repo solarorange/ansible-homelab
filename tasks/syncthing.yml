@@ -1,0 +1,84 @@
+---
+- name: Create Syncthing directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - "{{ docker_data_root }}/syncthing"
+    - "{{ docker_data_root }}/syncthing/config"
+    - "{{ docker_data_root }}/syncthing/data"
+
+- name: Create Syncthing docker-compose service
+  blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Syncthing"
+    block: |
+      syncthing:
+        image: linuxserver/syncthing:latest
+        container_name: syncthing
+        volumes:
+          - {{ docker_data_root }}/syncthing/config:/config
+          - {{ docker_data_root }}/syncthing/data:/data
+          - /etc/localtime:/etc/localtime:ro
+        environment:
+          - PUID=1000
+          - PGID=1000
+          - TZ={{ timezone }}
+        ports:
+          - "8384:8384"
+          - "22000:22000"
+          - "21027:21027/udp"
+        restart: unless-stopped
+        networks:
+          - traefik_network
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.syncthing.rule=Host(`syncthing.{{ domain_name }}`)"
+          - "traefik.http.routers.syncthing.entrypoints=websecure"
+          - "traefik.http.routers.syncthing.tls=true"
+          - "traefik.http.services.syncthing.loadbalancer.server.port=8384"
+
+- name: Create Syncthing health check script
+  copy:
+    dest: "{{ scripts_dir }}/health_check_syncthing.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! curl -s -f "https://syncthing.{{ domain_name }}/rest/system/status" | grep -q '"status":"OK"'; then
+        echo "Syncthing is not responding correctly"
+        exit 1
+      fi
+      exit 0
+
+- name: Create Syncthing backup script
+  copy:
+    dest: "{{ scripts_dir }}/backup_syncthing.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/syncthing"
+      mkdir -p "$BACKUP_DIR"
+      tar -czf "$BACKUP_DIR/syncthing_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/syncthing config
+
+- name: Add Syncthing backup to crontab
+  cron:
+    name: "Backup Syncthing"
+    job: "{{ scripts_dir }}/backup_syncthing.sh"
+    hour: "3"
+    minute: "30"
+    state: present
+
+- name: Create Syncthing log rotation configuration
+  copy:
+    dest: /etc/logrotate.d/syncthing
+    content: |
+      {{ docker_data_root }}/syncthing/config/syncthing.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      } 

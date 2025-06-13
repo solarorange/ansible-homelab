@@ -1,0 +1,108 @@
+---
+groups:
+  - name: homelab
+    rules:
+      # System Alerts
+      - alert: HighCPUUsage
+        expr: avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80% for 5 minutes"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90% for 5 minutes"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 85% for 5 minutes"
+
+      # Service Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down on {{ $labels.instance }}"
+          description: "Service has been down for more than 1 minute"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, instance)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.instance }}"
+          description: "95th percentile latency is above 1s for 5 minutes"
+
+      # Docker Alerts
+      - alert: ContainerRestarting
+        expr: increase(docker_container_restart_count[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting on {{ $labels.instance }}"
+          description: "Container has restarted in the last 5 minutes"
+
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage on {{ $labels.instance }}"
+          description: "Container memory usage is above 90% for 5 minutes"
+
+      # Network Alerts
+      - alert: HighNetworkErrors
+        expr: rate(node_network_transmit_errs_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High network errors on {{ $labels.instance }}"
+          description: "Network interface {{ $labels.device }} is experiencing errors"
+
+      # Backup Alerts
+      - alert: BackupFailed
+        expr: backup_status == 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup failed on {{ $labels.instance }}"
+          description: "Backup job {{ $labels.job }} has failed"
+
+      - alert: BackupTooOld
+        expr: time() - backup_last_success_timestamp > 86400
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup too old on {{ $labels.instance }}"
+          description: "No successful backup in the last 24 hours"
+
+      # Security Alerts
+      - alert: HighFailedLogins
+        expr: rate(failed_login_attempts_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of failed login attempts on {{ $labels.instance }}"
+          description: "More than 5 failed login attempts per minute for 5 minutes" 

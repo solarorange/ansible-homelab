@@ -1,0 +1,18 @@
+[Unit]
+Description=Certificate Management Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User={{ username }}
+Group={{ username }}
+WorkingDirectory={{ docker_dir }}/certificate_management
+ExecStart={{ docker_dir }}/certificate_management/scripts/automate_certs.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:{{ docker_dir }}/certificate_management/logs/service.log
+StandardError=append:{{ docker_dir }}/certificate_management/logs/service.error.log
+
+[Install]
+WantedBy=multi-user.target 

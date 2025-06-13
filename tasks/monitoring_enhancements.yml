@@ -1,0 +1,70 @@
+---
+# Enhanced monitoring tasks for homelab
+
+- name: Create monitoring directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_data_dir }}/healthchecks"
+    - "{{ monitoring_data_dir }}/backup_verification"
+    - "{{ monitoring_data_dir }}/metrics"
+    - "{{ monitoring_data_dir }}/dashboards"
+    - "{{ monitoring_data_dir }}/alerts"
+
+- name: Configure health check endpoints
+  ansible.builtin.template:
+    src: templates/healthcheck.yml.j2
+    dest: "{{ monitoring_data_dir }}/healthchecks/healthcheck.yml"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Setup backup verification
+  ansible.builtin.template:
+    src: templates/backup_verification.yml.j2
+    dest: "{{ monitoring_data_dir }}/backup_verification/config.yml"
+    mode: '0644'
+  notify: restart monitoring
+
+- name: Configure system metrics collection
+  ansible.builtin.template:
+    src: templates/telegraf.conf.j2
+    dest: "{{ monitoring_data_dir }}/telegraf/telegraf.conf"
+    mode: '0644'
+  notify: restart telegraf
+
+- name: Setup monitoring dashboards
+  ansible.builtin.template:
+    src: templates/dashboards/homelab.json.j2
+    dest: "{{ monitoring_data_dir }}/dashboards/homelab.json"
+    mode: '0644'
+  notify: restart grafana
+
+- name: Configure alerting rules
+  ansible.builtin.template:
+    src: templates/alerting/rules.yml.j2
+    dest: "{{ monitoring_data_dir }}/alerts/rules.yml"
+    mode: '0644'
+  notify: restart alertmanager
+
+- name: Setup alertmanager configuration
+  ansible.builtin.template:
+    src: templates/alertmanager.yml.j2
+    dest: "{{ monitoring_data_dir }}/alertmanager/alertmanager.yml"
+    mode: '0644'
+  notify: restart alertmanager
+
+- name: Configure blackbox exporter targets
+  ansible.builtin.template:
+    src: templates/blackbox.yml.j2
+    dest: "{{ monitoring_data_dir }}/blackbox/config.yml"
+    mode: '0644'
+  notify: restart blackbox_exporter
+
+- name: Setup Prometheus recording rules
+  ansible.builtin.template:
+    src: templates/prometheus/rules.yml.j2
+    dest: "{{ monitoring_data_dir }}/prometheus/rules.yml"
+    mode: '0644'
+  notify: restart prometheus 
