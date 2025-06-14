@@ -316,6 +316,44 @@ This guide provides detailed steps for deploying and validating the homelab envi
    curl -k https://guacamole.your-domain.com/api/session/data/mysql/activeConnections
    ```
 
+### 11. Certificate Management Deployment
+
+1. Deploy certificate management:
+   ```bash
+   ansible-playbook main.yml --tags certificate_management
+   ```
+
+2. Validate certificate management:
+   ```bash
+   # Check certificate status
+   ansible-playbook main.yml --tags certificate_management -e "check_status=true"
+   
+   # Verify certificate renewal
+   ansible-playbook main.yml --tags certificate_management -e "check_renewal=true"
+   
+   # Test certificate deployment
+   ansible-playbook main.yml --tags certificate_management -e "test_deployment=true"
+   ```
+
+### 12. Logging Stack Deployment
+
+1. Deploy logging services:
+   ```bash
+   ansible-playbook main.yml --tags logging
+   ```
+
+2. Validate logging services:
+   ```bash
+   # Check log aggregation
+   curl -k https://logging.your-domain.com/api/status
+   
+   # Verify log retention
+   curl -k https://logging.your-domain.com/api/retention
+   
+   # Test log shipping
+   ansible-playbook main.yml --tags logging -e "test_shipping=true"
+   ```
+
 ## Post-deployment Validation
 
 ### 1. Run Validation Script
@@ -363,6 +401,30 @@ ansible-playbook main.yml --tags backup -e "check_status=true"
 
 # Verify backup integrity
 ansible-playbook main.yml --tags backup -e "verify=true"
+```
+
+### 6. Verify Certificate Management
+```bash
+# Check certificate status
+ansible-playbook main.yml --tags certificate_management -e "check_status=true"
+
+# Verify certificate renewal
+ansible-playbook main.yml --tags certificate_management -e "check_renewal=true"
+
+# Test certificate deployment
+ansible-playbook main.yml --tags certificate_management -e "test_deployment=true"
+```
+
+### 7. Verify Logging System
+```bash
+# Check log aggregation status
+curl -k https://logging.your-domain.com/api/status
+
+# Verify log retention policies
+curl -k https://logging.your-domain.com/api/retention
+
+# Test log shipping
+ansible-playbook main.yml --tags logging -e "test_shipping=true"
 ```
 
 ## Troubleshooting

@@ -340,6 +340,70 @@ This guide provides solutions for common issues that may arise during deployment
    journalctl -u vault
    ```
 
+### Certificate Management Issues
+
+1. **Certificate Renewal Issues**
+   ```bash
+   # Check certificate status
+   ansible-playbook main.yml --tags certificate_management -e "check_status=true"
+   
+   # View certificate logs
+   journalctl -u cert-manager
+   
+   # Check certificate configuration
+   kubectl get certificates -A
+   ```
+
+2. **SSL/TLS Issues**
+   ```bash
+   # Test SSL configuration
+   curl -vI https://your-domain.com
+   
+   # Check certificate chain
+   openssl s_client -connect your-domain.com:443 -servername your-domain.com
+   
+   # Verify certificate validity
+   openssl x509 -in /path/to/cert.pem -text -noout
+   ```
+
+### Logging Stack Issues
+
+1. **Log Aggregation Issues**
+   ```bash
+   # Check log shipping status
+   systemctl status filebeat
+   
+   # View log shipping logs
+   journalctl -u filebeat
+   
+   # Test log shipping
+   ansible-playbook main.yml --tags logging -e "test_shipping=true"
+   ```
+
+2. **Log Storage Issues**
+   ```bash
+   # Check log storage status
+   curl -k https://logging.your-domain.com/api/storage
+   
+   # Verify log retention
+   curl -k https://logging.your-domain.com/api/retention
+   
+   # Check disk space
+   df -h /var/log
+   ```
+
+3. **Log Analysis Issues**
+   ```bash
+   # Check log analysis status
+   curl -k https://logging.your-domain.com/api/analysis
+   
+   # View analysis logs
+   journalctl -u log-analysis
+   
+   # Test log analysis
+   ansible-playbook main.yml --tags logging -e "test_analysis=true"
+   ```
+
 ## Recovery Procedures
 
 ### System Recovery
@@ -380,6 +444,46 @@ This guide provides solutions for common issues that may arise during deployment
    
    # Verify migration
    ansible-playbook main.yml --tags migrate -e "verify=true"
+   ```
+
+### Certificate Recovery
+
+1. **Restore Certificates**
+   ```bash
+   # Restore from backup
+   ansible-playbook main.yml --tags certificate_management -e "restore=true"
+   
+   # Verify certificate chain
+   openssl verify -CAfile /path/to/ca.pem /path/to/cert.pem
+   ```
+
+2. **Reset Certificate Management**
+   ```bash
+   # Reset configuration
+   ansible-playbook main.yml --tags certificate_management -e "reset=true"
+   
+   # Reinitialize certificates
+   ansible-playbook main.yml --tags certificate_management -e "reinitialize=true"
+   ```
+
+### Logging Recovery
+
+1. **Restore Logging System**
+   ```bash
+   # Restore from backup
+   ansible-playbook main.yml --tags logging -e "restore=true"
+   
+   # Verify log integrity
+   ansible-playbook main.yml --tags logging -e "verify=true"
+   ```
+
+2. **Reset Logging Configuration**
+   ```bash
+   # Reset configuration
+   ansible-playbook main.yml --tags logging -e "reset=true"
+   
+   # Reinitialize logging
+   ansible-playbook main.yml --tags logging -e "reinitialize=true"
    ```
 
 ## Getting Help

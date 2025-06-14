@@ -1,0 +1,155 @@
+---
+# Pi-hole Deployment and Configuration
+# Production-ready setup with monitoring, backup, and security
+
+- name: Create Pi-hole directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/pihole"
+    - "{{ docker_data_root }}/pihole/etc-pihole"
+    - "{{ docker_data_root }}/pihole/etc-dnsmasq.d"
+    - "{{ docker_data_root }}/pihole/logs"
+  tags: [pihole, setup]
+
+- name: Create Pi-hole docker-compose file
+  ansible.builtin.template:
+    src: templates/pihole/docker-compose.yml.j2
+    dest: "{{ docker_data_root }}/pihole/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags: [pihole, setup]
+
+- name: Create Pi-hole environment file
+  ansible.builtin.template:
+    src: templates/pihole/.env.j2
+    dest: "{{ docker_data_root }}/pihole/.env"
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags: [pihole, setup]
+
+- name: Create Pi-hole custom configuration
+  ansible.builtin.template:
+    src: templates/pihole/custom.list.j2
+    dest: "{{ docker_data_root }}/pihole/etc-pihole/custom.list"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags: [pihole, setup]
+
+- name: Create Pi-hole backup script
+  ansible.builtin.template:
+    src: templates/pihole/backup.sh.j2
+    dest: "{{ docker_data_root }}/pihole/backup.sh"
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags: [pihole, backup]
+
+- name: Add Pi-hole backup to crontab
+  ansible.builtin.cron:
+    name: "Pi-hole backup"
+    job: "{{ docker_data_root }}/pihole/backup.sh"
+    hour: "0"
+    minute: "0"
+    state: present
+  tags: [pihole, backup]
+
+- name: Create Pi-hole monitoring configuration
+  ansible.builtin.template:
+    src: templates/pihole/pihole-monitor.yml.j2
+    dest: "{{ docker_data_root }}/prometheus/pihole-monitor.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  when: monitoring_enabled | default(true)
+  tags: [pihole, monitoring]
+
+- name: Deploy Pi-hole
+  community.docker.docker_compose:
+    project_src: "{{ docker_data_root }}/pihole"
+    state: present
+    remove_orphans: true
+    build: false
+  register: pihole_deploy
+  tags: [pihole, deploy]
+
+- name: Wait for Pi-hole to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:80/admin/api.php?status"
+    return_content: yes
+    status_code: 200
+  register: pihole_status
+  until: pihole_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [pihole, validation]
+
+- name: Configure Pi-hole DNS settings
+  ansible.builtin.uri:
+    url: "http://localhost:80/admin/api.php"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "customdns": "{{ pihole_custom_dns | default([]) | to_json }}",
+        "upstream_dns_servers": "{{ pihole_upstream_dns | default(['1.1.1.1', '1.0.0.1']) | to_json }}"
+      }
+    status_code: 200
+  when: pihole_status.status == 200
+  tags: [pihole, configuration]
+
+- name: Configure Pi-hole blocklists
+  ansible.builtin.uri:
+    url: "http://localhost:80/admin/api.php"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "adlists": "{{ pihole_blocklists | default([]) | to_json }}"
+      }
+    status_code: 200
+  when: pihole_status.status == 200
+  tags: [pihole, configuration]
+
+- name: Update Pi-hole gravity
+  ansible.builtin.uri:
+    url: "http://localhost:80/admin/api.php?update"
+    method: POST
+    status_code: 200
+  when: pihole_status.status == 200
+  tags: [pihole, configuration]
+
+- name: Configure Pi-hole monitoring in Prometheus
+  ansible.builtin.uri:
+    url: "http://localhost:9090/-/reload"
+    method: POST
+    status_code: 200
+  when: monitoring_enabled | default(true)
+  tags: [pihole, monitoring]
+
+- name: Add Pi-hole to Traefik configuration
+  ansible.builtin.template:
+    src: templates/pihole/traefik.yml.j2
+    dest: "{{ docker_data_root }}/traefik/dynamic/pihole.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  tags: [pihole, traefik]
+
+- name: Reload Traefik configuration
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api/rawdata"
+    method: POST
+    status_code: 200
+  tags: [pihole, traefik]
+
+- name: Verify Pi-hole deployment
+  ansible.builtin.include_tasks: tasks/validate/pihole.yml
+  tags: [pihole, validation] 

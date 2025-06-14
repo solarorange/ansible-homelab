@@ -204,6 +204,105 @@ security_config:
     port: 51820
 ```
 
+### Certificate Management Configuration
+Configure certificate management in `group_vars/all/certificate_management.yml`:
+
+```yaml
+certificate_management:
+  provider: "letsencrypt"  # or "self-signed"
+  staging: false  # Set to true for testing
+  email: "your-email@domain.com"
+  domains:
+    - domain: "your-domain.com"
+      subdomains:
+        - "www"
+        - "api"
+        - "auth"
+    - domain: "another-domain.com"
+      subdomains:
+        - "app"
+  renewal:
+    enabled: true
+    schedule: "0 0 1 * *"  # Monthly at midnight
+    days_before_expiry: 30
+  storage:
+    type: "file"  # or "vault"
+    path: "/etc/ssl/certs"
+    backup: true
+  validation:
+    method: "dns"  # or "http"
+    dns_provider: "cloudflare"
+    http_port: 80
+```
+
+### Logging Configuration
+Configure logging in `group_vars/all/logging.yml`:
+
+```yaml
+logging:
+  aggregation:
+    enabled: true
+    type: "filebeat"  # or "fluentd"
+    hosts:
+      - "log-server.your-domain.com:5044"
+    ssl:
+      enabled: true
+      ca_cert: "/etc/ssl/certs/ca.pem"
+      client_cert: "/etc/ssl/certs/client.pem"
+      client_key: "/etc/ssl/private/client.key"
+  
+  storage:
+    type: "elasticsearch"  # or "loki"
+    hosts:
+      - "elasticsearch.your-domain.com:9200"
+    indices:
+      prefix: "logs-"
+      retention: "30d"
+    backup:
+      enabled: true
+      schedule: "0 1 * * *"  # Daily at 1 AM
+      retention: "90d"
+  
+  analysis:
+    enabled: true
+    type: "kibana"  # or "grafana"
+    dashboards:
+      - name: "system-logs"
+        refresh: "5m"
+      - name: "application-logs"
+        refresh: "1m"
+    alerts:
+      enabled: true
+      channels:
+        - type: "email"
+          recipients:
+            - "admin@your-domain.com"
+        - type: "slack"
+          webhook: "https://hooks.slack.com/services/xxx"
+  
+  retention:
+    enabled: true
+    policies:
+      - name: "system-logs"
+        pattern: "system-*"
+        max_age: "30d"
+        max_size: "10GB"
+      - name: "application-logs"
+        pattern: "app-*"
+        max_age: "90d"
+        max_size: "50GB"
+  
+  shipping:
+    enabled: true
+    batch_size: 2048
+    compression: true
+    timeout: "30s"
+    retry:
+      max_attempts: 3
+      initial_interval: "1s"
+      max_interval: "10s"
+```
+
 ## Deployment Guide
 
 For detailed deployment instructions, please refer to [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -257,6 +356,7 @@ The homelab architecture consists of several key components:
    - Vault for secrets management
    - WireGuard for VPN
    - Fail2ban for brute force protection
+   - Certificate Management for SSL/TLS
 
 4. Media Services:
    - Jellyfin for media streaming
@@ -275,6 +375,12 @@ The homelab architecture consists of several key components:
    - Node-RED for automation flows
    - MQTT broker for IoT communication
    - Task scheduling
+
+7. Logging Services:
+   - Centralized logging system
+   - Log aggregation and analysis
+   - Log retention management
+   - Log-based alerting
 
 ## Contributing
 

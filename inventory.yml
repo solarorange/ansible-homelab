@@ -1,28 +1,13 @@
 # Enhanced Homelab Inventory
 # Configure your Proxmox VM details here
 
-[homelab_core]
-# Primary homelab server (main services)
-homelab-core ansible_host=192.168.1.100 ansible_user=homelab
-
-[homelab_monitoring]
-# Dedicated monitoring server
-homelab-mon ansible_host=192.168.1.101 ansible_user=homelab
-
-[homelab_automation]
-# Dedicated automation server
-homelab-auto ansible_host=192.168.1.102 ansible_user=homelab
-
-[homelab_security]
-# Dedicated security server
-homelab-sec ansible_host=192.168.1.103 ansible_user=homelab
+# Single VM deployment (recommended for most homelabs)
+[homelab_all]
+homelab ansible_host=192.168.1.100 ansible_user=homelab
 
 # Group all homelab servers
 [homelab:children]
-homelab_core
-homelab_monitoring
-homelab_automation
-homelab_security
+homelab_all
 
 # Common variables for all homelab servers
 [homelab:vars]
@@ -86,19 +71,18 @@ automation_enabled: true
 
 # Example configurations for different deployment scenarios:
 
-# Single VM deployment (recommended for most homelabs)
-# [homelab_all]
-# homelab ansible_host=192.168.1.100 ansible_user=homelab
-
 # Multi-VM deployment (for larger setups)
 # [homelab_core]
-# core ansible_host=192.168.1.100 ansible_user=homelab
+# homelab-core ansible_host=192.168.1.100 ansible_user=homelab
 # 
-# [homelab_monitoring] 
-# monitoring ansible_host=192.168.1.101 ansible_user=homelab
-#
+# [homelab_monitoring]
+# homelab-mon ansible_host=192.168.1.101 ansible_user=homelab
+# 
 # [homelab_automation]
-# automation ansible_host=192.168.1.102 ansible_user=homelab
+# homelab-auto ansible_host=192.168.1.102 ansible_user=homelab
+# 
+# [homelab_security]
+# homelab-sec ansible_host=192.168.1.103 ansible_user=homelab
 
 # Cloud deployment (VPS/dedicated servers)
 # [homelab_cloud]
