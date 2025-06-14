@@ -17,13 +17,13 @@ prompt_with_default() {
 }
 
 # Email Configuration
-MONITORING_EMAIL=$(prompt_with_default "MONITORING_EMAIL" "monitoring@example.com" "Enter monitoring email address")
-ADMIN_EMAIL=$(prompt_with_default "ADMIN_EMAIL" "admin@example.com" "Enter admin email address")
+MONITORING_EMAIL=$(prompt_with_default "MONITORING_EMAIL" "monitoring@zorg.media" "Enter monitoring email address")
+ADMIN_EMAIL=$(prompt_with_default "ADMIN_EMAIL" "admin@zorg.media" "Enter admin email address")
 
 # SMTP Configuration
-SMTP_HOST=$(prompt_with_default "SMTP_HOST" "smtp.gmail.com" "Enter SMTP host")
+SMTP_HOST=$(prompt_with_default "SMTP_HOST" "smtp.zorg.media" "Enter SMTP host")
 SMTP_PORT=$(prompt_with_default "SMTP_PORT" "587" "Enter SMTP port")
-SMTP_USERNAME=$(prompt_with_default "SMTP_USERNAME" "your-email@gmail.com" "Enter SMTP username")
+SMTP_USERNAME=$(prompt_with_default "SMTP_USERNAME" "monitoring@zorg.media" "Enter SMTP username")
 SMTP_PASSWORD=$(prompt_with_default "SMTP_PASSWORD" "" "Enter SMTP password/app-specific password")
 
 # Slack Configuration

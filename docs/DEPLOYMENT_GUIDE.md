@@ -28,8 +28,8 @@ This guide provides detailed instructions for deploying and managing the homelab
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/ansible_homelab.git
-cd ansible_homab
+git clone https://github.com/solarorange/ansible-homelab.git
+cd ansible-homelab
 ```
 
 ### 2. Install Dependencies
@@ -51,7 +51,7 @@ homelab-core ansible_host=192.168.1.100 ansible_user=homelab
 
 3. Configure variables in group_vars/all/vars.yml:
 ```yaml
-domain: your.domain.com
+domain: zorg.media
 username: your_username
 ```
 
@@ -98,9 +98,9 @@ ansible-playbook main.yml --tags update
 ## Monitoring
 
 ### Accessing Dashboards
-- Grafana: https://grafana.your.domain
-- Prometheus: https://prometheus.your.domain
-- Alertmanager: https://alertmanager.your.domain
+- Grafana: https://grafana.zorg.media
+- Prometheus: https://prometheus.zorg.media
+- Alertmanager: https://alertmanager.zorg.media
 
 ### Setting Up Alerts
 1. Configure notification channels in Alertmanager

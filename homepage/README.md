@@ -11,7 +11,7 @@ This directory contains the configuration for the Homepage dashboard, which prov
 
 ## Setup Instructions
 
-1. Replace all instances of `{{ domain }}` in the configuration files with your actual domain name.
+1. Replace all instances of `zorg.media` in the configuration files with your actual domain name if different.
 
 2. Generate and configure API keys for services that require them:
    - Traefik
@@ -49,7 +49,7 @@ This directory contains the configuration for the Homepage dashboard, which prov
    docker-compose up -d
    ```
 
-4. Access the dashboard at `https://homepage.your-domain.com`
+4. Access the dashboard at `https://homepage.zorg.media`
 
 ## Customization
 

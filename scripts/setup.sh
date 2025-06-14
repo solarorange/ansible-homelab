@@ -96,16 +96,8 @@ read -sp "Enter Proxmox password: " proxmox_password
 echo
 
 # Network Configuration
-read -p "Enter your domain name (e.g., homelab.local): " domain_name
-while ! validate_domain "$domain_name"; do
-    print_warning "Invalid domain name"
-    read -p "Enter your domain name (e.g., homelab.local): " domain_name
-done
-
-read -p "Enter network subnet (default: 192.168.1.0/24): " network_subnet
+domain_name="zorg.media"
 network_subnet=${network_subnet:-192.168.1.0/24}
-
-read -p "Enter gateway IP (default: 192.168.1.1): " gateway_ip
 gateway_ip=${gateway_ip:-192.168.1.1}
 
 # Create Proxmox vault file

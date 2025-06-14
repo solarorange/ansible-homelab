@@ -60,8 +60,8 @@ ansible-playbook main.yml --syntax-check
 ### Initial Setup
 ```bash
 # Clone repository
-git clone https://github.com/your-repo/homelab.git
-cd homelab
+git clone https://github.com/solarorange/ansible-homelab.git
+cd ansible-homelab
 
 # Install dependencies
 ansible-galaxy install -r requirements.yml
