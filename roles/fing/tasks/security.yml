@@ -1,0 +1,342 @@
+---
+# Fing Security Integration
+# Integrates Fing with security services (CrowdSec, Fail2ban, etc.)
+
+- name: Configure CrowdSec for Fing
+  ansible.builtin.template:
+    src: "crowdsec.yml.j2"
+    dest: "{{ docker_dir }}/crowdsec/config/acquis.d/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Configure CrowdSec scenarios for Fing
+  ansible.builtin.template:
+    src: "crowdsec-scenarios.yml.j2"
+    dest: "{{ docker_dir }}/crowdsec/config/scenarios/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Configure CrowdSec collections for Fing
+  ansible.builtin.template:
+    src: "crowdsec-collections.yml.j2"
+    dest: "{{ docker_dir }}/crowdsec/config/collections/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Configure Fail2ban jail for Fing
+  ansible.builtin.template:
+    src: "fail2ban-jail.conf.j2"
+    dest: "/etc/fail2ban/jail.d/fing.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Configure Fail2ban filter for Fing
+  ansible.builtin.template:
+    src: "fail2ban-filter.conf.j2"
+    dest: "/etc/fail2ban/filter.d/fing.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Configure Fail2ban action for Fing
+  ansible.builtin.template:
+    src: "fail2ban-action.conf.j2"
+    dest: "/etc/fail2ban/action.d/fing.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Create Fing security monitoring script
+  ansible.builtin.template:
+    src: "security-monitor.sh.j2"
+    dest: "{{ docker_dir }}/fing/security-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing threat detection script
+  ansible.builtin.template:
+    src: "threat-detection.sh.j2"
+    dest: "{{ docker_dir }}/fing/threat-detection.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing vulnerability scan script
+  ansible.builtin.template:
+    src: "vulnerability-scan.sh.j2"
+    dest: "{{ docker_dir }}/fing/vulnerability-scan.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing access control script
+  ansible.builtin.template:
+    src: "access-control.sh.j2"
+    dest: "{{ docker_dir }}/fing/access-control.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing audit log script
+  ansible.builtin.template:
+    src: "audit-log.sh.j2"
+    dest: "{{ docker_dir }}/fing/audit-log.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing security report script
+  ansible.builtin.template:
+    src: "security-report.sh.j2"
+    dest: "{{ docker_dir }}/fing/security-report.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing security monitoring cron jobs
+  ansible.builtin.cron:
+    name: "Fing security monitoring"
+    minute: "*/5"
+    job: "{{ docker_dir }}/fing/security-monitor.sh"
+    user: "{{ username }}"
+  when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
+
+- name: Create Fing threat detection cron
+  ansible.builtin.cron:
+    name: "Fing threat detection"
+    minute: "*/10"
+    job: "{{ docker_dir }}/fing/threat-detection.sh"
+    user: "{{ username }}"
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Create Fing vulnerability scan cron
+  ansible.builtin.cron:
+    name: "Fing vulnerability scan"
+    hour: "2"
+    job: "{{ docker_dir }}/fing/vulnerability-scan.sh"
+    user: "{{ username }}"
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Create Fing access control cron
+  ansible.builtin.cron:
+    name: "Fing access control"
+    minute: "*/15"
+    job: "{{ docker_dir }}/fing/access-control.sh"
+    user: "{{ username }}"
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Create Fing audit log cron
+  ansible.builtin.cron:
+    name: "Fing audit log"
+    minute: "*/30"
+    job: "{{ docker_dir }}/fing/audit-log.sh"
+    user: "{{ username }}"
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Create Fing security report cron
+  ansible.builtin.cron:
+    name: "Fing security report"
+    hour: "6"
+    job: "{{ docker_dir }}/fing/security-report.sh"
+    user: "{{ username }}"
+  when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
+
+- name: Configure UFW rules for Fing
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ fing_web_port }}"
+    - "{{ fing_api_port }}"
+    - "{{ fing_metrics_port }}"
+  when: fing_metrics_enabled | default(true)
+
+- name: Configure UFW rate limiting for Fing
+  ansible.builtin.ufw:
+    rule: limit
+    port: "{{ fing_web_port }}"
+    proto: tcp
+    from_ip: any
+  when: fing_rate_limiting | default(true)
+
+- name: Configure UFW rate limiting for Fing API
+  ansible.builtin.ufw:
+    rule: limit
+    port: "{{ fing_api_port }}"
+    proto: tcp
+    from_ip: any
+  when: 
+    - fing_rate_limiting | default(true)
+    - fing_api_enabled | default(true)
+
+- name: Configure UFW rate limiting for Fing metrics
+  ansible.builtin.ufw:
+    rule: limit
+    port: "{{ fing_metrics_port }}"
+    proto: tcp
+    from_ip: any
+  when: 
+    - fing_rate_limiting | default(true)
+    - fing_metrics_enabled | default(true)
+
+- name: Restart security services to apply configuration
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - fail2ban
+    - crowdsec
+  when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
+  register: security_restart_result
+
+- name: Wait for security services to be ready
+  ansible.builtin.wait_for:
+    host: "localhost"
+    port: "{{ item }}"
+    delay: 10
+    timeout: 300
+  loop:
+    - 6060  # CrowdSec API
+    - 6061  # CrowdSec LAPI
+  when: 
+    - fing_crowdsec_enabled | default(true)
+    - security_restart_result.changed
+
+- name: Verify CrowdSec configuration
+  ansible.builtin.command:
+    cmd: "docker exec crowdsec cscli config show"
+    chdir: "{{ docker_dir }}/crowdsec"
+  register: crowdsec_config_check
+  when: fing_crowdsec_enabled | default(true)
+
+- name: Verify Fail2ban configuration
+  ansible.builtin.command:
+    cmd: "fail2ban-client status"
+  register: fail2ban_status_check
+  when: fing_fail2ban_enabled | default(true)
+
+- name: Test Fing security endpoints
+  ansible.builtin.uri:
+    url: "http://localhost:{{ fing_web_port }}/security/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: fing_security_check
+  retries: 3
+  delay: 10
+  until: fing_security_check.status == 200
+
+- name: Test Fing authentication
+  ansible.builtin.uri:
+    url: "http://localhost:{{ fing_web_port }}/auth/login"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "email": "{{ fing_admin_email }}",
+        "password": "{{ fing_admin_password }}"
+      }
+    status_code: 200
+    timeout: 10
+  register: fing_auth_check
+  retries: 3
+  delay: 10
+  until: fing_auth_check.status == 200
+  when: fing_auth_enabled | default(true)
+
+- name: Test Fing rate limiting
+  ansible.builtin.uri:
+    url: "http://localhost:{{ fing_web_port }}/api/test"
+    method: GET
+    status_code: [200, 429]
+    timeout: 10
+  register: fing_rate_limit_check
+  retries: 5
+  delay: 5
+  when: fing_rate_limiting | default(true)
+
+- name: Display Fing security integration summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Security Integration Complete:
+      
+      CrowdSec Integration:
+      - CrowdSec Enabled: {{ fing_crowdsec_enabled | default(true) }}
+      - Acquis Config: {{ docker_dir }}/crowdsec/config/acquis.d/fing.yml
+      - Scenarios Config: {{ docker_dir }}/crowdsec/config/scenarios/fing.yml
+      - Collections Config: {{ docker_dir }}/crowdsec/config/collections/fing.yml
+      - Collections: {{ fing_crowdsec_collections | join(', ') }}
+      - Config Status: {{ crowdsec_config_check.rc | default('N/A') }}
+      
+      Fail2ban Integration:
+      - Fail2ban Enabled: {{ fing_fail2ban_enabled | default(true) }}
+      - Jail Config: /etc/fail2ban/jail.d/fing.conf
+      - Filter Config: /etc/fail2ban/filter.d/fing.conf
+      - Action Config: /etc/fail2ban/action.d/fing.conf
+      - Max Retry: {{ fing_fail2ban_max_retry }}
+      - Ban Time: {{ fing_fail2ban_bantime }}s
+      - Status: {{ fail2ban_status_check.rc | default('N/A') }}
+      
+      UFW Configuration:
+      - Web Port: {{ fing_web_port }} (allowed)
+      - API Port: {{ fing_api_port }} (allowed)
+      - Metrics Port: {{ fing_metrics_port }} (allowed)
+      - Rate Limiting: {{ fing_rate_limiting | default(true) | ternary('Enabled', 'Disabled') }}
+      
+      Security Scripts:
+      - Security Monitor: {{ docker_dir }}/fing/security-monitor.sh
+      - Threat Detection: {{ docker_dir }}/fing/threat-detection.sh
+      - Vulnerability Scan: {{ docker_dir }}/fing/vulnerability-scan.sh
+      - Access Control: {{ docker_dir }}/fing/access-control.sh
+      - Audit Log: {{ docker_dir }}/fing/audit-log.sh
+      - Security Report: {{ docker_dir }}/fing/security-report.sh
+      
+      Cron Jobs:
+      - Security Monitoring: Every 5 minutes
+      - Threat Detection: Every 10 minutes
+      - Vulnerability Scan: Daily at 2 AM
+      - Access Control: Every 15 minutes
+      - Audit Log: Every 30 minutes
+      - Security Report: Daily at 6 AM
+      
+      Security Tests:
+      - Security Endpoint: {{ fing_security_check.status | default('N/A') }}
+      - Authentication: {{ fing_auth_check.status | default('N/A') }}
+      - Rate Limiting: {{ fing_rate_limit_check.status | default('N/A') }}
+      
+      Security Features:
+      - Authentication: {{ fing_auth_enabled | default(true) | ternary('Enabled', 'Disabled') }}
+      - Auth Method: {{ fing_auth_method }}
+      - Security Headers: {{ fing_security_headers | default(true) | ternary('Enabled', 'Disabled') }}
+      - Rate Limiting: {{ fing_rate_limiting | default(true) | ternary('Enabled', 'Disabled') }}
+      - CORS: {{ fing_cors_enabled | default(false) | ternary('Enabled', 'Disabled') }}
+      - Rate Limit Requests: {{ fing_rate_limit_requests }}
+      - Rate Limit Window: {{ fing_rate_limit_window }}s
+      
+      Access Control:
+      - Admin Email: {{ fing_admin_email }}
+      - API Key: Configured
+      - API Rate Limit: {{ fing_api_rate_limit }}
+      - API Rate Limit Window: {{ fing_api_rate_limit_window }}s
+      
+      Next Steps:
+      1. Monitor CrowdSec alerts for Fing
+      2. Check Fail2ban logs for blocked attempts
+      3. Review security reports daily
+      4. Configure additional security rules
+      5. Set up security monitoring dashboards
+      6. Test authentication and rate limiting
+      7. Monitor access logs for suspicious activity
+      8. Configure security notifications 

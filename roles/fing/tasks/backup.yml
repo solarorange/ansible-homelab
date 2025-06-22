@@ -1,0 +1,118 @@
+---
+# Fing Backup Configuration
+# Handles backup and restoration of Fing data
+
+- name: Create Fing backup script
+  ansible.builtin.template:
+    src: "backup.sh.j2"
+    dest: "{{ docker_dir }}/fing/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing restore script
+  ansible.builtin.template:
+    src: "restore.sh.j2"
+    dest: "{{ docker_dir }}/fing/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing backup verification script
+  ansible.builtin.template:
+    src: "backup-verify.sh.j2"
+    dest: "{{ docker_dir }}/fing/backup-verify.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing backup cleanup script
+  ansible.builtin.template:
+    src: "backup-cleanup.sh.j2"
+    dest: "{{ docker_dir }}/fing/backup-cleanup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing backup monitoring script
+  ansible.builtin.template:
+    src: "backup-monitor.sh.j2"
+    dest: "{{ docker_dir }}/fing/backup-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing backup cron jobs
+  ansible.builtin.cron:
+    name: "Fing backup"
+    minute: "{{ fing_backup_schedule.split(' ')[0] }}"
+    hour: "{{ fing_backup_schedule.split(' ')[1] }}"
+    day: "{{ fing_backup_schedule.split(' ')[2] }}"
+    month: "{{ fing_backup_schedule.split(' ')[3] }}"
+    weekday: "{{ fing_backup_schedule.split(' ')[4] }}"
+    job: "{{ docker_dir }}/fing/backup.sh"
+    user: "{{ username }}"
+
+- name: Create Fing backup verification cron
+  ansible.builtin.cron:
+    name: "Fing backup verification"
+    minute: "30"
+    hour: "{{ fing_backup_schedule.split(' ')[1] }}"
+    day: "{{ fing_backup_schedule.split(' ')[2] }}"
+    month: "{{ fing_backup_schedule.split(' ')[3] }}"
+    weekday: "{{ fing_backup_schedule.split(' ')[4] }}"
+    job: "{{ docker_dir }}/fing/backup-verify.sh"
+    user: "{{ username }}"
+
+- name: Create Fing backup cleanup cron
+  ansible.builtin.cron:
+    name: "Fing backup cleanup"
+    minute: "0"
+    hour: "4"
+    day: "1"
+    job: "{{ docker_dir }}/fing/backup-cleanup.sh"
+    user: "{{ username }}"
+
+- name: Create Fing backup monitoring cron
+  ansible.builtin.cron:
+    name: "Fing backup monitoring"
+    minute: "*/30"
+    job: "{{ docker_dir }}/fing/backup-monitor.sh"
+    user: "{{ username }}"
+
+- name: Display Fing backup configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Backup Configuration Complete:
+      
+      Backup Scripts:
+      - Backup: {{ docker_dir }}/fing/backup.sh
+      - Restore: {{ docker_dir }}/fing/restore.sh
+      - Verify: {{ docker_dir }}/fing/backup-verify.sh
+      - Cleanup: {{ docker_dir }}/fing/backup-cleanup.sh
+      - Monitor: {{ docker_dir }}/fing/backup-monitor.sh
+      
+      Backup Schedule:
+      - Schedule: {{ fing_backup_schedule }}
+      - Retention: {{ fing_backup_retention }} days
+      - Compression: {{ fing_backup_compression | ternary('Enabled', 'Disabled') }}
+      
+      Cron Jobs:
+      - Backup: {{ fing_backup_schedule }}
+      - Verification: 30 minutes after backup
+      - Cleanup: Monthly at 4 AM
+      - Monitoring: Every 30 minutes
+      
+      Backup Locations:
+      - Data: {{ docker_dir }}/fing/data
+      - Database: {{ docker_dir }}/fing/database
+      - Configuration: {{ docker_dir }}/fing/config
+      - Logs: {{ docker_dir }}/fing/logs
+      - Cache: {{ docker_dir }}/fing/cache
+      
+      Next Steps:
+      1. Test backup functionality manually
+      2. Verify backup restoration process
+      3. Monitor backup success/failure
+      4. Configure backup notifications
+      5. Set up backup monitoring dashboards 

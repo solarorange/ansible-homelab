@@ -1,0 +1,48 @@
+---
+# Fing Network Monitoring Service Deployment
+# Production-ready Ansible tasks for homelab deployment
+
+- name: Include Fing deployment tasks
+  block:
+    - name: Validate Fing configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [fing, validation]
+
+    - name: Setup Fing prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [fing, setup]
+
+    - name: Deploy Fing service
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [fing, deploy]
+
+    - name: Configure Fing monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: fing_monitoring_enabled | default(true)
+      tags: [fing, monitoring]
+
+    - name: Configure Fing security
+      ansible.builtin.include_tasks: security.yml
+      tags: [fing, security]
+
+    - name: Configure Fing backup
+      ansible.builtin.include_tasks: backup.yml
+      when: fing_backup_enabled | default(true)
+      tags: [fing, backup]
+
+    - name: Configure Fing homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: fing_homepage_enabled | default(true)
+      tags: [fing, homepage]
+
+    - name: Configure Fing alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: fing_alerting_enabled | default(true)
+      tags: [fing, alerts]
+
+    - name: Validate Fing deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [fing, validation]
+
+  when: fing_enabled | default(true)
+  tags: [fing, always] 

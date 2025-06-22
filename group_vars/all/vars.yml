@@ -1,5 +1,5 @@
 ---
-# Enhanced Homelab Configuration Variables
+# Enhanced Watchtower Configuration Variables
 # Production-ready setup with comprehensive service definitions
 
 #==============================================================================
@@ -13,6 +13,9 @@ pgid: "<pgid>"                           # Group ID (get with: id -g username)
 ip_address: "<server_ip>"                # Server's static IP address
 timezone: "<timezone>"                   # System timezone (timedatectl list-timezones)
 
+# Plex server configuration
+plex_server_ip: "192.168.1.41"           # IP address of your existing Plex server
+
 # Directory structure
 docker_dir: "/home/{{ username }}/docker"
 data_dir: "/home/{{ username }}/data"
@@ -25,8 +28,8 @@ logs_dir: "/home/{{ username }}/logs"
 #==============================================================================
 
 domain: "zorg.media"                  # Your domain name
-cloudflare_email: "<cloudflare_email"   # Cloudflare account email (optional)
-cloudflare_api_key: "cloudflare_api_key" # Cloudflare Global API key (optional)
+cloudflare_email: "endlessoul@gmail.com"   # Cloudflare account email (optional)
+cloudflare_api_key: "TZ5HWYBrL6mtTmJizv3BuvzOEZ4X2zPCUWExj2bv" # Cloudflare Global API key (optional)
 
 # Subdomain configuration (customize as needed)
 subdomains:
@@ -39,6 +42,7 @@ subdomains:
   grafana: "grafana"
   prometheus: "prometheus"
   loki: "loki"
+  promtail: "logs"
   alertmanager: "alerts"
   
   # Media
@@ -68,12 +72,17 @@ subdomains:
   
   # Security
   vault: "vault"
+  vaultwarden: "passwords"
   wireguard: "vpn"
   
+  # Network
+  pihole: "dns"
+  nginx_proxy_manager: "proxy"
+  
   # Utilities
-  uptime: "status"
   dash: "dash"
   files: "files"
+  watchtower: "updates"
 
 #==============================================================================
 # AUTHENTICATION AND SECURITY
@@ -146,7 +155,6 @@ enabled_services:
   - promtail
   - alertmanager
   - blackbox_exporter
-  - uptime_kuma
   
   # Media services (following TRASH guides)
   - sonarr
@@ -354,7 +362,7 @@ resource_limits:
 
 # Backup settings
 backup_retention_days: 30
-backup_schedule: "0 2 * * *"  # 2 AM daily
+backup_schedule: "0 2 * * *"  # 2 AM daily (system-wide)
 backup_encryption_key: "<backup_encryption_key>"
 
 # Services to include in backups
@@ -363,6 +371,179 @@ backup_include:
   - config_files
   - application_data
   - databases
+
+#==============================================================================
+# STAGGERED BACKUP SCHEDULING
+#==============================================================================
+
+# Backup priority levels and timing
+backup_priority_levels:
+  critical:
+    description: "Essential services that must backup first"
+    time_slot: "1:00 AM"
+    services:
+      - authentik
+      - traefik
+      - vault
+      - databases
+      - system_configs
+  
+  high:
+    description: "Important services with moderate data"
+    time_slot: "2:00 AM"
+    services:
+      - homeassistant
+      - zigbee2mqtt
+      - mosquitto
+      - monitoring_infrastructure
+  
+  media_core:
+    description: "Core media management services"
+    time_slot: "3:00 AM"
+    services:
+      - sonarr
+      - radarr
+      - lidarr
+      - readarr
+      - prowlarr
+      - bazarr
+  
+  media_download:
+    description: "Download and processing services"
+    time_slot: "4:00 AM"
+    services:
+      - qbittorrent
+      - sabnzbd
+      - tdarr
+      - komga
+      - audiobookshelf
+  
+  media_playback:
+    description: "Media playback and streaming services"
+    time_slot: "5:00 AM"
+    services:
+      - jellyfin
+      - emby
+      - tautulli
+      - overseerr
+  
+  file_services:
+    description: "File storage and sharing services"
+    time_slot: "6:00 AM"
+    services:
+      - nextcloud
+      - samba
+      - syncthing
+      - paperless_ngx
+      - immich
+  
+  utilities:
+    description: "Utility and monitoring services"
+    time_slot: "7:00 AM"
+    services:
+      - portainer
+      - grafana
+      - prometheus
+      - loki
+      - alertmanager
+      - pihole
+
+# Staggered backup schedules (in cron format)
+backup_schedules:
+  # Critical services (1:00 AM)
+  authentik: "0 1 * * *"
+  traefik: "5 1 * * *"
+  vault: "10 1 * * *"
+  postgresql: "15 1 * * *"
+  mariadb: "20 1 * * *"
+  redis: "25 1 * * *"
+  
+  # High priority services (2:00 AM)
+  homeassistant: "0 2 * * *"
+  zigbee2mqtt: "5 2 * * *"
+  mosquitto: "10 2 * * *"
+  influxdb: "15 2 * * *"
+  telegraf: "20 2 * * *"
+  
+  # Media core services (3:00 AM)
+  sonarr: "0 3 * * *"
+  radarr: "5 3 * * *"
+  lidarr: "10 3 * * *"
+  readarr: "15 3 * * *"
+  prowlarr: "20 3 * * *"
+  bazarr: "25 3 * * *"
+  
+  # Media download services (4:00 AM)
+  qbittorrent: "0 4 * * *"
+  sabnzbd: "5 4 * * *"
+  tdarr: "10 4 * * *"
+  komga: "15 4 * * *"
+  audiobookshelf: "20 4 * * *"
+  
+  # Media playback services (5:00 AM)
+  jellyfin: "0 5 * * *"
+  emby: "5 5 * * *"
+  tautulli: "10 5 * * *"
+  overseerr: "15 5 * * *"
+  
+  # File services (6:00 AM)
+  nextcloud: "0 6 * * *"
+  samba: "5 6 * * *"
+  syncthing: "10 6 * * *"
+  paperless_ngx: "15 6 * * *"
+  immich: "20 6 * * *"
+  
+  # Utility services (7:00 AM)
+  portainer: "0 7 * * *"
+  grafana: "5 7 * * *"
+  prometheus: "10 7 * * *"
+  loki: "15 7 * * *"
+  alertmanager: "20 7 * * *"
+  pihole: "25 7 * * *"
+
+# Weekend backup schedule (more time for large backups)
+weekend_backup_schedules:
+  # Saturday - Extended backup window
+  saturday_start: "2:00 AM"
+  saturday_end: "10:00 AM"
+  
+  # Sunday - System maintenance and verification
+  sunday_start: "2:00 AM"
+  sunday_end: "8:00 AM"
+
+# Backup dependencies (services that should backup before others)
+backup_dependencies:
+  sonarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  radarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  lidarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  readarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  jellyfin:
+    depends_on: ["postgresql", "sonarr", "radarr"]
+  emby:
+    depends_on: ["postgresql", "sonarr", "radarr"]
+  nextcloud:
+    depends_on: ["postgresql", "redis"]
+  paperless_ngx:
+    depends_on: ["postgresql", "redis"]
+
+# Backup resource limits
+backup_resource_limits:
+  max_concurrent_backups: 3
+  max_backup_duration_minutes: 120
+  max_backup_size_gb: 50
+  backup_timeout_minutes: 30
+
+# Backup monitoring and alerting
+backup_monitoring:
+  enabled: true
+  check_interval_minutes: 30
+  alert_on_failure: true
+  alert_on_timeout: true
+  alert_on_size_exceeded: true
 
 #==============================================================================
 # VERIFICATION URLS
@@ -719,7 +900,6 @@ utilities_enabled: true
 utility_services:
   - portainer
   - watchtower
-  - uptime_kuma
   - dashdot
   - code_server
   - guacamole

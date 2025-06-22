@@ -1,0 +1,76 @@
+---
+- name: Create Docker root directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  with_items:
+    - "{{ docker_root }}"
+    - "{{ docker_data_root }}"
+    - "{{ docker_config_root }}"
+    - "{{ docker_logs_root }}"
+
+- name: Create service-specific directories
+  file:
+    path: "{{ docker_data_root }}/{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  with_items:
+    - pihole
+    - traefik
+    - authentik
+    - portainer
+    - grafana
+    - prometheus
+    - influxdb
+    - loki
+    - homeassistant
+    - nodered
+    - n8n
+    - jellyfin
+    - sonarr
+    - radarr
+    - lidarr
+    - readarr
+    - prowlarr
+    - bazarr
+    - tautulli
+    - overseerr
+    - nextcloud
+    - vaultwarden
+    - gitlab
+    - harbor
+    - minio
+    - paperless
+    - bookstack
+    - immich
+    - filebrowser
+    - kopia
+    - duplicati
+    - uptime_kuma
+    - dashdot
+    - code_server
+    - guacamole
+    - heimdall
+    - homarr
+    - requestrr
+    - unmanic
+
+- name: Configure Docker daemon to use custom root
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "data-root": "{{ docker_root }}",
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m",
+          "max-file": "3"
+        }
+      }
+    mode: '0644'
+  notify: restart docker 

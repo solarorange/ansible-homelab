@@ -1,0 +1,91 @@
+---
+# Paperless-ngx Service Handlers
+# Handlers for service lifecycle management
+
+- name: restart paperless-ngx
+  community.docker.docker_container:
+    name: "{{ paperless_ngx_container_name }}"
+    state: started
+    restart: true
+  listen: "restart paperless-ngx"
+
+- name: reload paperless-ngx
+  community.docker.docker_container:
+    name: "{{ paperless_ngx_container_name }}"
+    state: started
+    restart: true
+  listen: "reload paperless-ngx"
+
+- name: restart telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: restarted
+  listen: "restart telegraf"
+
+- name: restart prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: restarted
+  listen: "restart prometheus"
+
+- name: restart grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    state: restarted
+  listen: "restart grafana"
+
+- name: restart loki
+  ansible.builtin.systemd:
+    name: loki
+    state: restarted
+  listen: "restart loki"
+
+- name: restart promtail
+  ansible.builtin.systemd:
+    name: promtail
+    state: restarted
+  listen: "restart promtail"
+
+- name: restart alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: restarted
+  listen: "restart alertmanager"
+
+- name: restart blackbox_exporter
+  ansible.builtin.systemd:
+    name: blackbox_exporter
+    state: restarted
+  listen: "restart blackbox_exporter"
+
+- name: restart crowdsec
+  ansible.builtin.systemd:
+    name: crowdsec
+    state: restarted
+  listen: "restart crowdsec"
+
+- name: restart fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted
+  listen: "restart fail2ban"
+
+- name: restart homepage
+  community.docker.docker_container:
+    name: homepage
+    state: started
+    restart: true
+  listen: "restart homepage"
+
+- name: reload nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+  listen: "reload nginx"
+
+- name: restart traefik
+  community.docker.docker_container:
+    name: traefik
+    state: started
+    restart: true
+  listen: "restart traefik" 

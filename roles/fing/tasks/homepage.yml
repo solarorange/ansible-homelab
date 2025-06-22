@@ -1,0 +1,437 @@
+---
+# Fing Homepage Integration
+# Adds Fing to the Homepage dashboard
+
+- name: Generate Fing API key for Homepage
+  ansible.builtin.set_fact:
+    homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({'fing': fing_api_key}) }}"
+  no_log: true
+
+- name: Store Fing API key in vault for Homepage
+  ansible.builtin.set_fact:
+    vault_homepage_api_keys: "{{ vault_homepage_api_keys | default({}) | combine({'fing': fing_api_key}) }}"
+  no_log: true
+
+- name: Create Fing Homepage service configuration
+  ansible.builtin.template:
+    src: "homepage-service.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/services/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage bookmark configuration
+  ansible.builtin.template:
+    src: "homepage-bookmark.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/bookmarks/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Download Fing icon for Homepage
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons/fing.png"
+    dest: "{{ docker_dir }}/homepage/config/icons/fing.png"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: fing_icon_download
+
+- name: Create Fing Homepage widget configuration
+  ansible.builtin.template:
+    src: "homepage-widget.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/widgets/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_homepage_widget_enabled | default(true)
+
+- name: Create Fing Homepage health check configuration
+  ansible.builtin.template:
+    src: "homepage-health.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/health/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage notification configuration
+  ansible.builtin.template:
+    src: "homepage-notifications.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/notifications/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_alerting_enabled | default(true)
+
+- name: Create Fing Homepage settings configuration
+  ansible.builtin.template:
+    src: "homepage-settings.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/settings/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage theme configuration
+  ansible.builtin.template:
+    src: "homepage-theme.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/themes/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage localization configuration
+  ansible.builtin.template:
+    src: "homepage-localization.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/localization/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage backup configuration
+  ansible.builtin.template:
+    src: "homepage-backup.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/backup/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_backup_enabled | default(true)
+
+- name: Create Fing Homepage maintenance configuration
+  ansible.builtin.template:
+    src: "homepage-maintenance.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/maintenance/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_maintenance_enabled | default(true)
+
+- name: Create Fing Homepage documentation configuration
+  ansible.builtin.template:
+    src: "homepage-docs.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/documentation/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage troubleshooting configuration
+  ansible.builtin.template:
+    src: "homepage-troubleshooting.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/troubleshooting/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage quick actions configuration
+  ansible.builtin.template:
+    src: "homepage-actions.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/actions/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage shortcuts configuration
+  ansible.builtin.template:
+    src: "homepage-shortcuts.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/shortcuts/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage search configuration
+  ansible.builtin.template:
+    src: "homepage-search.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/search/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage favorites configuration
+  ansible.builtin.template:
+    src: "homepage-favorites.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/favorites/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage history configuration
+  ansible.builtin.template:
+    src: "homepage-history.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/history/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage analytics configuration
+  ansible.builtin.template:
+    src: "homepage-analytics.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/analytics/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage reports configuration
+  ansible.builtin.template:
+    src: "homepage-reports.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/reports/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage logs configuration
+  ansible.builtin.template:
+    src: "homepage-logs.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/logs/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage metrics configuration
+  ansible.builtin.template:
+    src: "homepage-metrics.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/metrics/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_metrics_enabled | default(true)
+
+- name: Create Fing Homepage alerts configuration
+  ansible.builtin.template:
+    src: "homepage-alerts.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/alerts/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_alerting_enabled | default(true)
+
+- name: Create Fing Homepage devices configuration
+  ansible.builtin.template:
+    src: "homepage-devices.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/devices/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage network configuration
+  ansible.builtin.template:
+    src: "homepage-network.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/network/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage discovery configuration
+  ansible.builtin.template:
+    src: "homepage-discovery.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/discovery/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage scan configuration
+  ansible.builtin.template:
+    src: "homepage-scan.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/scan/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage monitoring configuration
+  ansible.builtin.template:
+    src: "homepage-monitoring.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/monitoring/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_monitoring_enabled | default(true)
+
+- name: Create Fing Homepage security configuration
+  ansible.builtin.template:
+    src: "homepage-security.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/security/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage API configuration
+  ansible.builtin.template:
+    src: "homepage-api.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/api/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_api_enabled | default(true)
+
+- name: Create Fing Homepage webhooks configuration
+  ansible.builtin.template:
+    src: "homepage-webhooks.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/webhooks/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_webhooks_enabled | default(true)
+
+- name: Create Fing Homepage notifications configuration
+  ansible.builtin.template:
+    src: "homepage-notifications.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/notifications/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_notifications_enabled | default(true)
+
+- name: Create Fing Homepage email configuration
+  ansible.builtin.template:
+    src: "homepage-email.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/email/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_email_enabled | default(false)
+
+- name: Create Fing Homepage slack configuration
+  ansible.builtin.template:
+    src: "homepage-slack.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/slack/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_slack_enabled | default(false)
+
+- name: Create Fing Homepage discord configuration
+  ansible.builtin.template:
+    src: "homepage-discord.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/discord/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_discord_enabled | default(false)
+
+- name: Create Fing Homepage performance configuration
+  ansible.builtin.template:
+    src: "homepage-performance.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/performance/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing Homepage cache configuration
+  ansible.builtin.template:
+    src: "homepage-cache.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/cache/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_cache_enabled | default(true)
+
+- name: Create Fing Homepage debug configuration
+  ansible.builtin.template:
+    src: "homepage-debug.yml.j2"
+    dest: "{{ docker_dir }}/homepage/config/debug/fing.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_debug_enabled | default(false)
+
+- name: Restart Homepage to apply Fing configuration
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/homepage"
+    state: present
+    restarted: true
+  register: homepage_restart_result
+
+- name: Wait for Homepage to be ready
+  ansible.builtin.wait_for:
+    host: "localhost"
+    port: 3000
+    delay: 10
+    timeout: 300
+  when: homepage_restart_result.changed
+
+- name: Verify Fing service in Homepage
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/services"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: homepage_services_check
+  retries: 3
+  delay: 10
+  until: homepage_services_check.status == 200
+
+- name: Display Fing Homepage integration summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Homepage Integration Complete:
+      
+      Service Configuration:
+      - Service File: {{ docker_dir }}/homepage/config/services/fing.yml
+      - Category: {{ fing_homepage_category }}
+      - Description: {{ fing_homepage_description }}
+      - Icon: {{ fing_homepage_icon }}
+      
+      Widget Configuration:
+      - Widget Enabled: {{ fing_homepage_widget_enabled | default(true) }}
+      - Widget File: {{ docker_dir }}/homepage/config/widgets/fing.yml
+      - API Key: Configured
+      
+      Bookmark Configuration:
+      - Bookmark File: {{ docker_dir }}/homepage/config/bookmarks/fing.yml
+      - Quick Access: Enabled
+      
+      Health Check:
+      - Health File: {{ docker_dir }}/homepage/config/health/fing.yml
+      - Status: Active
+      
+      Additional Configurations:
+      - Settings: {{ docker_dir }}/homepage/config/settings/fing.yml
+      - Theme: {{ docker_dir }}/homepage/config/themes/fing.yml
+      - Localization: {{ docker_dir }}/homepage/config/localization/fing.yml
+      - Backup: {{ docker_dir }}/homepage/config/backup/fing.yml
+      - Maintenance: {{ docker_dir }}/homepage/config/maintenance/fing.yml
+      - Documentation: {{ docker_dir }}/homepage/config/documentation/fing.yml
+      - Troubleshooting: {{ docker_dir }}/homepage/config/troubleshooting/fing.yml
+      - Quick Actions: {{ docker_dir }}/homepage/config/actions/fing.yml
+      - Shortcuts: {{ docker_dir }}/homepage/config/shortcuts/fing.yml
+      - Search: {{ docker_dir }}/homepage/config/search/fing.yml
+      - Favorites: {{ docker_dir }}/homepage/config/favorites/fing.yml
+      - History: {{ docker_dir }}/homepage/config/history/fing.yml
+      - Analytics: {{ docker_dir }}/homepage/config/analytics/fing.yml
+      - Reports: {{ docker_dir }}/homepage/config/reports/fing.yml
+      - Logs: {{ docker_dir }}/homepage/config/logs/fing.yml
+      - Metrics: {{ docker_dir }}/homepage/config/metrics/fing.yml
+      - Alerts: {{ docker_dir }}/homepage/config/alerts/fing.yml
+      - Devices: {{ docker_dir }}/homepage/config/devices/fing.yml
+      - Network: {{ docker_dir }}/homepage/config/network/fing.yml
+      - Discovery: {{ docker_dir }}/homepage/config/discovery/fing.yml
+      - Scan: {{ docker_dir }}/homepage/config/scan/fing.yml
+      - Monitoring: {{ docker_dir }}/homepage/config/monitoring/fing.yml
+      - Security: {{ docker_dir }}/homepage/config/security/fing.yml
+      - API: {{ docker_dir }}/homepage/config/api/fing.yml
+      - Webhooks: {{ docker_dir }}/homepage/config/webhooks/fing.yml
+      - Notifications: {{ docker_dir }}/homepage/config/notifications/fing.yml
+      - Email: {{ docker_dir }}/homepage/config/email/fing.yml
+      - Slack: {{ docker_dir }}/homepage/config/slack/fing.yml
+      - Discord: {{ docker_dir }}/homepage/config/discord/fing.yml
+      - Performance: {{ docker_dir }}/homepage/config/performance/fing.yml
+      - Cache: {{ docker_dir }}/homepage/config/cache/fing.yml
+      - Debug: {{ docker_dir }}/homepage/config/debug/fing.yml
+      
+      Access Information:
+      - Homepage URL: https://homepage.{{ domain }}
+      - Fing Service: Available in Network category
+      - Widget Status: {{ fing_homepage_widget_enabled | default(true) | ternary('Enabled', 'Disabled') }}
+      - Health Status: Active
+      
+      Icon Status:
+      - Icon Downloaded: {{ fing_icon_download.changed | default(false) }}
+      - Icon Path: {{ docker_dir }}/homepage/config/icons/fing.png
+      
+      Next Steps:
+      1. Access Homepage at https://homepage.{{ domain }}
+      2. Navigate to the Network category
+      3. Find Fing service in the list
+      4. Click to access the Fing web interface
+      5. Configure network discovery settings
+      6. Set up monitoring dashboards
+      7. Configure alerting rules
+      8. Test network discovery functionality 

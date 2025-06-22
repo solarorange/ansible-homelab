@@ -1,0 +1,274 @@
+version: '3.8'
+
+services:
+  paperless-ngx:
+    image: {{ paperless_ngx_image }}:{{ paperless_ngx_version }}
+    container_name: {{ paperless_ngx_container_name }}
+    restart: {{ paperless_ngx_restart_policy }}
+    
+    # Environment variables
+    environment:
+      # Basic configuration
+      - PAPERLESS_URL=https://{{ paperless_ngx_domain }}
+      - PAPERLESS_SECRET_KEY={{ paperless_ngx_secret_key }}
+      - PAPERLESS_TIME_ZONE={{ timezone | default('UTC') }}
+      - PAPERLESS_DEBUG={{ paperless_ngx_debug_enabled | lower }}
+      
+      # Database configuration
+      - PAPERLESS_DBHOST={{ paperless_ngx_database_host }}
+      - PAPERLESS_DBPORT={{ paperless_ngx_database_port }}
+      - PAPERLESS_DBNAME={{ paperless_ngx_database_name }}
+      - PAPERLESS_DBUSER={{ paperless_ngx_database_user }}
+      - PAPERLESS_DBPASS={{ paperless_ngx_database_password }}
+      
+      # Redis configuration
+      - PAPERLESS_REDIS={{ paperless_ngx_redis_host }}:{{ paperless_ngx_redis_port }}
+      {% if paperless_ngx_redis_password %}
+      - PAPERLESS_REDIS_PASSWORD={{ paperless_ngx_redis_password }}
+      {% endif %}
+      - PAPERLESS_REDIS_DB={{ paperless_ngx_redis_db }}
+      
+      # OCR configuration
+      - PAPERLESS_OCR_LANGUAGE={{ paperless_ngx_ocr_language }}
+      - PAPERLESS_OCR_CLEAN={{ paperless_ngx_ocr_clean | lower }}
+      - PAPERLESS_OCR_DESKEW={{ paperless_ngx_ocr_deskew | lower }}
+      - PAPERLESS_OCR_ROTATE_PAGES={{ paperless_ngx_ocr_rotate_pages | lower }}
+      - PAPERLESS_OCR_ROTATE_PAGES_THRESHOLD={{ paperless_ngx_ocr_rotate_pages_threshold }}
+      - PAPERLESS_OCR_MAX_IMAGE_PIXELS={{ paperless_ngx_ocr_max_image_pixels }}
+      - PAPERLESS_OCR_OUTPUT_TYPE={{ paperless_ngx_ocr_output_type }}
+      - PAPERLESS_OCR_PAGES={{ paperless_ngx_ocr_pages }}
+      
+      # Document processing
+      - PAPERLESS_CONSUMER_POLLING={{ paperless_ngx_consumer_polling }}
+      - PAPERLESS_CONSUMER_DELETE_DUPLICATES={{ paperless_ngx_consumer_delete_duplicates | lower }}
+      - PAPERLESS_CONSUMER_SUBDIRS={{ paperless_ngx_consumer_subdirs | lower }}
+      - PAPERLESS_CONSUMER_RECURSIVE={{ paperless_ngx_consumer_recursive | lower }}
+      - PAPERLESS_CONSUMER_OVERRIDE_FILENAME={{ paperless_ngx_consumer_override_filename | lower }}
+      
+      # Authentication
+      - PAPERLESS_AUTH_ENABLED={{ paperless_ngx_auth_enabled | lower }}
+      {% if paperless_ngx_auth_method == "authentik" %}
+      - PAPERLESS_AUTH_METHOD=authentik
+      - PAPERLESS_AUTHENTIK_URL=https://{{ authentik_subdomain }}.{{ domain }}
+      {% endif %}
+      
+      # API configuration
+      - PAPERLESS_API_ENABLED={{ paperless_ngx_api_enabled | lower }}
+      - PAPERLESS_API_VERSION={{ paperless_ngx_api_version }}
+      - PAPERLESS_API_RATE_LIMIT={{ paperless_ngx_api_rate_limit }}
+      - PAPERLESS_API_RATE_LIMIT_WINDOW={{ paperless_ngx_api_rate_limit_window }}
+      
+      # Security
+      - PAPERLESS_SECURITY_HEADERS={{ paperless_ngx_security_headers | lower }}
+      - PAPERLESS_RATE_LIMITING={{ paperless_ngx_rate_limiting | lower }}
+      - PAPERLESS_RATE_LIMIT_REQUESTS={{ paperless_ngx_rate_limit_requests }}
+      - PAPERLESS_RATE_LIMIT_WINDOW={{ paperless_ngx_rate_limit_window }}
+      - PAPERLESS_CORS_ENABLED={{ paperless_ngx_cors_enabled | lower }}
+      - PAPERLESS_CORS_ORIGINS={{ paperless_ngx_cors_origins | join(',') }}
+      - PAPERLESS_ALLOW_ANONYMOUS_ACCESS={{ paperless_ngx_allow_anonymous_access | lower }}
+      - PAPERLESS_ALLOW_REGISTRATION={{ paperless_ngx_allow_registration | lower }}
+      
+      # Webhooks
+      - PAPERLESS_WEBHOOKS_ENABLED={{ paperless_ngx_webhooks_enabled | lower }}
+      - PAPERLESS_WEBHOOK_EVENTS={{ paperless_ngx_webhook_events | join(',') }}
+      
+      # Notifications
+      - PAPERLESS_NOTIFICATIONS_ENABLED={{ paperless_ngx_notifications_enabled | lower }}
+      - PAPERLESS_NOTIFICATION_CHANNELS={{ paperless_ngx_notification_channels | join(',') }}
+      
+      # Email configuration
+      {% if paperless_ngx_email_enabled | default(false) %}
+      - PAPERLESS_EMAIL_HOST={{ paperless_ngx_smtp_host }}
+      - PAPERLESS_EMAIL_PORT={{ paperless_ngx_smtp_port }}
+      - PAPERLESS_EMAIL_USERNAME={{ paperless_ngx_smtp_username }}
+      - PAPERLESS_EMAIL_PASSWORD={{ paperless_ngx_smtp_password }}
+      - PAPERLESS_EMAIL_ENCRYPTION={{ paperless_ngx_smtp_encryption }}
+      {% endif %}
+      
+      # Slack configuration
+      {% if paperless_ngx_slack_enabled | default(false) %}
+      - PAPERLESS_SLACK_WEBHOOK={{ paperless_ngx_slack_webhook }}
+      - PAPERLESS_SLACK_CHANNEL={{ paperless_ngx_slack_channel }}
+      {% endif %}
+      
+      # Discord configuration
+      {% if paperless_ngx_discord_enabled | default(false) %}
+      - PAPERLESS_DISCORD_WEBHOOK={{ paperless_ngx_discord_webhook }}
+      - PAPERLESS_DISCORD_CHANNEL={{ paperless_ngx_discord_channel }}
+      {% endif %}
+      
+      # Performance
+      - PAPERLESS_PERFORMANCE_MODE={{ paperless_ngx_performance_mode }}
+      - PAPERLESS_CACHE_ENABLED={{ paperless_ngx_cache_enabled | lower }}
+      - PAPERLESS_CACHE_SIZE={{ paperless_ngx_cache_size }}
+      - PAPERLESS_CACHE_TTL={{ paperless_ngx_cache_ttl }}
+      
+      # Development
+      - PAPERLESS_DEBUG_ENABLED={{ paperless_ngx_debug_enabled | lower }}
+      - PAPERLESS_DEBUG_PORT={{ paperless_ngx_debug_port }}
+      - PAPERLESS_DEBUG_HOST={{ paperless_ngx_debug_host }}
+      
+      # Custom environment variables
+      {% for key, value in paperless_ngx_environment_variables.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+      
+      # System environment
+      - TZ={{ timezone | default('UTC') }}
+      - PUID={{ username_uid | default(1000) }}
+      - PGID={{ username_gid | default(1000) }}
+    
+    # Volume mounts
+    volumes:
+      # Configuration
+      - {{ config_dir }}/paperless-ngx/paperless.conf:/usr/src/paperless/paperless.conf:ro
+      - {{ config_dir }}/paperless-ngx/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ config_dir }}/paperless-ngx/custom:/usr/src/paperless/custom:ro
+      
+      # Data persistence
+      - {{ data_dir }}/paperless-ngx/documents:/usr/src/paperless/media/documents
+      - {{ data_dir }}/paperless-ngx/thumbnails:/usr/src/paperless/media/thumbnails
+      - {{ data_dir }}/paperless-ngx/archive:/usr/src/paperless/media/archive
+      - {{ data_dir }}/paperless-ngx/originals:/usr/src/paperless/media/originals
+      - {{ data_dir }}/paperless-ngx/consume:/usr/src/paperless/consume
+      
+      # Export and backup
+      - {{ docker_dir }}/paperless-ngx/export:/usr/src/paperless/export
+      - {{ backup_dir }}/paperless-ngx:/usr/src/paperless/backup
+      
+      # Logs
+      - {{ logs_dir }}/paperless-ngx/application:/usr/src/paperless/logs
+      - {{ logs_dir }}/paperless-ngx/nginx:/var/log/nginx
+      - {{ logs_dir }}/paperless-ngx/ocr:/usr/src/paperless/ocr_logs
+      
+      # Temporary files
+      - {{ docker_dir }}/paperless-ngx/temp:/tmp/paperless
+      - {{ docker_dir }}/paperless-ngx/trash:/usr/src/paperless/trash
+      
+      # Custom volume mounts
+      {% for mount in paperless_ngx_volume_mounts %}
+      - {{ mount }}
+      {% endfor %}
+    
+    # Port mappings
+    ports:
+      - "{{ paperless_ngx_web_port }}:8000"
+      {% if paperless_ngx_debug_enabled | default(false) %}
+      - "{{ paperless_ngx_debug_port }}:{{ paperless_ngx_debug_port }}"
+      {% endif %}
+    
+    # Networks
+    networks:
+      - {{ paperless_ngx_traefik_network }}
+      - paperless-internal
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: {{ paperless_ngx_memory_limit }}
+          cpus: '{{ paperless_ngx_cpu_limit }}'
+        reservations:
+          memory: {{ (paperless_ngx_memory_limit | regex_replace('([0-9]+)g', '\\1') | int * 512) | int }}m
+          cpus: '{{ (paperless_ngx_cpu_limit | float * 0.5) | round(2) }}'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000{{ paperless_ngx_health_check_url }}"]
+      interval: {{ paperless_ngx_health_check_interval }}s
+      timeout: {{ paperless_ngx_health_check_timeout }}s
+      retries: {{ paperless_ngx_health_check_retries }}
+      start_period: 120s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined
+    
+    # Capabilities
+    cap_add:
+      - SYS_ADMIN  # Required for OCR processing
+    
+    # Labels for Traefik
+    labels:
+      {% if paperless_ngx_traefik_enabled | default(true) %}
+      # Traefik labels
+      - "traefik.enable=true"
+      - "traefik.http.routers.paperless-ngx.rule=Host(`{{ paperless_ngx_domain }}`)"
+      - "traefik.http.routers.paperless-ngx.entrypoints=websecure"
+      - "traefik.http.routers.paperless-ngx.tls.certresolver={{ paperless_ngx_traefik_ssl_resolver }}"
+      - "traefik.http.routers.paperless-ngx.middlewares={{ paperless_ngx_traefik_middleware }}"
+      {% if paperless_ngx_auth_method == "authentik" %}
+      - "traefik.http.routers.paperless-ngx.middlewares={{ paperless_ngx_traefik_auth_middleware }}"
+      {% endif %}
+      - "traefik.http.services.paperless-ngx.loadbalancer.server.port=8000"
+      
+      # API router
+      - "traefik.http.routers.paperless-ngx-api.rule=Host(`{{ paperless_ngx_domain }}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.paperless-ngx-api.entrypoints=websecure"
+      - "traefik.http.routers.paperless-ngx-api.tls.certresolver={{ paperless_ngx_traefik_ssl_resolver }}"
+      - "traefik.http.routers.paperless-ngx-api.middlewares={{ paperless_ngx_traefik_middleware }}"
+      {% if paperless_ngx_auth_method == "authentik" %}
+      - "traefik.http.routers.paperless-ngx-api.middlewares={{ paperless_ngx_traefik_auth_middleware }}"
+      {% endif %}
+      - "traefik.http.services.paperless-ngx-api.loadbalancer.server.port=8000"
+      
+      # Admin router
+      - "traefik.http.routers.paperless-ngx-admin.rule=Host(`{{ paperless_ngx_domain }}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.paperless-ngx-admin.entrypoints=websecure"
+      - "traefik.http.routers.paperless-ngx-admin.tls.certresolver={{ paperless_ngx_traefik_ssl_resolver }}"
+      - "traefik.http.routers.paperless-ngx-admin.middlewares={{ paperless_ngx_traefik_middleware }}"
+      {% if paperless_ngx_auth_method == "authentik" %}
+      - "traefik.http.routers.paperless-ngx-admin.middlewares={{ paperless_ngx_traefik_auth_middleware }}"
+      {% endif %}
+      - "traefik.http.services.paperless-ngx-admin.loadbalancer.server.port=8000"
+      {% endif %}
+      
+      # Monitoring labels
+      {% if paperless_ngx_monitoring_enabled | default(true) %}
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=8000"
+      - "prometheus.io/path=/api/health/"
+      - "loki.grafana.com/logs=true"
+      - "loki.grafana.com/label/app=paperless-ngx"
+      - "loki.grafana.com/label/container=paperless-ngx"
+      {% endif %}
+      
+      # Security labels
+      {% if paperless_ngx_crowdsec_enabled | default(true) %}
+      - "crowdsec.enabled=true"
+      - "crowdsec.service=paperless-ngx"
+      {% endif %}
+      
+      {% if paperless_ngx_fail2ban_enabled | default(true) %}
+      - "fail2ban.enabled=true"
+      - "fail2ban.jail={{ paperless_ngx_fail2ban_jail }}"
+      {% endif %}
+      
+      # Custom labels
+      {% for key, value in paperless_ngx_extra_labels.items() %}
+      - "{{ key }}={{ value }}"
+      {% endfor %}
+    
+    # Dependencies
+    depends_on:
+      {% if paperless_ngx_database_type == "postgresql" %}
+      - postgresql
+      {% endif %}
+      - redis
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "app=paperless-ngx,service=document-management"
+        env: "TZ={{ timezone | default('UTC') }}"
+
+networks:
+  {{ paperless_ngx_traefik_network }}:
+    external: true
+  paperless-internal:
+    driver: bridge
+    internal: true 

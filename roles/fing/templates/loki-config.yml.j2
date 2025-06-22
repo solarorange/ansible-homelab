@@ -1,0 +1,81 @@
+# Fing Loki Configuration
+# Aggregates and stores Fing logs for centralized monitoring
+
+auth_enabled: false
+
+server:
+  http_listen_port: {{ fing_loki_port | default(3100) }}
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /var/lib/loki
+  storage:
+    filesystem:
+      chunks_directory: /var/lib/loki/chunks
+      rules_directory: /var/lib/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  max_cache_freshness_per_query: 10m
+  split_queries_by_interval: 15m
+
+chunk_store_config:
+  max_look_back_period: 0s
+
+table_manager:
+  retention_deletes_enabled: false
+  retention_period: 0s
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+frontend:
+  compress_responses: true
+  log_queries_longer_than: 5s
+
+analytics:
+  reporting_enabled: false
+
+# Fing-specific log labels
+log_config:
+  level: info
+  format: logfmt
+  disable_timestamp: false
+  disable_caller: false
+  disable_stacktrace: false
+  sampling:
+    tick: 1s
+    first: 10
+    thereafter: 5
+  outputPaths:
+    - stdout
+  errorOutputPaths:
+    - stderr
+  initialFields:
+    service: fing
+    environment: "{{ environment | default('production') }}"
+    domain: "{{ domain }}" 

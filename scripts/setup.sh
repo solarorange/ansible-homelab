@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Enhanced setup script for Ansible Homelab
+# Enhanced setup script for Ansible Watchtower
 # This script automates initial configuration and setup
 
 set -e
@@ -97,8 +97,8 @@ echo
 
 # Network Configuration
 domain_name="zorg.media"
-network_subnet=${network_subnet:-192.168.1.0/24}
-gateway_ip=${gateway_ip:-192.168.1.1}
+network_subnet=${network_subnet:-192.168.40.0/24}
+gateway_ip=${gateway_ip:-192.168.40.1}
 
 # Create Proxmox vault file
 print_status "Creating Proxmox vault file"
@@ -150,7 +150,7 @@ cat > ansible.cfg << EOF
 [defaults]
 inventory = inventory/hosts.yml
 remote_user = root
-private_key_file = ~/.ssh/homelab_key
+private_key_file = ~/.ssh/watchtower_key
 host_key_checking = False
 retry_files_enabled = False
 nocows = 1
@@ -165,9 +165,9 @@ pipelining = True
 EOF
 
 # Generate SSH key if it doesn't exist
-if [ ! -f "$HOME/.ssh/homelab_key" ]; then
-    print_status "Generating SSH key"
-    ssh-keygen -t ed25519 -f "$HOME/.ssh/homelab_key" -N ""
+if [ ! -f "$HOME/.ssh/watchtower_key" ]; then
+    print_status "Generating SSH key for Watchtower"
+    ssh-keygen -t ed25519 -f "$HOME/.ssh/watchtower_key" -N ""
     print_status "SSH key generated"
 fi
 
@@ -176,7 +176,7 @@ print_status "Creating validation script"
 cat > scripts/validate.sh << 'EOF'
 #!/bin/bash
 
-# Validation script for Ansible Homelab
+# Validation script for Ansible Watchtower
 # This script validates the configuration before deployment
 
 set -e

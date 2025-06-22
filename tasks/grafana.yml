@@ -261,7 +261,7 @@
     group: "{{ username }}"
     mode: "0640"
 
-- name: Create Grafana dashboard configuration
+- name: Create Enhanced Grafana dashboard configuration
   ansible.builtin.copy:
     dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/default.yml"
     content: |
@@ -276,6 +276,219 @@
           editable: true
           options:
             path: /etc/grafana/provisioning/dashboards
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create SSL Certificate Monitoring Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/ssl-certificates.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "SSL Certificate Monitoring",
+          "tags": ["ssl", "certificates", "security"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "SSL Certificate Expiry",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_ssl_earliest_cert_expiry - time()",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "orange", "value": 604800},
+                      {"color": "green", "value": 2592000}
+                    ]
+                  },
+                  "unit": "s"
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "SSL Validation Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_ssl_validation_success",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Service Availability Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/service-availability.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "Service Availability",
+          "tags": ["availability", "uptime", "services"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "Service Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "Response Time",
+              "type": "timeseries",
+              "targets": [
+                {
+                  "expr": "probe_duration_seconds",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "s"
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Network Monitoring Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/network-monitoring.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "Network Monitoring",
+          "tags": ["network", "connectivity", "dns"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "DNS Resolution Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success{job=\"dns_monitoring\"}",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "Network Ping Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success{job=\"network_ping\"}",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"

@@ -4,9 +4,8 @@ networks:
   media:
     name: media
     external: true
-  homelab:
-    name: homelab
-    external: true
+  watchtower:
+    name: watchtower
 
 services:
   immich-server:
@@ -33,10 +32,10 @@ services:
     restart: unless-stopped
     networks:
       - media
-      - homelab
+      - watchtower
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=homelab"
+      - "traefik.docker.network=watchtower"
       - "traefik.http.routers.immich-server.rule=Host(`immich.{{ domain }}`)"
       - "traefik.http.routers.immich-server.entrypoints=websecure"
       - "traefik.http.routers.immich-server.tls=true"
@@ -71,10 +70,10 @@ services:
     restart: unless-stopped
     networks:
       - media
-      - homelab
+      - watchtower
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=homelab"
+      - "traefik.docker.network=watchtower"
       - "traefik.http.routers.immich-web.rule=Host(`immich.{{ domain }}`)"
       - "traefik.http.routers.immich-web.entrypoints=websecure"
       - "traefik.http.routers.immich-web.tls=true"
@@ -149,4 +148,37 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
-      - immich-server 
+      - immich-server
+
+  watchtower:
+    name: watchtower
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      - WATCHTOWER_SCHEDULE={{ watchtower_schedule }}
+    volumes:
+      - {{ docker_dir }}/watchtower:/config
+    restart: unless-stopped
+    networks:
+      - watchtower
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=watchtower"
+      - "traefik.http.routers.watchtower.rule=Host(`watchtower.{{ domain }}`)"
+      - "traefik.http.routers.watchtower.entrypoints=websecure"
+      - "traefik.http.routers.watchtower.tls=true"
+      - "traefik.http.routers.watchtower.tls.certresolver=cloudflare"
+      - "traefik.http.services.watchtower.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.watchtower-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.watchtower-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.watchtower.middlewares=watchtower-auth"
+      - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Host=watchtower.{{ domain }}"
+      - "traefik.http.routers.watchtower.middlewares=watchtower-headers"
+    depends_on:
+      - immich-server
+      - immich-web
+      - immich-postgres
+      - immich-redis
+      - immich-machine-learning
+      - watchtower 

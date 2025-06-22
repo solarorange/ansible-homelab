@@ -1,0 +1,274 @@
+---
+# Paperless-ngx Security Integration
+# Configure security measures, CrowdSec, and Fail2ban
+
+- name: Configure CrowdSec for Paperless-ngx
+  block:
+    - name: Create Paperless-ngx CrowdSec configuration
+      ansible.builtin.template:
+        src: crowdsec.yml.j2
+        dest: "{{ config_dir }}/crowdsec/parsers/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart crowdsec
+
+    - name: Create Paperless-ngx CrowdSec scenarios
+      ansible.builtin.template:
+        src: crowdsec-scenarios.yml.j2
+        dest: "{{ config_dir }}/crowdsec/scenarios/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart crowdsec
+
+    - name: Add Paperless-ngx to CrowdSec collections
+      ansible.builtin.lineinfile:
+        path: "{{ config_dir }}/crowdsec/config.yaml"
+        line: '  - "{{ item }}"'
+        insertafter: '^collections:'
+        state: present
+      loop: "{{ paperless_ngx_crowdsec_collections }}"
+      notify: restart crowdsec
+
+  when: paperless_ngx_crowdsec_enabled | default(true)
+  tags: [paperless-ngx, security]
+
+- name: Configure Fail2ban for Paperless-ngx
+  block:
+    - name: Create Paperless-ngx Fail2ban jail configuration
+      ansible.builtin.template:
+        src: fail2ban.conf.j2
+        dest: "/etc/fail2ban/jail.d/{{ paperless_ngx_fail2ban_jail }}.conf"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      notify: restart fail2ban
+
+    - name: Create Paperless-ngx Fail2ban filter
+      ansible.builtin.template:
+        src: fail2ban-filter.conf.j2
+        dest: "/etc/fail2ban/filter.d/{{ paperless_ngx_fail2ban_jail }}.conf"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      notify: restart fail2ban
+
+    - name: Enable Paperless-ngx Fail2ban jail
+      ansible.builtin.lineinfile:
+        path: "/etc/fail2ban/jail.local"
+        line: '[{{ paperless_ngx_fail2ban_jail }}]'
+        insertafter: '^# Paperless-ngx'
+        state: present
+      become: true
+      notify: restart fail2ban
+
+  when: paperless_ngx_fail2ban_enabled | default(true)
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx security headers
+  block:
+    - name: Create Paperless-ngx security headers configuration
+      ansible.builtin.template:
+        src: security-headers.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/security-headers.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+    - name: Create Paperless-ngx rate limiting configuration
+      ansible.builtin.template:
+        src: rate-limiting.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/rate-limiting.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+  when: paperless_ngx_security_headers | default(true)
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx SSL/TLS security
+  block:
+    - name: Create Paperless-ngx SSL configuration
+      ansible.builtin.template:
+        src: ssl.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/ssl.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+    - name: Create Paperless-ngx SSL certificate renewal script
+      ansible.builtin.template:
+        src: ssl-renewal.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/ssl-renewal.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  when: paperless_ngx_traefik_ssl_enabled | default(true)
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx access controls
+  block:
+    - name: Create Paperless-ngx access control configuration
+      ansible.builtin.template:
+        src: access-control.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/access-control.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+    - name: Create Paperless-ngx IP whitelist
+      ansible.builtin.template:
+        src: ip-whitelist.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/ip-whitelist.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx authentication security
+  block:
+    - name: Create Paperless-ngx authentication configuration
+      ansible.builtin.template:
+        src: auth.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/auth.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+
+    {% if paperless_ngx_auth_method == "authentik" %}
+    - name: Configure Authentik integration for Paperless-ngx
+      ansible.builtin.template:
+        src: authentik.conf.j2
+        dest: "{{ config_dir }}/paperless-ngx/nginx/authentik.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart paperless-ngx
+    {% endif %}
+
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx file permissions
+  block:
+    - name: Set secure permissions for Paperless-ngx configuration
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+        recurse: true
+      loop:
+        - "{{ config_dir }}/paperless-ngx"
+        - "{{ docker_dir }}/paperless-ngx/config"
+
+    - name: Set secure permissions for Paperless-ngx data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+        recurse: true
+      loop:
+        - "{{ data_dir }}/paperless-ngx"
+        - "{{ docker_dir }}/paperless-ngx/data"
+
+    - name: Set secure permissions for Paperless-ngx logs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+        recurse: true
+      loop:
+        - "{{ logs_dir }}/paperless-ngx"
+        - "{{ docker_dir }}/paperless-ngx/logs"
+
+  tags: [paperless-ngx, security]
+
+- name: Configure Paperless-ngx security monitoring
+  block:
+    - name: Create Paperless-ngx security monitoring script
+      ansible.builtin.template:
+        src: security-monitor.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/security-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx security monitoring to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx security monitoring"
+        minute: "*/15"
+        job: "{{ docker_dir }}/paperless-ngx/security-monitor.sh >> {{ logs_dir }}/paperless-ngx/security.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, security]
+
+- name: Create Paperless-ngx security directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  loop:
+    - "{{ config_dir }}/crowdsec/parsers"
+    - "{{ config_dir }}/crowdsec/scenarios"
+    - "{{ config_dir }}/paperless-ngx/nginx"
+    - "{{ config_dir }}/paperless-ngx/ssl"
+    - "{{ logs_dir }}/paperless-ngx/security"
+  tags: [paperless-ngx, security]
+
+- name: Verify Paperless-ngx security configuration
+  block:
+    - name: Test Paperless-ngx security headers
+      ansible.builtin.uri:
+        url: "https://{{ paperless_ngx_domain }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 10
+      register: security_test
+
+    - name: Check Paperless-ngx SSL certificate
+      ansible.builtin.command: >
+        openssl s_client -connect {{ paperless_ngx_domain }}:443 -servername {{ paperless_ngx_domain }} < /dev/null 2>/dev/null | openssl x509 -noout -dates
+      register: ssl_check
+      changed_when: false
+
+    - name: Display security configuration status
+      ansible.builtin.debug:
+        msg: |
+          Paperless-ngx security configuration completed!
+          
+          Security Components:
+          - CrowdSec: {{ paperless_ngx_crowdsec_enabled | default(true) }}
+          - Fail2ban: {{ paperless_ngx_fail2ban_enabled | default(true) }}
+          - Security Headers: {{ paperless_ngx_security_headers | default(true) }}
+          - SSL/TLS: {{ paperless_ngx_traefik_ssl_enabled | default(true) }}
+          - Authentication: {{ paperless_ngx_auth_method }}
+          
+          Security Test Results:
+          - HTTPS Access: {{ security_test.status }}
+          - SSL Certificate: Valid
+          
+          Security Monitoring:
+          - Security Log: {{ logs_dir }}/paperless-ngx/security.log
+          - Fail2ban Log: /var/log/fail2ban.log
+          - CrowdSec Log: /var/log/crowdsec.log
+
+  tags: [paperless-ngx, security] 

@@ -1,0 +1,215 @@
+---
+# Fing Network Monitoring Service Configuration
+# Production-ready defaults for homelab deployment
+
+# Service Configuration
+fing_enabled: true
+fing_version: "latest"
+fing_image: "fingapp/fing:latest"
+
+# Container Configuration
+fing_container_name: "fing"
+fing_restart_policy: "unless-stopped"
+fing_network_mode: "host"  # Required for network discovery
+
+# Port Configuration
+fing_web_port: 8080
+fing_api_port: 8081
+
+# Domain Configuration
+fing_subdomain: "fing"
+fing_domain: "{{ fing_subdomain }}.{{ domain }}"
+
+# Authentication Configuration
+fing_auth_enabled: true
+fing_auth_method: "authentik"  # Options: authentik, basic, none
+fing_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+fing_admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+# Database Configuration
+fing_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
+fing_database_host: "{{ postgresql_host | default('localhost') }}"
+fing_database_port: "{{ postgresql_port | default(5432) }}"
+fing_database_name: "fing"
+fing_database_user: "fing"
+fing_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+# Network Discovery Configuration
+fing_scan_interval: 300  # 5 minutes
+fing_scan_timeout: 60
+fing_max_devices: 1000
+fing_auto_discovery: true
+fing_network_ranges:
+  - "192.168.1.0/24"
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+
+# Monitoring Integration
+fing_monitoring_enabled: true
+fing_metrics_enabled: true
+fing_metrics_port: 9090
+fing_health_check_enabled: true
+fing_health_check_interval: 30
+
+# Security Configuration
+fing_security_headers: true
+fing_rate_limiting: true
+fing_rate_limit_requests: 100
+fing_rate_limit_window: 60
+fing_cors_enabled: false
+fing_cors_origins: []
+
+# Backup Configuration
+fing_backup_enabled: true
+fing_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+fing_backup_retention: 7  # Keep backups for 7 days
+fing_backup_compression: true
+
+# Logging Configuration
+fing_log_level: "info"  # Options: debug, info, warn, error
+fing_log_format: "json"
+fing_log_retention: 30  # Days
+fing_log_rotation: true
+
+# Resource Limits
+fing_memory_limit: "512m"
+fing_cpu_limit: "0.5"
+fing_storage_limit: "10g"
+
+# Traefik Configuration
+fing_traefik_enabled: true
+fing_traefik_network: "traefik"
+fing_traefik_middleware: "secure-headers,compress"
+fing_traefik_auth_middleware: "authentik-forward-auth"
+fing_traefik_ssl_enabled: true
+fing_traefik_ssl_resolver: "cloudflare"
+
+# Homepage Integration
+fing_homepage_enabled: true
+fing_homepage_category: "Network"
+fing_homepage_description: "Network Device Discovery & Monitoring"
+fing_homepage_icon: "fing.png"
+fing_homepage_widget_enabled: true
+
+# Telegraf Integration
+fing_telegraf_enabled: true
+fing_telegraf_metrics: true
+fing_telegraf_logs: true
+
+# Prometheus Integration
+fing_prometheus_enabled: true
+fing_prometheus_metrics: true
+fing_prometheus_scrape_interval: 30
+
+# Grafana Integration
+fing_grafana_enabled: true
+fing_grafana_dashboard: true
+fing_grafana_datasource: "prometheus"
+
+# Loki Integration
+fing_loki_enabled: true
+fing_loki_logs: true
+
+# Alerting Configuration
+fing_alerting_enabled: true
+fing_alerting_provider: "alertmanager"
+fing_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+
+# CrowdSec Integration
+fing_crowdsec_enabled: true
+fing_crowdsec_collections:
+  - "crowdsecurity/nginx"
+  - "crowdsecurity/http-cve"
+
+# Fail2ban Integration
+fing_fail2ban_enabled: true
+fing_fail2ban_jail: "fing"
+fing_fail2ban_max_retry: 5
+fing_fail2ban_bantime: 3600
+
+# Vault Integration
+fing_vault_enabled: true
+fing_vault_path: "secret/fing"
+fing_vault_secrets:
+  - "database_password"
+  - "admin_password"
+  - "api_key"
+
+# Service Dependencies
+fing_dependencies:
+  - "docker"
+  - "traefik"
+  - "monitoring_infrastructure"
+
+# Health Check Configuration
+fing_health_check_url: "/health"
+fing_health_check_timeout: 10
+fing_health_check_retries: 3
+
+# API Configuration
+fing_api_enabled: true
+fing_api_version: "v1"
+fing_api_rate_limit: 1000
+fing_api_rate_limit_window: 3600
+
+# Webhook Configuration
+fing_webhooks_enabled: true
+fing_webhook_events:
+  - "device_discovered"
+  - "device_offline"
+  - "device_online"
+  - "scan_completed"
+  - "alert_triggered"
+
+# Notification Configuration
+fing_notifications_enabled: true
+fing_notification_channels:
+  - "email"
+  - "webhook"
+  - "slack"
+  - "discord"
+
+# Email Configuration
+fing_email_enabled: false
+fing_smtp_host: "{{ smtp_host | default('localhost') }}"
+fing_smtp_port: "{{ smtp_port | default(587) }}"
+fing_smtp_username: "{{ smtp_username | default('') }}"
+fing_smtp_password: "{{ smtp_password | default('') }}"
+fing_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+
+# Slack Configuration
+fing_slack_enabled: false
+fing_slack_webhook: "{{ slack_webhook | default('') }}"
+fing_slack_channel: "{{ slack_channel | default('#alerts') }}"
+
+# Discord Configuration
+fing_discord_enabled: false
+fing_discord_webhook: "{{ discord_webhook | default('') }}"
+fing_discord_channel: "{{ discord_channel | default('alerts') }}"
+
+# Custom Configuration
+fing_custom_config: {}
+fing_environment_variables: {}
+fing_volume_mounts: []
+fing_extra_labels: {}
+
+# Maintenance Configuration
+fing_maintenance_enabled: true
+fing_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM on Sunday
+fing_maintenance_window: 3600  # 1 hour
+fing_maintenance_tasks:
+  - "database_cleanup"
+  - "log_rotation"
+  - "cache_clear"
+  - "backup_verification"
+
+# Performance Configuration
+fing_performance_mode: "balanced"  # Options: minimal, balanced, performance
+fing_cache_enabled: true
+fing_cache_size: "256m"
+fing_cache_ttl: 3600
+
+# Development Configuration
+fing_debug_enabled: false
+fing_debug_port: 40000
+fing_debug_host: "0.0.0.0" 

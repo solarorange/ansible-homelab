@@ -1,0 +1,289 @@
+---
+# Paperless-ngx Backup Configuration
+# Configure automated backup strategy and recovery procedures
+
+- name: Configure Paperless-ngx backup strategy
+  block:
+    - name: Create Paperless-ngx backup script
+      ansible.builtin.template:
+        src: backup.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Paperless-ngx restore script
+      ansible.builtin.template:
+        src: restore.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/restore.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Paperless-ngx backup verification script
+      ansible.builtin.template:
+        src: backup-verify.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup-verify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx backup cron jobs
+  block:
+    - name: Add Paperless-ngx daily backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx daily backup"
+        hour: "{{ paperless_ngx_backup_schedule.split()[1] }}"
+        minute: "{{ paperless_ngx_backup_schedule.split()[0] }}"
+        job: "{{ docker_dir }}/paperless-ngx/backup.sh daily >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add Paperless-ngx weekly backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx weekly backup"
+        weekday: "0"
+        hour: "3"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/backup.sh weekly >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add Paperless-ngx monthly backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx monthly backup"
+        day: "1"
+        hour: "4"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/backup.sh monthly >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add Paperless-ngx backup verification to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx backup verification"
+        hour: "6"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/backup-verify.sh >> {{ logs_dir }}/paperless-ngx/backup-verify.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx backup retention
+  block:
+    - name: Create Paperless-ngx backup retention script
+      ansible.builtin.template:
+        src: backup-retention.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup-retention.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx backup retention to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx backup retention cleanup"
+        hour: "5"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/backup-retention.sh >> {{ logs_dir }}/paperless-ngx/backup-retention.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx database backup
+  block:
+    - name: Create Paperless-ngx database backup script
+      ansible.builtin.template:
+        src: db-backup.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/db-backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx database backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx database backup"
+        hour: "1"
+        minute: "30"
+        job: "{{ docker_dir }}/paperless-ngx/db-backup.sh >> {{ logs_dir }}/paperless-ngx/db-backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  when: paperless_ngx_backup_include_database | default(true)
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx media backup
+  block:
+    - name: Create Paperless-ngx media backup script
+      ansible.builtin.template:
+        src: media-backup.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/media-backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx media backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx media backup"
+        hour: "2"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/media-backup.sh >> {{ logs_dir }}/paperless-ngx/media-backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  when: paperless_ngx_backup_include_media | default(true)
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx configuration backup
+  block:
+    - name: Create Paperless-ngx configuration backup script
+      ansible.builtin.template:
+        src: config-backup.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/config-backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx configuration backup to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx configuration backup"
+        hour: "1"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/config-backup.sh >> {{ logs_dir }}/paperless-ngx/config-backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx backup monitoring
+  block:
+    - name: Create Paperless-ngx backup monitoring script
+      ansible.builtin.template:
+        src: backup-monitor.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx backup monitoring to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx backup monitoring"
+        minute: "*/30"
+        job: "{{ docker_dir }}/paperless-ngx/backup-monitor.sh >> {{ logs_dir }}/paperless-ngx/backup-monitor.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, backup]
+
+- name: Create Paperless-ngx backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  loop:
+    - "{{ backup_dir }}/paperless-ngx"
+    - "{{ backup_dir }}/paperless-ngx/daily"
+    - "{{ backup_dir }}/paperless-ngx/weekly"
+    - "{{ backup_dir }}/paperless-ngx/monthly"
+    - "{{ backup_dir }}/paperless-ngx/database"
+    - "{{ backup_dir }}/paperless-ngx/media"
+    - "{{ backup_dir }}/paperless-ngx/config"
+    - "{{ backup_dir }}/paperless-ngx/logs"
+    - "{{ logs_dir }}/paperless-ngx/backup"
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx backup encryption
+  block:
+    - name: Create Paperless-ngx backup encryption script
+      ansible.builtin.template:
+        src: backup-encrypt.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup-encrypt.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Generate Paperless-ngx backup encryption key
+      ansible.builtin.command: >
+        openssl rand -hex 32 > {{ docker_dir }}/paperless-ngx/backup.key
+      args:
+        creates: "{{ docker_dir }}/paperless-ngx/backup.key"
+      register: backup_key_generated
+
+    - name: Set secure permissions for backup key
+      ansible.builtin.file:
+        path: "{{ docker_dir }}/paperless-ngx/backup.key"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0600"
+
+  when: paperless_ngx_backup_compression | default(true)
+  tags: [paperless-ngx, backup]
+
+- name: Configure Paperless-ngx backup notifications
+  block:
+    - name: Create Paperless-ngx backup notification script
+      ansible.builtin.template:
+        src: backup-notify.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/backup-notify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [paperless-ngx, backup]
+
+- name: Verify Paperless-ngx backup configuration
+  block:
+    - name: Test Paperless-ngx backup script
+      ansible.builtin.command: "{{ docker_dir }}/paperless-ngx/backup.sh test"
+      register: backup_test
+      changed_when: backup_test.rc == 0
+      failed_when: backup_test.rc != 0
+
+    - name: Test Paperless-ngx backup verification script
+      ansible.builtin.command: "{{ docker_dir }}/paperless-ngx/backup-verify.sh"
+      register: backup_verify_test
+      changed_when: backup_verify_test.rc == 0
+      failed_when: backup_verify_test.rc != 0
+
+    - name: Display backup configuration status
+      ansible.builtin.debug:
+        msg: |
+          Paperless-ngx backup configuration completed!
+          
+          Backup Schedule:
+          - Daily: {{ paperless_ngx_backup_schedule }}
+          - Weekly: Sunday 3:00 AM
+          - Monthly: 1st of month 4:00 AM
+          
+          Backup Components:
+          - Database: {{ paperless_ngx_backup_include_database | default(true) }}
+          - Media: {{ paperless_ngx_backup_include_media | default(true) }}
+          - Configuration: Always included
+          
+          Backup Retention:
+          - Daily backups: {{ paperless_ngx_backup_retention }} days
+          - Weekly backups: 4 weeks
+          - Monthly backups: 12 months
+          
+          Backup Compression: {{ paperless_ngx_backup_compression | default(true) }}
+          Backup Encryption: {{ paperless_ngx_backup_compression | default(true) }}
+          
+          Backup Locations:
+          - Daily: {{ backup_dir }}/paperless-ngx/daily
+          - Weekly: {{ backup_dir }}/paperless-ngx/weekly
+          - Monthly: {{ backup_dir }}/paperless-ngx/monthly
+          - Database: {{ backup_dir }}/paperless-ngx/database
+          - Media: {{ backup_dir }}/paperless-ngx/media
+          - Config: {{ backup_dir }}/paperless-ngx/config
+          
+          Backup Logs:
+          - Main: {{ logs_dir }}/paperless-ngx/backup.log
+          - Verification: {{ logs_dir }}/paperless-ngx/backup-verify.log
+          - Monitoring: {{ logs_dir }}/paperless-ngx/backup-monitor.log
+
+  tags: [paperless-ngx, backup] 

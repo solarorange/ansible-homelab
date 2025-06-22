@@ -1,0 +1,36 @@
+# Backup orchestration log rotation
+{{ backup_dir }}/orchestration/logs/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 {{ username }} {{ username }}
+    postrotate
+        # Reload systemd if needed
+        systemctl reload backup-orchestration.service 2>/dev/null || true
+    endscript
+}
+
+# Backup status files (clean up old status files)
+{{ backup_dir }}/orchestration/status/*.status {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 {{ username }} {{ username }}
+}
+
+# Backup error files
+{{ backup_dir }}/orchestration/status/*.error {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 {{ username }} {{ username }}
+} 

@@ -1,6 +1,6 @@
-# Enhanced Ansible Homelab Playbook
+# Enhanced Ansible Watchtower Playbook
 
-A production-ready Ansible playbook for deploying and managing a comprehensive homelab environment with monitoring, automation, security, and media services.
+A production-ready Ansible playbook for deploying and managing a comprehensive Watchtower environment with monitoring, automation, security, and media services.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -91,7 +91,7 @@ A production-ready Ansible playbook for deploying and managing a comprehensive h
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/ansible_homelab.git
+   git clone https://github.com/solarorange/ansible-watchtower.git
    cd ansible_homelab
    ```
 
@@ -168,7 +168,7 @@ network_config:
   bridge: "vmbr0"
   vlan: "optional-vlan-id"
   ip_config: "static"  # or dhcp
-  gateway: "192.168.1.1"
+  gateway: "192.168.40.1"
   dns_servers:
     - "8.8.8.8"
     - "8.8.4.4"
@@ -337,7 +337,7 @@ For common issues and solutions, please refer to [TROUBLESHOOTING.md](TROUBLESHO
 
 ## Architecture
 
-The homelab architecture consists of several key components:
+The Watchtower architecture consists of several key components:
 
 1. Core Infrastructure:
    - Proxmox VE for virtualization

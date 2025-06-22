@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# Backup Resource Monitor
+# Monitors system resources during backup operations
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
+STATUS_DIR="$SCRIPT_DIR/status"
+CONFIG_FILE="$SCRIPT_DIR/config.yml"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_DIR/resource_monitor.log"
+}
+
+# Resource thresholds
+CPU_THRESHOLD=80
+MEMORY_THRESHOLD=80
+DISK_THRESHOLD=90
+IO_THRESHOLD=80
+
+# Get current resource usage
+get_cpu_usage() {
+    top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1
+}
+
+get_memory_usage() {
+    free | grep Mem | awk '{printf("%.0f", $3/$2 * 100.0)}'
+}
+
+get_disk_usage() {
+    df / | tail -1 | awk '{print $5}' | sed 's/%//'
+}
+
+get_io_usage() {
+    iostat -x 1 1 | grep -E "^[a-z]" | awk '{sum+=$NF} END {print int(sum)}' 2>/dev/null || echo "0"
+}
+
+get_backup_processes() {
+    pgrep -c -f "backup.*\.sh" || echo "0"
+}
+
+# Check if backups should be throttled
+check_throttling() {
+    local cpu_usage=$(get_cpu_usage)
+    local memory_usage=$(get_memory_usage)
+    local disk_usage=$(get_disk_usage)
+    local io_usage=$(get_io_usage)
+    local backup_count=$(get_backup_processes)
+    
+    local should_throttle=false
+    local reason=""
+    
+    # Check CPU usage
+    if [ "$cpu_usage" -gt "$CPU_THRESHOLD" ]; then
+        should_throttle=true
+        reason="CPU usage high: ${cpu_usage}%"
+    fi
+    
+    # Check memory usage
+    if [ "$memory_usage" -gt "$MEMORY_THRESHOLD" ]; then
+        should_throttle=true
+        reason="Memory usage high: ${memory_usage}%"
+    fi
+    
+    # Check disk usage
+    if [ "$disk_usage" -gt "$DISK_THRESHOLD" ]; then
+        should_throttle=true
+        reason="Disk usage high: ${disk_usage}%"
+    fi
+    
+    # Check I/O usage
+    if [ "$io_usage" -gt "$IO_THRESHOLD" ]; then
+        should_throttle=true
+        reason="I/O usage high: ${io_usage}%"
+    fi
+    
+    # Log resource status
+    log "Resource Status - CPU: ${cpu_usage}%, Memory: ${memory_usage}%, Disk: ${disk_usage}%, I/O: ${io_usage}%, Active Backups: ${backup_count}"
+    
+    if [ "$should_throttle" = true ]; then
+        echo "$reason" > "$STATUS_DIR/throttling_reason"
+        log "WARNING: Resource throttling recommended - $reason"
+        return 1
+    else
+        rm -f "$STATUS_DIR/throttling_reason"
+        return 0
+    fi
+}
+
+# Check for stuck or long-running backups
+check_stuck_backups() {
+    local max_duration_minutes={{ backup_resource_limits.max_backup_duration_minutes }}
+    local current_time=$(date +%s)
+    
+    for status_file in "$STATUS_DIR"/*.status; do
+        if [ ! -f "$status_file" ]; then
+            continue
+        fi
+        
+        local service=$(basename "$status_file" .status)
+        local status=$(cat "$status_file")
+        
+        if [ "$status" = "running" ]; then
+            local pid_file="$STATUS_DIR/${service}.pid"
+            local started_file="$STATUS_DIR/${service}.started"
+            
+            if [ -f "$pid_file" ] && [ -f "$started_file" ]; then
+                local pid=$(cat "$pid_file")
+                local started_time=$(cat "$started_file" | xargs date -d +%s 2>/dev/null || echo "0")
+                
+                if [ "$started_time" -gt 0 ]; then
+                    local duration_minutes=$(( (current_time - started_time) / 60 ))
+                    
+                    if [ "$duration_minutes" -gt "$max_duration_minutes" ]; then
+                        log "WARNING: Backup for $service has been running for ${duration_minutes} minutes (max: ${max_duration_minutes})"
+                        
+                        # Check if process is still alive
+                        if ! kill -0 "$pid" 2>/dev/null; then
+                            log "ERROR: Backup process for $service (PID: $pid) is not running but status is 'running'"
+                            echo "failed" > "$status_file"
+                            echo "Process died unexpectedly" > "$STATUS_DIR/${service}.error"
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    done
+}
+
+# Main monitoring loop
+main() {
+    log "Starting resource monitoring"
+    
+    while true; do
+        # Check resource usage
+        if ! check_throttling; then
+            # Send notification about throttling
+            if [ -f "$SCRIPT_DIR/notifications.sh" ]; then
+                local reason=$(cat "$STATUS_DIR/throttling_reason" 2>/dev/null || echo "Unknown reason")
+                "$SCRIPT_DIR/notifications.sh" "resource_throttling" "$reason"
+            fi
+        fi
+        
+        # Check for stuck backups
+        check_stuck_backups
+        
+        # Sleep for monitoring interval
+        sleep 300  # 5 minutes
+    done
+}
+
+# Handle script termination
+trap 'log "Resource monitoring stopped"; exit 0' SIGTERM SIGINT
+
+# Start monitoring
+main 

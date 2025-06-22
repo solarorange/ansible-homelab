@@ -1,0 +1,142 @@
+# Fing CrowdSec Configuration
+# Monitors Fing API access and network events for security threats
+
+api:
+  server:
+    listen_uri: 127.0.0.1:8080
+    profiles_path: /etc/crowdsec/profiles.yaml
+    use_forwarded_for_headers: true
+    forwarded_for_headers_trust_proxies:
+      - 127.0.0.1
+      - ::1
+      - {{ fing_network_subnet | default('10.0.0.0/8') }}
+
+common:
+  daemonize: true
+  log_media: file
+  log_level: info
+  log_dir: /var/log/
+  working_dir: /etc/crowdsec/
+  data_dir: /var/lib/crowdsec/data/
+  pid_dir: /var/run/
+
+config_paths:
+  config_dir: /etc/crowdsec/
+  data_dir: /var/lib/crowdsec/data/
+  simulation_path: /etc/crowdsec/simulation.yaml
+  hub_dir: /etc/crowdsec/hub/
+  index_path: /etc/crowdsec/hub/.index
+
+db_config:
+  type: sqlite
+  db_path: /var/lib/crowdsec/data/crowdsec.db
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 3600
+
+plugin_config:
+  user: root
+  group: root
+
+# Fing-specific parsers
+parsers:
+  - name: fing-api-access
+    description: "Parse Fing API access logs"
+    format: regex
+    pattern: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?P<level>\w+) (?P<message>.*)$'
+    nodes:
+      - name: timestamp
+        statics:
+          - meta: log_type
+            value: fing_api
+      - name: level
+        statics:
+          - meta: log_level
+            value: "{{ .level }}"
+      - name: message
+        statics:
+          - meta: source
+            value: fing
+
+# Fing-specific scenarios
+scenarios:
+  - name: fing-brute-force
+    description: "Detect brute force attacks on Fing API"
+    filter: "evt.Meta.log_type == 'fing_api' && evt.Meta.log_level == 'error'"
+    groupby:
+      - evt.Meta.source_ip
+    capacity: 10
+    leaky: true
+    blackhole: 300s
+    remediations:
+      - type: ban
+        parameters:
+          duration: 3600s
+          scope: ip
+
+  - name: fing-unauthorized-access
+    description: "Detect unauthorized access attempts to Fing API"
+    filter: "evt.Meta.log_type == 'fing_api' && evt.Parsed.message contains 'unauthorized'"
+    groupby:
+      - evt.Meta.source_ip
+    capacity: 5
+    leaky: true
+    blackhole: 600s
+    remediations:
+      - type: ban
+        parameters:
+          duration: 7200s
+          scope: ip
+
+  - name: fing-network-scan
+    description: "Detect network scanning activities"
+    filter: "evt.Meta.log_type == 'fing_api' && evt.Parsed.message contains 'scan'"
+    groupby:
+      - evt.Meta.source_ip
+    capacity: 3
+    leaky: true
+    blackhole: 1800s
+    remediations:
+      - type: ban
+        parameters:
+          duration: 14400s
+          scope: ip
+
+# Fing-specific collections
+collections:
+  - name: fing-security
+    description: "Fing security monitoring collection"
+    parsers:
+      - fing-api-access
+    scenarios:
+      - fing-brute-force
+      - fing-unauthorized-access
+      - fing-network-scan
+
+# Fing-specific postoverflows
+postoverflows:
+  - name: fing-enrichment
+    description: "Enrich Fing events with additional context"
+    filter: "evt.Meta.log_type == 'fing_api'"
+    statics:
+      - meta: service
+        value: fing
+      - meta: environment
+        value: "{{ environment | default('production') }}"
+      - meta: domain
+        value: "{{ domain }}"
+
+# Fing-specific profiles
+profiles:
+  - name: fing-api
+    description: "Fing API security profile"
+    debug: false
+    filters:
+      - "evt.Meta.log_type == 'fing_api'"
+    decisions:
+      - type: ban
+        scope: ip
+        duration: 3600s
+        reason: "Fing API security violation"
+    on_success: continue
+    on_failure: continue 

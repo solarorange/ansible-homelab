@@ -1,0 +1,308 @@
+---
+# Fing Prerequisites Setup
+# Creates necessary directories, permissions, and dependencies
+
+- name: Create Fing directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/fing"
+    - "{{ docker_dir }}/fing/config"
+    - "{{ docker_dir }}/fing/data"
+    - "{{ docker_dir }}/fing/logs"
+    - "{{ docker_dir }}/fing/backups"
+    - "{{ docker_dir }}/fing/cache"
+    - "{{ logs_dir }}/fing"
+    - "{{ config_dir }}/fing"
+  register: fing_dirs_created
+
+- name: Create Fing database directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/database"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  when: fing_database_type == "sqlite"
+
+- name: Create Fing network configuration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/network"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing monitoring configuration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/monitoring"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: fing_monitoring_enabled | default(true)
+
+- name: Create Fing security configuration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/security"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Fing backup configuration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/backup"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: fing_backup_enabled | default(true)
+
+- name: Create Fing alerting configuration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/fing/alerts"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: fing_alerting_enabled | default(true)
+
+- name: Install required packages
+  ansible.builtin.package:
+    name:
+      - curl
+      - wget
+      - jq
+      - sqlite3
+      - nmap
+      - net-tools
+      - iputils-ping
+      - traceroute
+      - arping
+    state: present
+  register: fing_packages_installed
+
+- name: Create Fing user and group
+  ansible.builtin.user:
+    name: "fing"
+    system: true
+    shell: "/bin/false"
+    home: "/var/lib/fing"
+    create_home: false
+    state: present
+  register: fing_user_created
+
+- name: Create Fing system directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "fing"
+    group: "fing"
+    mode: "0750"
+  loop:
+    - "/var/lib/fing"
+    - "/var/log/fing"
+    - "/etc/fing"
+  when: fing_user_created.changed
+
+- name: Set up Fing capabilities
+  ansible.builtin.file:
+    path: "/etc/systemd/system/fing.service.d"
+    state: directory
+    mode: "0755"
+
+- name: Create Fing capabilities configuration
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BROADCAST
+      AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BROADCAST
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ReadWritePaths=/var/lib/fing /var/log/fing /etc/fing
+      PrivateTmp=true
+      PrivateDevices=true
+      ProtectKernelTunables=true
+      ProtectKernelModules=true
+      ProtectControlGroups=true
+      RestrictRealtime=true
+      RestrictSUIDSGID=true
+      LockPersonality=true
+      MemoryDenyWriteExecute=true
+    dest: "/etc/systemd/system/fing.service.d/capabilities.conf"
+    mode: "0644"
+  when: fing_user_created.changed
+
+- name: Create Fing environment file
+  ansible.builtin.template:
+    src: "env.j2"
+    dest: "{{ docker_dir }}/fing/.env"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: fing_env_created
+
+- name: Create Fing configuration files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ docker_dir }}/fing/{{ item.dest }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - { src: 'config.yml.j2', dest: 'config/config.yml', mode: '0640' }
+    - { src: 'network.yml.j2', dest: 'network/network.yml', mode: '0640' }
+    - { src: 'monitoring.yml.j2', dest: 'monitoring/monitoring.yml', mode: '0640' }
+    - { src: 'security.yml.j2', dest: 'security/security.yml', mode: '0640' }
+    - { src: 'alerts.yml.j2', dest: 'alerts/alerts.yml', mode: '0640' }
+    - { src: 'backup.yml.j2', dest: 'backup/backup.yml', mode: '0640' }
+  when: fing_env_created.changed
+
+- name: Create Fing health check script
+  ansible.builtin.template:
+    src: "health_check.sh.j2"
+    dest: "{{ docker_dir }}/fing/health_check.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing maintenance script
+  ansible.builtin.template:
+    src: "maintenance.sh.j2"
+    dest: "{{ docker_dir }}/fing/maintenance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing backup script
+  ansible.builtin.template:
+    src: "backup.sh.j2"
+    dest: "{{ docker_dir }}/fing/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: fing_backup_enabled | default(true)
+
+- name: Create Fing restore script
+  ansible.builtin.template:
+    src: "restore.sh.j2"
+    dest: "{{ docker_dir }}/fing/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: fing_backup_enabled | default(true)
+
+- name: Create Fing log rotation configuration
+  ansible.builtin.template:
+    src: "logrotate.conf.j2"
+    dest: "/etc/logrotate.d/fing"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Create Fing systemd service
+  ansible.builtin.template:
+    src: "fing.service.j2"
+    dest: "/etc/systemd/system/fing.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: fing_service_created
+
+- name: Create Fing systemd timer
+  ansible.builtin.template:
+    src: "fing.timer.j2"
+    dest: "/etc/systemd/system/fing.timer"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  when: fing_maintenance_enabled | default(true)
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: fing_service_created.changed
+
+- name: Enable Fing systemd timer
+  ansible.builtin.systemd:
+    name: "fing.timer"
+    enabled: true
+    state: started
+  when: 
+    - fing_maintenance_enabled | default(true)
+    - fing_service_created.changed
+
+- name: Set up Fing cron jobs
+  ansible.builtin.cron:
+    name: "Fing backup"
+    minute: "{{ fing_backup_schedule.split(' ')[0] }}"
+    hour: "{{ fing_backup_schedule.split(' ')[1] }}"
+    day: "{{ fing_backup_schedule.split(' ')[2] }}"
+    month: "{{ fing_backup_schedule.split(' ')[3] }}"
+    weekday: "{{ fing_backup_schedule.split(' ')[4] }}"
+    job: "{{ docker_dir }}/fing/backup.sh"
+    user: "{{ username }}"
+  when: fing_backup_enabled | default(true)
+
+- name: Set up Fing maintenance cron
+  ansible.builtin.cron:
+    name: "Fing maintenance"
+    minute: "{{ fing_maintenance_schedule.split(' ')[0] }}"
+    hour: "{{ fing_maintenance_schedule.split(' ')[1] }}"
+    day: "{{ fing_maintenance_schedule.split(' ')[2] }}"
+    month: "{{ fing_maintenance_schedule.split(' ')[3] }}"
+    weekday: "{{ fing_maintenance_schedule.split(' ')[4] }}"
+    job: "{{ docker_dir }}/fing/maintenance.sh"
+    user: "{{ username }}"
+  when: fing_maintenance_enabled | default(true)
+
+- name: Create Fing API key
+  ansible.builtin.set_fact:
+    fing_api_key: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}"
+  no_log: true
+
+- name: Store Fing secrets in vault
+  ansible.builtin.set_fact:
+    vault_fing_secrets:
+      api_key: "{{ fing_api_key }}"
+      admin_password: "{{ fing_admin_password }}"
+      database_password: "{{ fing_database_password }}"
+  no_log: true
+  when: fing_vault_enabled | default(true)
+
+- name: Display Fing prerequisites summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Prerequisites Setup Complete:
+      
+      Directories Created: {{ fing_dirs_created.results | length }}
+      Packages Installed: {{ fing_packages_installed.results | length }}
+      User Created: {{ fing_user_created.changed }}
+      Service Created: {{ fing_service_created.changed }}
+      
+      Configuration Files:
+      - Environment: {{ docker_dir }}/fing/.env
+      - Config: {{ docker_dir }}/fing/config/config.yml
+      - Network: {{ docker_dir }}/fing/network/network.yml
+      - Monitoring: {{ docker_dir }}/fing/monitoring/monitoring.yml
+      - Security: {{ docker_dir }}/fing/security/security.yml
+      - Alerts: {{ docker_dir }}/fing/alerts/alerts.yml
+      - Backup: {{ docker_dir }}/fing/backup/backup.yml
+      
+      Scripts:
+      - Health Check: {{ docker_dir }}/fing/health_check.sh
+      - Maintenance: {{ docker_dir }}/fing/maintenance.sh
+      - Backup: {{ docker_dir }}/fing/backup.sh
+      - Restore: {{ docker_dir }}/fing/restore.sh
+      
+      System Integration:
+      - Systemd Service: /etc/systemd/system/fing.service
+      - Systemd Timer: /etc/systemd/system/fing.timer
+      - Log Rotation: /etc/logrotate.d/fing
+      - Cron Jobs: {{ fing_backup_enabled | default(true) | ternary('Backup & Maintenance', 'None') }} 

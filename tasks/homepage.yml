@@ -22,6 +22,18 @@
     - { src: 'bookmarks.yml.j2', dest: 'config/bookmarks.yml' }
     - { src: 'docker-compose.yml.j2', dest: 'docker-compose.yml' }
 
+- name: Copy Homepage icon setup script
+  ansible.builtin.template:
+    src: "scripts/setup_homepage_icons.sh"
+    dest: "{{ docker_compose_dir }}/homepage/setup_icons.sh"
+    mode: '0755'
+
+- name: Setup Homepage icons
+  ansible.builtin.shell:
+    cmd: "{{ docker_compose_dir }}/homepage/setup_icons.sh"
+    chdir: "{{ docker_compose_dir }}/homepage"
+  become_user: "{{ username }}"
+
 - name: Generate API keys for services
   ansible.builtin.set_fact:
     homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({item: lookup('password', '/dev/null length=32 chars=ascii_letters,digits')}) }}"
@@ -54,6 +66,9 @@
     - guacamole
     - requestrr
     - unmanic
+    - pihole
+    - vaultwarden
+    - promtail
 
 - name: Store API keys in vault
   ansible.builtin.set_fact:

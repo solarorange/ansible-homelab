@@ -1,0 +1,138 @@
+---
+# Paperless-ngx Configuration Validation
+# Validate all required variables and dependencies
+
+- name: Validate Paperless-ngx configuration variables
+  block:
+    - name: Check required domain configuration
+      ansible.builtin.assert:
+        that:
+          - domain is defined
+          - domain != ""
+        fail_msg: "Domain configuration is required for Paperless-ngx"
+        success_msg: "Domain configuration validated"
+
+    - name: Check database configuration
+      ansible.builtin.assert:
+        that:
+          - paperless_ngx_database_type is defined
+          - paperless_ngx_database_type in ["postgresql", "sqlite"]
+        fail_msg: "Invalid database type. Must be 'postgresql' or 'sqlite'"
+        success_msg: "Database configuration validated"
+
+    - name: Check authentication configuration
+      ansible.builtin.assert:
+        that:
+          - paperless_ngx_auth_method is defined
+          - paperless_ngx_auth_method in ["authentik", "basic", "none"]
+        fail_msg: "Invalid authentication method. Must be 'authentik', 'basic', or 'none'"
+        success_msg: "Authentication configuration validated"
+
+    - name: Check OCR configuration
+      ansible.builtin.assert:
+        that:
+          - paperless_ngx_ocr_language is defined
+          - paperless_ngx_ocr_language != ""
+        fail_msg: "OCR language configuration is required"
+        success_msg: "OCR configuration validated"
+
+    - name: Check resource limits
+      ansible.builtin.assert:
+        that:
+          - paperless_ngx_memory_limit is defined
+          - paperless_ngx_cpu_limit is defined
+          - paperless_ngx_memory_limit != ""
+          - paperless_ngx_cpu_limit != ""
+        fail_msg: "Resource limits must be configured"
+        success_msg: "Resource limits validated"
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx dependencies
+  block:
+    - name: Check Docker availability
+      ansible.builtin.command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: docker_check.rc != 0
+
+    - name: Check Docker Compose availability
+      ansible.builtin.command: docker-compose --version
+      register: docker_compose_check
+      changed_when: false
+      failed_when: docker_compose_check.rc != 0
+
+    - name: Check required directories exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - "{{ docker_dir }}"
+        - "{{ data_dir }}"
+        - "{{ config_dir }}"
+        - "{{ backup_dir }}"
+        - "{{ logs_dir }}"
+
+    - name: Validate directory permissions
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+        fail_msg: "Required directory {{ item.item }} does not exist or is not a directory"
+        success_msg: "Directory {{ item.item }} validated"
+      loop: "{{ dir_check.results }}"
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx network configuration
+  block:
+    - name: Check Traefik network exists
+      ansible.builtin.command: docker network ls --filter name=traefik --format "{{ '{{' }}.Name{{ '}}' }}"
+      register: traefik_network_check
+      changed_when: false
+      failed_when: traefik_network_check.rc != 0
+
+    - name: Validate Traefik network
+      ansible.builtin.assert:
+        that:
+          - traefik_network_check.stdout_lines | length > 0
+          - "traefik" in traefik_network_check.stdout_lines
+        fail_msg: "Traefik network is required for Paperless-ngx"
+        success_msg: "Traefik network validated"
+
+  when: paperless_ngx_traefik_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx database connectivity
+  block:
+    - name: Check PostgreSQL connectivity
+      ansible.builtin.wait_for:
+        host: "{{ paperless_ngx_database_host }}"
+        port: "{{ paperless_ngx_database_port }}"
+        timeout: 30
+      when: paperless_ngx_database_type == "postgresql"
+
+    - name: Check Redis connectivity
+      ansible.builtin.wait_for:
+        host: "{{ paperless_ngx_redis_host }}"
+        port: "{{ paperless_ngx_redis_port }}"
+        timeout: 30
+
+  when: paperless_ngx_database_type == "postgresql"
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx monitoring configuration
+  block:
+    - name: Check monitoring services availability
+      ansible.builtin.wait_for:
+        host: "{{ item.host }}"
+        port: "{{ item.port }}"
+        timeout: 10
+      loop:
+        - { host: "{{ influxdb_host | default('localhost') }}", port: "{{ influxdb_port | default(8086) }}" }
+        - { host: "{{ prometheus_host | default('localhost') }}", port: "{{ prometheus_port | default(9090) }}" }
+        - { host: "{{ loki_host | default('localhost') }}", port: "{{ loki_port | default(3100) }}" }
+      when: paperless_ngx_monitoring_enabled | default(true)
+
+  when: paperless_ngx_monitoring_enabled | default(true)
+  tags: [paperless-ngx, validation] 

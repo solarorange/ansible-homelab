@@ -1,7 +1,7 @@
 ---
-# Enhanced Homelab Setup with Comprehensive Monitoring and Automation
+# Enhanced Watchtower Setup with Comprehensive Monitoring and Automation
 # Production-ready Ansible playbook for Proxmox VM deployment
-- name: Enhanced Homelab Setup
+- name: Enhanced Watchtower Setup
   hosts: all
   become: true
   gather_facts: true
@@ -49,7 +49,7 @@
     - name: Display deployment information
       ansible.builtin.debug:
         msg: |
-          Starting Enhanced Homelab Deployment
+          Starting Enhanced Watchtower Deployment
           Target Host: {{ inventory_hostname }}
           Domain: {{ domain }}
           Services: {{ enabled_services | length }} services enabled
@@ -198,6 +198,7 @@
       loop:
         - pihole
         - nginx_proxy_manager
+        - fing
       when: item in enabled_services
       tags: [network]
       async: 300
@@ -294,6 +295,24 @@
         loop_var: service_name
       when: dev_services_result is success
       tags: [development, storage, validation]
+
+    # Phase 8.5: Utility Services
+    - name: Deploy utility services
+      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+      loop: "{{ utility_services }}"
+      when: item in enabled_services
+      tags: [utility]
+      async: 300
+      poll: 0
+      register: utility_services_result
+
+    - name: Validate utility services
+      ansible.builtin.include_tasks: tasks/validate.yml
+      loop: "{{ utility_services_result.results | map(attribute='item') | list }}"
+      loop_control:
+        loop_var: service_name
+      when: utility_services_result is success
+      tags: [utility, validation]
 
     # Phase 9: Automation & Smart Home
     - name: Deploy automation services

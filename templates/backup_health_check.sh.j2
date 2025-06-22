@@ -1,0 +1,391 @@
+#!/bin/bash
+
+# Backup Health Check Script
+# Validates backup system health and sends status to monitoring stack
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
+STATUS_DIR="$SCRIPT_DIR/status"
+CONFIG_FILE="$SCRIPT_DIR/config.yml"
+BACKUP_ROOT="{{ backup_dir }}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/health_check.log"
+}
+
+# Send notification
+send_notification() {
+    if [ -f "$SCRIPT_DIR/notifications.sh" ]; then
+        "$SCRIPT_DIR/notifications.sh" "$@"
+    fi
+}
+
+# Check if required directories exist
+check_directories() {
+    local issues=0
+    local details=""
+    
+    log "Checking required directories..."
+    
+    local required_dirs=(
+        "$BACKUP_ROOT"
+        "$SCRIPT_DIR"
+        "$LOG_DIR"
+        "$STATUS_DIR"
+    )
+    
+    for dir in "${required_dirs[@]}"; do
+        if [ ! -d "$dir" ]; then
+            log "ERROR: Required directory missing: $dir"
+            issues=$((issues + 1))
+            details="${details}Missing directory: $dir; "
+        else
+            log "✓ Directory exists: $dir"
+        fi
+    done
+    
+    echo "$issues|$details"
+}
+
+# Check if required scripts exist and are executable
+check_scripts() {
+    local issues=0
+    local details=""
+    
+    log "Checking required scripts..."
+    
+    local required_scripts=(
+        "$SCRIPT_DIR/backup_orchestrator.sh"
+        "$SCRIPT_DIR/dependency_checker.sh"
+        "$SCRIPT_DIR/resource_monitor.sh"
+        "$SCRIPT_DIR/status_tracker.sh"
+        "$SCRIPT_DIR/notifications.sh"
+        "$SCRIPT_DIR/cleanup.sh"
+    )
+    
+    for script in "${required_scripts[@]}"; do
+        if [ ! -f "$script" ]; then
+            log "ERROR: Required script missing: $script"
+            issues=$((issues + 1))
+            details="${details}Missing script: $script; "
+        elif [ ! -x "$script" ]; then
+            log "ERROR: Script not executable: $script"
+            issues=$((issues + 1))
+            details="${details}Script not executable: $script; "
+        else
+            log "✓ Script OK: $script"
+        fi
+    done
+    
+    echo "$issues|$details"
+}
+
+# Check if configuration file exists and is valid
+check_configuration() {
+    local issues=0
+    local details=""
+    
+    log "Checking configuration..."
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log "ERROR: Configuration file missing: $CONFIG_FILE"
+        issues=$((issues + 1))
+        details="${details}Missing config file: $CONFIG_FILE; "
+    else
+        # Basic YAML validation
+        if command -v python3 >/dev/null 2>&1; then
+            if python3 -c "import yaml; yaml.safe_load(open('$CONFIG_FILE'))" 2>/dev/null; then
+                log "✓ Configuration file is valid YAML"
+            else
+                log "ERROR: Configuration file has invalid YAML syntax"
+                issues=$((issues + 1))
+                details="${details}Invalid YAML in config file; "
+            fi
+        else
+            log "⚠ Python3 not available, skipping YAML validation"
+        fi
+    fi
+    
+    echo "$issues|$details"
+}
+
+# Check if monitoring services are accessible
+check_monitoring_services() {
+    local issues=0
+    local details=""
+    
+    log "Checking monitoring services..."
+    
+    local services=(
+        "http://alertmanager:9093/-/healthy"
+        "http://loki:3100/ready"
+        "http://prometheus:9090/-/healthy"
+        "http://grafana:3000/api/health"
+    )
+    
+    for service in "${services[@]}"; do
+        local service_name=$(echo "$service" | cut -d'/' -f3 | cut -d':' -f1)
+        if curl -s --max-time 5 "$service" >/dev/null 2>&1; then
+            log "✓ Monitoring service accessible: $service_name"
+        else
+            log "ERROR: Monitoring service not accessible: $service_name"
+            issues=$((issues + 1))
+            details="${details}Service not accessible: $service_name; "
+        fi
+    done
+    
+    echo "$issues|$details"
+}
+
+# Check if cron jobs are properly configured
+check_cron_jobs() {
+    local issues=0
+    local details=""
+    
+    log "Checking cron jobs..."
+    
+    local required_jobs=(
+        "Backup Resource Monitor"
+        "Backup Status Tracker"
+        "Backup Cleanup"
+        "Backup Health Check"
+    )
+    
+    local cron_output=$(crontab -l 2>/dev/null || echo "")
+    
+    for job in "${required_jobs[@]}"; do
+        if echo "$cron_output" | grep -q "$job"; then
+            log "✓ Cron job found: $job"
+        else
+            log "ERROR: Cron job missing: $job"
+            issues=$((issues + 1))
+            details="${details}Missing cron job: $job; "
+        fi
+    done
+    
+    echo "$issues|$details"
+}
+
+# Check disk space
+check_disk_space() {
+    local issues=0
+    local details=""
+    
+    log "Checking disk space..."
+    
+    local usage_percent=$(df "$BACKUP_ROOT" | tail -1 | awk '{print $5}' | sed 's/%//')
+    local available_space=$(df "$BACKUP_ROOT" | tail -1 | awk '{print $4}')
+    
+    if [ "$usage_percent" -gt 90 ]; then
+        log "ERROR: Disk usage critical: ${usage_percent}%"
+        issues=$((issues + 1))
+        details="${details}Critical disk usage: ${usage_percent}%; "
+    elif [ "$usage_percent" -gt 80 ]; then
+        log "WARNING: Disk usage high: ${usage_percent}%"
+        issues=$((issues + 1))
+        details="${details}High disk usage: ${usage_percent}%; "
+    else
+        log "✓ Disk usage OK: ${usage_percent}%"
+    fi
+    
+    log "Available space: $(numfmt --to=iec $((available_space * 1024)))"
+    
+    echo "$issues|$details"
+}
+
+# Check for stuck or failed backups
+check_backup_status() {
+    local issues=0
+    local details=""
+    
+    log "Checking backup status..."
+    
+    if [ ! -d "$STATUS_DIR" ]; then
+        log "ERROR: Status directory missing"
+        issues=$((issues + 1))
+        details="${details}Status directory missing; "
+        echo "$issues|$details"
+        return
+    fi
+    
+    local running_count=0
+    local failed_count=0
+    local timeout_count=0
+    
+    for status_file in "$STATUS_DIR"/*.status; do
+        if [ ! -f "$status_file" ]; then
+            continue
+        fi
+        
+        local service=$(basename "$status_file" .status)
+        local status=$(cat "$status_file" 2>/dev/null || echo "unknown")
+        
+        case $status in
+            "running")
+                running_count=$((running_count + 1))
+                # Check if process is actually running
+                local pid_file="$STATUS_DIR/${service}.pid"
+                if [ -f "$pid_file" ]; then
+                    local pid=$(cat "$pid_file" 2>/dev/null || echo "")
+                    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                        log "✓ Service running: $service"
+                    else
+                        log "ERROR: Service marked as running but process dead: $service"
+                        issues=$((issues + 1))
+                        details="${details}Dead process for: $service; "
+                    fi
+                else
+                    log "ERROR: Service running but no PID file: $service"
+                    issues=$((issues + 1))
+                    details="${details}No PID file for: $service; "
+                fi
+                ;;
+            "failed")
+                failed_count=$((failed_count + 1))
+                log "ERROR: Service failed: $service"
+                issues=$((issues + 1))
+                details="${details}Failed service: $service; "
+                ;;
+            "timeout")
+                timeout_count=$((timeout_count + 1))
+                log "ERROR: Service timed out: $service"
+                issues=$((issues + 1))
+                details="${details}Timed out service: $service; "
+                ;;
+            "completed")
+                log "✓ Service completed: $service"
+                ;;
+            *)
+                log "WARNING: Unknown status for $service: $status"
+                ;;
+        esac
+    done
+    
+    if [ "$running_count" -gt 0 ]; then
+        log "INFO: $running_count services currently running"
+    fi
+    
+    echo "$issues|$details"
+}
+
+# Check log file health
+check_log_files() {
+    local issues=0
+    local details=""
+    
+    log "Checking log files..."
+    
+    if [ ! -d "$LOG_DIR" ]; then
+        log "ERROR: Log directory missing"
+        issues=$((issues + 1))
+        details="${details}Log directory missing; "
+        echo "$issues|$details"
+        return
+    fi
+    
+    # Check for log files that are too large
+    local max_log_size_mb=100
+    for log_file in "$LOG_DIR"/*.log; do
+        if [ -f "$log_file" ]; then
+            local file_size_mb=$(stat -c %s "$log_file" 2>/dev/null | awk '{print int($1/1024/1024)}')
+            if [ "$file_size_mb" -gt "$max_log_size_mb" ]; then
+                log "WARNING: Log file too large: $log_file (${file_size_mb}MB)"
+                issues=$((issues + 1))
+                details="${details}Large log file: $log_file; "
+            fi
+        fi
+    done
+    
+    # Check for recent error patterns
+    local error_count=$(grep -c "ERROR\|CRITICAL\|FAILED" "$LOG_DIR"/*.log 2>/dev/null | awk '{sum+=$2} END {print sum+0}')
+    if [ "$error_count" -gt 10 ]; then
+        log "WARNING: High error count in recent logs: $error_count"
+        issues=$((issues + 1))
+        details="${details}High error count: $error_count; "
+    fi
+    
+    echo "$issues|$details"
+}
+
+# Main health check function
+main() {
+    log "Starting backup system health check"
+    
+    local total_issues=0
+    local all_details=""
+    
+    # Run all health checks
+    read -r issues details <<< "$(check_directories | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_scripts | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_configuration | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_monitoring_services | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_cron_jobs | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_disk_space | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_backup_status | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    read -r issues details <<< "$(check_log_files | tr '|' ' ')"
+    total_issues=$((total_issues + issues))
+    all_details="${all_details}${details}"
+    
+    # Determine overall health status
+    if [ "$total_issues" -eq 0 ]; then
+        local status="healthy"
+        local summary="All health checks passed"
+        log "✓ Backup system is healthy"
+    elif [ "$total_issues" -le 3 ]; then
+        local status="degraded"
+        local summary="Some issues detected but system is operational"
+        log "⚠ Backup system is degraded ($total_issues issues)"
+    else
+        local status="unhealthy"
+        local summary="Multiple critical issues detected"
+        log "✗ Backup system is unhealthy ($total_issues issues)"
+    fi
+    
+    # Send health check notification
+    send_notification "health_check" "$status" "$summary - Issues: $all_details"
+    
+    log "Health check completed - Status: $status, Issues: $total_issues"
+    log "Details: $all_details"
+    
+    # Exit with appropriate code
+    if [ "$status" = "healthy" ]; then
+        exit 0
+    elif [ "$status" = "degraded" ]; then
+        exit 1
+    else
+        exit 2
+    fi
+}
+
+# Run health check
+main 

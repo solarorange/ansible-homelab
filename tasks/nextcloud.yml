@@ -100,12 +100,12 @@
       docker exec nextcloud-db mysqldump -u root -p{{ nextcloud_db_root_password }} nextcloud > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
 
 - name: Add Nextcloud backup to crontab
-  cron:
-    name: "Backup Nextcloud"
-    job: "{{ scripts_dir }}/backup_nextcloud.sh"
-    hour: "3"
-    minute: "0"
-    state: present
+  ansible.builtin.cron:
+    name: "Backup Nextcloud data"
+    job: "{{ docker_dir }}/nextcloud/scripts/manage.sh backup"
+    minute: "{{ backup_schedules.nextcloud.split(' ')[0] }}"
+    hour: "{{ backup_schedules.nextcloud.split(' ')[1] }}"
+    user: "{{ username }}"
 
 - name: Create Nextcloud log rotation configuration
   copy:

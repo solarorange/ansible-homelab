@@ -1,0 +1,284 @@
+version: '3.8'
+
+services:
+  fing:
+    image: {{ fing_image }}:{{ fing_version }}
+    container_name: {{ fing_container_name }}
+    restart: {{ fing_restart_policy }}
+    network_mode: {{ fing_network_mode }}
+    
+    # Environment variables
+    environment:
+      # Basic configuration
+      - FING_DOMAIN={{ fing_domain }}
+      - FING_WEB_PORT={{ fing_web_port }}
+      - FING_API_PORT={{ fing_api_port }}
+      - FING_LOG_LEVEL={{ fing_log_level }}
+      - FING_LOG_FORMAT={{ fing_log_format }}
+      
+      # Database configuration
+      - FING_DB_TYPE={{ fing_database_type }}
+      {% if fing_database_type == "postgresql" %}
+      - FING_DB_HOST={{ fing_database_host }}
+      - FING_DB_PORT={{ fing_database_port }}
+      - FING_DB_NAME={{ fing_database_name }}
+      - FING_DB_USER={{ fing_database_user }}
+      - FING_DB_PASSWORD={{ fing_database_password }}
+      {% endif %}
+      
+      # Network discovery
+      - FING_SCAN_INTERVAL={{ fing_scan_interval }}
+      - FING_SCAN_TIMEOUT={{ fing_scan_timeout }}
+      - FING_MAX_DEVICES={{ fing_max_devices }}
+      - FING_AUTO_DISCOVERY={{ fing_auto_discovery | lower }}
+      - FING_NETWORK_RANGES={{ fing_network_ranges | join(',') }}
+      
+      # Authentication
+      - FING_AUTH_ENABLED={{ fing_auth_enabled | lower }}
+      - FING_AUTH_METHOD={{ fing_auth_method }}
+      - FING_ADMIN_EMAIL={{ fing_admin_email }}
+      - FING_ADMIN_PASSWORD={{ fing_admin_password }}
+      
+      # API configuration
+      - FING_API_ENABLED={{ fing_api_enabled | lower }}
+      - FING_API_VERSION={{ fing_api_version }}
+      - FING_API_KEY={{ fing_api_key }}
+      - FING_API_RATE_LIMIT={{ fing_api_rate_limit }}
+      - FING_API_RATE_LIMIT_WINDOW={{ fing_api_rate_limit_window }}
+      
+      # Monitoring
+      - FING_METRICS_ENABLED={{ fing_metrics_enabled | lower }}
+      - FING_METRICS_PORT={{ fing_metrics_port }}
+      - FING_HEALTH_CHECK_ENABLED={{ fing_health_check_enabled | lower }}
+      - FING_HEALTH_CHECK_INTERVAL={{ fing_health_check_interval }}
+      
+      # Security
+      - FING_SECURITY_HEADERS={{ fing_security_headers | lower }}
+      - FING_RATE_LIMITING={{ fing_rate_limiting | lower }}
+      - FING_RATE_LIMIT_REQUESTS={{ fing_rate_limit_requests }}
+      - FING_RATE_LIMIT_WINDOW={{ fing_rate_limit_window }}
+      - FING_CORS_ENABLED={{ fing_cors_enabled | lower }}
+      - FING_CORS_ORIGINS={{ fing_cors_origins | join(',') }}
+      
+      # Webhooks
+      - FING_WEBHOOKS_ENABLED={{ fing_webhooks_enabled | lower }}
+      - FING_WEBHOOK_EVENTS={{ fing_webhook_events | join(',') }}
+      
+      # Notifications
+      - FING_NOTIFICATIONS_ENABLED={{ fing_notifications_enabled | lower }}
+      - FING_NOTIFICATION_CHANNELS={{ fing_notification_channels | join(',') }}
+      
+      # Email configuration
+      {% if fing_email_enabled | default(false) %}
+      - FING_SMTP_HOST={{ fing_smtp_host }}
+      - FING_SMTP_PORT={{ fing_smtp_port }}
+      - FING_SMTP_USERNAME={{ fing_smtp_username }}
+      - FING_SMTP_PASSWORD={{ fing_smtp_password }}
+      - FING_SMTP_ENCRYPTION={{ fing_smtp_encryption }}
+      {% endif %}
+      
+      # Slack configuration
+      {% if fing_slack_enabled | default(false) %}
+      - FING_SLACK_WEBHOOK={{ fing_slack_webhook }}
+      - FING_SLACK_CHANNEL={{ fing_slack_channel }}
+      {% endif %}
+      
+      # Discord configuration
+      {% if fing_discord_enabled | default(false) %}
+      - FING_DISCORD_WEBHOOK={{ fing_discord_webhook }}
+      - FING_DISCORD_CHANNEL={{ fing_discord_channel }}
+      {% endif %}
+      
+      # Performance
+      - FING_PERFORMANCE_MODE={{ fing_performance_mode }}
+      - FING_CACHE_ENABLED={{ fing_cache_enabled | lower }}
+      - FING_CACHE_SIZE={{ fing_cache_size }}
+      - FING_CACHE_TTL={{ fing_cache_ttl }}
+      
+      # Development
+      - FING_DEBUG_ENABLED={{ fing_debug_enabled | lower }}
+      - FING_DEBUG_PORT={{ fing_debug_port }}
+      - FING_DEBUG_HOST={{ fing_debug_host }}
+      
+      # Custom environment variables
+      {% for key, value in fing_environment_variables.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+      
+      # System environment
+      - TZ={{ timezone | default('UTC') }}
+      - PUID={{ username_uid | default(1000) }}
+      - PGID={{ username_gid | default(1000) }}
+    
+    # Volume mounts
+    volumes:
+      # Configuration
+      - {{ docker_dir }}/fing/config:/app/config:ro
+      - {{ docker_dir }}/fing/network:/app/network:ro
+      - {{ docker_dir }}/fing/monitoring:/app/monitoring:ro
+      - {{ docker_dir }}/fing/security:/app/security:ro
+      - {{ docker_dir }}/fing/alerts:/app/alerts:ro
+      - {{ docker_dir }}/fing/backup:/app/backup:ro
+      
+      # Data persistence
+      - {{ docker_dir }}/fing/data:/app/data
+      - {{ docker_dir }}/fing/database:/app/database
+      - {{ docker_dir }}/fing/cache:/app/cache
+      - {{ docker_dir }}/fing/backups:/app/backups
+      
+      # Logs
+      - {{ docker_dir }}/fing/logs:/app/logs
+      - {{ logs_dir }}/fing:/var/log/fing
+      
+      # Network access (required for discovery)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/net:/proc/net:ro
+      - /sys/class/net:/sys/class/net:ro
+      
+      # Custom volume mounts
+      {% for mount in fing_volume_mounts %}
+      - {{ mount }}
+      {% endfor %}
+    
+    # Port mappings
+    ports:
+      - "{{ fing_web_port }}:{{ fing_web_port }}"
+      - "{{ fing_api_port }}:{{ fing_api_port }}"
+      {% if fing_metrics_enabled | default(true) %}
+      - "{{ fing_metrics_port }}:{{ fing_metrics_port }}"
+      {% endif %}
+      {% if fing_debug_enabled | default(false) %}
+      - "{{ fing_debug_port }}:{{ fing_debug_port }}"
+      {% endif %}
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: {{ fing_memory_limit }}
+          cpus: '{{ fing_cpu_limit }}'
+        reservations:
+          memory: {{ (fing_memory_limit | regex_replace('([0-9]+)m', '\\1') | int * 0.5) | int }}m
+          cpus: '{{ (fing_cpu_limit | float * 0.5) | round(2) }}'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}"]
+      interval: {{ fing_health_check_interval }}s
+      timeout: {{ fing_health_check_timeout }}s
+      retries: {{ fing_health_check_retries }}
+      start_period: 60s
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined
+    
+    # Capabilities (required for network discovery)
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BROADCAST
+    
+    # Labels for Traefik
+    labels:
+      {% if fing_traefik_enabled | default(true) %}
+      # Traefik labels
+      - "traefik.enable=true"
+      - "traefik.http.routers.fing.rule=Host(`{{ fing_domain }}`)"
+      - "traefik.http.routers.fing.entrypoints=websecure"
+      - "traefik.http.routers.fing.tls.certresolver={{ fing_traefik_ssl_resolver }}"
+      - "traefik.http.routers.fing.middlewares={{ fing_traefik_middleware }}"
+      {% if fing_auth_method == "authentik" %}
+      - "traefik.http.routers.fing.middlewares={{ fing_traefik_auth_middleware }}"
+      {% endif %}
+      - "traefik.http.services.fing.loadbalancer.server.port={{ fing_web_port }}"
+      
+      # API router
+      - "traefik.http.routers.fing-api.rule=Host(`{{ fing_domain }}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.fing-api.entrypoints=websecure"
+      - "traefik.http.routers.fing-api.tls.certresolver={{ fing_traefik_ssl_resolver }}"
+      - "traefik.http.routers.fing-api.middlewares={{ fing_traefik_middleware }}"
+      - "traefik.http.services.fing-api.loadbalancer.server.port={{ fing_api_port }}"
+      
+      # Metrics router (if enabled)
+      {% if fing_metrics_enabled | default(true) %}
+      - "traefik.http.routers.fing-metrics.rule=Host(`{{ fing_domain }}`) && PathPrefix(`/metrics`)"
+      - "traefik.http.routers.fing-metrics.entrypoints=websecure"
+      - "traefik.http.routers.fing-metrics.tls.certresolver={{ fing_traefik_ssl_resolver }}"
+      - "traefik.http.routers.fing-metrics.middlewares={{ fing_traefik_middleware }}"
+      - "traefik.http.services.fing-metrics.loadbalancer.server.port={{ fing_metrics_port }}"
+      {% endif %}
+      {% endif %}
+      
+      # Service labels
+      - "com.docker.compose.service=fing"
+      - "com.docker.compose.project=homelab"
+      - "service.name=fing"
+      - "service.type=network-monitoring"
+      - "service.category=network"
+      - "service.description=Network Device Discovery & Monitoring"
+      
+      # Monitoring labels
+      {% if fing_monitoring_enabled | default(true) %}
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port={{ fing_metrics_port }}"
+      - "prometheus.io/path=/metrics"
+      - "prometheus.io/scheme=http"
+      {% endif %}
+      
+      # Custom labels
+      {% for key, value in fing_extra_labels.items() %}
+      - "{{ key }}={{ value }}"
+      {% endfor %}
+    
+    # Networks
+    networks:
+      {% if fing_traefik_enabled | default(true) %}
+      - {{ fing_traefik_network }}
+      {% endif %}
+      - fing
+      - monitoring
+      - homelab
+    
+    # Dependencies
+    depends_on:
+      {% if fing_database_type == "postgresql" %}
+      - postgresql
+      {% endif %}
+      {% if fing_database_type == "mysql" %}
+      - mysql
+      {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=fing"
+        env: "TZ"
+
+networks:
+  fing:
+    external: true
+  {% if fing_traefik_enabled | default(true) %}
+  {{ fing_traefik_network }}:
+    external: true
+  {% endif %}
+  monitoring:
+    external: true
+  homelab:
+    external: true
+
+{% if fing_database_type == "postgresql" %}
+volumes:
+  fing_postgresql_data:
+    driver: local
+{% endif %}
+
+{% if fing_database_type == "mysql" %}
+volumes:
+  fing_mysql_data:
+    driver: local
+{% endif %} 

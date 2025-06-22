@@ -1,0 +1,45 @@
+---
+# Main playbook for homelab setup
+
+- name: Configure homelab
+  hosts: all
+  become: true
+  tasks:
+    - name: Include common tasks
+      ansible.builtin.include_tasks: tasks/common.yml
+
+    - name: Include Docker tasks
+      ansible.builtin.include_tasks: tasks/docker.yml
+
+    - name: Include Traefik tasks
+      ansible.builtin.include_tasks: tasks/traefik.yml
+
+    - name: Include Authentik tasks
+      ansible.builtin.include_tasks: tasks/authentik.yml
+
+    - name: Include Plex tasks
+      ansible.builtin.include_tasks: tasks/plex.yml
+
+    - name: Include media stack tasks
+      ansible.builtin.include_tasks: tasks/media_stack.yml
+
+    - name: Include monitoring tasks
+      ansible.builtin.include_tasks: tasks/monitoring.yml
+
+    - name: Include backup tasks
+      ansible.builtin.include_tasks: tasks/backup.yml
+
+    - name: Include backup orchestration tasks
+      ansible.builtin.include_tasks: tasks/backup_orchestration.yml
+      tags: [backup, orchestration]
+
+    - name: Update backup schedules to staggered timing
+      ansible.builtin.include_tasks: tasks/update_backup_schedules.yml
+      tags: [backup, schedules]
+
+    - name: Include Paperless-ngx role
+      ansible.builtin.include_role:
+        name: paperless_ngx
+      when: paperless_ngx_enabled | default(true)
+
+    # ... existing code ... 

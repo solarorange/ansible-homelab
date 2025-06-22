@@ -1,0 +1,30 @@
+[Unit]
+Description=Backup Orchestration Service
+Documentation=https://github.com/your-repo/ansible_homelab
+After=network.target docker.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+User={{ username }}
+Group={{ username }}
+WorkingDirectory={{ backup_dir }}/orchestration
+ExecStart={{ backup_dir }}/orchestration/backup_orchestrator.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=0
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ backup_dir }}
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,0 +1,33 @@
+---
+# Base Configuration
+domain: zorg.media  # Main domain name
+timezone: America/New_York  # Server timezone
+
+# Network Configuration
+ansible_server_ip: 192.168.40.99
+server_ips:
+  - 192.168.40.100
+  - 192.168.40.101
+  - 192.168.40.102
+  - 192.168.40.103
+
+# DNS Configuration
+pihole_domain: pihole.zorg.media
+pihole_upstream_dns:
+  - 192.168.1.35
+  - 192.168.1.10
+
+# Docker Configuration
+# Recommended paths:
+# /opt/docker - Main Docker root (requires 100GB+ space)
+# /var/lib/docker - Docker daemon data (system managed)
+# /mnt/docker - Alternative for large storage arrays
+docker_root: /opt/docker
+docker_data_root: "{{ docker_root }}/data"
+docker_config_root: "{{ docker_root }}/config"
+docker_logs_root: "{{ docker_root }}/logs"
+
+# Cloudflare Configuration
+cloudflare_enabled: true
+cloudflare_email: "{{ lookup('env', 'CLOUDFLARE_EMAIL') | default('') }}"
+cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}" 

@@ -1,0 +1,239 @@
+---
+# Paperless-ngx Monitoring Integration
+# Configure monitoring, metrics, and logging integration
+
+- name: Configure Telegraf for Paperless-ngx metrics
+  block:
+    - name: Create Paperless-ngx Telegraf configuration
+      ansible.builtin.template:
+        src: telegraf.conf.j2
+        dest: "{{ config_dir }}/telegraf/conf.d/paperless-ngx.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart telegraf
+
+    - name: Add Paperless-ngx to Telegraf inputs
+      ansible.builtin.lineinfile:
+        path: "{{ config_dir }}/telegraf/telegraf.conf"
+        line: '  # Paperless-ngx monitoring'
+        insertafter: '^# Input plugins'
+        state: present
+      notify: restart telegraf
+
+  when: paperless_ngx_telegraf_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Prometheus for Paperless-ngx scraping
+  block:
+    - name: Add Paperless-ngx to Prometheus targets
+      ansible.builtin.template:
+        src: prometheus-targets.yml.j2
+        dest: "{{ config_dir }}/prometheus/targets/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart prometheus
+
+    - name: Create Paperless-ngx Prometheus rules
+      ansible.builtin.template:
+        src: prometheus-rules.yml.j2
+        dest: "{{ config_dir }}/prometheus/rules/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart prometheus
+
+  when: paperless_ngx_prometheus_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Grafana dashboard for Paperless-ngx
+  block:
+    - name: Create Paperless-ngx Grafana dashboard
+      ansible.builtin.template:
+        src: grafana-dashboard.json.j2
+        dest: "{{ config_dir }}/grafana/provisioning/dashboards/paperless-ngx.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart grafana
+
+    - name: Add Paperless-ngx to Grafana dashboard provider
+      ansible.builtin.lineinfile:
+        path: "{{ config_dir }}/grafana/provisioning/dashboards/dashboard.yml"
+        line: '  - name: "paperless-ngx"'
+        insertafter: '^  - name: ".*"'
+        state: present
+      notify: restart grafana
+
+  when: paperless_ngx_grafana_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Loki for Paperless-ngx logs
+  block:
+    - name: Create Paperless-ngx Loki configuration
+      ansible.builtin.template:
+        src: loki-config.yml.j2
+        dest: "{{ config_dir }}/loki/conf.d/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart loki
+
+    - name: Create Paperless-ngx Promtail configuration
+      ansible.builtin.template:
+        src: promtail.yml.j2
+        dest: "{{ config_dir }}/promtail/conf.d/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart promtail
+
+  when: paperless_ngx_loki_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Alertmanager for Paperless-ngx alerts
+  block:
+    - name: Create Paperless-ngx Alertmanager configuration
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ config_dir }}/alertmanager/conf.d/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+    - name: Add Paperless-ngx alert rules
+      ansible.builtin.template:
+        src: alert-rules.yml.j2
+        dest: "{{ config_dir }}/alertmanager/rules/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  when: paperless_ngx_alerting_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Blackbox Exporter for Paperless-ngx health checks
+  block:
+    - name: Add Paperless-ngx to Blackbox targets
+      ansible.builtin.template:
+        src: blackbox-targets.yml.j2
+        dest: "{{ config_dir }}/blackbox/targets/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart blackbox_exporter
+
+  when: paperless_ngx_monitoring_enabled | default(true)
+  tags: [paperless-ngx, monitoring]
+
+- name: Create Paperless-ngx monitoring scripts
+  block:
+    - name: Create Paperless-ngx health check script
+      ansible.builtin.template:
+        src: healthcheck.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/healthcheck.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Paperless-ngx metrics collection script
+      ansible.builtin.template:
+        src: metrics.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/metrics.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Paperless-ngx log collection script
+      ansible.builtin.template:
+        src: logs.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/logs.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [paperless-ngx, monitoring]
+
+- name: Configure Paperless-ngx monitoring cron jobs
+  block:
+    - name: Add Paperless-ngx metrics collection to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx metrics collection"
+        minute: "*/5"
+        job: "{{ docker_dir }}/paperless-ngx/metrics.sh >> {{ logs_dir }}/paperless-ngx/metrics.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add Paperless-ngx log rotation to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx log rotation"
+        hour: "2"
+        minute: "0"
+        job: "{{ docker_dir }}/paperless-ngx/logs.sh >> {{ logs_dir }}/paperless-ngx/log-rotation.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, monitoring]
+
+- name: Create Paperless-ngx monitoring directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ config_dir }}/telegraf/conf.d"
+    - "{{ config_dir }}/prometheus/targets"
+    - "{{ config_dir }}/prometheus/rules"
+    - "{{ config_dir }}/grafana/provisioning/dashboards"
+    - "{{ config_dir }}/loki/conf.d"
+    - "{{ config_dir }}/promtail/conf.d"
+    - "{{ config_dir }}/alertmanager/conf.d"
+    - "{{ config_dir }}/alertmanager/rules"
+    - "{{ config_dir }}/blackbox/targets"
+    - "{{ logs_dir }}/paperless-ngx/monitoring"
+  tags: [paperless-ngx, monitoring]
+
+- name: Verify Paperless-ngx monitoring integration
+  block:
+    - name: Test Paperless-ngx health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 10
+      register: health_check
+
+    - name: Test Paperless-ngx metrics endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/health/"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: metrics_check
+
+    - name: Display monitoring integration status
+      ansible.builtin.debug:
+        msg: |
+          Paperless-ngx monitoring integration completed!
+          
+          Health Check: {{ health_check.status }}
+          Metrics Endpoint: {{ metrics_check.status }}
+          
+          Monitoring Components:
+          - Telegraf: {{ paperless_ngx_telegraf_enabled | default(true) }}
+          - Prometheus: {{ paperless_ngx_prometheus_enabled | default(true) }}
+          - Grafana: {{ paperless_ngx_grafana_enabled | default(true) }}
+          - Loki: {{ paperless_ngx_loki_enabled | default(true) }}
+          - Alertmanager: {{ paperless_ngx_alerting_enabled | default(true) }}
+          
+          Access URLs:
+          - Grafana Dashboard: https://{{ grafana_subdomain }}.{{ domain }}/d/paperless-ngx
+          - Prometheus Targets: https://{{ prometheus_subdomain }}.{{ domain }}/targets
+          - Loki Logs: https://{{ loki_subdomain }}.{{ domain }}/explore
+
+  tags: [paperless-ngx, monitoring] 

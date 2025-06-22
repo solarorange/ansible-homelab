@@ -1,0 +1,228 @@
+---
+# Paperless-ngx Alerting Configuration
+# Configure alerting and notification systems
+
+- name: Configure Paperless-ngx Alertmanager integration
+  block:
+    - name: Create Paperless-ngx Alertmanager configuration
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ config_dir }}/alertmanager/conf.d/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+    - name: Create Paperless-ngx alert rules
+      ansible.builtin.template:
+        src: alert-rules.yml.j2
+        dest: "{{ config_dir }}/alertmanager/rules/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  when: paperless_ngx_alerting_enabled | default(true)
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx notification channels
+  block:
+    - name: Create Paperless-ngx email notification configuration
+      ansible.builtin.template:
+        src: email-notifications.yml.j2
+        dest: "{{ config_dir }}/alertmanager/notifications/paperless-ngx-email.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+      when: paperless_ngx_email_enabled | default(false)
+
+    - name: Create Paperless-ngx Slack notification configuration
+      ansible.builtin.template:
+        src: slack-notifications.yml.j2
+        dest: "{{ config_dir }}/alertmanager/notifications/paperless-ngx-slack.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+      when: paperless_ngx_slack_enabled | default(false)
+
+    - name: Create Paperless-ngx Discord notification configuration
+      ansible.builtin.template:
+        src: discord-notifications.yml.j2
+        dest: "{{ config_dir }}/alertmanager/notifications/paperless-ngx-discord.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+      when: paperless_ngx_discord_enabled | default(false)
+
+  when: paperless_ngx_alerting_enabled | default(true)
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx webhook alerts
+  block:
+    - name: Create Paperless-ngx webhook configuration
+      ansible.builtin.template:
+        src: webhook-alerts.yml.j2
+        dest: "{{ config_dir }}/alertmanager/webhooks/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+    - name: Create Paperless-ngx webhook receiver
+      ansible.builtin.template:
+        src: webhook-receiver.yml.j2
+        dest: "{{ config_dir }}/alertmanager/receivers/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  when: paperless_ngx_webhooks_enabled | default(true)
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx alert thresholds
+  block:
+    - name: Create Paperless-ngx alert thresholds configuration
+      ansible.builtin.template:
+        src: alert-thresholds.yml.j2
+        dest: "{{ config_dir }}/alertmanager/thresholds/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx alert escalation
+  block:
+    - name: Create Paperless-ngx alert escalation configuration
+      ansible.builtin.template:
+        src: alert-escalation.yml.j2
+        dest: "{{ config_dir }}/alertmanager/escalation/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx alert templates
+  block:
+    - name: Create Paperless-ngx alert templates
+      ansible.builtin.template:
+        src: alert-templates.yml.j2
+        dest: "{{ config_dir }}/alertmanager/templates/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx alert monitoring
+  block:
+    - name: Create Paperless-ngx alert monitoring script
+      ansible.builtin.template:
+        src: alert-monitor.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/alert-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add Paperless-ngx alert monitoring to crontab
+      ansible.builtin.cron:
+        name: "Paperless-ngx alert monitoring"
+        minute: "*/5"
+        job: "{{ docker_dir }}/paperless-ngx/alert-monitor.sh >> {{ logs_dir }}/paperless-ngx/alerts.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [paperless-ngx, alerts]
+
+- name: Create Paperless-ngx alert directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ config_dir }}/alertmanager/conf.d"
+    - "{{ config_dir }}/alertmanager/rules"
+    - "{{ config_dir }}/alertmanager/notifications"
+    - "{{ config_dir }}/alertmanager/webhooks"
+    - "{{ config_dir }}/alertmanager/receivers"
+    - "{{ config_dir }}/alertmanager/thresholds"
+    - "{{ config_dir }}/alertmanager/escalation"
+    - "{{ config_dir }}/alertmanager/templates"
+    - "{{ logs_dir }}/paperless-ngx/alerts"
+  tags: [paperless-ngx, alerts]
+
+- name: Configure Paperless-ngx alert testing
+  block:
+    - name: Create Paperless-ngx alert test script
+      ansible.builtin.template:
+        src: alert-test.sh.j2
+        dest: "{{ docker_dir }}/paperless-ngx/alert-test.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Test Paperless-ngx alert configuration
+      ansible.builtin.command: "{{ docker_dir }}/paperless-ngx/alert-test.sh"
+      register: alert_test
+      changed_when: alert_test.rc == 0
+      failed_when: alert_test.rc != 0
+
+  tags: [paperless-ngx, alerts]
+
+- name: Verify Paperless-ngx alert configuration
+  block:
+    - name: Test Alertmanager configuration
+      ansible.builtin.uri:
+        url: "http://localhost:{{ alertmanager_port | default(9093) }}/api/v1/status"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: alertmanager_test
+
+    - name: Display alert configuration status
+      ansible.builtin.debug:
+        msg: |
+          Paperless-ngx alert configuration completed!
+          
+          Alert Components:
+          - Alertmanager: {{ paperless_ngx_alerting_enabled | default(true) }}
+          - Webhooks: {{ paperless_ngx_webhooks_enabled | default(true) }}
+          - Email: {{ paperless_ngx_email_enabled | default(false) }}
+          - Slack: {{ paperless_ngx_slack_enabled | default(false) }}
+          - Discord: {{ paperless_ngx_discord_enabled | default(false) }}
+          
+          Alert Events:
+          {% for event in paperless_ngx_webhook_events %}
+          - {{ event }}
+          {% endfor %}
+          
+          Alert Thresholds:
+          - CPU Usage: 80%
+          - Memory Usage: 85%
+          - Disk Usage: 90%
+          - Response Time: 5s
+          - Error Rate: 5%
+          
+          Alert Escalation:
+          - Level 1: Immediate notification
+          - Level 2: Escalation after 5 minutes
+          - Level 3: Escalation after 15 minutes
+          
+          Alertmanager Test Results:
+          - Status: {{ alertmanager_test.status }}
+          
+          Alert Monitoring:
+          - Alert Log: {{ logs_dir }}/paperless-ngx/alerts.log
+          - Alert Test: {{ docker_dir }}/paperless-ngx/alert-test.sh
+
+  tags: [paperless-ngx, alerts] 

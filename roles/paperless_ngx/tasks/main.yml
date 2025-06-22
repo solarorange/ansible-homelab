@@ -1,0 +1,48 @@
+---
+# Paperless-ngx Document Management Service Deployment
+# Production-ready Ansible tasks for homelab deployment
+
+- name: Include Paperless-ngx deployment tasks
+  block:
+    - name: Validate Paperless-ngx configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [paperless-ngx, validation]
+
+    - name: Setup Paperless-ngx prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [paperless-ngx, setup]
+
+    - name: Deploy Paperless-ngx service
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [paperless-ngx, deploy]
+
+    - name: Configure Paperless-ngx monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: paperless_ngx_monitoring_enabled | default(true)
+      tags: [paperless-ngx, monitoring]
+
+    - name: Configure Paperless-ngx security
+      ansible.builtin.include_tasks: security.yml
+      tags: [paperless-ngx, security]
+
+    - name: Configure Paperless-ngx backup
+      ansible.builtin.include_tasks: backup.yml
+      when: paperless_ngx_backup_enabled | default(true)
+      tags: [paperless-ngx, backup]
+
+    - name: Configure Paperless-ngx homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: paperless_ngx_homepage_enabled | default(true)
+      tags: [paperless-ngx, homepage]
+
+    - name: Configure Paperless-ngx alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: paperless_ngx_alerting_enabled | default(true)
+      tags: [paperless-ngx, alerts]
+
+    - name: Validate Paperless-ngx deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [paperless-ngx, validation]
+
+  when: paperless_ngx_enabled | default(true)
+  tags: [paperless-ngx, always] 

@@ -76,10 +76,20 @@
       url: http://loki:3100
 {% endif %}
 
+{% if 'promtail' in enabled_services %}
+- Promtail:
+    icon: promtail.png
+    href: https://logs.{{ domain }}
+    description: Log Collection
+    widget:
+      type: promtail
+      url: http://promtail:9080
+{% endif %}
+
 {% if 'alertmanager' in enabled_services %}
 - Alertmanager:
     icon: alertmanager.png
-    href: https://alertmanager.{{ domain }}
+    href: https://alerts.{{ domain }}
     description: Alert Management
     widget:
       type: alertmanager
@@ -105,6 +115,39 @@
       type: telegraf
       url: http://telegraf:8125
 {% endif %}
+{% endif %}
+
+# Network Services
+{% if 'pihole' in enabled_services %}
+- Pi-hole:
+    icon: pihole.png
+    href: https://dns.{{ domain }}
+    description: DNS Ad Blocker
+    widget:
+      type: pihole
+      url: http://pihole:80
+      key: {{ vault_homepage_api_keys.pihole }}
+{% endif %}
+
+{% if 'nginx_proxy_manager' in enabled_services %}
+- Nginx Proxy Manager:
+    icon: nginx.png
+    href: https://proxy.{{ domain }}
+    description: Proxy Management
+    widget:
+      type: nginx
+      url: http://nginx-proxy-manager:81
+{% endif %}
+
+{% if 'fing' in enabled_services %}
+- Fing:
+    icon: fing.png
+    href: https://fing.{{ domain }}
+    description: Network Device Discovery & Monitoring
+    widget:
+      type: fing
+      url: http://fing:{{ fing_web_port | default(8080) }}
+      key: {{ vault_homepage_api_keys.fing }}
 {% endif %}
 
 # Media Stack
@@ -415,10 +458,21 @@
       key: {{ vault_homepage_api_keys.vault }}
 {% endif %}
 
+{% if 'vaultwarden' in enabled_services %}
+- Vaultwarden:
+    icon: vaultwarden.png
+    href: https://passwords.{{ domain }}
+    description: Password Manager
+    widget:
+      type: vaultwarden
+      url: http://vaultwarden:80
+      key: {{ vault_homepage_api_keys.vaultwarden }}
+{% endif %}
+
 {% if 'wireguard' in enabled_services %}
 - Wireguard:
     icon: wireguard.png
-    href: https://wireguard.{{ domain }}
+    href: https://vpn.{{ domain }}
     description: VPN
     widget:
       type: wireguard
@@ -589,4 +643,14 @@
       type: unmanic
       url: http://unmanic:8888
       key: {{ vault_homepage_api_keys.unmanic }}
+{% endif %}
+
+{% if 'watchtower' in enabled_services %}
+- Watchtower:
+    icon: watchtower.png
+    href: https://updates.{{ domain }}
+    description: Container Updates
+    widget:
+      type: watchtower
+      url: http://watchtower:8080
 {% endif %} 

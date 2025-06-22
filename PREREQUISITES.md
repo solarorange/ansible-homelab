@@ -1,6 +1,6 @@
-# Pre-deployment Requirements and Configuration
+# Watchtower Deployment Prerequisites
 
-This document outlines all the information and configurations needed before running the Ansible homelab playbook. Please ensure you have all these items ready before proceeding with the deployment.
+This document outlines all the information and configurations needed before running the Ansible Watchtower playbook. Please ensure you have all these items ready before proceeding with the deployment.
 
 ## Required Information
 
@@ -12,8 +12,8 @@ This document outlines all the information and configurations needed before runn
 - VLAN ID (if using VLANs)
 
 ### 2. Network Configuration
-- Domain name for your homelab
-- Internal network subnet (e.g., 192.168.1.0/24)
+- Domain name for your Watchtower
+- Internal network subnet (e.g., 192.168.40.0/24)
 - Gateway IP address
 - DNS servers
 - Static IP addresses for each service (if using static IPs)
@@ -76,8 +76,8 @@ Edit `group_vars/all/vars.yml`:
 ```yaml
 network:
   domain: zorg.media
-  subnet: 192.168.1.0/24
-  gateway: 192.168.1.1
+  subnet: 192.168.40.0/24
+  gateway: 192.168.40.1
   dns_servers:
     - 8.8.8.8
     - 8.8.4.4

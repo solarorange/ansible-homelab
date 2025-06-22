@@ -1,18 +1,18 @@
-# Enhanced Homelab Inventory
+# Enhanced Watchtower Inventory
 # Configure your Proxmox VM details here
 
-# Single VM deployment (recommended for most homelabs)
-[homelab_all]
-homelab ansible_host=192.168.1.100 ansible_user=homelab
+# Single VM deployment (recommended for most Watchtower deployments)
+[watchtower_all]
+watchtower ansible_host=192.168.40.100 ansible_user=watchtower
 
-# Group all homelab servers
-[homelab:children]
-homelab_all
+# Group all Watchtower servers
+[watchtower:children]
+watchtower_all
 
-# Common variables for all homelab servers
-[homelab:vars]
+# Common variables for all Watchtower servers
+[watchtower:vars]
 # SSH Configuration
-ansible_ssh_private_key_file=~/.ssh/homelab_key
+ansible_ssh_private_key_file=~/.ssh/watchtower_key
 ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
 ansible_python_interpreter=/usr/bin/python3
 
@@ -32,18 +32,9 @@ ansible_timeout=300
 
 # Network segmentation
 network_segments:
-  - name: homelab
-    subnet: 172.20.0.0/16
-    gateway: 172.20.0.1
-  - name: monitoring
-    subnet: 172.21.0.0/16
-    gateway: 172.21.0.1
-  - name: media
-    subnet: 172.22.0.0/16
-    gateway: 172.22.0.1
-  - name: security
-    subnet: 172.23.0.0/16
-    gateway: 172.23.0.1
+  - name: watchtower
+    subnet: 192.168.40.0/24
+    gateway: 192.168.40.1
 
 # Resource limits
 resource_limits:
@@ -72,22 +63,51 @@ automation_enabled: true
 # Example configurations for different deployment scenarios:
 
 # Multi-VM deployment (for larger setups)
-# [homelab_core]
-# homelab-core ansible_host=192.168.1.100 ansible_user=homelab
+# [watchtower_core]
+# watchtower-core ansible_host=192.168.40.100 ansible_user=watchtower
 # 
-# [homelab_monitoring]
-# homelab-mon ansible_host=192.168.1.101 ansible_user=homelab
+# [watchtower_monitoring]
+# watchtower-mon ansible_host=192.168.40.101 ansible_user=watchtower
 # 
-# [homelab_automation]
-# homelab-auto ansible_host=192.168.1.102 ansible_user=homelab
+# [watchtower_automation]
+# watchtower-auto ansible_host=192.168.40.102 ansible_user=watchtower
 # 
-# [homelab_security]
-# homelab-sec ansible_host=192.168.1.103 ansible_user=homelab
+# [watchtower_security]
+# watchtower-sec ansible_host=192.168.40.103 ansible_user=watchtower
 
 # Cloud deployment (VPS/dedicated servers)
-# [homelab_cloud]
-# homelab ansible_host=your.domain.com ansible_user=ubuntu ansible_port=22
+# [watchtower_cloud]
+# watchtower ansible_host=your.domain.com ansible_user=ubuntu ansible_port=22
 
 # Development/testing environment
-# [homelab_dev]
+# [watchtower_dev]
 # dev ansible_host=127.0.0.1 ansible_user=vagrant ansible_port=2222
+
+---
+all:
+  children:
+    homelab_core:
+      hosts:
+        core1:
+          ansible_host: 192.168.40.100
+          ansible_user: homelab
+        core2:
+          ansible_host: 192.168.40.101
+          ansible_user: homelab
+        core3:
+          ansible_host: 192.168.40.102
+          ansible_user: homelab
+        core4:
+          ansible_host: 192.168.40.103
+          ansible_user: homelab
+      vars:
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_python_interpreter: /usr/bin/python3
+
+    ansible_control:
+      hosts:
+        ansible:
+          ansible_host: 192.168.40.99
+          ansible_user: homelab
+      vars:
+        ansible_connection: local

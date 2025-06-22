@@ -1,0 +1,173 @@
+#!/bin/bash
+
+# Backup Orchestrator Script
+# Manages staggered backup scheduling with dependency management
+
+set -euo pipefail
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/config.yml"
+LOG_DIR="$SCRIPT_DIR/logs"
+STATUS_DIR="$SCRIPT_DIR/status"
+LOCK_FILE="$SCRIPT_DIR/orchestrator.lock"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/orchestrator.log"
+}
+
+# Error handling
+error_exit() {
+    log "${RED}ERROR: $1${NC}"
+    exit 1
+}
+
+# Check if orchestrator is already running
+if [ -f "$LOCK_FILE" ]; then
+    PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+    if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+        log "${YELLOW}Backup orchestrator already running (PID: $PID)${NC}"
+        exit 0
+    else
+        log "${YELLOW}Removing stale lock file${NC}"
+        rm -f "$LOCK_FILE"
+    fi
+fi
+
+# Create lock file
+echo $$ > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
+
+# Load configuration
+if [ ! -f "$CONFIG_FILE" ]; then
+    error_exit "Configuration file not found: $CONFIG_FILE"
+fi
+
+# Parse current time slot
+CURRENT_HOUR=$(date +%H)
+CURRENT_MINUTE=$(date +%M)
+CURRENT_DAY=$(date +%u)  # 1=Monday, 7=Sunday
+
+log "${BLUE}Starting backup orchestration at $(date)${NC}"
+
+# Determine current time slot
+case $CURRENT_HOUR in
+    01) TIME_SLOT="critical" ;;
+    02) TIME_SLOT="high" ;;
+    03) TIME_SLOT="media_core" ;;
+    04) TIME_SLOT="media_download" ;;
+    05) TIME_SLOT="media_playback" ;;
+    06) TIME_SLOT="file_services" ;;
+    07) TIME_SLOT="utilities" ;;
+    *) 
+        log "${YELLOW}Outside backup window (current hour: $CURRENT_HOUR)${NC}"
+        exit 0
+        ;;
+esac
+
+log "${BLUE}Current time slot: $TIME_SLOT${NC}"
+
+# Get services for current time slot
+case $TIME_SLOT in
+    critical)
+        SERVICES=("authentik" "traefik" "vault" "postgresql" "mariadb" "redis")
+        ;;
+    high)
+        SERVICES=("homeassistant" "zigbee2mqtt" "mosquitto" "influxdb" "telegraf")
+        ;;
+    media_core)
+        SERVICES=("sonarr" "radarr" "lidarr" "readarr" "prowlarr" "bazarr")
+        ;;
+    media_download)
+        SERVICES=("qbittorrent" "sabnzbd" "tdarr" "komga" "audiobookshelf")
+        ;;
+    media_playback)
+        SERVICES=("jellyfin" "emby" "tautulli" "overseerr")
+        ;;
+    file_services)
+        SERVICES=("nextcloud" "samba" "syncthing" "paperless_ngx" "immich")
+        ;;
+    utilities)
+        SERVICES=("portainer" "grafana" "prometheus" "loki" "alertmanager" "pihole")
+        ;;
+    *)
+        error_exit "Unknown time slot: $TIME_SLOT"
+        ;;
+esac
+
+# Check resource limits
+MAX_CONCURRENT={{ backup_resource_limits.max_concurrent_backups }}
+CURRENT_BACKUPS=$(pgrep -c -f "backup.*\.sh" || echo "0")
+
+if [ "$CURRENT_BACKUPS" -ge "$MAX_CONCURRENT" ]; then
+    log "${YELLOW}Maximum concurrent backups reached ($CURRENT_BACKUPS/$MAX_CONCURRENT)${NC}"
+    exit 0
+fi
+
+# Check system resources
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+MEMORY_USAGE=$(free | grep Mem | awk '{printf("%.0f", $3/$2 * 100.0)}')
+DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+
+if [ "$CPU_USAGE" -gt 80 ] || [ "$MEMORY_USAGE" -gt 80 ] || [ "$DISK_USAGE" -gt 90 ]; then
+    log "${YELLOW}System resources high - CPU: ${CPU_USAGE}%, Memory: ${MEMORY_USAGE}%, Disk: ${DISK_USAGE}%${NC}"
+    exit 0
+fi
+
+log "${GREEN}System resources OK - CPU: ${CPU_USAGE}%, Memory: ${MEMORY_USAGE}%, Disk: ${DISK_USAGE}%${NC}"
+
+# Process services in current time slot
+for service in "${SERVICES[@]}"; do
+    log "${BLUE}Processing service: $service${NC}"
+    
+    # Check if service backup script exists
+    SERVICE_BACKUP_SCRIPT="{{ docker_dir }}/$service/scripts/backup.sh"
+    if [ ! -f "$SERVICE_BACKUP_SCRIPT" ]; then
+        log "${YELLOW}Backup script not found for $service: $SERVICE_BACKUP_SCRIPT${NC}"
+        continue
+    fi
+    
+    # Check dependencies
+    if [ -f "$SCRIPT_DIR/dependency_checker.sh" ]; then
+        if ! "$SCRIPT_DIR/dependency_checker.sh" "$service"; then
+            log "${YELLOW}Dependencies not met for $service, skipping${NC}"
+            continue
+        fi
+    fi
+    
+    # Check if service is running
+    if ! docker ps --format "table {{.Names}}" | grep -q "$service"; then
+        log "${YELLOW}Service $service is not running, skipping backup${NC}"
+        continue
+    fi
+    
+    # Start backup in background
+    log "${GREEN}Starting backup for $service${NC}"
+    nohup "$SERVICE_BACKUP_SCRIPT" > "$LOG_DIR/${service}_backup.log" 2>&1 &
+    BACKUP_PID=$!
+    
+    # Update status
+    echo "$BACKUP_PID" > "$STATUS_DIR/${service}.pid"
+    echo "$(date)" > "$STATUS_DIR/${service}.started"
+    echo "running" > "$STATUS_DIR/${service}.status"
+    
+    log "${GREEN}Backup started for $service (PID: $BACKUP_PID)${NC}"
+    
+    # Wait a bit between backups to avoid overwhelming the system
+    sleep 30
+done
+
+log "${GREEN}Backup orchestration completed for time slot: $TIME_SLOT${NC}"
+
+# Send summary notification
+if [ -f "$SCRIPT_DIR/notifications.sh" ]; then
+    "$SCRIPT_DIR/notifications.sh" "orchestration_complete" "$TIME_SLOT"
+fi 

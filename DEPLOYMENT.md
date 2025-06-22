@@ -1,6 +1,6 @@
-# Deployment Guide
+# Watchtower Deployment Guide
 
-This guide provides detailed steps for deploying and validating the homelab environment.
+This guide provides detailed steps for deploying and validating the Watchtower environment.
 
 ## Pre-deployment Checklist
 
@@ -77,8 +77,8 @@ This guide provides detailed steps for deploying and validating the homelab envi
 
 1. Clone and run setup script:
    ```bash
-   git clone https://github.com/yourusername/ansible_homelab.git
-   cd ansible_homelab
+   git clone https://github.com/yourusername/ansible_watchtower.git
+   cd ansible_watchtower
    ./scripts/setup.sh
    ```
 

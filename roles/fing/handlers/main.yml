@@ -1,0 +1,120 @@
+---
+# Fing Service Handlers
+# Handles service restarts and reloads for Fing
+
+- name: restart fing
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/fing"
+    state: present
+    restarted: true
+
+- name: reload fing
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/fing"
+    state: present
+    restarted: true
+
+- name: restart fing systemd
+  ansible.builtin.systemd:
+    name: "fing"
+    state: restarted
+    daemon_reload: true
+
+- name: reload fing systemd
+  ansible.builtin.systemd:
+    name: "fing"
+    state: reloaded
+    daemon_reload: true
+
+- name: restart fing timer
+  ansible.builtin.systemd:
+    name: "fing.timer"
+    state: restarted
+    daemon_reload: true
+
+- name: reload fing timer
+  ansible.builtin.systemd:
+    name: "fing.timer"
+    state: reloaded
+    daemon_reload: true
+
+- name: restart monitoring services
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/monitoring"
+    state: present
+    restarted: true
+
+- name: reload monitoring services
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/monitoring"
+    state: present
+    restarted: true
+
+- name: restart homepage
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/homepage"
+    state: present
+    restarted: true
+
+- name: reload homepage
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/homepage"
+    state: present
+    restarted: true
+
+- name: restart security services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - fail2ban
+    - crowdsec
+
+- name: reload security services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: reloaded
+  loop:
+    - fail2ban
+    - crowdsec
+
+- name: restart traefik
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/traefik"
+    state: present
+    restarted: true
+
+- name: reload traefik
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/traefik"
+    state: present
+    restarted: true
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    enabled: true
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart networking
+  ansible.builtin.systemd:
+    name: networking
+    state: restarted
+
+- name: reload ufw
+  ansible.builtin.ufw:
+    state: reloaded
+
+- name: restart cron
+  ansible.builtin.systemd:
+    name: cron
+    state: restarted
+
+- name: reload cron
+  ansible.builtin.systemd:
+    name: cron
+    state: reloaded 

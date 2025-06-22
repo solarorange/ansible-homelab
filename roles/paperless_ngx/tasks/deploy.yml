@@ -1,0 +1,247 @@
+---
+# Paperless-ngx Service Deployment
+# Deploy and configure the Paperless-ngx container
+
+- name: Pull Paperless-ngx Docker image
+  community.docker.docker_image:
+    name: "{{ paperless_ngx_image }}:{{ paperless_ngx_version }}"
+    source: pull
+    force_source: true
+  tags: [paperless-ngx, deploy]
+
+- name: Stop existing Paperless-ngx container if running
+  community.docker.docker_container:
+    name: "{{ paperless_ngx_container_name }}"
+    state: stopped
+    force_kill: true
+  ignore_errors: true
+  tags: [paperless-ngx, deploy]
+
+- name: Remove existing Paperless-ngx container if exists
+  community.docker.docker_container:
+    name: "{{ paperless_ngx_container_name }}"
+    state: absent
+    force_kill: true
+  ignore_errors: true
+  tags: [paperless-ngx, deploy]
+
+- name: Deploy Paperless-ngx with Docker Compose
+  ansible.builtin.command: >
+    docker-compose up -d
+  args:
+    chdir: "{{ docker_dir }}/paperless-ngx"
+  register: docker_compose_result
+  changed_when: docker_compose_result.rc == 0
+  failed_when: docker_compose_result.rc != 0
+  tags: [paperless-ngx, deploy]
+
+- name: Wait for Paperless-ngx to start
+  ansible.builtin.wait_for:
+    host: "localhost"
+    port: "{{ paperless_ngx_web_port }}"
+    timeout: 120
+    delay: 10
+  tags: [paperless-ngx, deploy]
+
+- name: Check Paperless-ngx container status
+  community.docker.docker_container_info:
+    name: "{{ paperless_ngx_container_name }}"
+  register: paperless_ngx_container_info
+  tags: [paperless-ngx, deploy]
+
+- name: Verify Paperless-ngx container is running
+  ansible.builtin.assert:
+    that:
+      - paperless_ngx_container_info.exists
+      - paperless_ngx_container_info.container.State.Status == "running"
+      - paperless_ngx_container_info.container.State.Health.Status == "healthy"
+    fail_msg: "Paperless-ngx container is not running or healthy"
+    success_msg: "Paperless-ngx container is running and healthy"
+  tags: [paperless-ngx, deploy]
+
+- name: Wait for Paperless-ngx web interface
+  ansible.builtin.uri:
+    url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+    method: GET
+    status_code: [200, 302, 401, 403]
+    timeout: 30
+  register: health_check_result
+  until: health_check_result.status in [200, 302, 401, 403]
+  retries: 10
+  delay: 10
+  tags: [paperless-ngx, deploy]
+
+- name: Create Paperless-ngx admin user if not exists
+  block:
+    - name: Check if admin user exists
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/users/"
+        method: GET
+        headers:
+          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+        status_code: [200, 401, 403]
+      register: admin_check
+      ignore_errors: true
+
+    - name: Create admin user via API
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/users/"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          username: "admin"
+          email: "{{ paperless_ngx_admin_email }}"
+          password: "{{ paperless_ngx_admin_password }}"
+          is_superuser: true
+          is_staff: true
+        status_code: [201, 400]
+      register: admin_create
+      when: admin_check.status == 401 or admin_check.status == 403
+      ignore_errors: true
+
+  when: paperless_ngx_auth_method != "authentik"
+  tags: [paperless-ngx, deploy]
+
+- name: Configure Paperless-ngx initial settings
+  block:
+    - name: Set Paperless-ngx timezone
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+        method: PATCH
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+        body_format: json
+        body:
+          TIME_ZONE: "{{ timezone | default('UTC') }}"
+        status_code: [200, 401, 403]
+      register: timezone_setting
+      ignore_errors: true
+
+    - name: Set Paperless-ngx OCR language
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+        method: PATCH
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+        body_format: json
+        body:
+          OCR_LANGUAGE: "{{ paperless_ngx_ocr_language }}"
+        status_code: [200, 401, 403]
+      register: ocr_setting
+      ignore_errors: true
+
+    - name: Set Paperless-ngx consumer polling
+      ansible.builtin.uri:
+        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+        method: PATCH
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+        body_format: json
+        body:
+          CONSUMER_POLLING: "{{ paperless_ngx_consumer_polling }}"
+        status_code: [200, 401, 403]
+      register: polling_setting
+      ignore_errors: true
+
+  when: paperless_ngx_auth_method != "authentik"
+  tags: [paperless-ngx, deploy]
+
+- name: Create Paperless-ngx consume directory symlink
+  ansible.builtin.file:
+    src: "{{ docker_dir }}/paperless-ngx/consume"
+    dest: "{{ data_dir }}/paperless-ngx/consume"
+    state: link
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [paperless-ngx, deploy]
+
+- name: Set proper permissions for Paperless-ngx data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+    recurse: true
+  loop:
+    - "{{ data_dir }}/paperless-ngx"
+    - "{{ docker_dir }}/paperless-ngx/consume"
+  tags: [paperless-ngx, deploy]
+
+- name: Create Paperless-ngx log symlinks
+  ansible.builtin.file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - { src: "{{ docker_dir }}/paperless-ngx/logs/paperless.log", dest: "{{ logs_dir }}/paperless-ngx/application/paperless.log" }
+    - { src: "{{ docker_dir }}/paperless-ngx/logs/nginx.log", dest: "{{ logs_dir }}/paperless-ngx/nginx/nginx.log" }
+  tags: [paperless-ngx, deploy]
+
+- name: Restart Paperless-ngx if configuration changed
+  community.docker.docker_container:
+    name: "{{ paperless_ngx_container_name }}"
+    state: started
+    restart: true
+  when: paperless_ngx_container_info.container.State.Status != "running"
+  tags: [paperless-ngx, deploy]
+
+- name: Wait for Paperless-ngx to be ready after restart
+  ansible.builtin.wait_for:
+    host: "localhost"
+    port: "{{ paperless_ngx_web_port }}"
+    timeout: 60
+    delay: 5
+  when: paperless_ngx_container_info.container.State.Status != "running"
+  tags: [paperless-ngx, deploy]
+
+- name: Verify Paperless-ngx deployment
+  ansible.builtin.uri:
+    url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+    method: GET
+    status_code: [200, 302, 401, 403]
+    timeout: 10
+  register: final_health_check
+  tags: [paperless-ngx, deploy]
+
+- name: Display Paperless-ngx deployment status
+  ansible.builtin.debug:
+    msg: |
+      Paperless-ngx deployment completed successfully!
+      
+      Service Information:
+      - Container: {{ paperless_ngx_container_name }}
+      - Status: {{ paperless_ngx_container_info.container.State.Status }}
+      - Health: {{ paperless_ngx_container_info.container.State.Health.Status }}
+      - Web Port: {{ paperless_ngx_web_port }}
+      - Domain: {{ paperless_ngx_domain }}
+      
+      Access Information:
+      - Web Interface: https://{{ paperless_ngx_domain }}
+      - API Endpoint: https://{{ paperless_ngx_domain }}/api/
+      - Health Check: https://{{ paperless_ngx_domain }}{{ paperless_ngx_health_check_url }}
+      
+      Configuration:
+      - Database: {{ paperless_ngx_database_type }}
+      - Authentication: {{ paperless_ngx_auth_method }}
+      - OCR Language: {{ paperless_ngx_ocr_language }}
+      - Consumer Polling: {{ paperless_ngx_consumer_polling }}s
+      
+      Data Directories:
+      - Documents: {{ data_dir }}/paperless-ngx/documents
+      - Consume: {{ data_dir }}/paperless-ngx/consume
+      - Export: {{ docker_dir }}/paperless-ngx/export
+      - Backup: {{ backup_dir }}/paperless-ngx
+      
+      Logs:
+      - Application: {{ logs_dir }}/paperless-ngx/application
+      - Nginx: {{ logs_dir }}/paperless-ngx/nginx
+      - OCR: {{ logs_dir }}/paperless-ngx/ocr
+  tags: [paperless-ngx, deploy] 

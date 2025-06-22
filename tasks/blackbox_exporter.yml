@@ -1,6 +1,6 @@
 ---
-# Blackbox Exporter Configuration
-# Production-ready external service monitoring
+# Enhanced Blackbox Exporter Configuration
+# Production-ready external service monitoring with certificate validation
 
 - name: Create Blackbox Exporter directories
   ansible.builtin.file:
@@ -14,14 +14,15 @@
     - "{{ docker_dir }}/monitoring/blackbox/scripts"
     - "{{ logs_dir }}/monitoring/blackbox"
 
-- name: Create Blackbox Exporter configuration
+- name: Create Enhanced Blackbox Exporter configuration
   ansible.builtin.copy:
     dest: "{{ docker_dir }}/monitoring/blackbox/config/blackbox.yml"
     content: |
       modules:
+        # HTTP/HTTPS monitoring with SSL certificate validation
         http_2xx:
           prober: http
-          timeout: 5s
+          timeout: 10s
           http:
             method: GET
             preferred_ip_protocol: "ip4"
@@ -30,13 +31,34 @@
             fail_if_ssl: false
             fail_if_not_ssl: false
             tls_config:
-              insecure_skip_verify: true
+              insecure_skip_verify: false
+              ca_file: /etc/ssl/certs/ca-certificates.crt
             headers:
               User-Agent: "Prometheus/Blackbox Exporter"
+            body_size_limit: 1048576  # 1MB
         
+        # HTTPS-only monitoring with strict SSL validation
+        https_2xx:
+          prober: http
+          timeout: 10s
+          http:
+            method: GET
+            preferred_ip_protocol: "ip4"
+            valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+            valid_status_codes: [200, 201, 202, 203, 204]
+            fail_if_not_ssl: true
+            fail_if_ssl: false
+            tls_config:
+              insecure_skip_verify: false
+              ca_file: /etc/ssl/certs/ca-certificates.crt
+            headers:
+              User-Agent: "Prometheus/Blackbox Exporter"
+            body_size_limit: 1048576  # 1MB
+        
+        # HTTP POST monitoring for APIs
         http_post_2xx:
           prober: http
-          timeout: 5s
+          timeout: 10s
           http:
             method: POST
             preferred_ip_protocol: "ip4"
@@ -45,20 +67,48 @@
             fail_if_ssl: false
             fail_if_not_ssl: false
             tls_config:
-              insecure_skip_verify: true
+              insecure_skip_verify: false
+              ca_file: /etc/ssl/certs/ca-certificates.crt
             headers:
               User-Agent: "Prometheus/Blackbox Exporter"
+              Content-Type: "application/json"
             body: "{}"
+            body_size_limit: 1048576  # 1MB
         
+        # TCP connection monitoring
         tcp_connect:
           prober: tcp
-          timeout: 5s
+          timeout: 10s
           tcp:
             preferred_ip_protocol: "ip4"
+            tls: false
         
+        # TCP with TLS monitoring
+        tcp_tls:
+          prober: tcp
+          timeout: 10s
+          tcp:
+            preferred_ip_protocol: "ip4"
+            tls: true
+            tls_config:
+              insecure_skip_verify: false
+              ca_file: /etc/ssl/certs/ca-certificates.crt
+        
+        # DNS resolution monitoring
+        dns_udp_53:
+          prober: dns
+          timeout: 10s
+          dns:
+            preferred_ip_protocol: "ip4"
+            transport_protocol: "udp"
+            query_name: "{{ domain }}"
+            query_type: "A"
+            valid_rcodes: ["NOERROR"]
+        
+        # ICMP ping monitoring
         icmp:
           prober: icmp
-          timeout: 5s
+          timeout: 10s
           icmp:
             preferred_ip_protocol: "ip4"
     owner: "{{ username }}"
@@ -71,36 +121,71 @@
     content: |
       #!/bin/bash
       
-      # Blackbox Exporter Management Script
+      # Enhanced Blackbox Exporter Management Script
       
       function show_help {
-        echo "Blackbox Exporter Management Script"
-        echo "Usage: $0 [command]"
+        echo "Enhanced Blackbox Exporter Management Script"
+        echo "Usage: $0 [command] [target]"
         echo ""
         echo "Commands:"
         echo "  status    - Show Blackbox Exporter status"
         echo "  logs      - Show Blackbox Exporter logs"
         echo "  restart   - Restart Blackbox Exporter"
-        echo "  test      - Test a target"
+        echo "  test      - Test a target (requires target URL)"
+        echo "  cert      - Check SSL certificate for target (requires target URL)"
+        echo "  dns       - Test DNS resolution for target (requires target domain)"
+        echo "  ping      - Test ICMP ping for target (requires target IP)"
         echo "  help      - Show this help"
+        echo ""
+        echo "Examples:"
+        echo "  $0 test https://grafana.{{ domain }}"
+        echo "  $0 cert https://traefik.{{ domain }}"
+        echo "  $0 dns {{ domain }}"
+        echo "  $0 ping {{ ip_address }}"
       }
       
       case "$1" in
         status)
           curl -s http://localhost:9115/-/healthy
+          echo ""
           ;;
         logs)
-          docker logs blackbox-exporter --tail 100 -f
+          docker logs blackbox --tail 100 -f
           ;;
         restart)
-          docker restart blackbox-exporter
+          docker restart blackbox
           ;;
         test)
           if [ -z "$2" ]; then
             echo "Please specify target URL"
             exit 1
           fi
-          curl -s "http://localhost:9115/probe?target=$2&module=http_2xx"
+          echo "Testing HTTP/HTTPS connectivity to $2..."
+          curl -s "http://localhost:9115/probe?target=$2&module=https_2xx" | grep -E "(probe_success|probe_duration_seconds)"
+          ;;
+        cert)
+          if [ -z "$2" ]; then
+            echo "Please specify target URL"
+            exit 1
+          fi
+          echo "Checking SSL certificate for $2..."
+          curl -s "http://localhost:9115/probe?target=$2&module=https_2xx" | grep -E "(probe_ssl_earliest_cert_expiry|probe_ssl_validation_success)"
+          ;;
+        dns)
+          if [ -z "$2" ]; then
+            echo "Please specify target domain"
+            exit 1
+          fi
+          echo "Testing DNS resolution for $2..."
+          curl -s "http://localhost:9115/probe?target=$2&module=dns_udp_53" | grep -E "(probe_success|probe_duration_seconds)"
+          ;;
+        ping)
+          if [ -z "$2" ]; then
+            echo "Please specify target IP"
+            exit 1
+          fi
+          echo "Testing ICMP ping to $2..."
+          curl -s "http://localhost:9115/probe?target=$2&module=icmp" | grep -E "(probe_success|probe_duration_seconds)"
           ;;
         help|*)
           show_help
@@ -116,6 +201,8 @@
     content: |
       #!/bin/bash
       
+      # Enhanced Blackbox Exporter Health Check Script
+      
       # Check if Blackbox Exporter is responding
       if ! curl -s http://localhost:9115/-/healthy > /dev/null; then
         echo "Blackbox Exporter is not responding"
@@ -128,6 +215,13 @@
         exit 1
       fi
       
+      # Check if we can perform a test probe
+      if ! curl -s "http://localhost:9115/probe?target=localhost&module=http_2xx" > /dev/null; then
+        echo "Blackbox Exporter probe endpoint is not responding"
+        exit 1
+      fi
+      
+      echo "Blackbox Exporter is healthy"
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"

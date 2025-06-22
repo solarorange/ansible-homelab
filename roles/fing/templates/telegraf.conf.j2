@@ -1,0 +1,48 @@
+# Fing Metrics Collection for Telegraf
+[[inputs.http]]
+  urls = ["http://{{ fing_container_name }}:{{ fing_metrics_port }}/metrics"]
+  method = "GET"
+  timeout = "5s"
+  interval = "30s"
+  name_override = "fing_metrics"
+  data_format = "prometheus"
+  tag_keys = ["job", "instance", "service"]
+
+[[inputs.http_response]]
+  urls = [
+    "http://{{ fing_container_name }}:{{ fing_web_port }}{{ fing_health_check_url }}",
+    "http://{{ fing_container_name }}:{{ fing_api_port }}/api/{{ fing_api_version }}/health"
+  ]
+  response_timeout = "5s"
+  method = "GET"
+  name_override = "fing_health"
+  tag_keys = ["url"]
+
+[[inputs.exec]]
+  commands = [
+    "docker exec {{ fing_container_name }} fing stats --format=json"
+  ]
+  timeout = "10s"
+  data_format = "json"
+  name_override = "fing_stats"
+  tag_keys = ["service"]
+
+[[inputs.logparser]]
+  files = ["{{ docker_dir }}/fing/logs/*.log"]
+  from_beginning = false
+  watch_method = "poll"
+  max_undelivered_lines = 1000
+  character_encoding = "utf-8"
+  name_override = "fing_logs"
+  data_format = "grok"
+  grok_patterns = [
+    "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}",
+    "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{WORD:component} %{GREEDYDATA:message}"
+  ]
+  tag_keys = ["level", "component"]
+
+[[inputs.prometheus]]
+  urls = ["http://{{ fing_container_name }}:{{ fing_metrics_port }}/metrics"]
+  metric_version = 2
+  name_override = "fing_prometheus"
+  tag_keys = ["job", "instance", "service"] 
