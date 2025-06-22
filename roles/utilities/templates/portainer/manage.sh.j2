@@ -1,0 +1,72 @@
+#!/bin/bash
+# Portainer Management Script
+
+PORTAINER_CONTAINER="portainer"
+PORTAINER_DATA_DIR="{{ portainer_data_dir }}"
+BACKUP_DIR="${PORTAINER_DATA_DIR}/backups"
+
+show_help() {
+  echo "Portainer Management Script"
+  echo "Usage: $0 [command] [args]"
+  echo "Commands:"
+  echo "  status    - Show Portainer status"
+  echo "  logs      - Show Portainer logs"
+  echo "  restart   - Restart Portainer"
+  echo "  backup    - Backup Portainer data volume"
+  echo "  restore   - Restore Portainer data volume from backup"
+  echo "  help      - Show this help"
+}
+
+backup_data() {
+  mkdir -p "$BACKUP_DIR"
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+  BACKUP_FILE="$BACKUP_DIR/portainer_data_$TIMESTAMP.tar.gz"
+  echo "Stopping Portainer container..."
+  docker stop $PORTAINER_CONTAINER
+  echo "Backing up $PORTAINER_DATA_DIR to $BACKUP_FILE..."
+  tar -czf "$BACKUP_FILE" -C "$PORTAINER_DATA_DIR" .
+  echo "Starting Portainer container..."
+  docker start $PORTAINER_CONTAINER
+  echo "Backup created: $BACKUP_FILE"
+}
+
+restore_data() {
+  if [ -z "$1" ]; then
+    echo "Please specify backup file"
+    exit 1
+  fi
+  BACKUP_FILE="$1"
+  if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Backup file not found: $BACKUP_FILE"
+    exit 1
+  fi
+  echo "Stopping Portainer container..."
+  docker stop $PORTAINER_CONTAINER
+  echo "Restoring $PORTAINER_DATA_DIR from $BACKUP_FILE..."
+  rm -rf "$PORTAINER_DATA_DIR"/*
+  tar -xzf "$BACKUP_FILE" -C "$PORTAINER_DATA_DIR"
+  echo "Starting Portainer container..."
+  docker start $PORTAINER_CONTAINER
+  echo "Backup restored from: $BACKUP_FILE"
+}
+
+case "$1" in
+  status)
+    docker ps -f name=$PORTAINER_CONTAINER
+    ;;
+  logs)
+    docker logs $PORTAINER_CONTAINER --tail 100 -f
+    ;;
+  restart)
+    docker restart $PORTAINER_CONTAINER
+    ;;
+  backup)
+    backup_data
+    ;;
+  restore)
+    restore_data "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

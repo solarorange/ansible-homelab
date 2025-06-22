@@ -1,0 +1,39 @@
+---
+# Main orchestration for utilities stack
+
+- import_tasks: prerequisites.yml
+  tags: [utilities, prerequisites]
+
+- import_tasks: validate.yml
+  tags: [utilities, validation]
+
+- import_tasks: container_management.yml
+  when: utilities_container_management_enabled | default(true)
+  tags: [utilities, container_management]
+
+- import_tasks: media_processing.yml
+  when: utilities_media_processing_enabled | default(true)
+  tags: [utilities, media_processing]
+
+- import_tasks: dashboards.yml
+  when: utilities_dashboards_enabled | default(true)
+  tags: [utilities, dashboards]
+
+- import_tasks: monitoring.yml
+  when: utilities_monitoring_enabled | default(true)
+  tags: [utilities, monitoring]
+
+- import_tasks: security.yml
+  when: utilities_security_enabled | default(true)
+  tags: [utilities, security]
+
+- import_tasks: backup.yml
+  when: utilities_backup_enabled | default(true)
+  tags: [utilities, backup]
+
+- import_tasks: homepage.yml
+  when: utilities_homepage_enabled | default(true)
+  tags: [utilities, homepage]
+
+- import_tasks: validate_deployment.yml
+  tags: [utilities, validation] 

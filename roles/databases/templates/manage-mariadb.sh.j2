@@ -1,0 +1,35 @@
+#!/bin/bash
+# MariaDB Management Script
+function show_help {
+  echo "MariaDB Management Script"
+  echo "Usage: $0 [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status    - Show MariaDB status"
+  echo "  logs      - Show MariaDB logs"
+  echo "  restart   - Restart MariaDB"
+  echo "  backup    - Create backup"
+  echo "  restore   - Restore from backup"
+  echo "  help      - Show this help"
+}
+case "$1" in
+  status)
+    docker ps -f name={{ mariadb_container_name }}
+    docker exec {{ mariadb_container_name }} mysqladmin ping -u root -p"{{ mariadb_root_password }}"
+    ;;
+  logs)
+    docker logs {{ mariadb_container_name }} --tail 100 -f
+    ;;
+  restart)
+    docker restart {{ mariadb_container_name }}
+    ;;
+  backup)
+    {{ docker_dir }}/mariadb/scripts/backup.sh
+    ;;
+  restore)
+    {{ docker_dir }}/mariadb/scripts/restore.sh "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

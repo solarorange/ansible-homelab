@@ -1,0 +1,43 @@
+---
+# Media Stack Players
+# Deploy media players (Jellyfin, Immich)
+
+- name: Deploy Jellyfin media player
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    services:
+      - jellyfin
+  when: media_players.jellyfin.enabled | default(true)
+
+- name: Deploy Immich media player and its components
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    services:
+      - immich-server
+      - immich-web
+      - immich-postgres
+      - immich-redis
+      - immich-ml
+  when: media_players.immich.enabled | default(true)
+
+- name: Wait for Jellyfin to be ready
+  ansible.builtin.uri:
+    url: "{{ media_players.jellyfin.healthcheck.test[-1] }}"
+    method: GET
+    status_code: 200
+  register: jellyfin_health
+  retries: 30
+  delay: 10
+  until: jellyfin_health.status == 200
+  when: media_players.jellyfin.enabled | default(true)
+
+- name: Wait for Immich server to be ready
+  ansible.builtin.uri:
+    url: "{{ media_players.immich.healthcheck.test[-1] }}"
+    method: GET
+    status_code: 200
+  register: immich_health
+  retries: 30
+  delay: 10
+  until: immich_health.status == 200
+  when: media_players.immich.enabled | default(true) 

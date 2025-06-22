@@ -1,0 +1,35 @@
+---
+# tasks file for security/authentication
+
+- name: Create authentik directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/authentik"
+    - "{{ docker_dir }}/authentik/media"
+    - "{{ docker_dir }}/authentik/templates"
+    - "{{ docker_dir }}/authentik/certs"
+    - "{{ data_dir }}/authentik/postgresql"
+
+- name: Create authentik docker-compose file
+  ansible.builtin.template:
+    src: authentik-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/authentik/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart authentik stack
+
+- name: Start authentik stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/authentik"
+    build: false
+  register: authentik_result
+
+- name: Display authentik deployment result
+  ansible.builtin.debug:
+    var: authentik_result 

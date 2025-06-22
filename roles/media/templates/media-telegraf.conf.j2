@@ -1,0 +1,36 @@
+# Telegraf config for media stack
+[agent]
+  interval = "10s"
+  round_interval = true
+  metric_batch_size = 1000
+  metric_buffer_limit = 10000
+  collection_jitter = "0s"
+  flush_interval = "10s"
+  flush_jitter = "0s"
+  precision = "1s"
+  hostname = "{{ inventory_hostname }}"
+  omit_hostname = false
+
+# System metrics
+[[inputs.cpu]]
+  percpu = true
+  totalcpu = true
+  collect_cpu_time = false
+  report_active = false
+[[inputs.disk]]
+  ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
+[[inputs.diskio]]
+[[inputs.mem]]
+[[inputs.net]]
+[[inputs.system]]
+[[inputs.swap]]
+[[inputs.netstat]]
+[[inputs.processes]]
+[[inputs.kernel]]
+
+# Outputs
+[[outputs.influxdb_v2]]
+  urls = ["{{ influxdb_url | default('http://influxdb:8086') }}"]
+  token = "{{ influxdb_token | default('') }}"
+  organization = "{{ influxdb_org | default('') }}"
+  bucket = "{{ influxdb_bucket | default('media') }}" 

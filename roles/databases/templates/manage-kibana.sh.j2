@@ -1,0 +1,27 @@
+#!/bin/bash
+# Kibana Management Script
+function show_help {
+  echo "Kibana Management Script"
+  echo "Usage: $0 [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status    - Show Kibana status"
+  echo "  logs      - Show Kibana logs"
+  echo "  restart   - Restart Kibana"
+  echo "  help      - Show this help"
+}
+case "$1" in
+  status)
+    docker ps -f name={{ kibana_container_name }}
+    docker exec {{ kibana_container_name }} curl -s -k https://localhost:{{ kibana_web_port }}/api/status
+    ;;
+  logs)
+    docker logs {{ kibana_container_name }} --tail 100 -f
+    ;;
+  restart)
+    docker restart {{ kibana_container_name }}
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

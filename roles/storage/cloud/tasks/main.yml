@@ -1,0 +1,73 @@
+---
+- name: Create Nextcloud directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/nextcloud"
+    - "{{ docker_data_root }}/nextcloud/html"
+    - "{{ docker_data_root }}/nextcloud/data"
+    - "{{ docker_data_root }}/nextcloud/config"
+    - "{{ docker_data_root }}/nextcloud/custom_apps"
+    - "{{ docker_data_root }}/nextcloud/themes"
+
+- name: Create Nextcloud docker-compose service
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Nextcloud"
+    block: |
+      nextcloud:
+        image: nextcloud:latest
+        container_name: nextcloud
+        volumes:
+          - {{ docker_data_root }}/nextcloud/html:/var/www/html
+          - {{ docker_data_root }}/nextcloud/data:/var/www/html/data
+          - {{ docker_data_root }}/nextcloud/config:/var/www/html/config
+          - {{ docker_data_root }}/nextcloud/custom_apps:/var/www/html/custom_apps
+          - {{ docker_data_root }}/nextcloud/themes:/var/www/html/themes
+        environment:
+          - MYSQL_HOST=nextcloud-db
+          - MYSQL_DATABASE=nextcloud
+          - MYSQL_USER=nextcloud
+          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+          - REDIS_HOST=nextcloud-redis
+          - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.zorg.media
+          - NEXTCLOUD_ADMIN_USER={{ nextcloud_admin_user }}
+          - NEXTCLOUD_ADMIN_PASSWORD={{ nextcloud_admin_password }}
+        depends_on:
+          - nextcloud-db
+          - nextcloud-redis
+        restart: unless-stopped
+        networks:
+          - traefik_network
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.zorg.media`)"
+          - "traefik.http.routers.nextcloud.entrypoints=websecure"
+          - "traefik.http.routers.nextcloud.tls=true"
+          - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+
+      nextcloud-db:
+        image: mariadb:10.6
+        container_name: nextcloud-db
+        volumes:
+          - {{ docker_data_root }}/nextcloud/db:/var/lib/mysql
+        environment:
+          - MYSQL_ROOT_PASSWORD={{ nextcloud_db_root_password }}
+          - MYSQL_DATABASE=nextcloud
+          - MYSQL_USER=nextcloud
+          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+        command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+        restart: unless-stopped
+        networks:
+          - traefik_network
+
+      nextcloud-redis:
+        image: redis:alpine
+        container_name: nextcloud-redis
+        volumes:
+          - {{ docker_data_root }}/nextcloud/redis:/data
+        restart: unless-stopped
+        networks:
+          - traefik_network 

@@ -1,0 +1,11 @@
+groups:
+  - name: media-stack-rules
+    rules:
+      - record: job:media_stack:up
+        expr: sum(up{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"})
+      - record: job:media_stack:cpu_usage
+        expr: avg(rate(process_cpu_seconds_total{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"}[5m]))
+      - record: job:media_stack:memory_usage
+        expr: avg(process_resident_memory_bytes{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"})
+      - record: job:media_stack:disk_usage
+        expr: avg(node_filesystem_usage{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"}) 

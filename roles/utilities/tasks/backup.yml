@@ -1,0 +1,68 @@
+---
+# Utilities Stack Backup Procedures
+
+- name: Create utilities stack backup script
+  ansible.builtin.template:
+    src: utilities-backup.sh.j2
+    dest: "{{ utilities_config_dir }}/utilities-backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create utilities stack backup verification script
+  ansible.builtin.template:
+    src: utilities-backup-verify.sh.j2
+    dest: "{{ utilities_config_dir }}/utilities-backup-verify.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create utilities stack backup cleanup script
+  ansible.builtin.template:
+    src: utilities-backup-cleanup.sh.j2
+    dest: "{{ utilities_config_dir }}/utilities-backup-cleanup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Configure utilities stack backup retention
+  ansible.builtin.template:
+    src: utilities-backup-retention.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-backup-retention.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Schedule utilities stack backup
+  ansible.builtin.cron:
+    name: "Utilities stack backup"
+    hour: "{{ utilities_backup_schedule.split()[1] }}"
+    minute: "{{ utilities_backup_schedule.split()[0] }}"
+    job: "{{ utilities_config_dir }}/utilities-backup.sh"
+    user: "{{ username }}"
+
+- name: Schedule utilities stack backup verification
+  ansible.builtin.cron:
+    name: "Utilities stack backup verification"
+    hour: "{{ (utilities_backup_schedule.split()[1] | int + 1) % 24 }}"
+    minute: "{{ utilities_backup_schedule.split()[0] }}"
+    job: "{{ utilities_config_dir }}/utilities-backup-verify.sh"
+    user: "{{ username }}"
+
+- name: Schedule utilities stack backup cleanup
+  ansible.builtin.cron:
+    name: "Utilities stack backup cleanup"
+    hour: "5"
+    minute: "0"
+    job: "{{ utilities_config_dir }}/utilities-backup-cleanup.sh"
+    user: "{{ username }}"
+
+- name: Create utilities stack backup documentation
+  ansible.builtin.template:
+    src: utilities-backup-docs.md.j2
+    dest: "{{ docs_dir }}/utilities-backup.md"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+  tags: [utilities, backup] 

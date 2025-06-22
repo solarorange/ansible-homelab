@@ -1,0 +1,64 @@
+# Utilities Stack Monitoring Rules (Prometheus/Loki)
+# Placeholder template
+
+# Prometheus scrape configs for utility services
+scrape_configs:
+  - job_name: 'portainer'
+    metrics_path: /api/status
+    static_configs:
+      - targets: ['localhost:{{ portainer_port }}']
+
+  - job_name: 'tdarr'
+    metrics_path: /api/v2/status
+    static_configs:
+      - targets: ['localhost:{{ tdarr_port }}']
+
+  - job_name: 'tautulli'
+    metrics_path: /api/v2?cmd=get_server_info
+    static_configs:
+      - targets: ['localhost:{{ tautulli_port }}']
+
+# Alert rules
+rule_files:
+  - 'alert.rules.yml'
+
+# Example alert.rules.yml content:
+groups:
+  - name: utilities-alerts
+    rules:
+      - alert: PortainerDown
+        expr: up{job="portainer"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Portainer is down"
+          description: "Portainer API is not responding on port {{ portainer_port }}."
+
+      - alert: TdarrDown
+        expr: up{job="tdarr"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tdarr is down"
+          description: "Tdarr API is not responding on port {{ tdarr_port }}."
+
+      - alert: TautulliDown
+        expr: up{job="tautulli"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tautulli is down"
+          description: "Tautulli API is not responding on port {{ tautulli_port }}."
+
+# Example alert rule
+- alert: UtilitiesServiceDown
+  expr: up{job="utilities"} == 0
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Utility service is down"
+    description: "A utility service has not been running for 5 minutes." 

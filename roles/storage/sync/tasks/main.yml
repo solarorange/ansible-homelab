@@ -1,0 +1,40 @@
+---
+- name: Create Syncthing directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/syncthing"
+    - "{{ docker_data_root }}/syncthing/config"
+    - "{{ docker_data_root }}/syncthing/data"
+
+- name: Create Syncthing docker-compose service
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Syncthing"
+    block: |
+      syncthing:
+        image: linuxserver/syncthing:latest
+        container_name: syncthing
+        volumes:
+          - {{ docker_data_root }}/syncthing/config:/config
+          - {{ docker_data_root }}/syncthing/data:/data
+          - /etc/localtime:/etc/localtime:ro
+        environment:
+          - PUID=1000
+          - PGID=1000
+          - TZ={{ timezone }}
+        ports:
+          - "8384:8384"
+          - "22000:22000"
+          - "21027:21027/udp"
+        restart: unless-stopped
+        networks:
+          - traefik_network
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.syncthing.rule=Host(`syncthing.{{ domain_name }}`)"
+          - "traefik.http.routers.syncthing.entrypoints=websecure"
+          - "traefik.http.routers.syncthing.tls=true"
+          - "traefik.http.services.syncthing.loadbalancer.server.port=8384" 

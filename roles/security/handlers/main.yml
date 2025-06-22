@@ -1,0 +1,63 @@
+---
+# Handlers for Security Stack Role
+
+- name: restart authentik
+  ansible.builtin.service:
+    name: authentik
+    state: restarted
+
+- name: restart traefik
+  ansible.builtin.service:
+    name: traefik
+    state: restarted
+
+- name: restart pihole
+  ansible.builtin.service:
+    name: pihole-FTL
+    state: restarted
+
+- name: restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+
+- name: restart crowdsec
+  ansible.builtin.service:
+    name: crowdsec
+    state: restarted
+
+- name: restart wireguard
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: restarted
+
+- name: Restart authentik stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/authentik"
+    restarted: true
+
+- name: Restart traefik stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/traefik"
+    restarted: true
+
+- name: Restart pihole stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/pihole"
+    restarted: true
+
+- name: Restart fail2ban service
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  become: true
+
+- name: Restart crowdsec stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/crowdsec"
+    restarted: true
+
+- name: Restart wireguard stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/wireguard"
+    restarted: true 

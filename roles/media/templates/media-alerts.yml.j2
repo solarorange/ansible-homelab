@@ -1,0 +1,35 @@
+groups:
+  - name: media-stack-alerts
+    rules:
+      - alert: MediaServiceDown
+        expr: up{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 5 minutes."
+      - alert: MediaHighCPU
+        expr: process_cpu_seconds_total{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"} > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.job }}"
+          description: "CPU usage is above 80% for more than 2 minutes."
+      - alert: MediaHighMemory
+        expr: process_resident_memory_bytes{job=~"sonarr|radarr|lidarr|readarr|prowlarr|bazarr|pulsarr|sabnzbd|qbittorrent|plex|jellyfin|emby"} > 500000000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.job }}"
+          description: "Memory usage is above 500MB for more than 2 minutes."
+      - alert: MediaFailedDownloads
+        expr: media_failed_downloads_total > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Failed downloads detected"
+          description: "There are failed downloads in the media stack." 

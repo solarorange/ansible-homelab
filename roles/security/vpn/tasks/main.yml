@@ -1,0 +1,32 @@
+---
+# tasks file for security/vpn
+
+- name: Create wireguard directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/wireguard"
+    - "{{ docker_dir }}/wireguard/config"
+
+- name: Create wireguard docker-compose file
+  ansible.builtin.template:
+    src: wireguard-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/wireguard/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart wireguard stack
+
+- name: Start wireguard stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/wireguard"
+    build: false
+  register: wireguard_result
+
+- name: Display wireguard deployment result
+  ansible.builtin.debug:
+    var: wireguard_result 

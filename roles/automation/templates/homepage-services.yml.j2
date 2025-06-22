@@ -1,0 +1,22 @@
+# Automation Services for Homepage
+services:
+  - name: Home Assistant
+    url: http://homeassistant.{{ automation_domain }}
+    icon: home-assistant
+    description: Home automation platform
+  - name: Zigbee2MQTT
+    url: http://zigbee2mqtt.{{ automation_domain }}:8080
+    icon: zigbee2mqtt
+    description: Zigbee to MQTT bridge
+  # Add more automation services as needed
+
+# Homepage service definition
+# This file is dynamically generated for each service
+- "{{ item.name }}":
+    icon: "{{ item.icon }}"
+    href: "{{ item.href }}"
+    description: "{{ item.description }}"
+    widget:
+      type: "{{ item.service_name }}"
+      url: "http://{{ item.service_name }}:{{ item.port }}"
+      key: "{{ lookup('ansible.builtin.vault', 'secret/automation/' + item.service_name + '_api_key') | default('') }}" 

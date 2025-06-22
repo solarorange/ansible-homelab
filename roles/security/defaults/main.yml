@@ -1,0 +1,139 @@
+---
+# Security Stack Defaults
+# Production-ready defaults for the complete homelab security stack
+
+# Main switch for the entire security role
+security_enabled: true
+
+# Switches for individual security components
+security_authentication_enabled: true
+security_proxy_enabled: true
+security_dns_enabled: true
+security_firewall_enabled: true
+security_vpn_enabled: true
+
+# Integration switches
+security_monitoring_enabled: true
+security_backup_enabled: true
+security_homepage_enabled: true
+security_alerting_enabled: true
+
+# --- Service Configurations ---
+
+# Authentik (Authentication)
+security_authentik:
+  enabled: true
+  image: "ghcr.io/goauthentik/server:latest"
+  container_name: "authentik"
+  subdomain: "auth"
+  # Authentik requires a unique secret key
+  secret_key: "{{ vault_authentik_secret_key | default('authentik_secret_key_placeholder') }}"
+  # Postgres password for Authentik
+  postgres_password: "{{ vault_authentik_postgres_password | default('authentik_postgres_password_placeholder') }}"
+  # Authentik admin password
+  admin_password: "{{ vault_authentik_admin_password | default('admin_password_placeholder') }}"
+
+# Traefik (Reverse Proxy)
+security_traefik:
+  enabled: true
+  image: "traefik:latest"
+  container_name: "traefik"
+  # Traefik should not have a subdomain, it is the entrypoint
+  # Cloudflare API Token for DNS challenge
+  cloudflare_api_token: "{{ vault_cloudflare_api_token | default('cloudflare_api_token_placeholder') }}"
+
+# Pi-hole (DNS)
+security_pihole:
+  enabled: true
+  image: "pihole/pihole:latest"
+  container_name: "pihole"
+  subdomain: "pihole"
+  # Pi-hole admin password
+  admin_password: "{{ vault_pihole_admin_password | default('pihole_admin_password_placeholder') }}"
+
+# Fail2ban (Firewall)
+security_fail2ban:
+  enabled: true
+  # Fail2ban is typically installed on the host, not in a container
+  # Configuration for jails, bantime, etc.
+  bantime: "1h"
+  maxretry: 5
+  destemail: "{{ admin_email }}"
+
+# CrowdSec (Firewall)
+security_crowdsec:
+  enabled: true
+  image: "crowdsecurity/crowdsec:latest"
+  container_name: "crowdsec"
+  # No subdomain needed, runs as an agent
+
+# WireGuard (VPN)
+security_wireguard:
+  enabled: true
+  image: "linuxserver/wireguard:latest"
+  container_name: "wireguard"
+  subdomain: "vpn" # For management UI if any
+  # Peers configuration would be a list of dicts
+  peers: []
+
+# --- Integration Defaults ---
+
+# Homepage Integration
+security_homepage_category: "Security"
+security_homepage_description: "Security Infrastructure"
+security_homepage_icon: "security.png"
+
+# Backup Configuration
+security_backup_schedule: "0 3 * * *" # Daily at 3 AM
+security_backup_retention: 14
+security_backup_include_config: true
+security_backup_encryption_passphrase: "{{ vault_backup_encryption_passphrase | default('backup_passphrase_placeholder') }}"
+
+# Monitoring Configuration
+security_prometheus_scrape_interval: 60
+security_grafana_dashboard: true
+
+# Alerting Configuration
+security_alerting_provider: "alertmanager"
+security_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+
+# General
+security_stack_enabled: true
+security_stack_services:
+  - authentication
+  - proxy
+  - dns
+  - firewall
+  - vpn
+
+# Homepage Integration
+security_homepage_widget_enabled: true
+
+# Monitoring Integration
+security_prometheus_enabled: true
+security_grafana_enabled: true
+security_loki_enabled: true
+
+# Backup
+security_backup_compression: true
+
+# Vault Integration
+security_vault_enabled: true
+security_vault_path: "secret/security"
+security_vault_secrets:
+  - "authentik_admin_password"
+  - "traefik_api_key"
+  - "pihole_web_password"
+  - "fail2ban_secret_key"
+  - "crowdsec_api_key"
+  - "wireguard_private_key"
+
+# Service dependencies
+security_dependencies:
+  - "docker"
+  - "monitoring_infrastructure"
+
+# Health Check Configuration
+security_health_check_timeout: 10
+security_health_check_retries: 3
+security_health_check_interval: 30 

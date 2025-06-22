@@ -1,0 +1,20 @@
+#!/bin/bash
+# Portainer Health Check Script
+
+PORTAINER_CONTAINER="portainer"
+PORTAINER_PORT={{ portainer_port }}
+
+# Check if Portainer container is running
+if ! docker ps -f name=$PORTAINER_CONTAINER -f status=running | grep -q $PORTAINER_CONTAINER; then
+  echo "Portainer container is not running"
+  exit 1
+fi
+
+# Check if Portainer API is responsive
+if ! curl -s -f http://localhost:$PORTAINER_PORT/api/status > /dev/null; then
+  echo "Portainer API is not responding on port $PORTAINER_PORT"
+  exit 1
+fi
+
+echo "Portainer is healthy."
+exit 0 

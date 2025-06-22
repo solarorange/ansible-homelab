@@ -1,0 +1,26 @@
+---
+# Security Stack Pre-flight Validation
+# Perform checks before deploying the security stack
+
+- name: Check for required variables
+  ansible.builtin.assert:
+    that:
+      - item is defined and item != ""
+  loop:
+    - "{{ domain }}"
+    - "{{ admin_email }}"
+    - "{{ docker_dir }}"
+    - "{{ vault_authentik_secret_key }}"
+    - "{{ vault_cloudflare_api_token }}"
+    - "{{ vault_pihole_admin_password }}"
+  no_log: true
+
+- name: Check if Docker is installed and running
+  ansible.builtin.service_facts:
+  register: service_facts
+- name: Assert Docker service is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in service_facts.ansible_facts.services"
+      - "service_facts.ansible_facts.services['docker.service'].state == 'running'"
+    msg: "Docker is not installed or not running. Please install and start Docker." 

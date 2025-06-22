@@ -1,0 +1,62 @@
+---
+# Security Stack Prerequisites
+# System requirements and setup for security stack deployment
+
+- name: Update system packages
+  ansible.builtin.apt:
+    update_cache: yes
+    upgrade: yes
+  become: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - "docker.io"
+      - "docker-compose"
+      - "curl"
+      - "jq"
+      - "logrotate"
+      - "iptables"
+      - "wireguard-tools"
+      - "fail2ban"
+      - "unzip"
+      - "wget"
+      - "git"
+      - "vim"
+      - "nano"
+      - "tree"
+      - "rsync"
+      - "openssl"
+    state: present
+  become: true
+
+- name: Ensure required directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}"
+    - "{{ config_dir }}"
+    - "{{ backup_dir }}"
+    - "{{ logs_dir }}"
+    - "/home/{{ username }}/.config"
+    - "/home/{{ username }}/.cache"
+
+- name: Configure Docker network for security stack
+  community.docker.docker_network:
+    name: "security"
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: "172.30.0.0/16"
+
+- name: Display security prerequisites summary
+  ansible.builtin.debug:
+    msg: |
+      Security Prerequisites Setup Complete:
+      - Packages Installed
+      - Directories Created
+      - Docker Network Created 

@@ -1,0 +1,41 @@
+groups:
+  - name: media_stack_alerts
+    rules:
+      {% for name, service in media_downloaders.items() %}
+      {% if service.enabled | default(false) %}
+      - alert: {{ name | capitalize }}Down
+        expr: up{job="{{ name }}"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ name | capitalize }} down"
+          description: "{{ name | capitalize }} service is down."
+      {% endif %}
+      {% endfor %}
+
+      {% for name, service in media_arr_services.items() %}
+      {% if service.enabled | default(false) %}
+      - alert: {{ name | capitalize }}Down
+        expr: up{job="{{ name }}"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ name | capitalize }} down"
+          description: "{{ name | capitalize }} service is down."
+      {% endif %}
+      {% endfor %}
+
+      {% for name, service in media_players.items() %}
+      {% if service.enabled | default(false) %}
+      - alert: {{ name | capitalize }}Down
+        expr: up{job="{{ name }}"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ name | capitalize }} down"
+          description: "{{ name | capitalize }} service is down."
+      {% endif %}
+      {% endfor %} 

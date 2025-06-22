@@ -1,0 +1,60 @@
+---
+# Security Stack Monitoring
+# Configure monitoring for all security services
+
+- name: Create security stack monitoring dashboard in Grafana
+  ansible.builtin.template:
+    src: security-grafana-dashboard.json.j2
+    dest: "{{ grafana_dashboards_dir }}/security-stack-dashboard.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: security_grafana_dashboard | default(true)
+
+- name: Create Prometheus scrape configs for security stack
+  ansible.builtin.template:
+    src: security-prometheus-jobs.yml.j2
+    dest: "{{ prometheus_config_dir }}/security-stack-jobs.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: security_prometheus_enabled | default(true)
+
+- name: Create security stack alerting rules for Alertmanager
+  ansible.builtin.template:
+    src: security-alerting-rules.yml.j2
+    dest: "{{ alertmanager_config_dir }}/security-stack-rules.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: security_alerting_enabled | default(true)
+
+- name: Integrate authentication with monitoring
+  import_role:
+    name: security/authentication
+    tasks_from: monitoring.yml
+  when: security_authentication_enabled | default(true)
+
+- name: Integrate proxy with monitoring
+  import_role:
+    name: security/proxy
+    tasks_from: monitoring.yml
+  when: security_proxy_enabled | default(true)
+
+- name: Integrate DNS with monitoring
+  import_role:
+    name: security/dns
+    tasks_from: monitoring.yml
+  when: security_dns_enabled | default(true)
+
+- name: Integrate firewall with monitoring
+  import_role:
+    name: security/firewall
+    tasks_from: monitoring.yml
+  when: security_firewall_enabled | default(true)
+
+- name: Integrate VPN with monitoring
+  import_role:
+    name: security/vpn
+    tasks_from: monitoring.yml
+  when: security_vpn_enabled | default(true) 

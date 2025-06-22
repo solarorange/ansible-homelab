@@ -1,0 +1,23 @@
+# Prometheus scrape config for media stack with Docker service discovery
+scrape_configs:
+  - job_name: 'media-stack-services'
+    dockersd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      # Only scrape containers with the media.prometheus.scrape=true label
+      - source_labels: [__meta_docker_container_label_media_prometheus_scrape]
+        action: keep
+        regex: true
+      # Use the container name as the instance label
+      - source_labels: [__meta_docker_container_name]
+        target_label: instance
+        regex: /?(.*)
+      # Allow overriding the scrape port with a label
+      - source_labels: [__meta_docker_container_label_media_prometheus_port]
+        target_label: __address__
+        regex: (.+)
+        replacement: ${1}
+      # Allow overriding the metrics path with a label
+      - source_labels: [__meta_docker_container_label_media_prometheus_path]
+        target_label: __metrics_path__
+        regex: (.+) 

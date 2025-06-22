@@ -1,0 +1,16 @@
+---
+# Automation Stack Homepage Integration
+
+- name: Register automation services with homepage
+  ansible.builtin.template:
+    src: homepage-services.yml.j2
+    dest: "{{ homepage_config_dir }}/services/{{ item.service_name }}.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+  loop:
+    - { name: 'Home Assistant', service_name: 'homeassistant', enabled: "{{ home_assistant_enabled }}", icon: 'home-assistant.svg', href: "https://homeassistant.{{ automation_domain }}", description: 'Home Automation', port: "{{ home_assistant_port }}" }
+    - { name: 'Zigbee2MQTT', service_name: 'zigbee2mqtt', enabled: "{{ zigbee2mqtt_enabled }}", icon: 'zigbee2mqtt.svg', href: "https://zigbee2mqtt.{{ automation_domain }}", description: 'Zigbee Gateway', port: "{{ zigbee2mqtt_port }}" }
+    - { name: 'Node-RED', service_name: 'nodered', enabled: "{{ node_red_enabled }}", icon: 'node-red.svg', href: "https://nodered.{{ automation_domain }}", description: 'Flow Automation', port: "{{ node_red_port }}" }
+    - { name: 'n8n', service_name: 'n8n', enabled: "{{ n8n_enabled }}", icon: 'n8n.svg', href: "https://n8n.{{ automation_domain }}", description: 'Workflow Automation', port: "{{ n8n_port }}" }
+  when: item.enabled | default(true) 

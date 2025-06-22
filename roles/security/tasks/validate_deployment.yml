@@ -1,0 +1,66 @@
+---
+# Security Stack Post-Deployment Validation
+# Perform health checks after deploying the security stack
+
+- name: Wait for Authentik to be healthy
+  ansible.builtin.uri:
+    url: "https://{{ security_authentik.subdomain }}.{{ domain }}/api/v3/root/health/"
+    method: GET
+    status_code: 200
+    validate_certs: false
+  register: result
+  until: result.status == 200
+  retries: 10
+  delay: 30
+  when: security_authentik.enabled | default(true)
+
+- name: Wait for Traefik dashboard to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api/rawdata"
+    method: GET
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 5
+  delay: 10
+  when: security_traefik.enabled | default(true)
+
+- name: Wait for Pi-hole to be healthy
+  ansible.builtin.uri:
+    url: "https://{{ security_pihole.subdomain }}.{{ domain }}/admin/api.php?status"
+    method: GET
+    status_code: 200
+    validate_certs: false
+  register: result
+  until: result.status == 200 and "enabled" in result.json.status
+  retries: 5
+  delay: 10
+  when: security_pihole.enabled | default(true)
+
+- name: Check Fail2ban service status
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+  check_mode: true
+  register: fail2ban_status
+  changed_when: false
+  when: security_fail2ban.enabled | default(true)
+
+- name: Assert Fail2ban is running
+  ansible.builtin.assert:
+    that:
+      - not fail2ban_status.changed
+  when: security_fail2ban.enabled | default(true)
+
+- name: Check Crowdsec container status
+  community.docker.docker_container_info:
+    name: "{{ security_crowdsec.container_name }}"
+  register: crowdsec_container
+  when: security_crowdsec.enabled | default(true)
+
+- name: Assert Crowdsec is running
+  ansible.builtin.assert:
+    that:
+      - crowdsec_container.container.State.Running
+  when: security_crowdsec.enabled | default(true) 

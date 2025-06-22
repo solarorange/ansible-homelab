@@ -1,0 +1,42 @@
+---
+# tasks file for security/proxy
+
+- name: Create traefik directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/traefik"
+    - "{{ docker_dir }}/traefik/logs"
+    - "{{ docker_dir }}/traefik/config"
+
+- name: Create traefik configuration file
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ docker_dir }}/traefik/config/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart traefik stack
+
+- name: Create traefik docker-compose file
+  ansible.builtin.template:
+    src: traefik-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/traefik/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart traefik stack
+
+- name: Start traefik stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/traefik"
+    build: false
+  register: traefik_result
+
+- name: Display traefik deployment result
+  ansible.builtin.debug:
+    var: traefik_result 

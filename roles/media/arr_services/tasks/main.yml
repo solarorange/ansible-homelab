@@ -1,0 +1,238 @@
+---
+# Media ARR Services Sub-Role
+# Deploy and configure ARR applications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, Bazarr, Pulsarr)
+
+- name: Include ARR services deployment tasks
+  block:
+    - name: Deploy Prowlarr (Indexer Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - prowlarr
+        state: present
+      when: media_arr_services.prowlarr.enabled | default(true)
+      register: prowlarr_deploy
+
+    - name: Deploy Sonarr (TV Show Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - sonarr
+        state: present
+      when: media_arr_services.sonarr.enabled | default(true)
+      register: sonarr_deploy
+
+    - name: Deploy Radarr (Movie Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - radarr
+        state: present
+      when: media_arr_services.radarr.enabled | default(true)
+      register: radarr_deploy
+
+    - name: Deploy Lidarr (Music Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - lidarr
+        state: present
+      when: media_arr_services.lidarr.enabled | default(true)
+      register: lidarr_deploy
+
+    - name: Deploy Readarr (Book Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - readarr
+        state: present
+      when: media_arr_services.readarr.enabled | default(true)
+      register: readarr_deploy
+
+    - name: Deploy Bazarr (Subtitle Management)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - bazarr
+        state: present
+      when: media_arr_services.bazarr.enabled | default(true)
+      register: bazarr_deploy
+
+    - name: Deploy Pulsarr (ARR Service Status Dashboard)
+      community.docker.docker_compose:
+        project_src: "{{ docker_dir }}/media"
+        files: docker-compose.yml
+        services:
+          - pulsarr
+        state: present
+      when: media_arr_services.pulsarr.enabled | default(true)
+      register: pulsarr_deploy
+
+    - name: Wait for ARR services to be ready
+      ansible.builtin.uri:
+        url: "http://localhost:{{ item.value.port }}/health"
+        method: GET
+        status_code: 200
+      register: arr_health
+      retries: 30
+      delay: 10
+      until: arr_health.status == 200
+      loop: "{{ media_arr_services | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure Prowlarr indexers
+      ansible.builtin.template:
+        src: prowlarr-indexers.yml.j2
+        dest: "{{ config_dir }}/media/prowlarr-indexers.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.prowlarr.enabled | default(true)
+
+    - name: Configure Sonarr download clients
+      ansible.builtin.template:
+        src: sonarr-download-clients.yml.j2
+        dest: "{{ config_dir }}/media/sonarr-download-clients.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.sonarr.enabled | default(true)
+
+    - name: Configure Radarr download clients
+      ansible.builtin.template:
+        src: radarr-download-clients.yml.j2
+        dest: "{{ config_dir }}/media/radarr-download-clients.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.radarr.enabled | default(true)
+
+    - name: Configure Lidarr download clients
+      ansible.builtin.template:
+        src: lidarr-download-clients.yml.j2
+        dest: "{{ config_dir }}/media/lidarr-download-clients.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.lidarr.enabled | default(true)
+
+    - name: Configure Readarr download clients
+      ansible.builtin.template:
+        src: readarr-download-clients.yml.j2
+        dest: "{{ config_dir }}/media/readarr-download-clients.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.readarr.enabled | default(true)
+
+    - name: Configure Bazarr subtitle providers
+      ansible.builtin.template:
+        src: bazarr-subtitle-providers.yml.j2
+        dest: "{{ config_dir }}/media/bazarr-subtitle-providers.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.bazarr.enabled | default(true)
+
+    - name: Configure Pulsarr services
+      ansible.builtin.template:
+        src: pulsarr-services.yml.j2
+        dest: "{{ config_dir }}/media/pulsarr-services.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_arr_services.pulsarr.enabled | default(true)
+
+    - name: Create ARR service configuration files
+      ansible.builtin.template:
+        src: "{{ item.key }}-config.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure ARR service monitoring
+      ansible.builtin.template:
+        src: "{{ item.key }}-monitoring.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-monitoring.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - media_monitoring_enabled | default(true)
+
+    - name: Configure ARR service security
+      ansible.builtin.template:
+        src: "{{ item.key }}-security.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-security.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure ARR service backup
+      ansible.builtin.template:
+        src: "{{ item.key }}-backup.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-backup.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - media_backup_enabled | default(true)
+
+    - name: Configure ARR service homepage integration
+      ansible.builtin.template:
+        src: "{{ item.key }}-homepage.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-homepage.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - media_homepage_enabled | default(true)
+
+    - name: Configure ARR service alerts
+      ansible.builtin.template:
+        src: "{{ item.key }}-alerts.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - media_alerting_enabled | default(true)
+
+    - name: Configure ARR service API keys
+      ansible.builtin.uri:
+        url: "http://localhost:{{ item.value.port }}/api/v3/system/status"
+        method: GET
+        status_code: 200
+      register: arr_api_keys
+      loop: "{{ media_arr_services | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Verify ARR service deployment
+      ansible.builtin.uri:
+        url: "http://localhost:{{ item.value.port }}/health"
+        method: GET
+        status_code: 200
+      loop: "{{ media_arr_services | dict2items }}"
+      when: item.value.enabled | default(false)
+      register: arr_verification
+
+  tags: [media, arr_services, deploy] 

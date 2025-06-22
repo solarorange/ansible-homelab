@@ -1,0 +1,98 @@
+---
+# Redis deployment, configuration, backup, validation, homepage integration
+
+- name: Ensure Redis directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/redis/data"
+    - "{{ docker_dir }}/redis/config"
+    - "{{ docker_dir }}/redis/scripts"
+    - "{{ docker_dir }}/redis/backup"
+    - "{{ logs_dir }}/redis"
+
+- name: Deploy redis.conf
+  ansible.builtin.template:
+    src: redis.conf.j2
+    dest: "{{ docker_dir }}/redis/config/redis.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy Redis backup script
+  ansible.builtin.template:
+    src: backup-redis.sh.j2
+    dest: "{{ docker_dir }}/redis/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Redis restore script
+  ansible.builtin.template:
+    src: restore-redis.sh.j2
+    dest: "{{ docker_dir }}/redis/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Redis management script
+  ansible.builtin.template:
+    src: manage-redis.sh.j2
+    dest: "{{ docker_dir }}/redis/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Start Redis container
+  community.docker.docker_container:
+    name: "{{ redis_container_name }}"
+    image: "{{ redis_image }}"
+    restart_policy: "{{ redis_restart_policy }}"
+    network_mode: "{{ redis_network_mode }}"
+    published_ports:
+      - "{{ redis_web_port }}:6379"
+    env:
+      REDIS_PASSWORD: "{{ redis_password }}"
+    command: "redis-server /usr/local/etc/redis/redis.conf --requirepass {{ redis_password }}"
+    volumes:
+      - "{{ docker_dir }}/redis/data:/data"
+      - "{{ docker_dir }}/redis/config:/usr/local/etc/redis"
+      - "{{ docker_dir }}/redis/scripts:/docker-entrypoint-initdb.d"
+      - "{{ docker_dir }}/redis/backup:/backup"
+      - "{{ logs_dir }}/redis:/var/log/redis"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "{{ redis_password }}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    state: started
+    restart: true
+  register: redis_container
+
+- name: Validate Redis is running
+  ansible.builtin.command: docker exec {{ redis_container_name }} redis-cli -a {{ redis_password }} ping
+  register: redis_ping_result
+  changed_when: false
+  failed_when: redis_ping_result.stdout.strip() != 'PONG'
+
+- name: Schedule Redis backup cron job
+  ansible.builtin.cron:
+    name: "Redis Backup"
+    job: "{{ docker_dir }}/redis/scripts/backup.sh >> {{ logs_dir }}/redis/backup.log 2>&1"
+    minute: "0"
+    hour: "3"
+    user: "{{ username }}"
+    state: present
+
+- name: Integrate Redis with homepage
+  ansible.builtin.template:
+    src: homepage-redis.yml.j2
+    dest: "{{ homepage_config_dir }}/services/redis.yml"
+    mode: "0644"
+  when: redis_homepage_enabled | default(true)
+
+# Security and SSL tasks can be added here as needed 

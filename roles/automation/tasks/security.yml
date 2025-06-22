@@ -1,0 +1,92 @@
+---
+# Automation Stack Security Hardening
+
+- name: Configure Fail2ban for automation
+  ansible.builtin.template:
+    src: security.yml.j2
+    dest: /etc/fail2ban/jail.d/automation.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: automation_fail2ban_enabled | default(true)
+
+- name: Configure CrowdSec for automation
+  ansible.builtin.template:
+    src: security.yml.j2
+    dest: /etc/crowdsec/acquis.d/automation.yml
+    owner: root
+    group: root
+    mode: '0644'
+  when: automation_crowdsec_enabled | default(true)
+
+- name: Create automation security monitoring script
+  ansible.builtin.template:
+    src: security-monitor.sh.j2
+    dest: "{{ scripts_dir }}/security_monitor_automation.sh"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0755"
+
+- name: Schedule automation security monitoring
+  ansible.builtin.cron:
+    name: "Automation security monitoring"
+    job: "{{ scripts_dir }}/security_monitor_automation.sh"
+    minute: "*/15"
+    user: "{{ automation_username }}"
+
+- name: Configure firewall rules for automation services
+  ansible.builtin.command: >
+    ufw allow {{ item }}
+  loop:
+    - {{ home_assistant_port }}
+    - {{ zigbee2mqtt_port }}
+    - {{ node_red_port }}
+    - {{ n8n_port }}
+  when: automation_security_enabled | default(true)
+
+- name: Harden Docker containers for automation
+  ansible.builtin.command: >
+    docker update --restart=unless-stopped --security-opt no-new-privileges:true {{ item }}
+  loop:
+    - homeassistant
+    - zigbee2mqtt
+    - nodered
+    - n8n
+  when: automation_security_enabled | default(true)
+
+- name: Harden permissions on automation directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "{{ item.mode | default('0750') }}"
+    recurse: true
+  loop:
+    - { path: "{{ docker_data_root }}/homeassistant", mode: "0750" }
+    - { path: "{{ docker_data_root }}/zigbee2mqtt", mode: "0750" }
+    - { path: "{{ backup_root }}/homeassistant", mode: "0700" }
+    - { path: "{{ backup_root }}/zigbee2mqtt", mode: "0700" }
+
+- name: Enable UFW firewall and allow required ports
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 8123   # Home Assistant
+    - 8080   # Zigbee2MQTT
+    - 1880   # Node-RED
+    - 5678   # n8n
+
+- name: Enable UFW firewall
+  ansible.builtin.ufw:
+    state: enabled
+    policy: deny
+
+- name: Ensure fail2ban is enabled for automation
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+  when: automation_fail2ban_enabled | default(true) 

@@ -1,0 +1,75 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+
+services:
+  postgresql:
+    image: postgres:12-alpine
+    container_name: authentik_postgres
+    restart: unless-stopped
+    volumes:
+      - "{{ data_dir }}/authentik/postgresql:/var/lib/postgresql/data"
+    environment:
+      - POSTGRES_PASSWORD={{ security_authentik.postgres_password }}
+      - POSTGRES_USER=authentik
+      - POSTGRES_DB=authentik
+    networks:
+      - homelab
+
+  redis:
+    image: redis:alpine
+    container_name: authentik_redis
+    restart: unless-stopped
+    networks:
+      - homelab
+
+  server:
+    image: "{{ security_authentik.image }}"
+    container_name: "{{ security_authentik.container_name }}"
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: "{{ security_authentik.secret_key }}"
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: "{{ security_authentik.postgres_password }}"
+      AUTHENTIK_REDIS__HOST: redis
+      PUID: "{{ user_id }}"
+      PGID: "{{ group_id }}"
+      TZ: "{{ timezone }}"
+    volumes:
+      - "{{ docker_dir }}/authentik/media:/media"
+      - "{{ docker_dir }}/authentik/templates:/templates"
+      - "{{ docker_dir }}/authentik/certs:/certs"
+    networks:
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.authentik.rule=Host(`{{ security_authentik.subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.authentik.entrypoints=https"
+      - "traefik.http.routers.authentik.tls=true"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+
+  worker:
+    image: "{{ security_authentik.image }}"
+    container_name: authentik_worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: "{{ security_authentik.secret_key }}"
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: "{{ security_authentik.postgres_password }}"
+      AUTHENTIK_REDIS__HOST: redis
+    volumes:
+      - "{{ docker_dir }}/authentik/media:/media"
+      - "{{ docker_dir }}/authentik/templates:/templates"
+      - "{{ docker_dir }}/authentik/certs:/certs"
+    networks:
+      - homelab 

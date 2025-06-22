@@ -1,0 +1,78 @@
+---
+# Default variables for storage role
+username: homelab
+timezone: UTC
+domain_name: zorg.media
+
+# Directory paths
+base_dir: /srv
+config_dir: /srv/config
+data_dir: /srv/data
+docker_dir: /srv/docker
+backup_dir: /srv/backup
+logs_dir: /srv/logs
+scripts_dir: /srv/scripts
+docker_data_root: /srv/docker
+backup_root: /srv/backup
+
+# Media directories
+media_directories:
+  - /srv/data/media
+  - /srv/data/media/movies
+  - /srv/data/media/tv
+  - /srv/data/media/music
+  - /srv/data/media/books
+  - /srv/data/media/audiobooks
+  - /srv/data/media/photos
+  - /srv/data/media/backups
+
+# Enabled services
+enabled_services:
+  - samba
+  - syncthing
+  - nextcloud
+
+# Samba
+samba_workgroup: WORKGROUP
+samba_server_string: Homelab Samba Server
+samba_security: user
+samba_map_to_guest: Bad User
+samba_shares:
+  - { name: "media", path: "/srv/data/media", browseable: "yes", read_only: "no", guest_ok: "yes" }
+  - { name: "backups", path: "/srv/data/backups", browseable: "yes", read_only: "no", guest_ok: "no" }
+
+docker_compose_file: /srv/docker/docker-compose.yml
+
+# Nextcloud
+nextcloud_admin_user: admin
+nextcloud_admin_password: vault_nextcloud_admin_password
+nextcloud_db_password: vault_nextcloud_db_password
+nextcloud_db_root_password: vault_nextcloud_db_root_password
+
+# Backup
+backup_schedules:
+  samba: "15 3 * * *"
+  syncthing: "30 3 * * *"
+  nextcloud: "0 4 * * *"
+
+# Monitoring
+prometheus_pushgateway: http://localhost:9091
+
+# Security
+firewall_enabled: true
+encryption_enabled: true
+
+# Homepage integration
+homepage_services:
+  - name: Samba
+    url: http://samba.zorg.media
+    icon: samba
+    description: Network file sharing
+  - name: Syncthing
+    url: https://syncthing.zorg.media
+    icon: syncthing
+    description: File synchronization
+  - name: Nextcloud
+    url: https://nextcloud.zorg.media
+    icon: nextcloud
+    description: Cloud storage 

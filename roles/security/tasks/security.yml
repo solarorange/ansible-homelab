@@ -1,0 +1,22 @@
+---
+# Security Stack Hardening
+# Apply additional security measures to the stack
+
+- name: Apply security headers middleware to Traefik
+  ansible.builtin.template:
+    src: traefik-security-middleware.yml.j2
+    dest: "{{ docker_dir }}/traefik/config/dynamic/security-middleware.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart traefik stack
+
+- name: Run security audit script
+  ansible.builtin.script:
+    cmd: security-audit.sh
+  register: audit_results
+  changed_when: false
+
+- name: Display security audit results
+  ansible.builtin.debug:
+    var: audit_results.stdout_lines 

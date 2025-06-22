@@ -1,0 +1,16 @@
+---
+# Automation Stack Deployment
+
+- name: Create docker-compose for automation stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/automation/docker-compose.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+
+- name: Deploy automation stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/automation"
+    state: present
+    restarted: true 

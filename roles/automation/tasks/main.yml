@@ -1,0 +1,39 @@
+---
+# Main entry point for automation role
+
+- name: Include prerequisites
+  import_tasks: prerequisites.yml
+
+- name: Include container management tasks
+  import_tasks: ../container_management/tasks/main.yml
+  when: container_management_enabled | default(true)
+
+- name: Include home automation tasks
+  import_tasks: ../home_automation/tasks/main.yml
+  when: home_automation_enabled | default(true)
+
+- name: Include scheduling tasks
+  import_tasks: ../scheduling/tasks/main.yml
+  when: scheduling_enabled | default(true)
+
+- name: Include deployment tasks
+  import_tasks: deploy.yml
+
+- name: Include monitoring integration
+  import_tasks: monitoring.yml
+  when: automation_monitoring_enabled | default(true)
+
+- name: Include backup procedures
+  import_tasks: backup.yml
+  when: automation_backup_enabled | default(true)
+
+- name: Include security hardening
+  import_tasks: security.yml
+  when: automation_security_enabled | default(true)
+
+- name: Include homepage integration
+  import_tasks: homepage.yml
+  when: automation_homepage_enabled | default(true)
+
+- name: Include validation tasks
+  import_tasks: validate.yml 

@@ -1,0 +1,52 @@
+---
+# Utilities Stack Validation
+
+- name: Validate Utilities Stack configuration
+  block:
+    - name: Check required directories exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - "{{ utilities_data_dir }}"
+        - "{{ utilities_docker_dir }}"
+        - "{{ utilities_logs_dir }}"
+        - "{{ utilities_config_dir }}"
+
+    - name: Fail if required directories don't exist
+      ansible.builtin.fail:
+        msg: "Required directory {{ item.item }} does not exist"
+      loop: "{{ dir_check.results }}"
+      when: not item.stat.exists
+
+    - name: Validate port conflicts
+      ansible.builtin.fail:
+        msg: "Port conflict detected: {{ item }} is used by multiple services"
+      loop:
+        - "{{ portainer_port }}"
+        - "{{ tdarr_port }}"
+        - "{{ tautulli_port }}"
+      when: [portainer_port, tdarr_port, tautulli_port]|unique|length != [portainer_port, tdarr_port, tautulli_port]|length
+
+    - name: Validate backup configuration
+      ansible.builtin.fail:
+        msg: "Backup is enabled but backup directory is not configured"
+      when:
+        - utilities_backup_enabled | default(false)
+        - not utilities_backup_dir | default(false)
+
+    - name: Validate monitoring configuration
+      ansible.builtin.fail:
+        msg: "Monitoring is enabled but monitoring infrastructure is not available"
+      when:
+        - utilities_monitoring_enabled | default(false)
+        - not monitoring_enabled | default(false)
+
+    - name: Validate security configuration
+      ansible.builtin.fail:
+        msg: "Security features are enabled but security infrastructure is not available"
+      when:
+        - utilities_security_enabled | default(false)
+        - not crowdsec_enabled | default(false)
+
+  tags: [utilities, validation] 

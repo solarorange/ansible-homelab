@@ -1,0 +1,26 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+
+services:
+  traefik:
+    image: "{{ security_traefik.image }}"
+    container_name: "{{ security_traefik.container_name }}"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # For dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "{{ docker_dir }}/traefik/config:/etc/traefik"
+      - "{{ docker_dir }}/traefik/logs:/var/log/traefik"
+      - "{{ docker_dir }}/traefik/certs:/certs"
+    networks:
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      # Other global labels if needed 

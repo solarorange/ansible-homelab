@@ -1,0 +1,239 @@
+---
+# Database Stack Backup Configuration
+# Configure automated backup strategy and recovery procedures
+
+- name: Configure database backup strategy
+  block:
+    - name: Create backup orchestration script
+      ansible.builtin.template:
+        src: backup_orchestrator.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      vars:
+        services:
+          - name: postgresql
+            enabled: "{{ postgresql_enabled | default(true) }}"
+          - name: mariadb
+            enabled: "{{ mariadb_enabled | default(true) }}"
+          - name: redis
+            enabled: "{{ redis_enabled | default(true) }}"
+          - name: elasticsearch
+            enabled: "{{ elasticsearch_enabled | default(true) }}"
+
+    - name: Create restore orchestration script
+      ansible.builtin.template:
+        src: restore_orchestrator.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/restore_orchestrator.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create backup verification script
+      ansible.builtin.template:
+        src: backup-verify.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/backup-verify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [databases, backup, scripts]
+
+- name: Configure database backup cron jobs
+  block:
+    - name: Add database daily backup to crontab
+      ansible.builtin.cron:
+        name: "Database daily backup"
+        hour: "{{ databases_backup_schedule.split(' ')[1] }}"
+        minute: "{{ databases_backup_schedule.split(' ')[0] }}"
+        job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh daily >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add database weekly backup to crontab
+      ansible.builtin.cron:
+        name: "Database weekly backup"
+        weekday: "0"
+        hour: "3"
+        minute: "0"
+        job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh weekly >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add database monthly backup to crontab
+      ansible.builtin.cron:
+        name: "Database monthly backup"
+        day: "1"
+        hour: "4"
+        minute: "0"
+        job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh monthly >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Add database backup verification to crontab
+      ansible.builtin.cron:
+        name: "Database backup verification"
+        hour: "6"
+        minute: "0"
+        job: "{{ docker_dir }}/databases/scripts/backup-verify.sh >> {{ logs_dir }}/databases/backup/backup-verify.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [databases, backup, cron]
+
+- name: Configure database backup retention
+  block:
+    - name: Create backup retention script
+      ansible.builtin.template:
+        src: backup-retention.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/backup-retention.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add database backup retention to crontab
+      ansible.builtin.cron:
+        name: "Database backup retention cleanup"
+        hour: "5"
+        minute: "0"
+        job: "{{ docker_dir }}/databases/scripts/backup-retention.sh >> {{ logs_dir }}/databases/backup/backup-retention.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [databases, backup, retention]
+
+- name: Configure Point-in-Time Recovery (PITR)
+  block:
+    - name: Create PITR backup script for PostgreSQL
+      ansible.builtin.template:
+        src: postgresql-pitr.sh.j2
+        dest: "{{ docker_dir }}/postgresql/scripts/pitr.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: postgresql_enabled | default(true)
+
+    - name: Create PITR backup script for MariaDB
+      ansible.builtin.template:
+        src: mariadb-pitr.sh.j2
+        dest: "{{ docker_dir }}/mariadb/scripts/pitr.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: mariadb_enabled | default(true)
+
+    - name: Add PostgreSQL PITR backup to crontab
+      ansible.builtin.cron:
+        name: "PostgreSQL PITR backup"
+        minute: "*/{{ databases_pitr_interval[:-1] | int * 60 }}"
+        job: "{{ docker_dir }}/postgresql/scripts/pitr.sh >> {{ logs_dir }}/postgresql/pitr.log 2>&1"
+        user: "{{ username }}"
+        state: present
+      when: postgresql_enabled | default(true)
+
+    - name: Add MariaDB PITR backup to crontab
+      ansible.builtin.cron:
+        name: "MariaDB PITR backup"
+        minute: "*/{{ databases_pitr_interval[:-1] | int * 60 }}"
+        job: "{{ docker_dir }}/mariadb/scripts/pitr.sh >> {{ logs_dir }}/mariadb/pitr.log 2>&1"
+        user: "{{ username }}"
+        state: present
+      when: mariadb_enabled | default(true)
+
+  when: databases_pitr_enabled | default(true)
+  tags: [databases, backup, pitr]
+
+- name: Configure backup monitoring and reporting
+  block:
+    - name: Create backup monitoring script
+      ansible.builtin.template:
+        src: backup-monitor.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/backup-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add backup monitoring to crontab
+      ansible.builtin.cron:
+        name: "Database backup monitoring"
+        minute: "*/30"
+        job: "{{ docker_dir }}/databases/scripts/backup-monitor.sh >> {{ logs_dir }}/databases/backup/backup-monitor.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Create backup reporting script
+      ansible.builtin.template:
+        src: backup-report.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/backup-report.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add backup reporting to crontab
+      ansible.builtin.cron:
+        name: "Database backup reporting"
+        hour: "7"
+        minute: "0"
+        job: "{{ docker_dir }}/databases/scripts/backup-report.sh"
+        user: "{{ username }}"
+        state: present
+
+  tags: [databases, backup, monitoring]
+
+- name: Validate database backup deployment
+  block:
+    - name: Check backup scripts existence
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: backup_scripts
+      loop:
+        - "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh"
+        - "{{ docker_dir }}/databases/scripts/restore_orchestrator.sh"
+        - "{{ docker_dir }}/databases/scripts/backup-verify.sh"
+        - "{{ docker_dir }}/databases/scripts/backup-retention.sh"
+        - "{{ docker_dir }}/databases/scripts/backup-monitor.sh"
+
+    - name: Verify backup scripts are created
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists and item.stat.isreg
+        fail_msg: "Backup script {{ item.item }} not found or is not a regular file."
+        success_msg: "Backup script {{ item.item }} is correctly created."
+      loop: "{{ backup_scripts.results }}"
+
+    - name: Test a dry-run of the backup orchestrator
+      ansible.builtin.command: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh daily --dry-run"
+      register: backup_dry_run
+      changed_when: false
+
+    - name: Verify backup dry-run
+      ansible.builtin.assert:
+        that:
+          - backup_dry_run.rc == 0
+          - "'Dry-run backup completed' in backup_dry_run.stdout"
+        fail_msg: "Backup orchestrator dry-run failed."
+        success_msg: "Backup orchestrator dry-run successful."
+
+    - name: Display backup configuration status
+      ansible.builtin.debug:
+        msg: |
+          Database Backup Configuration Completed!
+          
+          Backup Strategy:
+          - Orchestration Scripts: Created
+          - Cron Jobs: Scheduled
+          - Retention Policy: Configured
+          - PITR: {{ 'Enabled' if databases_pitr_enabled else 'Disabled' }}
+          - Monitoring & Reporting: Configured
+          
+          Validation:
+          - Scripts Existence: OK
+          - Dry-run Test: OK
+          
+          Backup Management:
+          - Backup command: `{{ docker_dir }}/databases/scripts/backup_orchestrator.sh`
+          - Restore command: `{{ docker_dir }}/databases/scripts/restore_orchestrator.sh`
+
+  when: databases_backup_enabled | default(true)
+  tags: [databases, backup, validation] 

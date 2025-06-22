@@ -1,0 +1,103 @@
+---
+# Automation Stack Validation Tasks
+
+- name: Validate Home Assistant health
+  ansible.builtin.command: "{{ scripts_dir }}/health_check_homeassistant.sh"
+  register: ha_health
+  changed_when: false
+  failed_when: ha_health.rc != 0
+  when: home_assistant_enabled | default(true)
+
+- name: Validate Zigbee2MQTT health
+  ansible.builtin.command: "{{ scripts_dir }}/health_check_zigbee2mqtt.sh"
+  register: zigbee_health
+  changed_when: false
+  failed_when: zigbee_health.rc != 0
+  when: zigbee2mqtt_enabled | default(true)
+
+- name: Validate Node-RED health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ node_red_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: nodered_health
+  retries: 3
+  delay: 10
+  until: nodered_health.status == 200
+  when: node_red_enabled | default(true)
+
+- name: Validate n8n health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: n8n_health
+  retries: 3
+  delay: 10
+  until: n8n_health.status == 200
+  when: n8n_enabled | default(true)
+
+- name: Validate Home Assistant backup
+  ansible.builtin.command: "{{ scripts_dir }}/backup_homeassistant.sh test"
+  register: ha_backup
+  changed_when: false
+  failed_when: ha_backup.rc != 0
+  when: home_assistant_enabled | default(true)
+
+- name: Validate Zigbee2MQTT backup
+  ansible.builtin.command: "{{ scripts_dir }}/backup_zigbee2mqtt.sh test"
+  register: zigbee_backup
+  changed_when: false
+  failed_when: zigbee_backup.rc != 0
+  when: zigbee2mqtt_enabled | default(true)
+
+- name: Validate Node-RED backup
+  ansible.builtin.command: "{{ scripts_dir }}/backup_nodered.sh test"
+  register: nodered_backup
+  changed_when: false
+  failed_when: nodered_backup.rc != 0
+  when: node_red_enabled | default(true)
+
+- name: Validate n8n backup
+  ansible.builtin.command: "{{ scripts_dir }}/backup_n8n.sh test"
+  register: n8n_backup
+  changed_when: false
+  failed_when: n8n_backup.rc != 0
+  when: n8n_enabled | default(true)
+
+- name: Validate homepage integration for automation services
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/services"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: homepage_services_check
+  when: automation_homepage_enabled | default(true)
+
+- name: Assert Home Assistant is in Homepage services
+  ansible.builtin.assert:
+    that: "'Home Assistant' in homepage_services_check.json | map(attribute='name') | list"
+    fail_msg: "Home Assistant is not in Homepage services"
+  when: home_assistant_enabled | default(true)
+
+- name: Assert Zigbee2MQTT is in Homepage services
+  ansible.builtin.assert:
+    that: "'Zigbee2MQTT' in homepage_services_check.json | map(attribute='name') | list"
+    fail_msg: "Zigbee2MQTT is not in Homepage services"
+  when: zigbee2mqtt_enabled | default(true)
+
+- name: Assert Node-RED is in Homepage services
+  ansible.builtin.assert:
+    that: "'Node-RED' in homepage_services_check.json | map(attribute='name') | list"
+    fail_msg: "Node-RED is not in Homepage services"
+  when: node_red_enabled | default(true)
+
+- name: Assert n8n is in Homepage services
+  ansible.builtin.assert:
+    that: "'n8n' in homepage_services_check.json | map(attribute='name') | list"
+    fail_msg: "n8n is not in Homepage services"
+  when: n8n_enabled | default(true)
+
+# Add additional health checks for other automation services as needed 

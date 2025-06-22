@@ -1,0 +1,86 @@
+---
+# Scheduling Tasks (Node-RED, n8n)
+
+- name: Deploy Node-RED
+  import_tasks: ../../../../tasks/nodered.yml
+  when: node_red_enabled | default(true)
+
+- name: Deploy n8n
+  import_tasks: ../../../../tasks/n8n.yml
+  when: n8n_enabled | default(true)
+
+- name: Create automated maintenance script
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Automated system maintenance script
+      
+      # Set variables
+      CONFIG_DIR="{{ config_dir }}"
+      LOG_DIR="{{ logs_dir }}/ansible"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      
+      # Create log directory if it doesn't exist
+      mkdir -p "$LOG_DIR"
+      
+      # Function to log messages
+      log_message() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_DIR/maintenance_$DATE.log"
+      }
+      
+      # Run system optimization
+      log_message "Starting system optimization..."
+      
+      # Run Docker maintenance
+      log_message "Running Docker maintenance..."
+      docker system prune -f >> "$LOG_DIR/docker_$DATE.log" 2>&1
+      
+      log_message "Maintenance completed successfully!"
+    dest: "{{ config_dir }}/scripts/automated-maintenance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create systemd service for automated maintenance
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Automated Homelab Maintenance
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart={{ config_dir }}/scripts/automated-maintenance.sh
+      User={{ username }}
+      Group={{ username }}
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/homelab-maintenance.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create systemd timer for automated maintenance
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Run Homelab Maintenance Daily
+
+      [Timer]
+      OnCalendar=*-*-* 03:00:00
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/homelab-maintenance.timer
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start maintenance timer
+  ansible.builtin.systemd:
+    name: homelab-maintenance.timer
+    state: started
+    enabled: true
+    daemon_reload: true 

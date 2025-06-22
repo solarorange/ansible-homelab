@@ -1,0 +1,155 @@
+version: '3.8'
+
+networks:
+  {{ media_network_name }}:
+    external: {{ media_network_external | lower }}
+
+services:
+  # Downloaders
+  {% for name, service in media_downloaders.items() %}
+  {% if service.enabled | default(false) %}
+  {{ name }}:
+    image: "{{ service.image }}"
+    container_name: "{{ service.container_name }}"
+    restart: "{{ media_container_restart_policy }}"
+    networks:
+      - "{{ media_network_name }}"
+    environment:
+      - PUID={{ PUID }}
+      - PGID={{ PGID }}
+      - TZ={{ timezone }}
+    volumes:
+      {% for volume in service.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ service.port }}:{{ service.port }}"
+      {% if service.ports is defined %}
+      {% for port in service.ports %}
+      - "{{ port }}"
+      {% endfor %}
+      {% endif %}
+    labels:
+      - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.http.routers.{{ name }}.tls.certresolver={{ media_traefik_ssl_resolver }}"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.port={{ service.port }}"
+      # Loki scraping label
+      - "media.loki.scrape=true"
+    healthcheck:
+      test: {{ service.healthcheck.test }}
+      interval: "{{ service.healthcheck.interval }}"
+      timeout: "{{ service.healthcheck.timeout }}"
+      retries: {{ service.healthcheck.retries }}
+  {% endif %}
+  {% endfor %}
+
+  # ARR Services
+  {% for name, service in media_arr_services.items() %}
+  {% if service.enabled | default(false) %}
+  {{ name }}:
+    image: "{{ service.image }}"
+    container_name: "{{ service.container_name }}"
+    restart: "{{ media_container_restart_policy }}"
+    networks:
+      - "{{ media_network_name }}"
+    environment:
+      - PUID={{ PUID }}
+      - PGID={{ PGID }}
+      - TZ={{ timezone }}
+    volumes:
+      {% for volume in service.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ service.port }}:{{ service.port }}"
+    labels:
+      - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.http.routers.{{ name }}.tls.certresolver={{ media_traefik_ssl_resolver }}"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.port={{ service.port }}"
+      # Prometheus scraping labels
+      - "media.prometheus.scrape=true"
+      - "media.prometheus.port={{ service.port }}"
+      - "media.prometheus.path=/metrics"
+      # Loki scraping label
+      - "media.loki.scrape=true"
+    healthcheck:
+      test: {{ service.healthcheck.test }}
+      interval: "{{ service.healthcheck.interval }}"
+      timeout: "{{ service.healthcheck.timeout }}"
+      retries: {{ service.healthcheck.retries }}
+  {% endif %}
+  {% endfor %}
+
+  # Media Players
+  {% for name, service in media_players.items() %}
+  {% if service.enabled | default(false) %}
+  {{ name }}:
+    image: "{{ service.image }}"
+    container_name: "{{ service.container_name }}"
+    restart: "{{ media_container_restart_policy }}"
+    networks:
+      - "{{ media_network_name }}"
+    environment:
+      - PUID={{ PUID }}
+      - PGID={{ PGID }}
+      - TZ={{ timezone }}
+      {% if service.environment is defined %}
+      {% for env_var in service.environment %}
+      - "{{ env_var }}"
+      {% endfor %}
+      {% endif %}
+    volumes:
+      {% for volume in service.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ service.port }}:{{ service.port }}"
+      {% if service.ports is defined %}
+      {% for port in service.ports %}
+      - "{{ port }}"
+      {% endfor %}
+      {% endif %}
+    labels:
+      - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.{{ name }}.entrypoints=websecure"
+      - "traefik.http.routers.{{ name }}.tls.certresolver={{ media_traefik_ssl_resolver }}"
+      - "traefik.http.services.{{ name }}.loadbalancer.server.port={{ service.port }}"
+      # Loki scraping label
+      - "media.loki.scrape=true"
+    healthcheck:
+      test: {{ service.healthcheck.test }}
+      interval: "{{ service.healthcheck.interval }}"
+      timeout: "{{ service.healthcheck.timeout }}"
+      retries: {{ service.healthcheck.retries }}
+  {% endif %}
+  {% endfor %}
+
+  # Update Service
+  {% if media_watchtower_enabled %}
+  watchtower:
+    image: "{{ media_watchtower_image }}"
+    container_name: "{{ media_watchtower_container_name }}"
+    restart: "{{ media_container_restart_policy }}"
+    networks:
+      - "{{ media_network_name }}"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - WATCHTOWER_SCHEDULE={{ media_watchtower_schedule }}
+      - WATCHTOWER_CLEANUP={{ media_watchtower_cleanup }}
+      - WATCHTOWER_INCLUDE_RESTARTING={{ media_watchtower_include_restarting }}
+      - WATCHTOWER_INCLUDE_STOPPED={{ media_watchtower_include_stopped }}
+      - WATCHTOWER_REVIVE_STOPPED={{ media_watchtower_revive_stopped }}
+      - WATCHTOWER_REMOVE_VOLUMES={{ media_watchtower_remove_volumes }}
+      - WATCHTOWER_NO_PULL={{ media_watchtower_no_pull }}
+      - WATCHTOWER_NO_STARTUP_MESSAGE={{ media_watchtower_no_startup_message }}
+      - WATCHTOWER_HTTP_API_TOKEN={{ media_watchtower_http_api_token }}
+    labels:
+      # This service should not be updated by watchtower
+      - "com.centurylinklabs.watchtower.enable=false"
+  {% endif %} 

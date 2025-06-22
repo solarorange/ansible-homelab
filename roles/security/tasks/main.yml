@@ -1,0 +1,69 @@
+---
+# Security Stack Deployment
+# Production-ready Ansible tasks for the complete homelab security stack
+
+- name: Include Security Stack deployment tasks
+  block:
+    - name: Validate Security Stack configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [security, validation]
+
+    - name: Setup Security Stack prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [security, setup]
+
+    - name: Deploy Authentication services
+      ansible.builtin.include_tasks: authentication.yml
+      when: security_authentication_enabled | default(true)
+      tags: [security, authentication, deploy]
+
+    - name: Deploy Reverse Proxy services
+      ansible.builtin.include_tasks: proxy.yml
+      when: security_proxy_enabled | default(true)
+      tags: [security, proxy, deploy]
+
+    - name: Deploy DNS services
+      ansible.builtin.include_tasks: dns.yml
+      when: security_dns_enabled | default(true)
+      tags: [security, dns, deploy]
+
+    - name: Deploy Firewall services
+      ansible.builtin.include_tasks: firewall.yml
+      when: security_firewall_enabled | default(true)
+      tags: [security, firewall, deploy]
+
+    - name: Deploy VPN services
+      ansible.builtin.include_tasks: vpn.yml
+      when: security_vpn_enabled | default(true)
+      tags: [security, vpn, deploy]
+
+    - name: Configure Security Stack monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: security_monitoring_enabled | default(true)
+      tags: [security, monitoring]
+
+    - name: Configure Security Stack hardening
+      ansible.builtin.include_tasks: security.yml
+      tags: [security, hardening]
+
+    - name: Configure Security Stack backup
+      ansible.builtin.include_tasks: backup.yml
+      when: security_backup_enabled | default(true)
+      tags: [security, backup]
+
+    - name: Configure Security Stack homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: security_homepage_enabled | default(true)
+      tags: [security, homepage]
+
+    - name: Configure Security Stack alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: security_alerting_enabled | default(true)
+      tags: [security, alerts]
+
+    - name: Validate Security Stack deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [security, validation]
+
+  when: security_enabled | default(true)
+  tags: [security, always] 

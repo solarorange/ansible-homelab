@@ -1,0 +1,32 @@
+#!/bin/bash
+# Utilities Stack Backup Script
+
+set -e
+
+LOG_FILE="{{ utilities_backup_dir }}/utilities/backup_$(date +%Y%m%d_%H%M%S).log"
+
+# Portainer backup
+if [ -x "{{ portainer_scripts_dir }}/manage.sh" ]; then
+  echo "[Portainer] Starting backup..." | tee -a "$LOG_FILE"
+  {{ portainer_scripts_dir }}/manage.sh backup | tee -a "$LOG_FILE"
+else
+  echo "[Portainer] manage.sh not found or not executable" | tee -a "$LOG_FILE"
+fi
+
+# Tdarr backup
+if [ -x "{{ tdarr_scripts_dir }}/manage.sh" ]; then
+  echo "[Tdarr] Starting backup..." | tee -a "$LOG_FILE"
+  {{ tdarr_scripts_dir }}/manage.sh backup | tee -a "$LOG_FILE"
+else
+  echo "[Tdarr] manage.sh not found or not executable" | tee -a "$LOG_FILE"
+fi
+
+# Tautulli backup
+if [ -x "{{ tautulli_config_dir }}/../scripts/manage.sh" ]; then
+  echo "[Tautulli] Starting backup..." | tee -a "$LOG_FILE"
+  {{ tautulli_config_dir }}/../scripts/manage.sh backup | tee -a "$LOG_FILE"
+else
+  echo "[Tautulli] manage.sh not found or not executable" | tee -a "$LOG_FILE"
+fi
+
+echo "All utility service backups completed. Log: $LOG_FILE" 

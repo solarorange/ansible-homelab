@@ -1,0 +1,14 @@
+#!/bin/bash
+# Redis Restore Script
+if [ -z "$1" ]; then
+  echo "Please specify backup file"
+  exit 1
+fi
+BACKUP_FILE="$1"
+if [ ! -f "$BACKUP_FILE" ]; then
+  echo "Backup file not found: $BACKUP_FILE"
+  exit 1
+fi
+cp "$BACKUP_FILE" {{ docker_dir }}/redis/data/dump.rdb
+docker restart {{ redis_container_name }}
+echo "Backup restored from: $BACKUP_FILE" 

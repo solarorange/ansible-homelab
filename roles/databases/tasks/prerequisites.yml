@@ -1,0 +1,422 @@
+---
+# Database Stack Prerequisites
+# System requirements and setup for database stack deployment
+
+- name: Configure system requirements
+  block:
+    - name: Update system packages
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: yes
+      become: true
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - "docker.io"
+          - "docker-compose"
+          - "curl"
+          - "jq"
+          - "bc"
+          - "logrotate"
+          - "htop"
+          - "iotop"
+          - "sysstat"
+          - "net-tools"
+          - "ssl-cert"
+          - "ca-certificates"
+          - "unzip"
+          - "wget"
+          - "git"
+          - "vim"
+          - "nano"
+          - "tree"
+          - "rsync"
+          - "openssl"
+        state: present
+      become: true
+
+    - name: Install Python packages
+      ansible.builtin.pip:
+        name:
+          - "docker"
+          - "requests"
+          - "pyyaml"
+          - "jinja2"
+          - "cryptography"
+        state: present
+      become: true
+
+  tags: [databases, prerequisites, system]
+
+- name: Configure Docker network
+  block:
+    - name: Create databases network
+      community.docker.docker_network:
+        name: "{{ databases_network | default('databases') }}"
+        state: present
+        driver: bridge
+        ipam_config:
+          - subnet: "{{ databases_network_subnet | default('172.20.0.0/16') }}"
+
+    - name: Create traefik network if not exists
+      community.docker.docker_network:
+        name: "{{ databases_traefik_network | default('traefik') }}"
+        state: present
+        driver: bridge
+        ipam_config:
+          - subnet: "{{ databases_traefik_network_subnet | default('172.18.0.0/16') }}"
+
+  tags: [databases, prerequisites, docker]
+
+- name: Configure performance tuning
+  block:
+    - name: Configure system limits
+      ansible.builtin.lineinfile:
+        path: /etc/security/limits.conf
+        line: "{{ item }}"
+        state: present
+      loop:
+        - "{{ username }} soft nofile 65536"
+        - "{{ username }} hard nofile 65536"
+        - "{{ username }} soft nproc 32768"
+        - "{{ username }} hard nproc 32768"
+      become: true
+
+    - name: Configure sysctl parameters
+      ansible.builtin.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: "vm.max_map_count", value: "262144" }
+        - { name: "net.core.somaxconn", value: "65535" }
+        - { name: "net.ipv4.tcp_max_syn_backlog", value: "65535" }
+        - { name: "net.core.netdev_max_backlog", value: "5000" }
+        - { name: "vm.swappiness", value: "1" }
+        - { name: "vm.dirty_ratio", value: "15" }
+        - { name: "vm.dirty_background_ratio", value: "5" }
+      become: true
+
+    - name: Configure I/O scheduler
+      ansible.builtin.lineinfile:
+        path: /etc/default/grub
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+        line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash elevator=deadline"'
+        state: present
+      become: true
+
+    - name: Update GRUB
+      ansible.builtin.command: update-grub
+      become: true
+
+  when: databases_performance_tuning_enabled | default(true)
+  tags: [databases, prerequisites, performance]
+
+- name: Configure security prerequisites
+  block:
+    - name: Create SSL certificates directory
+      ansible.builtin.file:
+        path: "{{ databases_ssl_cert_path }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      become: true
+
+    - name: Create SSL private key directory
+      ansible.builtin.file:
+        path: "{{ databases_ssl_key_path }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0700"
+      become: true
+
+    - name: Create SSL CA directory
+      ansible.builtin.file:
+        path: "{{ databases_ssl_ca_path }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      become: true
+
+    - name: Generate SSL certificates if not exists
+      ansible.builtin.command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout {{ databases_ssl_key_path }}/databases.key
+        -out {{ databases_ssl_cert_path }}/databases.crt
+        -subj "/C=US/ST=State/L=City/O=Organization/CN={{ ansible_hostname }}"
+      args:
+        creates: "{{ databases_ssl_cert_path }}/databases.crt"
+      become: true
+
+    - name: Set SSL certificate permissions
+      ansible.builtin.file:
+        path: "{{ databases_ssl_cert_path }}/databases.crt"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      become: true
+
+    - name: Set SSL key permissions
+      ansible.builtin.file:
+        path: "{{ databases_ssl_key_path }}/databases.key"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0600"
+      become: true
+
+  when: databases_security_enabled | default(true)
+  tags: [databases, prerequisites, security]
+
+- name: Configure monitoring prerequisites
+  block:
+    - name: Create monitoring directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ config_dir }}/prometheus/targets"
+        - "{{ config_dir }}/prometheus/rules"
+        - "{{ config_dir }}/grafana/provisioning/dashboards"
+        - "{{ config_dir }}/grafana/provisioning/datasources"
+        - "{{ config_dir }}/telegraf/conf.d"
+        - "{{ config_dir }}/loki/conf.d"
+        - "{{ config_dir }}/promtail/conf.d"
+        - "{{ config_dir }}/alertmanager/conf.d"
+        - "{{ config_dir }}/alertmanager/rules"
+
+    - name: Create monitoring configuration files
+      ansible.builtin.copy:
+        dest: "{{ config_dir }}/prometheus/prometheus.yml"
+        content: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+          
+          rule_files:
+            - "rules/*.yml"
+          
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  when: databases_monitoring_enabled | default(true)
+  tags: [databases, prerequisites, monitoring]
+
+- name: Configure backup prerequisites
+  block:
+    - name: Create backup directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+      loop:
+        - "{{ backup_dir }}/databases"
+        - "{{ backup_dir }}/databases/postgresql"
+        - "{{ backup_dir }}/databases/mariadb"
+        - "{{ backup_dir }}/databases/redis"
+        - "{{ backup_dir }}/databases/elasticsearch"
+        - "{{ backup_dir }}/databases/kibana"
+        - "{{ backup_dir }}/databases/config"
+        - "{{ backup_dir }}/databases/logs"
+
+    - name: Create backup encryption key
+      ansible.builtin.copy:
+        dest: "{{ backup_dir }}/databases/.encryption_key"
+        content: "{{ databases_backup_encryption_key }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0600"
+
+    - name: Create backup verification script
+      ansible.builtin.copy:
+        dest: "{{ backup_dir }}/databases/verify_backup.sh"
+        content: |
+          #!/bin/bash
+          
+          # Database Backup Verification Script
+          
+          BACKUP_DIR="{{ backup_dir }}/databases"
+          
+          echo "Verifying database backups..."
+          
+          # Check PostgreSQL backups
+          if [ -d "$BACKUP_DIR/postgresql" ]; then
+            PG_BACKUPS=$(find "$BACKUP_DIR/postgresql" -name "*.sql.gz" -mtime -1 | wc -l)
+            echo "PostgreSQL backups in last 24h: $PG_BACKUPS"
+          fi
+          
+          # Check MariaDB backups
+          if [ -d "$BACKUP_DIR/mariadb" ]; then
+            MD_BACKUPS=$(find "$BACKUP_DIR/mariadb" -name "*.sql.gz" -mtime -1 | wc -l)
+            echo "MariaDB backups in last 24h: $MD_BACKUPS"
+          fi
+          
+          # Check Redis backups
+          if [ -d "$BACKUP_DIR/redis" ]; then
+            RD_BACKUPS=$(find "$BACKUP_DIR/redis" -name "*.rdb" -mtime -1 | wc -l)
+            echo "Redis backups in last 24h: $RD_BACKUPS"
+          fi
+          
+          # Check Elasticsearch backups
+          if [ -d "$BACKUP_DIR/elasticsearch" ]; then
+            ES_BACKUPS=$(find "$BACKUP_DIR/elasticsearch" -name "snapshot_*" -mtime -1 | wc -l)
+            echo "Elasticsearch backups in last 24h: $ES_BACKUPS"
+          fi
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+  when: databases_backup_enabled | default(true)
+  tags: [databases, prerequisites, backup]
+
+- name: Configure logging prerequisites
+  block:
+    - name: Create logging directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ logs_dir }}/databases"
+        - "{{ logs_dir }}/databases/postgresql"
+        - "{{ logs_dir }}/databases/mariadb"
+        - "{{ logs_dir }}/databases/redis"
+        - "{{ logs_dir }}/databases/elasticsearch"
+        - "{{ logs_dir }}/databases/kibana"
+        - "{{ logs_dir }}/databases/monitoring"
+        - "{{ logs_dir }}/databases/backup"
+        - "{{ logs_dir }}/databases/security"
+
+    - name: Create logrotate configuration
+      ansible.builtin.copy:
+        dest: "/etc/logrotate.d/databases"
+        content: |
+          {{ logs_dir }}/databases/*/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ username }} {{ username }}
+            postrotate
+              systemctl reload rsyslog > /dev/null 2>&1 || true
+            endscript
+          }
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+
+  tags: [databases, prerequisites, logging]
+
+- name: Configure audit prerequisites
+  block:
+    - name: Create audit directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ databases_audit_log_path | dirname }}"
+        - "{{ logs_dir }}/databases/audit"
+
+    - name: Create audit configuration
+      ansible.builtin.copy:
+        dest: "{{ logs_dir }}/databases/audit/audit.conf"
+        content: |
+          # Database Audit Configuration
+          
+          # Audit Events
+          audit_events:
+            - authentication
+            - authorization
+            - data_access
+            - data_modification
+            - configuration_change
+            - backup_restore
+          
+          # Audit Retention
+          audit_retention_days: {{ databases_audit_retention }}
+          
+          # Audit Log Format
+          audit_log_format: json
+          
+          # Audit Log Level
+          audit_log_level: info
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+  when: databases_audit_enabled | default(true)
+  tags: [databases, prerequisites, audit]
+
+- name: Verify prerequisites installation
+  block:
+    - name: Check Docker installation
+      ansible.builtin.command: docker --version
+      register: docker_version
+      failed_when: false
+
+    - name: Check Docker Compose installation
+      ansible.builtin.command: docker-compose --version
+      register: docker_compose_version
+      failed_when: false
+
+    - name: Check required tools
+      ansible.builtin.command: "{{ item }} --version"
+      register: "{{ item }}_version"
+      failed_when: false
+      loop:
+        - curl
+        - jq
+        - bc
+
+    - name: Check system resources
+      ansible.builtin.shell: |
+        echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+        echo "Disk: $(df -h / | tail -1 | awk '{print $4}')"
+        echo "CPU Cores: $(nproc)"
+      register: system_resources
+
+    - name: Display prerequisites verification status
+      ansible.builtin.debug:
+        msg: |
+          Database Stack Prerequisites Verification Completed!
+          
+          Docker Status:
+          - Docker: {{ docker_version.rc == 0 }}
+          - Docker Compose: {{ docker_compose_version.rc == 0 }}
+          
+          Required Tools:
+          - curl: {{ curl_version.rc == 0 }}
+          - jq: {{ jq_version.rc == 0 }}
+          - bc: {{ bc_version.rc == 0 }}
+          
+          System Resources:
+          {{ system_resources.stdout }}
+          
+          Configuration:
+          - Performance Tuning: {{ databases_performance_tuning_enabled | default(true) }}
+          - Security: {{ databases_security_enabled | default(true) }}
+          - Monitoring: {{ databases_monitoring_enabled | default(true) }}
+          - Backup: {{ databases_backup_enabled | default(true) }}
+          - Audit: {{ databases_audit_enabled | default(true) }} 

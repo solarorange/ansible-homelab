@@ -1,0 +1,422 @@
+---
+# Database Stack Monitoring Configuration
+# Comprehensive monitoring setup for all database services
+
+- name: Configure Prometheus monitoring for databases
+  block:
+    - name: Create PostgreSQL monitoring configuration
+      ansible.builtin.template:
+        src: postgresql-monitoring.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/postgresql.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB monitoring configuration
+      ansible.builtin.template:
+        src: mariadb-monitoring.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/mariadb.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+      when: mariadb_enabled | default(true)
+
+    - name: Create Redis monitoring configuration
+      ansible.builtin.template:
+        src: redis-monitoring.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/redis.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+      when: redis_enabled | default(true)
+
+    - name: Create Elasticsearch monitoring configuration
+      ansible.builtin.template:
+        src: elasticsearch-monitoring.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/elasticsearch.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+      when: elasticsearch_enabled | default(true)
+
+    - name: Create Kibana monitoring configuration
+      ansible.builtin.template:
+        src: kibana-monitoring.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/kibana.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+      when: kibana_enabled | default(true)
+
+    - name: Create database alerting rules
+      ansible.builtin.template:
+        src: databases-alerts.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/databases-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+
+  when: databases_prometheus_enabled | default(true)
+  tags: [databases, monitoring, prometheus]
+
+- name: Configure Grafana dashboards for databases
+  block:
+    - name: Create PostgreSQL Grafana dashboard
+      ansible.builtin.template:
+        src: postgresql-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/postgresql.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB Grafana dashboard
+      ansible.builtin.template:
+        src: mariadb-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/mariadb.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+      when: mariadb_enabled | default(true)
+
+    - name: Create Redis Grafana dashboard
+      ansible.builtin.template:
+        src: redis-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/redis.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+      when: redis_enabled | default(true)
+
+    - name: Create Elasticsearch Grafana dashboard
+      ansible.builtin.template:
+        src: elasticsearch-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/elasticsearch.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+      when: elasticsearch_enabled | default(true)
+
+    - name: Create Kibana Grafana dashboard
+      ansible.builtin.template:
+        src: kibana-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/kibana.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+      when: kibana_enabled | default(true)
+
+    - name: Create database overview dashboard
+      ansible.builtin.template:
+        src: databases-overview-dashboard.json.j2
+        dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/databases-overview.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart grafana
+
+  when: databases_grafana_enabled | default(true)
+  tags: [databases, monitoring, grafana]
+
+- name: Configure Telegraf monitoring for databases
+  block:
+    - name: Create PostgreSQL Telegraf configuration
+      ansible.builtin.template:
+        src: postgresql-telegraf.conf.j2
+        dest: "{{ docker_dir }}/monitoring/telegraf/conf.d/postgresql.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart telegraf
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB Telegraf configuration
+      ansible.builtin.template:
+        src: mariadb-telegraf.conf.j2
+        dest: "{{ docker_dir }}/monitoring/telegraf/conf.d/mariadb.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart telegraf
+      when: mariadb_enabled | default(true)
+
+    - name: Create Redis Telegraf configuration
+      ansible.builtin.template:
+        src: redis-telegraf.conf.j2
+        dest: "{{ docker_dir }}/monitoring/telegraf/conf.d/redis.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart telegraf
+      when: redis_enabled | default(true)
+
+    - name: Create Elasticsearch Telegraf configuration
+      ansible.builtin.template:
+        src: elasticsearch-telegraf.conf.j2
+        dest: "{{ docker_dir }}/monitoring/telegraf/conf.d/elasticsearch.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart telegraf
+      when: elasticsearch_enabled | default(true)
+
+    - name: Create database system monitoring configuration
+      ansible.builtin.template:
+        src: databases-system-telegraf.conf.j2
+        dest: "{{ docker_dir }}/monitoring/telegraf/conf.d/databases-system.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart telegraf
+
+  when: databases_telegraf_enabled | default(true)
+  tags: [databases, monitoring, telegraf]
+
+- name: Configure Loki logging for databases
+  block:
+    - name: Create PostgreSQL logging configuration
+      ansible.builtin.template:
+        src: postgresql-logging.yml.j2
+        dest: "{{ docker_dir }}/monitoring/promtail/config/postgresql.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart promtail
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB logging configuration
+      ansible.builtin.template:
+        src: mariadb-logging.yml.j2
+        dest: "{{ docker_dir }}/monitoring/promtail/config/mariadb.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart promtail
+      when: mariadb_enabled | default(true)
+
+    - name: Create Redis logging configuration
+      ansible.builtin.template:
+        src: redis-logging.yml.j2
+        dest: "{{ docker_dir }}/monitoring/promtail/config/redis.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart promtail
+      when: redis_enabled | default(true)
+
+    - name: Create Elasticsearch logging configuration
+      ansible.builtin.template:
+        src: elasticsearch-logging.yml.j2
+        dest: "{{ docker_dir }}/monitoring/promtail/config/elasticsearch.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart promtail
+      when: elasticsearch_enabled | default(true)
+
+    - name: Create Kibana logging configuration
+      ansible.builtin.template:
+        src: kibana-logging.yml.j2
+        dest: "{{ docker_dir }}/monitoring/promtail/config/kibana.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart promtail
+      when: kibana_enabled | default(true)
+
+  when: databases_loki_enabled | default(true)
+  tags: [databases, monitoring, loki]
+
+- name: Configure database health checks
+  block:
+    - name: Create PostgreSQL health check configuration
+      ansible.builtin.template:
+        src: postgresql-health.yml.j2
+        dest: "{{ docker_dir }}/monitoring/health/postgresql.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB health check configuration
+      ansible.builtin.template:
+        src: mariadb-health.yml.j2
+        dest: "{{ docker_dir }}/monitoring/health/mariadb.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: mariadb_enabled | default(true)
+
+    - name: Create Redis health check configuration
+      ansible.builtin.template:
+        src: redis-health.yml.j2
+        dest: "{{ docker_dir }}/monitoring/health/redis.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: redis_enabled | default(true)
+
+    - name: Create Elasticsearch health check configuration
+      ansible.builtin.template:
+        src: elasticsearch-health.yml.j2
+        dest: "{{ docker_dir }}/monitoring/health/elasticsearch.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: elasticsearch_enabled | default(true)
+
+    - name: Create Kibana health check configuration
+      ansible.builtin.template:
+        src: kibana-health.yml.j2
+        dest: "{{ docker_dir }}/monitoring/health/kibana.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: kibana_enabled | default(true)
+
+  when: databases_health_check_enabled | default(true)
+  tags: [databases, monitoring, health]
+
+- name: Configure database metrics collection
+  block:
+    - name: Create database metrics collection script
+      ansible.builtin.template:
+        src: databases-metrics.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/collect-metrics.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Add database metrics collection to crontab
+      ansible.builtin.cron:
+        name: "Collect database metrics"
+        minute: "*/5"
+        job: "{{ docker_dir }}/databases/scripts/collect-metrics.sh >> {{ logs_dir }}/databases/metrics.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Create database performance monitoring script
+      ansible.builtin.template:
+        src: databases-performance.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/monitor-performance.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Add database performance monitoring to crontab
+      ansible.builtin.cron:
+        name: "Monitor database performance"
+        minute: "*/10"
+        job: "{{ docker_dir }}/databases/scripts/monitor-performance.sh >> {{ logs_dir }}/databases/performance.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  when: databases_metrics_enabled | default(true)
+  tags: [databases, monitoring, metrics]
+
+- name: Configure database monitoring alerts
+  block:
+    - name: Create database alerting configuration
+      ansible.builtin.template:
+        src: databases-alertmanager.yml.j2
+        dest: "{{ docker_dir }}/monitoring/alertmanager/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart alertmanager
+
+    - name: Create database notification templates
+      ansible.builtin.template:
+        src: databases-notifications.yml.j2
+        dest: "{{ docker_dir }}/monitoring/alertmanager/templates/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart alertmanager
+
+    - name: Create database alert rules
+      ansible.builtin.template:
+        src: databases-alert-rules.yml.j2
+        dest: "{{ docker_dir }}/monitoring/prometheus/rules/databases-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      notify: restart prometheus
+
+  when: databases_alerting_enabled | default(true)
+  tags: [databases, monitoring, alerts]
+
+- name: Verify database monitoring configuration
+  block:
+    - name: Test Prometheus configuration
+      ansible.builtin.uri:
+        url: "http://localhost:9090/api/v1/status/config"
+        method: GET
+        status_code: [200]
+        timeout: 10
+      register: prometheus_config_test
+      when: databases_prometheus_enabled | default(true)
+
+    - name: Test Grafana configuration
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        status_code: [200]
+        timeout: 10
+      register: grafana_config_test
+      when: databases_grafana_enabled | default(true)
+
+    - name: Test Telegraf configuration
+      ansible.builtin.command: "docker exec telegraf telegraf --test --config /etc/telegraf/telegraf.conf"
+      register: telegraf_config_test
+      failed_when: false
+      when: databases_telegraf_enabled | default(true)
+
+    - name: Display monitoring configuration status
+      ansible.builtin.debug:
+        msg: |
+          Database Monitoring Configuration Completed!
+          
+          Prometheus Integration:
+          - Enabled: {{ databases_prometheus_enabled | default(true) }}
+          - Configuration Test: {{ prometheus_config_test.status == 200 if databases_prometheus_enabled | default(true) else 'N/A' }}
+          
+          Grafana Integration:
+          - Enabled: {{ databases_grafana_enabled | default(true) }}
+          - Configuration Test: {{ grafana_config_test.status == 200 if databases_grafana_enabled | default(true) else 'N/A' }}
+          
+          Telegraf Integration:
+          - Enabled: {{ databases_telegraf_enabled | default(true) }}
+          - Configuration Test: {{ telegraf_config_test.rc == 0 if databases_telegraf_enabled | default(true) else 'N/A' }}
+          
+          Loki Integration:
+          - Enabled: {{ databases_loki_enabled | default(true) }}
+          
+          Health Checks:
+          - Enabled: {{ databases_health_check_enabled | default(true) }}
+          
+          Metrics Collection:
+          - Enabled: {{ databases_metrics_enabled | default(true) }}
+          
+          Alerting:
+          - Enabled: {{ databases_alerting_enabled | default(true) }}
+          
+          Monitoring URLs:
+          - Prometheus: http://localhost:9090
+          - Grafana: http://localhost:3000
+          - AlertManager: http://localhost:9093
+
+  when: databases_monitoring_enabled | default(true)
+  tags: [databases, monitoring, validation] 

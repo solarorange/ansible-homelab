@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+
+LOG_FILE="{{ logs_dir }}/automation/security.log"
+FAILURES=0
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "${LOG_FILE}"
+}
+
+check_permissions() {
+    DIR=$1
+    log "Checking permissions for ${DIR}..."
+    if [ "$(stat -c "%U:%G" "${DIR}")" != "{{ automation_username }}:{{ automation_username }}" ]; then
+        log "ERROR: Invalid owner/group for ${DIR}."
+        FAILURES=$((FAILURES + 1))
+    fi
+}
+
+log "Starting security scan for automation stack..."
+
+# Check key directories
+check_permissions "{{ home_assistant_config_dir }}"
+check_permissions "{{ zigbee2mqtt_data_dir }}"
+
+# Check for sensitive data exposure in logs
+if grep -q "password" "{{ logs_dir }}/automation/*.log"; then
+    log "ERROR: Potential password exposure in logs."
+    FAILURES=$((FAILURES + 1))
+fi
+
+if [ "${FAILURES}" -gt 0 ]; then
+    log "ERROR: ${FAILURES} security issues found."
+    exit 1
+fi
+
+log "Security scan complete. No issues found."
+exit 0 

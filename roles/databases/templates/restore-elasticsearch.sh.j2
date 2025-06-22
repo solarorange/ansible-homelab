@@ -1,0 +1,10 @@
+#!/bin/bash
+# Elasticsearch Restore Script (Snapshot)
+if [ -z "$1" ]; then
+  echo "Please specify snapshot name"
+  exit 1
+fi
+SNAPSHOT_NAME="$1"
+REPO_NAME="backup_repo"
+docker exec {{ elasticsearch_container_name }} curl -s -k -XPOST "https://localhost:{{ elasticsearch_web_port }}/_snapshot/$REPO_NAME/$SNAPSHOT_NAME/_restore" -u elastic:{{ elasticsearch_elastic_password }}
+echo "Restore triggered for snapshot: $SNAPSHOT_NAME" 

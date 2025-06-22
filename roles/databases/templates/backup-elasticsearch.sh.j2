@@ -1,0 +1,11 @@
+#!/bin/bash
+# Elasticsearch Backup Script (Snapshot)
+BACKUP_DIR="{{ docker_dir }}/elasticsearch/backup"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+REPO_NAME="backup_repo"
+SNAPSHOT_NAME="snapshot_$TIMESTAMP"
+mkdir -p "$BACKUP_DIR"
+docker exec {{ elasticsearch_container_name }} curl -s -k -XPUT "https://localhost:{{ elasticsearch_web_port }}/_snapshot/$REPO_NAME" -u elastic:{{ elasticsearch_elastic_password }} -H 'Content-Type: application/json' -d '{"type":"fs","settings":{"location":"/usr/share/elasticsearch/backup"}}'
+docker exec {{ elasticsearch_container_name }} curl -s -k -XPUT "https://localhost:{{ elasticsearch_web_port }}/_snapshot/$REPO_NAME/$SNAPSHOT_NAME?wait_for_completion=true" -u elastic:{{ elasticsearch_elastic_password }}
+find "$BACKUP_DIR" -name "snapshot_*" -mtime +7 -delete
+echo "Snapshot created: $SNAPSHOT_NAME" 

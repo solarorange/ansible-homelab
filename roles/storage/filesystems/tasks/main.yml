@@ -1,0 +1,70 @@
+---
+- name: Configure storage directories with proper permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "{{ item.mode | default('0755') }}"
+    recurse: "{{ item.recurse | default(false) }}"
+  loop:
+    - { path: "{{ docker_dir }}", mode: "0755" }
+    - { path: "{{ data_dir }}", mode: "0755" }
+    - { path: "{{ config_dir }}", mode: "0755" }
+    - { path: "{{ backup_dir }}", mode: "0750" }
+    - { path: "{{ logs_dir }}", mode: "0755" }
+    - { path: "/home/{{ username }}/.cache", mode: "0755" }
+    - { path: "/home/{{ username }}/.config", mode: "0755" }
+
+- name: Create detailed media directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop: "{{ media_directories }}"
+
+- name: Configure filesystem optimization
+  ansible.builtin.blockinfile:
+    path: /etc/sysctl.conf
+    block: |
+      # Storage and filesystem optimization
+      vm.dirty_ratio = 15
+      vm.dirty_background_ratio = 5
+      vm.dirty_expire_centisecs = 3000
+      vm.dirty_writeback_centisecs = 500
+      vm.swappiness = 10
+      fs.file-max = 2097152
+      fs.inotify.max_user_watches = 524288
+      fs.inotify.max_user_instances = 512
+      fs.inotify.max_queued_events = 16384
+      kernel.io_delay_type = 3
+    marker: "# {mark} HOMELAB STORAGE OPTIMIZATION"
+    backup: true
+
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl -p
+  changed_when: false
+
+- name: Detect storage devices
+  ansible.builtin.shell: |
+    lsblk -dnio NAME,TYPE | awk '$2=="disk" {print $1}'
+  register: storage_devices
+  changed_when: false
+
+- name: Set I/O scheduler for SSDs (mq-deadline)
+  ansible.builtin.shell: |
+    if [[ $(cat /sys/block/{{ item }}/queue/rotational) == "0" ]]; then
+      echo mq-deadline > /sys/block/{{ item }}/queue/scheduler
+    fi
+  loop: "{{ storage_devices.stdout_lines }}"
+  ignore_errors: true
+
+- name: Set I/O scheduler for HDDs (bfq)
+  ansible.builtin.shell: |
+    if [[ $(cat /sys/block/{{ item }}/queue/rotational) == "1" ]]; then
+      echo bfq > /sys/block/{{ item }}/queue/scheduler
+    fi
+  loop: "{{ storage_devices.stdout_lines }}"
+  ignore_errors: true 

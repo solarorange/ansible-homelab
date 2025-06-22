@@ -1,0 +1,141 @@
+---
+# Media Stack Validation
+# Pre-deployment validation tasks for media stack
+
+- name: Validate Media Stack configuration
+  block:
+    - name: Check available disk space
+      ansible.builtin.shell: df -h {{ data_dir }} | awk 'NR==2 {print $4}'
+      register: available_space
+      changed_when: false
+
+    - name: Verify minimum disk space for media stack
+      ansible.builtin.fail:
+        msg: "Insufficient disk space. Required: 500GB, Available: {{ available_space.stdout }}"
+      when: available_space.stdout | regex_replace('G', '') | int < 500
+
+    - name: Check Docker network
+      community.docker.docker_network_info:
+        name: "{{ media_network_name }}"
+      register: media_network
+      ignore_errors: true
+
+    - name: Create media network if not exists
+      community.docker.docker_network:
+        name: "{{ media_network_name }}"
+        driver: bridge
+      when: media_network.network is not defined
+
+    - name: Validate media stack dependencies
+      ansible.builtin.fail:
+        msg: "Required dependency '{{ item }}' is not enabled"
+      loop: "{{ media_dependencies }}"
+      when: 
+        - item == "docker" and not docker_enabled | default(false)
+        - item == "traefik" and not traefik_enabled | default(false)
+        - item == "monitoring_infrastructure" and not monitoring_enabled | default(false)
+
+    - name: Validate downloader configuration
+      ansible.builtin.fail:
+        msg: "Downloader '{{ item.key }}' is enabled but not properly configured"
+      loop: "{{ media_downloaders | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - not item.value.image | default(false)
+        - not item.value.port | default(false)
+
+    - name: Validate ARR services configuration
+      ansible.builtin.fail:
+        msg: "ARR service '{{ item.key }}' is enabled but not properly configured"
+      loop: "{{ media_arr_services | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - not item.value.image | default(false)
+        - not item.value.port | default(false)
+
+    - name: Validate media players configuration
+      ansible.builtin.fail:
+        msg: "Media player '{{ item.key }}' is enabled but not properly configured"
+      loop: "{{ media_players | dict2items }}"
+      when: 
+        - item.value.enabled | default(false)
+        - not item.value.image | default(false)
+        - not item.value.port | default(false)
+
+    - name: Validate port conflicts
+      ansible.builtin.fail:
+        msg: "Port conflict detected: {{ item }} is used by multiple services"
+      loop: "{{ media_ports.values() | list | unique }}"
+      when: media_ports.values() | list | unique | length != media_ports.values() | list | length
+
+    - name: Validate subdomain conflicts
+      ansible.builtin.fail:
+        msg: "Subdomain conflict detected: {{ item }} is used by multiple services"
+      loop: "{{ media_subdomains.values() | list | unique }}"
+      when: media_subdomains.values() | list | unique | length != media_subdomains.values() | list | length
+
+    - name: Check required directories exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - "{{ data_dir }}"
+        - "{{ docker_dir }}"
+        - "{{ logs_dir }}"
+        - "{{ config_dir }}"
+
+    - name: Fail if required directories don't exist
+      ansible.builtin.fail:
+        msg: "Required directory {{ item.item }} does not exist"
+      loop: "{{ dir_check.results }}"
+      when: not item.stat.exists
+
+    - name: Validate backup configuration
+      ansible.builtin.fail:
+        msg: "Backup is enabled but backup directory is not configured"
+      when: 
+        - media_backup_enabled | default(false)
+        - not backup_dir | default(false)
+
+    - name: Validate monitoring configuration
+      ansible.builtin.fail:
+        msg: "Monitoring is enabled but monitoring infrastructure is not available"
+      when: 
+        - media_monitoring_enabled | default(false)
+        - not monitoring_enabled | default(false)
+
+    - name: Validate security configuration
+      ansible.builtin.fail:
+        msg: "Security features are enabled but security infrastructure is not available"
+      when: 
+        - media_crowdsec_enabled | default(false)
+        - not crowdsec_enabled | default(false)
+
+    - name: Check system resources
+      ansible.builtin.shell: |
+        echo "CPU cores: $(nproc)"
+        echo "Total memory: $(free -h | awk 'NR==2{print $2}')"
+        echo "Available memory: $(free -h | awk 'NR==2{print $7}')"
+      register: system_resources
+      changed_when: false
+
+    - name: Validate system resources
+      ansible.builtin.fail:
+        msg: "Insufficient system resources for media stack deployment"
+      when: 
+        - system_resources.stdout is defined
+        - system_resources.stdout | regex_search('CPU cores: [0-9]+') | regex_replace('CPU cores: ', '') | int < 4
+
+    - name: Backup existing media stack configuration
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ ansible_backup_dir }}/media/{{ ansible_date_time.date }}/{{ item | basename }}"
+        remote_src: true
+      loop:
+        - "{{ docker_dir }}/media/docker-compose.yml"
+        - "{{ docker_dir }}/media/config"
+      when: item is file
+      register: config_backup
+      ignore_errors: true
+
+  tags: [media, validation] 

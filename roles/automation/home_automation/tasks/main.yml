@@ -1,0 +1,127 @@
+---
+# Home Automation Tasks (Home Assistant, Zigbee2MQTT)
+
+- name: Deploy Home Assistant
+  import_tasks: ../../../../tasks/home_assistant.yml
+  when: home_assistant_enabled | default(true)
+
+- name: Deploy Zigbee2MQTT
+  import_tasks: ../../../../tasks/zigbee2mqtt.yml
+  when: zigbee2mqtt_enabled | default(true)
+
+- name: Create Home Assistant directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/homeassistant"
+    - "{{ docker_data_root }}/homeassistant/config"
+    - "{{ docker_data_root }}/homeassistant/ssl"
+
+- name: Deploy Home Assistant docker-compose block
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Home Assistant"
+    block: |
+      homeassistant:
+        image: ghcr.io/home-assistant/home-assistant:stable
+        container_name: homeassistant
+        volumes:
+          - {{ docker_data_root }}/homeassistant/config:/config
+          - {{ docker_data_root }}/homeassistant/ssl:/ssl
+          - /etc/localtime:/etc/localtime:ro
+        restart: unless-stopped
+        privileged: true
+        network_mode: host
+        environment:
+          - TZ={{ automation_timezone }}
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.homeassistant.rule=Host(`homeassistant.{{ automation_domain }}`)"
+          - "traefik.http.routers.homeassistant.entrypoints=websecure"
+          - "traefik.http.routers.homeassistant.tls=true"
+          - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
+
+- name: Create Zigbee2MQTT directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/zigbee2mqtt"
+    - "{{ docker_data_root }}/zigbee2mqtt/data"
+
+- name: Deploy Zigbee2MQTT docker-compose block
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Zigbee2MQTT"
+    block: |
+      zigbee2mqtt:
+        image: koenkk/zigbee2mqtt:latest
+        container_name: zigbee2mqtt
+        volumes:
+          - {{ docker_data_root }}/zigbee2mqtt/data:/app/data
+          - /dev:/dev
+        ports:
+          - "8080:8080"
+        environment:
+          - TZ={{ automation_timezone }}
+        restart: unless-stopped
+        privileged: true
+        devices:
+          - /dev/ttyACM0:/dev/ttyACM0
+        networks:
+          - traefik_network
+        depends_on:
+          - mosquitto
+
+- name: Create Home Assistant configuration
+  ansible.builtin.copy:
+    dest: "{{ home_assistant_config_dir }}/configuration.yaml"
+    content: |
+      default_config:
+
+      http:
+        ssl_certificate: /ssl/fullchain.pem
+        ssl_key: /ssl/privkey.pem
+
+      tts:
+        - platform: google_translate
+
+- name: Create Zigbee2MQTT configuration file
+  ansible.builtin.copy:
+    dest: "{{ zigbee2mqtt_data_dir }}/configuration.yaml"
+    content: |
+      homeassistant: true
+      permit_join: false
+      mqtt:
+        server: mqtt://mosquitto:1883
+        user: zigbee2mqtt
+        password: "{{ zigbee2mqtt_mqtt_password }}"
+      serial:
+        port: /dev/ttyACM0
+      frontend:
+        port: 8080
+      advanced:
+        log_level: info
+        pan_id: 6754
+        channel: 11
+        network_key:
+          - 1
+          - 3
+          - 5
+          - 7
+          - 9
+          - 11
+          - 13
+          - 15
+          - 0
+          - 2
+          - 4
+          - 6
+          - 8
+          - 10
+          - 12
+          - 13
+  when: zigbee2mqtt_enabled | default(true) 

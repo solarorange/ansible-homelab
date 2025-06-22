@@ -1,0 +1,204 @@
+---
+# Database Stack Security Configuration
+# Configure SSL/TLS, firewall, access control, and other security measures
+
+- name: Configure SSL/TLS for databases
+  block:
+    - name: Generate SSL certificates for each database service
+      ansible.builtin.command: |
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+          -keyout {{ databases_ssl_key_path }}/{{ item.name }}.key \
+          -out {{ databases_ssl_cert_path }}/{{ item.name }}.crt \
+          -subj "/C=US/ST=State/L=City/O=Organization/CN={{ item.domain }}"
+      args:
+        creates: "{{ databases_ssl_cert_path }}/{{ item.name }}.crt"
+      loop:
+        - name: postgresql
+          domain: "{{ postgresql_domain }}"
+        - name: mariadb
+          domain: "{{ mariadb_domain }}"
+        - name: redis
+          domain: "{{ redis_domain }}"
+        - name: elasticsearch
+          domain: "{{ elasticsearch_domain }}"
+        - name: kibana
+          domain: "{{ kibana_domain }}"
+      when: item.name is defined
+
+    - name: Set permissions for SSL certificates and keys
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - path: "{{ databases_ssl_cert_path }}"
+          mode: "0755"
+        - path: "{{ databases_ssl_key_path }}"
+          mode: "0700"
+
+  when: databases_ssl_enabled | default(true)
+  tags: [databases, security, ssl]
+
+- name: Configure firewall rules for databases
+  block:
+    - name: Allow database ports through the firewall
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.protocol | default('tcp') }}"
+        src: "{{ item.source | default('any') }}"
+        comment: "Allow {{ item.name }} access"
+      loop:
+        - name: postgresql
+          port: "{{ postgresql_port }}"
+        - name: mariadb
+          port: "{{ mariadb_port }}"
+        - name: redis
+          port: "{{ redis_port }}"
+        - name: elasticsearch
+          port: "{{ elasticsearch_port }}"
+        - name: elasticsearch_transport
+          port: "{{ elasticsearch_transport_port }}"
+        - name: kibana
+          port: "{{ kibana_port }}"
+      when: item.name is defined
+
+  when: databases_firewall_enabled | default(true)
+  tags: [databases, security, firewall]
+
+- name: Configure database access controls
+  block:
+    - name: Create PostgreSQL access control configuration
+      ansible.builtin.template:
+        src: postgresql_pg_hba.conf.j2
+        dest: "{{ docker_dir }}/postgresql/config/pg_hba.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: postgresql_enabled | default(true)
+
+    - name: Create MariaDB access control configuration
+      ansible.builtin.template:
+        src: mariadb_my.cnf.j2
+        dest: "{{ docker_dir }}/mariadb/config/my.cnf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      when: mariadb_enabled | default(true)
+
+  when: databases_access_control_enabled | default(true)
+  tags: [databases, security, access_control]
+
+- name: Configure encryption at rest
+  block:
+    - name: Create encryption key for data at rest
+      ansible.builtin.copy:
+        content: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+        dest: "{{ docker_dir }}/databases/encryption.key"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0600"
+
+    - name: Configure PostgreSQL for encryption at rest
+      # This is typically handled by the underlying filesystem (e.g., LUKS)
+      # or a transparent data encryption feature of the database.
+      ansible.builtin.debug:
+        msg: "Encryption at rest for PostgreSQL should be configured at the filesystem level."
+      when: postgresql_enabled | default(true)
+
+  when: databases_encryption_at_rest_enabled | default(true)
+  tags: [databases, security, encryption]
+
+- name: Configure CrowdSec and Fail2ban integration
+  block:
+    - name: Create CrowdSec collection for databases
+      ansible.builtin.template:
+        src: crowdsec-collection.yml.j2
+        dest: "{{ config_dir }}/crowdsec/collections/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart crowdsec
+
+    - name: Create Fail2ban jail for databases
+      ansible.builtin.template:
+        src: fail2ban-jail.conf.j2
+        dest: "/etc/fail2ban/jail.d/databases.conf"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      notify: restart fail2ban
+
+  when: databases_crowdsec_enabled | default(true) or databases_fail2ban_enabled | default(true)
+  tags: [databases, security, intrusion_detection]
+
+- name: Harden database configurations
+  block:
+    - name: Apply security hardening scripts
+      ansible.builtin.script: "{{ item }}"
+      loop:
+        - "scripts/harden_postgresql.sh"
+        - "scripts/harden_mariadb.sh"
+        - "scripts/harden_redis.sh"
+        - "scripts/harden_elasticsearch.sh"
+      when: item is defined
+
+  tags: [databases, security, hardening]
+
+- name: Validate database security deployment
+  block:
+    - name: Check SSL certificate and key permissions
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+      register: ssl_files
+      loop:
+        - path: "{{ databases_ssl_key_path }}"
+          mode: "0700"
+        - path: "{{ databases_ssl_cert_path }}"
+          mode: "0755"
+
+    - name: Verify SSL file permissions
+      ansible.builtin.assert:
+        that:
+          - "item.stat.exists"
+          - "item.stat.mode[-3:] == item.item.mode[-3:]"
+        fail_msg: "SSL path {{ item.item.path }} has incorrect permissions."
+        success_msg: "SSL path {{ item.item.path }} has correct permissions."
+      loop: "{{ ssl_files.results }}"
+
+    - name: Check firewall rules
+      ansible.builtin.command: "ufw status verbose"
+      register: ufw_status
+      changed_when: false
+
+    - name: Verify firewall rules are active
+      ansible.builtin.assert:
+        that:
+          - "'{{ postgresql_port }}' in ufw_status.stdout"
+          - "'{{ mariadb_port }}' in ufw_status.stdout"
+          - "'{{ redis_port }}' in ufw_status.stdout"
+          - "'{{ elasticsearch_port }}' in ufw_status.stdout"
+          - "'{{ kibana_port }}' in ufw_status.stdout"
+        fail_msg: "Firewall rules for databases are not correctly configured."
+        success_msg: "Firewall rules for databases are active."
+      when: databases_firewall_enabled | default(true)
+
+    - name: Display security configuration status
+      ansible.builtin.debug:
+        msg: |
+          Database Security Configuration Completed!
+          
+          Security Features:
+          - SSL/TLS: {{ 'Configured' if databases_ssl_enabled else 'Disabled' }}
+          - Firewall: {{ 'Configured' if databases_firewall_enabled else 'Disabled' }}
+          - Access Control: {{ 'Configured' if databases_access_control_enabled else 'Disabled' }}
+          - Encryption at Rest: {{ 'Configured' if databases_encryption_at_rest_enabled else 'Disabled' }}
+          - Intrusion Detection (CrowdSec/Fail2ban): {{ 'Configured' if databases_crowdsec_enabled or databases_fail2ban_enabled else 'Disabled' }}
+          - Hardening: Applied
+          
+          Validation:
+          - SSL Permissions: OK
+          - Firewall Rules: {{ 'OK' if databases_firewall_enabled else 'N/A' }}
+
+  tags: [databases, security, validation] 

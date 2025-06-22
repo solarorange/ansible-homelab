@@ -1,0 +1,33 @@
+---
+# tasks file for security/dns
+
+- name: Create pihole directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/pihole"
+    - "{{ docker_dir }}/pihole/etc-pihole"
+    - "{{ docker_dir }}/pihole/etc-dnsmasq.d"
+
+- name: Create pihole docker-compose file
+  ansible.builtin.template:
+    src: pihole-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/pihole/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart pihole stack
+
+- name: Start pihole stack
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/pihole"
+    build: false
+  register: pihole_result
+
+- name: Display pihole deployment result
+  ansible.builtin.debug:
+    var: pihole_result 

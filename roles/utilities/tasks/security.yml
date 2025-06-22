@@ -1,0 +1,64 @@
+---
+# Utilities Stack Security Hardening
+
+- name: Configure utilities stack firewall rules
+  ansible.builtin.template:
+    src: utilities-firewall.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-firewall.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Configure utilities stack fail2ban rules
+  ansible.builtin.template:
+    src: utilities-fail2ban.conf.j2
+    dest: "/etc/fail2ban/jail.d/utilities-stack.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: utilities_fail2ban_enabled | default(true)
+
+- name: Configure utilities stack CrowdSec rules
+  ansible.builtin.template:
+    src: utilities-crowdsec.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-crowdsec.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_crowdsec_enabled | default(true)
+
+- name: Configure utilities stack SSL/TLS settings
+  ansible.builtin.template:
+    src: utilities-ssl.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-ssl.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_ssl_enabled | default(true)
+
+- name: Configure utilities stack access control
+  ansible.builtin.template:
+    src: utilities-access-control.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-access-control.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_access_control_enabled | default(true)
+
+- name: Configure utilities stack security monitoring
+  ansible.builtin.template:
+    src: utilities-security-monitoring.yml.j2
+    dest: "{{ utilities_config_dir }}/utilities-security-monitoring.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Schedule utilities stack security audit
+  ansible.builtin.cron:
+    name: "Utilities stack security audit"
+    hour: "1"
+    minute: "0"
+    job: "{{ utilities_config_dir }}/utilities-security-audit.sh"
+    user: "{{ username }}"
+
+  tags: [utilities, security] 

@@ -1,0 +1,59 @@
+---
+# Media Stack Deployment
+# Production-ready Ansible tasks for homelab media stack deployment
+
+- name: Include Media Stack deployment tasks
+  block:
+    - name: Validate Media Stack configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [media, validation]
+
+    - name: Setup Media Stack prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [media, setup]
+
+    - name: Deploy Media Stack downloaders
+      ansible.builtin.include_tasks: downloaders.yml
+      when: media_downloaders_enabled | default(true)
+      tags: [media, downloaders, deploy]
+
+    - name: Deploy Media Stack ARR services
+      ansible.builtin.include_tasks: arr_services.yml
+      when: media_arr_services_enabled | default(true)
+      tags: [media, arr_services, deploy]
+
+    - name: Deploy Media Stack players
+      ansible.builtin.include_tasks: players.yml
+      when: media_players_enabled | default(true)
+      tags: [media, players, deploy]
+
+    - name: Configure Media Stack monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: media_monitoring_enabled | default(true)
+      tags: [media, monitoring]
+
+    - name: Configure Media Stack security
+      ansible.builtin.include_tasks: security.yml
+      tags: [media, security]
+
+    - name: Configure Media Stack backup
+      ansible.builtin.include_tasks: backup.yml
+      when: media_backup_enabled | default(true)
+      tags: [media, backup]
+
+    - name: Configure Media Stack homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: media_homepage_enabled | default(true)
+      tags: [media, homepage]
+
+    - name: Configure Media Stack alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: media_alerting_enabled | default(true)
+      tags: [media, alerts]
+
+    - name: Validate Media Stack deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [media, validation]
+
+  when: media_enabled | default(true)
+  tags: [media, always] 

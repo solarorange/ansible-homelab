@@ -1,0 +1,97 @@
+---
+- name: Create Samba backup script
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/backup_samba.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/samba"
+      mkdir -p "$BACKUP_DIR"
+      tar -czf "$BACKUP_DIR/samba_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/samba config
+
+- name: Add Samba backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Samba"
+    job: "{{ scripts_dir }}/backup_samba.sh"
+    hour: "{{ backup_schedules.samba.split(' ')[1] }}"
+    minute: "{{ backup_schedules.samba.split(' ')[0] }}"
+    state: present
+
+- name: Create Syncthing backup script
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/backup_syncthing.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/syncthing"
+      mkdir -p "$BACKUP_DIR"
+      tar -czf "$BACKUP_DIR/syncthing_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/syncthing config
+
+- name: Add Syncthing backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Syncthing"
+    job: "{{ scripts_dir }}/backup_syncthing.sh"
+    hour: "{{ backup_schedules.syncthing.split(' ')[1] }}"
+    minute: "{{ backup_schedules.syncthing.split(' ')[0] }}"
+    state: present
+
+- name: Create Nextcloud backup script
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/backup_nextcloud.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/nextcloud"
+      mkdir -p "$BACKUP_DIR"
+      tar -czf "$BACKUP_DIR/nextcloud_data_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/nextcloud data config html/custom_apps html/themes
+      docker exec nextcloud-db mysqldump -u root -p{{ nextcloud_db_root_password }} nextcloud > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
+
+- name: Add Nextcloud backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Nextcloud data"
+    job: "{{ scripts_dir }}/backup_nextcloud.sh"
+    hour: "{{ backup_schedules.nextcloud.split(' ')[1] }}"
+    minute: "{{ backup_schedules.nextcloud.split(' ')[0] }}"
+    state: present
+
+- name: Create log rotation configuration for Samba
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/samba
+    content: |
+      {{ docker_data_root }}/samba/logs/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      }
+
+- name: Create log rotation configuration for Syncthing
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/syncthing
+    content: |
+      {{ docker_data_root }}/syncthing/config/syncthing.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      }
+
+- name: Create log rotation configuration for Nextcloud
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/nextcloud
+    content: |
+      {{ docker_data_root }}/nextcloud/data/nextcloud.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      } 

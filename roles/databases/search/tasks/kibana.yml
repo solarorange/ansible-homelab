@@ -1,0 +1,75 @@
+---
+# Kibana deployment, configuration, backup, validation, homepage integration
+
+- name: Ensure Kibana directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/kibana/data"
+    - "{{ docker_dir }}/kibana/config"
+    - "{{ docker_dir }}/kibana/scripts"
+    - "{{ logs_dir }}/kibana"
+
+- name: Deploy kibana.yml
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: "{{ docker_dir }}/kibana/config/kibana.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy Kibana management script
+  ansible.builtin.template:
+    src: manage-kibana.sh.j2
+    dest: "{{ docker_dir }}/kibana/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Start Kibana container
+  community.docker.docker_container:
+    name: "{{ kibana_container_name }}"
+    image: "{{ kibana_image }}"
+    restart_policy: "{{ kibana_restart_policy }}"
+    network_mode: "{{ kibana_network_mode }}"
+    published_ports:
+      - "{{ kibana_web_port }}:5601"
+    env:
+      ELASTICSEARCH_HOSTS: "https://{{ elasticsearch_domain }}:{{ elasticsearch_port }}"
+      ELASTICSEARCH_USERNAME: "elastic"
+      ELASTICSEARCH_PASSWORD: "{{ elasticsearch_elastic_password }}"
+      SERVER_SSL_ENABLED: "{{ kibana_server_ssl_enabled | lower }}"
+      XPACK_SECURITY_ENABLED: "{{ kibana_xpack_security_enabled | lower }}"
+      XPACK_ENCRYPTIONKEY: "{{ kibana_encryption_key }}"
+    volumes:
+      - "{{ docker_dir }}/kibana/data:/usr/share/kibana/data"
+      - "{{ docker_dir }}/kibana/config:/usr/share/kibana/config"
+      - "{{ docker_dir }}/kibana/scripts:/docker-entrypoint-initdb.d"
+      - "{{ logs_dir }}/kibana:/usr/share/kibana/logs"
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-k", "https://localhost:{{ kibana_web_port }}/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    state: started
+    restart: true
+  register: kibana_container
+
+- name: Validate Kibana is running
+  ansible.builtin.command: docker exec {{ kibana_container_name }} curl -s -k https://localhost:{{ kibana_web_port }}/api/status
+  register: kibana_status_result
+  changed_when: false
+  failed_when: kibana_status_result.rc != 0
+
+- name: Integrate Kibana with homepage
+  ansible.builtin.template:
+    src: homepage-kibana.yml.j2
+    dest: "{{ homepage_config_dir }}/services/kibana.yml"
+    mode: "0644"
+  when: kibana_homepage_enabled | default(true)
+
+# Security and SSL tasks can be added here as needed 

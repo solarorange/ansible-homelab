@@ -1,0 +1,583 @@
+---
+# Database Stack Configuration
+# Production-ready defaults for homelab database stack deployment
+
+#==============================================================================
+# GENERAL DATABASE STACK CONFIGURATION
+#==============================================================================
+
+# Service Configuration
+databases_enabled: true
+databases_relational_enabled: true
+databases_cache_enabled: true
+databases_search_enabled: true
+databases_version: "latest"
+databases_network: "databases"
+
+# Container Configuration
+databases_container_restart_policy: "unless-stopped"
+databases_container_network_mode: "bridge"
+
+# Resource Limits
+databases_memory_limit: "4g"
+databases_cpu_limit: "2.0"
+databases_storage_limit: "100g"
+
+#==============================================================================
+# RELATIONAL DATABASES CONFIGURATION
+#==============================================================================
+
+# PostgreSQL Configuration
+postgresql_enabled: true
+postgresql_version: "15"
+postgresql_image: "postgres:15-alpine"
+postgresql_container_name: "postgresql"
+postgresql_restart_policy: "unless-stopped"
+postgresql_network_mode: "bridge"
+postgresql_web_port: 5432
+postgresql_admin_user: "postgres"
+postgresql_admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+postgresql_data_dir: "{{ docker_dir }}/postgresql/data"
+postgresql_config_dir: "{{ docker_dir }}/postgresql/config"
+postgresql_backup_dir: "{{ docker_dir }}/postgresql/backup"
+postgresql_logs_dir: "{{ logs_dir }}/postgresql"
+
+# PostgreSQL Performance Tuning
+postgresql_shared_buffers: "1GB"
+postgresql_work_mem: "16MB"
+postgresql_maintenance_work_mem: "256MB"
+postgresql_effective_cache_size: "3GB"
+postgresql_max_connections: 100
+postgresql_wal_level: "replica"
+postgresql_max_wal_size: "1GB"
+postgresql_min_wal_size: "80MB"
+
+# PostgreSQL Security
+postgresql_ssl_enabled: true
+postgresql_ssl_cert_file: "/etc/ssl/certs/postgresql.crt"
+postgresql_ssl_key_file: "/etc/ssl/private/postgresql.key"
+postgresql_ssl_ca_file: "/etc/ssl/certs/ca.crt"
+
+# MariaDB Configuration
+mariadb_enabled: true
+mariadb_version: "10.11"
+mariadb_image: "mariadb:10.11"
+mariadb_container_name: "mariadb"
+mariadb_restart_policy: "unless-stopped"
+mariadb_network_mode: "bridge"
+mariadb_web_port: 3306
+mariadb_root_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+mariadb_data_dir: "{{ docker_dir }}/mariadb/data"
+mariadb_config_dir: "{{ docker_dir }}/mariadb/config"
+mariadb_backup_dir: "{{ docker_dir }}/mariadb/backup"
+mariadb_logs_dir: "{{ logs_dir }}/mariadb"
+
+# MariaDB Performance Tuning
+mariadb_innodb_buffer_pool_size: "1G"
+mariadb_innodb_log_file_size: "256M"
+mariadb_innodb_log_buffer_size: "16M"
+mariadb_key_buffer_size: "128M"
+mariadb_max_connections: 100
+mariadb_max_allowed_packet: "16M"
+mariadb_thread_cache_size: 128
+
+# MariaDB Security
+mariadb_ssl_enabled: true
+mariadb_ssl_cert_file: "/etc/ssl/certs/mariadb.crt"
+mariadb_ssl_key_file: "/etc/ssl/private/mariadb.key"
+mariadb_ssl_ca_file: "/etc/ssl/certs/ca.crt"
+
+#==============================================================================
+# CACHE DATABASES CONFIGURATION
+#==============================================================================
+
+# Redis Configuration
+redis_enabled: true
+redis_version: "7-alpine"
+redis_image: "redis:7-alpine"
+redis_container_name: "redis"
+redis_restart_policy: "unless-stopped"
+redis_network_mode: "bridge"
+redis_web_port: 6379
+redis_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+redis_data_dir: "{{ docker_dir }}/redis/data"
+redis_config_dir: "{{ docker_dir }}/redis/config"
+redis_backup_dir: "{{ docker_dir }}/redis/backup"
+redis_logs_dir: "{{ logs_dir }}/redis"
+
+# Redis Performance Tuning
+redis_maxmemory: "1gb"
+redis_maxmemory_policy: "allkeys-lru"
+redis_maxmemory_samples: 5
+redis_save_900: 1
+redis_save_300: 10
+redis_save_60: 10000
+
+# Redis Security
+redis_protected_mode: "yes"
+redis_requirepass: true
+redis_rename_commands:
+  FLUSHDB: ""
+  FLUSHALL: ""
+  DEBUG: ""
+  CONFIG: ""
+
+#==============================================================================
+# SEARCH DATABASES CONFIGURATION
+#==============================================================================
+
+# Elasticsearch Configuration
+elasticsearch_enabled: true
+elasticsearch_version: "8.11.0"
+elasticsearch_image: "docker.elastic.co/elasticsearch/elasticsearch:8.11.0"
+elasticsearch_container_name: "elasticsearch"
+elasticsearch_restart_policy: "unless-stopped"
+elasticsearch_network_mode: "bridge"
+elasticsearch_web_port: 9200
+elasticsearch_transport_port: 9300
+elasticsearch_cluster_name: "homelab"
+elasticsearch_node_name: "node-1"
+elasticsearch_data_dir: "{{ docker_dir }}/elasticsearch/data"
+elasticsearch_config_dir: "{{ docker_dir }}/elasticsearch/config"
+elasticsearch_backup_dir: "{{ docker_dir }}/elasticsearch/backup"
+elasticsearch_logs_dir: "{{ logs_dir }}/elasticsearch"
+
+# Elasticsearch Performance Tuning
+elasticsearch_heap_size: "1g"
+elasticsearch_bootstrap_memory_lock: true
+elasticsearch_discovery_type: "single-node"
+elasticsearch_number_of_shards: 1
+elasticsearch_number_of_replicas: 0
+
+# Elasticsearch Security
+elasticsearch_xpack_security_enabled: true
+elasticsearch_xpack_security_transport_ssl_enabled: true
+elasticsearch_xpack_security_http_ssl_enabled: true
+elasticsearch_elastic_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+#==============================================================================
+# MONITORING CONFIGURATION
+#==============================================================================
+
+databases_monitoring_enabled: true
+databases_metrics_enabled: true
+databases_health_check_enabled: true
+databases_health_check_interval: 30
+
+# Prometheus Integration
+databases_prometheus_enabled: true
+databases_prometheus_metrics: true
+databases_prometheus_scrape_interval: 30
+
+# Grafana Integration
+databases_grafana_enabled: true
+databases_grafana_dashboard: true
+databases_grafana_datasource: "prometheus"
+
+# Telegraf Integration
+databases_telegraf_enabled: true
+databases_telegraf_metrics: true
+databases_telegraf_logs: true
+
+# Loki Integration
+databases_loki_enabled: true
+databases_loki_logs: true
+
+#==============================================================================
+# SECURITY CONFIGURATION
+#==============================================================================
+
+databases_security_enabled: true
+databases_ssl_enabled: true
+databases_encryption_enabled: true
+databases_network_isolation: true
+
+# Firewall Configuration
+databases_firewall_enabled: true
+databases_firewall_rules:
+  - port: "5432"
+    protocol: "tcp"
+    source: "10.0.0.0/8"
+  - port: "3306"
+    protocol: "tcp"
+    source: "10.0.0.0/8"
+  - port: "6379"
+    protocol: "tcp"
+    source: "10.0.0.0/8"
+  - port: "9200"
+    protocol: "tcp"
+    source: "10.0.0.0/8"
+  - port: "5601"
+    protocol: "tcp"
+    source: "10.0.0.0/8"
+
+# CrowdSec Integration
+databases_crowdsec_enabled: true
+databases_crowdsec_collections:
+  - "crowdsecurity/nginx"
+  - "crowdsecurity/http-cve"
+  - "crowdsecurity/redis"
+  - "crowdsecurity/postgresql"
+
+# Fail2ban Integration
+databases_fail2ban_enabled: true
+databases_fail2ban_jail: "databases"
+databases_fail2ban_max_retry: 5
+databases_fail2ban_bantime: 3600
+
+#==============================================================================
+# BACKUP CONFIGURATION
+#==============================================================================
+
+databases_backup_enabled: true
+databases_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+databases_backup_retention: 7  # Keep backups for 7 days
+databases_backup_compression: true
+databases_backup_encryption: true
+databases_backup_verification: true
+databases_point_in_time_recovery: true
+
+# Backup Storage
+databases_backup_storage:
+  local: true
+  remote: false
+  cloud: false
+
+# Backup Monitoring
+databases_backup_monitoring_enabled: true
+databases_backup_alerting_enabled: true
+
+#==============================================================================
+# HOMEPAGE INTEGRATION
+#==============================================================================
+
+databases_homepage_enabled: true
+databases_homepage_category: "Databases"
+databases_homepage_description: "Database Stack Management"
+databases_homepage_icon: "database.png"
+databases_homepage_widget_enabled: true
+
+# PostgreSQL Homepage
+postgresql_homepage_enabled: true
+postgresql_homepage_category: "Databases"
+postgresql_homepage_description: "PostgreSQL Database"
+postgresql_homepage_icon: "postgresql.png"
+
+# MariaDB Homepage
+mariadb_homepage_enabled: true
+mariadb_homepage_category: "Databases"
+mariadb_homepage_description: "MariaDB Database"
+mariadb_homepage_icon: "mariadb.png"
+
+# Redis Homepage
+redis_homepage_enabled: true
+redis_homepage_category: "Databases"
+redis_homepage_description: "Redis Cache"
+redis_homepage_icon: "redis.png"
+
+# Elasticsearch Homepage
+elasticsearch_homepage_enabled: true
+elasticsearch_homepage_category: "Databases"
+elasticsearch_homepage_description: "Elasticsearch Search"
+elasticsearch_homepage_icon: "elasticsearch.png"
+
+# Kibana Homepage
+kibana_enabled: true
+kibana_version: "8.11.0"
+kibana_image: "docker.elastic.co/kibana/kibana:8.11.0"
+kibana_container_name: "kibana"
+kibana_restart_policy: "unless-stopped"
+kibana_network_mode: "bridge"
+kibana_web_port: 5601
+kibana_data_dir: "{{ docker_dir }}/kibana/data"
+kibana_config_dir: "{{ docker_dir }}/kibana/config"
+kibana_logs_dir: "{{ logs_dir }}/kibana"
+
+# Kibana Security
+kibana_xpack_security_enabled: true
+kibana_server_ssl_enabled: true
+kibana_elasticsearch_ssl_enabled: true
+kibana_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+#==============================================================================
+# ALERTING CONFIGURATION
+#==============================================================================
+
+databases_alerting_enabled: true
+databases_alerting_provider: "alertmanager"
+databases_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+
+# Alert Rules
+databases_alert_rules:
+  - name: "Database Down"
+    condition: "up == 0"
+    severity: "critical"
+  - name: "High Memory Usage"
+    condition: "memory_usage > 80"
+    severity: "warning"
+  - name: "High CPU Usage"
+    condition: "cpu_usage > 80"
+    severity: "warning"
+  - name: "Disk Space Low"
+    condition: "disk_usage > 90"
+    severity: "critical"
+  - name: "Connection Pool Exhausted"
+    condition: "active_connections / max_connections > 0.8"
+    severity: "warning"
+
+#==============================================================================
+# VAULT INTEGRATION
+#==============================================================================
+
+databases_vault_enabled: true
+databases_vault_path: "secret/databases"
+databases_vault_secrets:
+  - "postgresql_admin_password"
+  - "mariadb_root_password"
+  - "redis_password"
+  - "elasticsearch_elastic_password"
+  - "kibana_encryption_key"
+
+#==============================================================================
+# SERVICE DEPENDENCIES
+#==============================================================================
+
+databases_dependencies:
+  - "docker"
+  - "traefik"
+  - "monitoring_infrastructure"
+  - "logging_infrastructure"
+
+# Health Check Configuration
+databases_health_check_timeout: 10
+databases_health_check_retries: 3
+databases_health_check_interval: 30
+
+#==============================================================================
+# LOGGING CONFIGURATION
+#==============================================================================
+
+databases_log_level: "info"  # Options: debug, info, warn, error
+databases_log_format: "json"
+databases_log_retention: 30  # Days
+databases_log_rotation: true
+
+#==============================================================================
+# PERFORMANCE TUNING
+#==============================================================================
+
+# System Tuning
+databases_system_tuning_enabled: true
+databases_ulimit_nofile: 65536
+databases_ulimit_nproc: 32768
+databases_vm_max_map_count: 262144
+databases_swappiness: 1
+
+# Docker Tuning
+databases_docker_tuning_enabled: true
+databases_docker_memory_swap: false
+databases_docker_oom_kill_disable: false
+databases_docker_pids_limit: 1000
+
+# Traefik Configuration
+databases_traefik_enabled: true
+databases_traefik_network: "traefik"
+databases_traefik_middleware: "secure-headers,compress"
+databases_traefik_auth_middleware: "authentik-forward-auth"
+databases_traefik_ssl_enabled: true
+databases_traefik_ssl_resolver: "cloudflare"
+
+# API Configuration
+databases_api_enabled: true
+databases_api_version: "v1"
+databases_api_rate_limit: 1000
+databases_api_rate_limit_window: 3600
+
+# Webhook Configuration
+databases_webhooks_enabled: true
+databases_webhook_events:
+  - "database_backup_completed"
+  - "database_backup_failed"
+  - "database_restore_completed"
+  - "database_restore_failed"
+  - "database_health_check_failed"
+
+# Notification Configuration
+databases_notifications_enabled: true
+databases_notification_channels:
+  - "email"
+  - "webhook"
+  - "slack"
+  - "discord"
+
+# Email Configuration
+databases_email_enabled: false
+databases_smtp_host: "{{ smtp_host | default('localhost') }}"
+databases_smtp_port: "{{ smtp_port | default(587) }}"
+databases_smtp_username: "{{ smtp_username | default('') }}"
+databases_smtp_password: "{{ smtp_password | default('') }}"
+databases_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+
+# Performance Monitoring
+databases_performance_monitoring_enabled: true
+databases_slow_query_logging: true
+databases_query_analysis: true
+databases_connection_pooling: true
+
+# Maintenance Configuration
+databases_maintenance_enabled: true
+databases_maintenance_schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+databases_vacuum_enabled: true
+databases_optimize_enabled: true
+databases_analyze_enabled: true
+
+# Replication Configuration
+databases_replication_enabled: false
+databases_replication_type: "master-slave"  # Options: master-slave, master-master
+databases_replication_sync_mode: "semi-sync"  # Options: async, semi-sync, sync
+
+# Clustering Configuration
+databases_clustering_enabled: false
+databases_cluster_size: 3
+databases_cluster_consistency: "eventual"  # Options: strong, eventual
+
+# Disaster Recovery
+databases_disaster_recovery_enabled: true
+databases_dr_backup_location: "{{ backup_dir }}/databases"
+databases_dr_retention_policy: "30-7-1"  # 30 daily, 7 weekly, 1 monthly
+databases_dr_testing_enabled: true
+databases_dr_testing_schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+
+# Compliance Configuration
+databases_compliance_enabled: false
+databases_compliance_standards:
+  - "GDPR"
+  - "HIPAA"
+  - "SOX"
+  - "PCI-DSS"
+databases_compliance_audit_enabled: true
+databases_compliance_reporting_enabled: true
+
+# PostgreSQL Port Configuration
+postgresql_port: 5432
+
+# PostgreSQL Domain Configuration
+postgresql_subdomain: "postgresql"
+postgresql_domain: "{{ postgresql_subdomain }}.{{ domain }}"
+
+# PostgreSQL Authentication Configuration
+postgresql_auth_enabled: true
+postgresql_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+
+# PostgreSQL Database Configuration
+postgresql_database_host: "{{ postgresql_host | default('postgresql') }}"
+postgresql_database_port: "{{ postgresql_port | default(5432) }}"
+postgresql_database_name: "postgres"
+postgresql_database_user: "postgres"
+postgresql_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+# MariaDB Port Configuration
+mariadb_port: 3306
+
+# MariaDB Domain Configuration
+mariadb_subdomain: "mariadb"
+mariadb_domain: "{{ mariadb_subdomain }}.{{ domain }}"
+
+# MariaDB Authentication Configuration
+mariadb_auth_enabled: true
+mariadb_root_user: "root"
+mariadb_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+
+# MariaDB Database Configuration
+mariadb_database_host: "{{ mariadb_host | default('mariadb') }}"
+mariadb_database_port: "{{ mariadb_port | default(3306) }}"
+mariadb_database_name: "mysql"
+mariadb_database_user: "root"
+mariadb_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+# Redis Port Configuration
+redis_port: 6379
+
+# Redis Domain Configuration
+redis_subdomain: "redis"
+redis_domain: "{{ redis_subdomain }}.{{ domain }}"
+
+# Redis Authentication Configuration
+redis_auth_enabled: true
+redis_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+
+# Elasticsearch Port Configuration
+elasticsearch_port: 9200
+
+# Elasticsearch Domain Configuration
+elasticsearch_subdomain: "elasticsearch"
+elasticsearch_domain: "{{ elasticsearch_subdomain }}.{{ domain }}"
+
+# Elasticsearch Authentication Configuration
+elasticsearch_auth_enabled: true
+elasticsearch_user: "elastic"
+elasticsearch_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+elasticsearch_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+
+# Kibana Port Configuration
+kibana_port: 5601
+
+# Kibana Domain Configuration
+kibana_subdomain: "kibana"
+kibana_domain: "{{ kibana_subdomain }}.{{ domain }}"
+
+# Kibana Authentication Configuration
+kibana_auth_enabled: true
+kibana_user: "kibana"
+kibana_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+
+# Health Check Configuration
+databases_health_check_url: "/health"
+
+# Access Control Configuration
+databases_access_control_enabled: true
+databases_allowed_networks:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+databases_allowed_users: []
+databases_allowed_groups: []
+
+# Encryption Configuration
+databases_encryption_at_rest_enabled: true
+databases_encryption_in_transit_enabled: true
+databases_encryption_algorithm: "AES-256-GCM"
+databases_encryption_key_rotation: 90  # Days
+
+# Audit Configuration
+databases_audit_enabled: true
+databases_audit_log_path: "/var/log/databases/audit.log"
+databases_audit_retention: 365  # Days
+databases_audit_events:
+  - "authentication"
+  - "authorization"
+  - "data_access"
+  - "data_modification"
+  - "configuration_change"
+  - "backup_restore"
+
+# Maintenance Configuration
+databases_maintenance_tasks:
+  - "vacuum"
+  - "analyze"
+  - "reindex"
+  - "optimize"
+  - "cleanup"
+
+# Replication Configuration
+databases_replication_delay: 0  # Seconds
+
+# Clustering Configuration
+databases_cluster_quorum: 2
+
+# Disaster Recovery Configuration
+databases_dr_enabled: true
+databases_dr_type: "backup-restore"  # Options: backup-restore, replication, clustering
+databases_dr_rto: 3600  # Recovery Time Objective in seconds
+databases_dr_rpo: 300   # Recovery Point Objective in seconds
+databases_dr_test_schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM 

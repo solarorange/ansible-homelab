@@ -1,0 +1,102 @@
+---
+# Automation Stack Deployment Validation
+
+- name: Validate Home Assistant deployment
+  ansible.builtin.uri:
+    url: "http://localhost:{{ home_assistant_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: ha_deploy
+  retries: 3
+  delay: 10
+  until: ha_deploy.status == 200
+  when: home_assistant_enabled | default(true)
+
+- name: Validate Zigbee2MQTT deployment
+  ansible.builtin.uri:
+    url: "http://localhost:{{ zigbee2mqtt_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: zigbee_deploy
+  retries: 3
+  delay: 10
+  until: zigbee_deploy.status == 200
+  when: zigbee2mqtt_enabled | default(true)
+
+- name: Validate Node-RED deployment
+  ansible.builtin.uri:
+    url: "http://localhost:{{ node_red_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: nodered_deploy
+  retries: 3
+  delay: 10
+  until: nodered_deploy.status == 200
+  when: node_red_enabled | default(true)
+
+- name: Validate n8n deployment
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: n8n_deploy
+  retries: 3
+  delay: 10
+  until: n8n_deploy.status == 200
+  when: n8n_enabled | default(true)
+
+- name: Validate monitoring integration
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/targets"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: prometheus_targets_check
+  when: automation_monitoring_enabled | default(true)
+
+- name: Assert automation services are in Prometheus targets
+  ansible.builtin.assert:
+    that:
+      - "'homeassistant' in prometheus_targets_check.json.data.activeTargets | map(attribute='labels.job') | list"
+      - "'zigbee2mqtt' in prometheus_targets_check.json.data.activeTargets | map(attribute='labels.job') | list"
+      - "'nodered' in prometheus_targets_check.json.data.activeTargets | map(attribute='labels.job') | list"
+      - "'n8n' in prometheus_targets_check.json.data.activeTargets | map(attribute='labels.job') | list"
+    fail_msg: "One or more automation services are missing from Prometheus targets"
+  when: automation_monitoring_enabled | default(true)
+
+- name: Validate backup configuration
+  ansible.builtin.command: "ls {{ backup_root }}/homeassistant {{ backup_root }}/zigbee2mqtt"
+  register: backup_dirs
+  changed_when: false
+  failed_when: backup_dirs.rc != 0
+  when: automation_backup_enabled | default(true)
+
+- name: Validate security integration
+  ansible.builtin.command: "fail2ban-client status {{ automation_fail2ban_jail }}"
+  register: fail2ban_status
+  changed_when: false
+  failed_when: fail2ban_status.rc != 0
+  when: automation_fail2ban_enabled | default(true)
+
+- name: Validate homepage integration
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/services"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: homepage_services_check
+  when: automation_homepage_enabled | default(true)
+
+- name: Assert all automation services are in Homepage
+  ansible.builtin.assert:
+    that:
+      - "'Home Assistant' in homepage_services_check.json | map(attribute='name') | list"
+      - "'Zigbee2MQTT' in homepage_services_check.json | map(attribute='name') | list"
+      - "'Node-RED' in homepage_services_check.json | map(attribute='name') | list"
+      - "'n8n' in homepage_services_check.json | map(attribute='name') | list"
+    fail_msg: "One or more automation services are missing from Homepage"
+  when: automation_homepage_enabled | default(true) 

@@ -1,0 +1,63 @@
+---
+# Media Processing: Tdarr
+
+- name: Create Tdarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ tdarr_config_dir }}"
+    - "{{ tdarr_data_dir }}"
+    - "{{ tdarr_scripts_dir }}"
+    - "{{ tdarr_logs_dir }}"
+
+- name: Deploy Tdarr configuration file
+  ansible.builtin.template:
+    src: tdarr/config.json.j2
+    dest: "{{ tdarr_config_dir }}/config.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy Tdarr management script
+  ansible.builtin.template:
+    src: tdarr/manage.sh.j2
+    dest: "{{ tdarr_scripts_dir }}/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Tdarr health check script
+  ansible.builtin.template:
+    src: tdarr/healthcheck.sh.j2
+    dest: "{{ tdarr_scripts_dir }}/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Tdarr logrotate configuration
+  ansible.builtin.template:
+    src: tdarr/logrotate.conf.j2
+    dest: "{{ tdarr_config_dir }}/logrotate.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Tdarr log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Tdarr logs"
+    job: "logrotate {{ tdarr_config_dir }}/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Tdarr backup cron job
+  ansible.builtin.cron:
+    name: "Backup Tdarr data"
+    job: "{{ tdarr_scripts_dir }}/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

@@ -1,0 +1,296 @@
+---
+# Fail2Ban and CrowdSec Deployment and Management
+
+# All logic from tasks/fail2ban.yml and tasks/crowdsec.yml is migrated here.
+# Includes: directory creation, config, filters, management, healthcheck, logrotate, cron, validation.
+
+# ... (full migrated content from tasks/fail2ban.yml and tasks/crowdsec.yml) ... 
+
+---
+# Fail2ban Configuration
+- name: Create Fail2ban directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/fail2ban/config"
+    - "{{ docker_dir }}/fail2ban/data"
+    - "{{ docker_dir }}/fail2ban/scripts"
+    - "{{ logs_dir }}/fail2ban"
+
+- name: Create Fail2ban configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/jail.local"
+    content: |
+      [DEFAULT]
+      bantime = 86400
+      findtime = 600
+      maxretry = 5
+      banaction = iptables-allports
+      destemail = {{ admin_email }}
+      sender = fail2ban@{{ domain }}
+      action = %(action_mwl)s
+      loglevel = INFO
+      logtarget = /var/log/fail2ban/fail2ban.log
+      socket = /var/run/fail2ban/fail2ban.sock
+      pidfile = /var/run/fail2ban/fail2ban.pid
+      dbfile = /var/lib/fail2ban/fail2ban.sqlite3
+      dbpurgeage = 86400
+      
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [nginx-http-auth]
+      enabled = true
+      filter = nginx-http-auth
+      port = http,https
+      logpath = /var/log/nginx/error.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [traefik-auth]
+      enabled = true
+      filter = traefik-auth
+      port = http,https
+      logpath = /var/log/traefik/access.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+      
+      [authentik]
+      enabled = true
+      filter = authentik
+      port = http,https
+      logpath = /var/log/authentik/authentik.log
+      maxretry = 3
+      findtime = 300
+      bantime = 3600
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban filter for Traefik
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/filter.d/traefik-auth.conf"
+    content: |
+      [Definition]
+      failregex = ^.*"ClientIP":"<HOST>".*"Status":(401|403).*$
+      ignoreregex =
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban filter for Authentik
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/filter.d/authentik.conf"
+    content: |
+      [Definition]
+      failregex = ^.*"client_ip":"<HOST>".*"status":(401|403).*$
+      ignoreregex =
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Fail2ban management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      function show_help {
+        echo "Fail2ban Management Script"
+        echo "Usage: $0 [command]"
+        echo "Commands:"
+        echo "  status    - Show Fail2ban status"
+        echo "  logs      - Show Fail2ban logs"
+        echo "  restart   - Restart Fail2ban"
+        echo "  unban     - Unban an IP"
+        echo "  help      - Show this help"
+      }
+      case "$1" in
+        status) docker exec fail2ban fail2ban-client status;;
+        logs) docker logs fail2ban --tail 100 -f;;
+        restart) docker restart fail2ban;;
+        unban)
+          if [ -z "$2" ]; then echo "Please specify IP address"; exit 1; fi
+          docker exec fail2ban fail2ban-client unban "$2"
+          ;;
+        help|*) show_help;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Fail2ban health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      if ! docker exec fail2ban fail2ban-client status > /dev/null; then echo "Fail2ban is not responding"; exit 1; fi
+      if ! docker exec fail2ban fail2ban-client ping > /dev/null; then echo "Fail2ban socket is not accessible"; exit 1; fi
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Fail2ban log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/fail2ban/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/fail2ban/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Fail2ban log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Fail2ban logs"
+    job: "logrotate {{ docker_dir }}/fail2ban/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+---
+# CrowdSec Configuration
+- name: Create CrowdSec directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/crowdsec/config"
+    - "{{ docker_dir }}/crowdsec/data"
+    - "{{ docker_dir }}/crowdsec/scripts"
+    - "{{ logs_dir }}/crowdsec"
+
+- name: Create CrowdSec configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/crowdsec/config/config.yaml"
+    content: |
+      common:
+        daemonize: true
+        pid_dir: /var/run/
+        log_media: file
+        log_level: info
+        log_dir: /var/log/crowdsec
+        working_dir: /var/lib/crowdsec/data/
+      api:
+        server:
+          listen_uri: 127.0.0.1:8080
+          profiles_path: /etc/crowdsec/profiles.yaml
+          online_client: 
+            credentials_path: /etc/crowdsec/online_api_credentials.yaml
+      prometheus:
+        enabled: true
+        level: full
+        listen_addr: 127.0.0.1
+        listen_port: 6060
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create CrowdSec acquisition configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/crowdsec/config/acquis.yaml"
+    content: |
+      filenames:
+        - /var/log/auth.log
+        - /var/log/syslog
+        - /var/log/traefik/access.log
+      labels:
+        type: syslog
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create CrowdSec management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/crowdsec/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      function show_help {
+        echo "CrowdSec Management Script"
+        echo "Usage: $0 [command]"
+        echo "Commands:"
+        echo "  status    - Show CrowdSec status"
+        echo "  logs      - Show CrowdSec logs"
+        echo "  restart   - Restart CrowdSec"
+        echo "  update    - Update CrowdSec"
+        echo "  metrics   - Show CrowdSec metrics"
+        echo "  help      - Show this help"
+      }
+      case "$1" in
+        status) docker exec crowdsec cscli status;;
+        logs) docker logs crowdsec --tail 100 -f;;
+        restart) docker restart crowdsec;;
+        update) docker exec crowdsec cscli hub update && docker exec crowdsec cscli hub upgrade;;
+        metrics) curl -s http://localhost:6060/metrics;;
+        help|*) show_help;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create CrowdSec health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/crowdsec/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      if ! docker exec crowdsec cscli status > /dev/null; then echo "CrowdSec is not responding"; exit 1; fi
+      if ! curl -s http://localhost:6060/metrics > /dev/null; then echo "CrowdSec metrics are not accessible"; exit 1; fi
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create CrowdSec log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/crowdsec/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/crowdsec/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add CrowdSec log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate CrowdSec logs"
+    job: "logrotate {{ docker_dir }}/crowdsec/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add CrowdSec update to crontab
+  ansible.builtin.cron:
+    name: "Update CrowdSec"
+    job: "{{ docker_dir }}/crowdsec/scripts/manage.sh update"
+    hour: "*/6"
+    minute: "0"
+    user: "{{ username }}" 

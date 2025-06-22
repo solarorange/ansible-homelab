@@ -1,0 +1,74 @@
+#!/bin/bash
+# Tdarr Management Script
+
+TDARR_CONTAINER="tdarr"
+TDARR_CONFIG_DIR="{{ tdarr_config_dir }}"
+TDARR_DATA_DIR="{{ tdarr_data_dir }}"
+BACKUP_DIR="${TDARR_DATA_DIR}/backups"
+
+show_help() {
+  echo "Tdarr Management Script"
+  echo "Usage: $0 [command] [args]"
+  echo "Commands:"
+  echo "  status    - Show Tdarr status"
+  echo "  logs      - Show Tdarr logs"
+  echo "  restart   - Restart Tdarr"
+  echo "  backup    - Backup Tdarr config and database"
+  echo "  restore   - Restore Tdarr config and database from backup"
+  echo "  help      - Show this help"
+}
+
+backup_data() {
+  mkdir -p "$BACKUP_DIR"
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+  BACKUP_FILE="$BACKUP_DIR/tdarr_backup_$TIMESTAMP.tar.gz"
+  echo "Stopping Tdarr container..."
+  docker stop $TDARR_CONTAINER
+  echo "Backing up $TDARR_CONFIG_DIR and $TDARR_DATA_DIR/database to $BACKUP_FILE..."
+  tar -czf "$BACKUP_FILE" -C "$TDARR_CONFIG_DIR" . -C "$TDARR_DATA_DIR" database
+  echo "Starting Tdarr container..."
+  docker start $TDARR_CONTAINER
+  echo "Backup created: $BACKUP_FILE"
+}
+
+restore_data() {
+  if [ -z "$1" ]; then
+    echo "Please specify backup file"
+    exit 1
+  fi
+  BACKUP_FILE="$1"
+  if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Backup file not found: $BACKUP_FILE"
+    exit 1
+  fi
+  echo "Stopping Tdarr container..."
+  docker stop $TDARR_CONTAINER
+  echo "Restoring $TDARR_CONFIG_DIR and $TDARR_DATA_DIR/database from $BACKUP_FILE..."
+  rm -rf "$TDARR_CONFIG_DIR"/* "$TDARR_DATA_DIR"/database/*
+  tar -xzf "$BACKUP_FILE" -C "$TDARR_CONFIG_DIR"
+  tar -xzf "$BACKUP_FILE" -C "$TDARR_DATA_DIR" database
+  echo "Starting Tdarr container..."
+  docker start $TDARR_CONTAINER
+  echo "Backup restored from: $BACKUP_FILE"
+}
+
+case "$1" in
+  status)
+    docker ps -f name=$TDARR_CONTAINER
+    ;;
+  logs)
+    docker logs $TDARR_CONTAINER --tail 100 -f
+    ;;
+  restart)
+    docker restart $TDARR_CONTAINER
+    ;;
+  backup)
+    backup_data
+    ;;
+  restore)
+    restore_data "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

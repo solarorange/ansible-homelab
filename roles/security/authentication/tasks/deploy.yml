@@ -1,0 +1,352 @@
+---
+# Authentik Deployment and Management
+
+# All logic from tasks/authentik.yml is migrated here.
+# Includes: directory creation, config, backup/restore, management, healthcheck, logrotate, cron, validation, rescue/rollback.
+
+# ... (full migrated content from tasks/authentik.yml) ... 
+
+- name: Create Authentik directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/authentik/config"
+    - "{{ docker_dir }}/authentik/data"
+    - "{{ docker_dir }}/authentik/scripts"
+    - "{{ docker_dir }}/authentik/backup"
+    - "{{ logs_dir }}/authentik"
+  register: dir_creation
+
+- name: Backup existing Authentik configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir }}/authentik/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ docker_dir }}/authentik/config/authentik.yml"
+    - "{{ docker_dir }}/authentik/docker-compose.yml"
+  when: item is file
+  register: config_backup
+
+- name: Create Authentik configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/config/authentik.yml"
+    content: |
+      log_level: info
+      
+      postgresql:
+        host: postgresql
+        port: 5432
+        user: {{ authentic_postgres_user }}
+        password: {{ authentic_postgres_password }}
+        database: authentic
+      
+      redis:
+        host: redis
+        port: 6379
+        password: {{ authentic_redis_password }}
+      
+      outposts:
+        container_image_base: ghcr.io/goauthentik/dev-
+        kubernetes_replicas: 1
+        kubernetes_namespace: authentic
+        kubernetes_ingress_annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      
+      error_reporting:
+        enabled: false
+      
+      avatars:
+        sources:
+          - "initials"
+          - "gravatar"
+          - "disqus"
+          - "github"
+      
+      geoip: /usr/share/GeoIP/GeoLite2-City.mmdb
+      
+      disable_startup_checks: false
+      disable_exceptions: false
+      disable_footer_links: false
+      
+      email:
+        host: smtp.zorg.media
+        port: 587
+        username: {{ smtp_username }}
+        password: {{ smtp_password }}
+        use_tls: true
+        from: authentic@zorg.media
+      
+      ldap:
+        base_dn: dc=zorg,dc=media
+        bind_dn: cn=authentik,dc=zorg,dc=media
+        bind_password: {{ authentic_ldap_password }}
+      
+      security:
+        secret_key: {{ authentic_secret_key }}
+        disable_startup_checks: false
+        disable_footer_links: false
+        disable_exceptions: false
+        disable_startup_checks: false
+        disable_footer_links: false
+        disable_exceptions: false
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: config_creation
+
+- name: Create Authentik backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+      
+      # Authentik Backup Script
+      
+      BACKUP_DIR="{{ docker_dir }}/authentik/backup"
+      DATA_DIR="{{ docker_dir }}/authentik/data"
+      RETENTION_DAYS=30
+      
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+      
+      # Create timestamp for backup
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="$BACKUP_DIR/authentik_backup_$TIMESTAMP.tar.gz"
+      
+      # Stop Authentik services gracefully
+      echo "Stopping Authentik services..."
+      docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml down
+      
+      # Create backup
+      echo "Creating backup..."
+      tar -czf "$BACKUP_FILE" -C "$DATA_DIR" .
+      
+      # Start Authentik services
+      echo "Starting Authentik services..."
+      docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml up -d
+      
+      # Remove old backups
+      echo "Cleaning up old backups..."
+      find "$BACKUP_DIR" -name "authentik_backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+      
+      echo "Backup completed: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: backup_script_creation
+
+- name: Create Authentik restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+      
+      # Authentik Restore Script
+      
+      BACKUP_DIR="{{ docker_dir }}/authentik/backup"
+      DATA_DIR="{{ docker_dir }}/authentik/data"
+      
+      if [ -z "$1" ]; then
+        echo "Usage: $0 <backup_file>"
+        echo "Available backups:"
+        ls -1 "$BACKUP_DIR"/authentik_backup_*.tar.gz 2>/dev/null
+        exit 1
+      fi
+      
+      BACKUP_FILE="$1"
+      
+      if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Backup file not found: $BACKUP_FILE"
+        exit 1
+      fi
+      
+      # Stop Authentik services
+      echo "Stopping Authentik services..."
+      docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml down
+      
+      # Clear existing data
+      echo "Clearing existing data..."
+      rm -rf "$DATA_DIR"/*
+      
+      # Restore backup
+      echo "Restoring backup..."
+      tar -xzf "$BACKUP_FILE" -C "$DATA_DIR"
+      
+      # Fix permissions
+      echo "Fixing permissions..."
+      chown -R {{ username }}:{{ username }} "$DATA_DIR"
+      
+      # Start Authentik services
+      echo "Starting Authentik services..."
+      docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml up -d
+      
+      echo "Restore completed successfully"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: restore_script_creation
+
+- name: Create Authentik management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Authentik Management Script
+      
+      function show_help {
+        echo "Authentik Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Authentik status"
+        echo "  logs      - Show Authentik logs"
+        echo "  restart   - Restart Authentik services"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml ps
+          ;;
+        logs)
+          docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml logs -f
+          ;;
+        restart)
+          docker-compose -f {{ docker_dir }}/authentik/docker-compose.yml restart
+          ;;
+        backup)
+          {{ docker_dir }}/authentik/scripts/backup.sh
+          ;;
+        restore)
+          if [ -z "$2" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          {{ docker_dir }}/authentik/scripts/restore.sh "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: management_script_creation
+
+- name: Create Authentik health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Authentik is responding
+      if ! curl -s https://authentik.{{ domain }}/api/v3/core/health/ > /dev/null; then
+        echo "Authentik is not responding"
+        exit 1
+      fi
+      
+      # Check if we can access the admin interface
+      if ! curl -s -I https://authentik.{{ domain }}/if/admin/ > /dev/null; then
+        echo "Authentik admin interface is not accessible"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: healthcheck_script_creation
+
+- name: Create Authentik log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/authentik/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/authentik/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: logrotate_creation
+
+- name: Add Authentik log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Authentik logs"
+    job: "logrotate {{ docker_dir }}/authentik/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+  register: cron_creation
+
+- name: Verify Authentik configuration
+  ansible.builtin.command: "{{ docker_dir }}/authentik/scripts/healthcheck.sh"
+  register: health_check
+  changed_when: false
+  retries: 3
+  delay: 10
+  until: health_check.rc == 0
+
+rescue:
+  - name: Log Authentik deployment failure
+    ansible.builtin.debug:
+      msg: |
+        Authentik deployment failed:
+        - Directory creation: {{ dir_creation | default('N/A') }}
+        - Config backup: {{ config_backup | default('N/A') }}
+        - Config creation: {{ config_creation | default('N/A') }}
+        - Backup script: {{ backup_script_creation | default('N/A') }}
+        - Restore script: {{ restore_script_creation | default('N/A') }}
+        - Management script: {{ management_script_creation | default('N/A') }}
+        - Healthcheck script: {{ healthcheck_script_creation | default('N/A') }}
+        - Logrotate: {{ logrotate_creation | default('N/A') }}
+        - Cron job: {{ cron_creation | default('N/A') }}
+        - Health check: {{ health_check | default('N/A') }}
+
+  - name: Attempt Authentik recovery
+    ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+    vars:
+      failed_config_files:
+        - "{{ docker_dir }}/authentik/config/authentik.yml"
+        - "{{ docker_dir }}/authentik/docker-compose.yml"
+      config_verification_commands:
+        - "{{ docker_dir }}/authentik/scripts/healthcheck.sh"
+      critical_services:
+        - authentik
+        - postgresql
+        - redis
+
+  - name: Rollback if recovery failed
+    ansible.builtin.include_tasks: handlers/error_handling/rollback.yml
+    when: recovery_complete | default(false) | bool == false
+    vars:
+      affected_services:
+        - authentik
+        - postgresql
+        - redis
+      config_files:
+        - "{{ docker_dir }}/authentik/config/authentik.yml"
+        - "{{ docker_dir }}/authentik/docker-compose.yml"
+
+always:
+  - name: Cleanup temporary files
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop: "{{ temp_dirs | default([]) }}"
+    when: temp_dirs is defined 

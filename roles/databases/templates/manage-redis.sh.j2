@@ -1,0 +1,35 @@
+#!/bin/bash
+# Redis Management Script
+function show_help {
+  echo "Redis Management Script"
+  echo "Usage: $0 [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status    - Show Redis status"
+  echo "  logs      - Show Redis logs"
+  echo "  restart   - Restart Redis"
+  echo "  backup    - Create backup"
+  echo "  restore   - Restore from backup"
+  echo "  help      - Show this help"
+}
+case "$1" in
+  status)
+    docker ps -f name={{ redis_container_name }}
+    docker exec {{ redis_container_name }} redis-cli -a {{ redis_password }} ping
+    ;;
+  logs)
+    docker logs {{ redis_container_name }} --tail 100 -f
+    ;;
+  restart)
+    docker restart {{ redis_container_name }}
+    ;;
+  backup)
+    {{ docker_dir }}/redis/scripts/backup.sh
+    ;;
+  restore)
+    {{ docker_dir }}/redis/scripts/restore.sh "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

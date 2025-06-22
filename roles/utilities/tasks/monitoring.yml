@@ -1,0 +1,73 @@
+---
+# Utilities Stack Monitoring Integration
+
+- name: Configure Prometheus for utilities stack
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ utilities_config_dir }}/prometheus/rules/utilities.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_prometheus_enabled | default(true)
+
+- name: Configure Grafana dashboard for utilities stack
+  ansible.builtin.template:
+    src: grafana-dashboard.json.j2
+    dest: "{{ utilities_config_dir }}/grafana/provisioning/dashboards/utilities.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_grafana_enabled | default(true)
+
+- name: Configure Loki for utilities logs
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ utilities_config_dir }}/loki/conf.d/utilities.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_loki_enabled | default(true)
+
+- name: Configure Alertmanager for utilities alerts
+  ansible.builtin.template:
+    src: alerting.yml.j2
+    dest: "{{ utilities_config_dir }}/alertmanager/conf.d/utilities.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: utilities_alertmanager_enabled | default(true)
+
+- name: Create utilities stack health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ utilities_config_dir }}/health_check_utilities.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Schedule utilities stack health check
+  ansible.builtin.cron:
+    name: "Utilities stack health check"
+    job: "{{ utilities_config_dir }}/health_check_utilities.sh"
+    minute: "*/5"
+    user: "{{ username }}"
+
+- name: Validate Prometheus and Grafana endpoints
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/status/config"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: prometheus_config_test
+  when: utilities_prometheus_enabled | default(true)
+
+- name: Validate Grafana health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: grafana_config_test
+  when: utilities_grafana_enabled | default(true)
+
+  tags: [utilities, monitoring] 

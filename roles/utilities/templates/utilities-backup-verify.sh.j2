@@ -1,0 +1,39 @@
+#!/bin/bash
+# Utilities Stack Backup Verification Script
+
+set -e
+
+LOG_FILE="{{ utilities_backup_dir }}/utilities/verify_$(date +%Y%m%d_%H%M%S).log"
+EXIT_CODE=0
+
+# Helper to verify latest backup tarball
+verify_backup() {
+  SERVICE="$1"
+  DIR="$2"
+  PATTERN="$3"
+  echo "[$SERVICE] Verifying latest backup in $DIR..." | tee -a "$LOG_FILE"
+  LATEST=$(ls -1t "$DIR"/$PATTERN 2>/dev/null | head -n1)
+  if [ -z "$LATEST" ]; then
+    echo "[$SERVICE] No backup found in $DIR" | tee -a "$LOG_FILE"
+    EXIT_CODE=1
+    return
+  fi
+  if tar -tzf "$LATEST" > /dev/null; then
+    echo "[$SERVICE] Backup $LATEST is valid." | tee -a "$LOG_FILE"
+  else
+    echo "[$SERVICE] Backup $LATEST is corrupted!" | tee -a "$LOG_FILE"
+    EXIT_CODE=1
+  fi
+}
+
+verify_backup "Portainer" "{{ portainer_data_dir }}/backups" "portainer_data_*.tar.gz"
+verify_backup "Tdarr" "{{ tdarr_data_dir }}/backups" "tdarr_backup_*.tar.gz"
+verify_backup "Tautulli" "{{ tautulli_data_dir }}/backups" "tautulli_backup_*.tar.gz"
+
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "All utility service backups verified successfully." | tee -a "$LOG_FILE"
+else
+  echo "One or more utility service backups failed verification!" | tee -a "$LOG_FILE"
+fi
+
+exit $EXIT_CODE 

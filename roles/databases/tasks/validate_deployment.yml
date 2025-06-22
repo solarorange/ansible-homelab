@@ -1,0 +1,89 @@
+---
+# Database Stack Deployment Validation
+# Validate the overall health and status of the database stack after deployment
+
+- name: Validate relational databases deployment
+  block:
+    - name: Check PostgreSQL health
+      ansible.builtin.command: "{{ docker_dir }}/postgresql/scripts/healthcheck.sh"
+      register: postgresql_health
+      failed_when: false
+      when: postgresql_enabled | default(true)
+
+    - name: Check MariaDB health
+      ansible.builtin.command: "{{ docker_dir }}/mariadb/scripts/healthcheck.sh"
+      register: mariadb_health
+      failed_when: false
+      when: mariadb_enabled | default(true)
+
+    - name: Verify relational databases health
+      ansible.builtin.assert:
+        that:
+          - postgresql_health.rc == 0 or not postgresql_enabled
+          - mariadb_health.rc == 0 or not mariadb_enabled
+        fail_msg: "Relational database health check failed."
+        success_msg: "Relational databases are healthy."
+
+  tags: [databases, validation, relational]
+
+- name: Validate cache databases deployment
+  block:
+    - name: Check Redis health
+      ansible.builtin.command: "{{ docker_dir }}/redis/scripts/healthcheck.sh"
+      register: redis_health
+      failed_when: false
+      when: redis_enabled | default(true)
+
+    - name: Verify cache databases health
+      ansible.builtin.assert:
+        that:
+          - redis_health.rc == 0 or not redis_enabled
+        fail_msg: "Cache database health check failed."
+        success_msg: "Cache databases are healthy."
+
+  tags: [databases, validation, cache]
+
+- name: Validate search databases deployment
+  block:
+    - name: Check Elasticsearch health
+      ansible.builtin.command: "{{ docker_dir }}/elasticsearch/scripts/healthcheck.sh"
+      register: elasticsearch_health
+      failed_when: false
+      when: elasticsearch_enabled | default(true)
+
+    - name: Check Kibana health
+      ansible.builtin.command: "{{ docker_dir }}/kibana/scripts/healthcheck.sh"
+      register: kibana_health
+      failed_when: false
+      when: kibana_enabled | default(true)
+
+    - name: Verify search databases health
+      ansible.builtin.assert:
+        that:
+          - elasticsearch_health.rc == 0 or not elasticsearch_enabled
+          - kibana_health.rc == 0 or not kibana_enabled
+        fail_msg: "Search database health check failed."
+        success_msg: "Search databases are healthy."
+
+  tags: [databases, validation, search]
+
+- name: Final deployment status summary
+  ansible.builtin.debug:
+    msg: |
+      Database Stack Deployment Completed Successfully!
+      
+      Deployment Status:
+      - Relational Databases (PostgreSQL, MariaDB): Healthy
+      - Cache Databases (Redis): Healthy
+      - Search Databases (Elasticsearch, Kibana): Healthy
+      
+      Integration Status:
+      - Monitoring: {{ 'OK' if databases_monitoring_enabled else 'Disabled' }}
+      - Security: {{ 'OK' if databases_security_enabled else 'Disabled' }}
+      - Backup: {{ 'OK' if databases_backup_enabled else 'Disabled' }}
+      - Homepage: {{ 'OK' if databases_homepage_enabled else 'Disabled' }}
+      - Alerting: {{ 'OK' if databases_alerting_enabled else 'Disabled' }}
+      
+      Access your database services at their respective domains.
+
+  tags: [databases, validation, summary] 
