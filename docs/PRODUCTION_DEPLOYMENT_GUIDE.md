@@ -1,645 +1,456 @@
 # Production Deployment Guide
 
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Prerequisites](#prerequisites)
-3. [Environment Setup](#environment-setup)
-4. [Pre-Deployment Checklist](#pre-deployment-checklist)
-5. [Deployment Procedures](#deployment-procedures)
-6. [Post-Deployment Validation](#post-deployment-validation)
-7. [Monitoring and Alerting](#monitoring-and-alerting)
-8. [Security Hardening](#security-hardening)
-9. [Backup and Recovery](#backup-and-recovery)
-10. [Performance Tuning](#performance-tuning)
-11. [Scaling Strategies](#scaling-strategies)
-12. [Maintenance Procedures](#maintenance-procedures)
-13. [Troubleshooting](#troubleshooting)
-14. [Disaster Recovery](#disaster-recovery)
-
 ## Overview
 
-This guide provides comprehensive procedures for deploying the Ansible homelab infrastructure to production environments. The infrastructure includes:
-
-- **Core Infrastructure**: Security, databases, storage, networking
-- **Monitoring Stack**: Prometheus, Grafana, Loki, AlertManager
-- **Media Services**: Plex, Jellyfin, Sonarr, Radarr, etc.
-- **Automation**: Home automation, scheduling, container management
-- **Utilities**: Dashboards, media processing, backup orchestration
-- **Security**: Authentication, VPN, firewall, DNS protection
+This guide provides step-by-step instructions for deploying the Ansible Homelab in a production environment with enterprise-grade security, monitoring, and reliability.
 
 ## Prerequisites
 
 ### System Requirements
 
-#### Minimum Requirements
-- **CPU**: 4 cores (8+ recommended)
-- **RAM**: 8GB (16GB+ recommended)
-- **Storage**: 100GB SSD + additional storage for media
-- **Network**: 1Gbps connection
-- **OS**: Ubuntu 20.04+ or Debian 11+
+- **Minimum Hardware:**
+  - CPU: 4 cores (2.0 GHz or higher)
+  - RAM: 8GB (16GB recommended)
+  - Storage: 100GB SSD (500GB+ recommended)
+  - Network: Gigabit Ethernet
 
-#### Recommended Requirements
-- **CPU**: 8+ cores
-- **RAM**: 32GB+
-- **Storage**: 500GB+ NVMe SSD + 10TB+ for media
-- **Network**: 2.5Gbps+ connection
-- **OS**: Ubuntu 22.04 LTS
+- **Operating System:**
+  - Ubuntu 20.04 LTS or 22.04 LTS
+  - Debian 11 or 12
+  - CentOS 8+ or Rocky Linux 8+
 
-### Software Prerequisites
+- **Software Requirements:**
+  - Docker 20.10+
+  - Python 3.8+
+  - Ansible 2.9+
+
+### Network Requirements
+
+- Static IP address
+- Port 80 and 443 open (for web services)
+- Port 22 open (for SSH access)
+- DNS control for your domain
+- Cloudflare account (recommended)
+
+## Pre-Deployment Setup
+
+### 1. Environment Configuration
 
 ```bash
-# Install Ansible
-sudo apt update
-sudo apt install -y software-properties-common
-sudo apt-add-repository --yes --update ppa:ansible/ansible
-sudo apt install -y ansible
+# Clone the repository
+git clone <repository-url>
+cd ansible_homelab
+
+# Run environment setup script
+./scripts/setup_environment.sh
+
+# Edit environment variables
+nano .env
+```
+
+**Required Environment Variables:**
+
+```bash
+# Domain Configuration
+HOMELAB_DOMAIN=your-domain.com
+HOMELAB_TIMEZONE=America/New_York
+
+# User Configuration
+HOMELAB_USERNAME=homelab
+HOMELAB_PUID=1000
+HOMELAB_PGID=1000
+HOMELAB_IP_ADDRESS=192.168.40.100
+
+# Cloudflare Configuration (Required for SSL)
+CLOUDFLARE_EMAIL=your-email@domain.com
+CLOUDFLARE_API_KEY=your-cloudflare-api-key
+
+# Email Configuration
+ADMIN_EMAIL=admin@your-domain.com
+MONITORING_EMAIL=monitoring@your-domain.com
+
+# SMTP Configuration (Optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
+# Ansible Environment
+ANSIBLE_ENVIRONMENT=production
+```
+
+### 2. DNS Configuration
+
+Configure DNS records in Cloudflare or your DNS provider:
+
+```
+Type    Name                    Value
+A       @                       YOUR_SERVER_IP
+A       traefik                 YOUR_SERVER_IP
+A       auth                    YOUR_SERVER_IP
+A       dns                     YOUR_SERVER_IP
+A       grafana                 YOUR_SERVER_IP
+A       portainer               YOUR_SERVER_IP
+A       plex                    YOUR_SERVER_IP
+A       sonarr                  YOUR_SERVER_IP
+A       radarr                  YOUR_SERVER_IP
+A       dash                    YOUR_SERVER_IP
+```
+
+### 3. SSH Key Setup
+
+```bash
+# Generate SSH key (if not already done)
+ssh-keygen -t ed25519 -f ~/.ssh/homelab_key -N "" -C "homelab@your-domain.com"
+
+# Copy public key to target server
+ssh-copy-id -i ~/.ssh/homelab_key.pub homelab@YOUR_SERVER_IP
+
+# Test SSH connection
+ssh -i ~/.ssh/homelab_key homelab@YOUR_SERVER_IP
+```
+
+### 4. Target Server Preparation
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
 
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
+
+# Add user to docker group
 sudo usermod -aG docker $USER
 
-# Install Python dependencies
-sudo apt install -y python3-pip python3-venv
-pip3 install docker-compose
+# Install Python and pip
+sudo apt install -y python3 python3-pip python3-venv
 
-# Install monitoring tools
-sudo apt install -y htop iotop nethogs
+# Install required packages
+sudo apt install -y ufw fail2ban htop iotop nethogs
 ```
 
-### Network Requirements
+## Deployment Process
 
-- **Static IP**: Configure static IP for the server
-- **Port Forwarding**: Configure router for required ports
-- **DNS**: Set up domain name and DNS records
-- **SSL Certificates**: Obtain SSL certificates for services
-- **Firewall**: Configure firewall rules
-
-## Environment Setup
-
-### Environment Configuration
-
-Create environment-specific configuration files:
-
-```yaml
-# group_vars/all/environments/production.yml
-environment: production
-deployment_mode: production
-
-# Resource limits for production
-resource_limits:
-  max_concurrent_containers: 20
-  max_concurrent_backups: 3
-  cpu_threshold: 80
-  memory_threshold: 85
-
-# Production security settings
-security_hardening:
-  enabled: true
-  compliance_frameworks:
-    - cis_docker_benchmark
-    - nist_cybersecurity_framework
-
-# Production monitoring
-monitoring:
-  retention_days: 90
-  alerting_enabled: true
-  auto_scaling: true
-
-# Production backup strategy
-backup_strategies:
-  incremental:
-    enabled: true
-    retention_days: 365
-    encryption: true
-    compression: true
-```
-
-### Inventory Configuration
-
-```yaml
-# inventory/production.yml
-all:
-  children:
-    production:
-      hosts:
-        homelab-prod-01:
-          ansible_host: 192.168.1.100
-          ansible_user: ansible
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa
-          environment: production
-          datacenter: primary
-          role: main_server
-          
-        homelab-prod-02:
-          ansible_host: 192.168.1.101
-          ansible_user: ansible
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa
-          environment: production
-          datacenter: primary
-          role: backup_server
-      
-      vars:
-        ansible_python_interpreter: /usr/bin/python3
-        deployment_environment: production
-```
-
-## Pre-Deployment Checklist
-
-### System Preparation
-
-- [ ] Update system packages
-- [ ] Configure static IP address
-- [ ] Set up SSH key authentication
-- [ ] Configure firewall rules
-- [ ] Install required software
-- [ ] Configure DNS resolution
-- [ ] Set up SSL certificates
-- [ ] Configure backup storage
-- [ ] Test network connectivity
-- [ ] Verify disk space
-
-### Security Preparation
-
-- [ ] Review security policies
-- [ ] Configure user accounts
-- [ ] Set up monitoring access
-- [ ] Configure audit logging
-- [ ] Test security controls
-- [ ] Verify compliance requirements
-
-### Network Preparation
-
-- [ ] Configure port forwarding
-- [ ] Set up reverse proxy
-- [ ] Configure load balancer
-- [ ] Test external connectivity
-- [ ] Verify SSL certificates
-- [ ] Configure DNS records
-
-## Deployment Procedures
-
-### 1. Initial Deployment
+### Phase 1: Validation
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-repo/ansible_homelab.git
-cd ansible_homelab
+# Test connectivity
+ansible all -m ping
 
-# Create production inventory
-cp inventory.yml inventory/production.yml
-# Edit inventory/production.yml with your production hosts
+# Run pre-flight validation
+ansible-playbook site.yml --tags validation
 
-# Set environment variables
-export ANSIBLE_ENVIRONMENT=production
-export ANSIBLE_INVENTORY=inventory/production.yml
-
-# Run pre-flight checks
-ansible-playbook -i inventory/production.yml tasks/pre_tasks.yml --tags validation
-
-# Deploy core infrastructure
-ansible-playbook -i inventory/production.yml site.yml --tags infrastructure
-
-# Deploy monitoring stack
-ansible-playbook -i inventory/production.yml site.yml --tags monitoring
-
-# Deploy services
-ansible-playbook -i inventory/production.yml site.yml --tags services
-
-# Apply security hardening
-ansible-playbook -i inventory/production.yml site.yml --tags security,hardening
+# Check system requirements
+ansible-playbook tests/integration/test_deployment.yml --tags preflight
 ```
 
-### 2. Staged Deployment
-
-For large deployments, use staged approach:
+### Phase 2: Infrastructure Deployment
 
 ```bash
-# Stage 1: Core infrastructure
-ansible-playbook -i inventory/production.yml site.yml \
-  --tags "security,databases,storage" \
-  --limit homelab-prod-01
+# Deploy security infrastructure
+ansible-playbook site.yml --tags stage1
 
-# Stage 2: Monitoring and logging
-ansible-playbook -i inventory/production.yml site.yml \
-  --tags "logging,certificate_management" \
-  --limit homelab-prod-01
-
-# Stage 3: Media services
-ansible-playbook -i inventory/production.yml site.yml \
-  --tags "media" \
-  --limit homelab-prod-01
-
-# Stage 4: Automation and utilities
-ansible-playbook -i inventory/production.yml site.yml \
-  --tags "automation,utilities" \
-  --limit homelab-prod-01
-
-# Stage 5: Validation and optimization
-ansible-playbook -i inventory/production.yml site.yml \
-  --tags "validation,optimization" \
-  --limit homelab-prod-01
+# Verify security services
+ansible-playbook tests/integration/test_deployment.yml --tags security
 ```
 
-### 3. Blue-Green Deployment
-
-For zero-downtime deployments:
+### Phase 3: Core Services
 
 ```bash
-# Deploy to green environment
-ansible-playbook -i inventory/production.yml site.yml \
-  --limit homelab-prod-02 \
-  --extra-vars "deployment_color=green"
+# Deploy databases and storage
+ansible-playbook site.yml --tags stage2
 
-# Validate green environment
-ansible-playbook -i inventory/production.yml tasks/validate.yml \
-  --limit homelab-prod-02
-
-# Switch traffic to green
-ansible-playbook -i inventory/production.yml tasks/switch_traffic.yml \
-  --extra-vars "active_environment=green"
-
-# Deploy to blue environment (now inactive)
-ansible-playbook -i inventory/production.yml site.yml \
-  --limit homelab-prod-01 \
-  --extra-vars "deployment_color=blue"
+# Verify core services
+ansible-playbook tests/integration/test_deployment.yml --tags databases,monitoring
 ```
 
-## Post-Deployment Validation
-
-### Service Validation
+### Phase 4: Applications
 
 ```bash
-# Run comprehensive validation
-ansible-playbook -i inventory/production.yml tasks/validate.yml
+# Deploy media and utility services
+ansible-playbook site.yml --tags stage3
 
-# Check service health
-ansible-playbook -i inventory/production.yml tasks/advanced_health_monitoring.yml
-
-# Verify monitoring
-ansible-playbook -i inventory/production.yml tasks/monitor_performance.yml
-
-# Test backup procedures
-ansible-playbook -i inventory/production.yml tasks/verify_backups.yml
+# Verify all services
+ansible-playbook tests/integration/test_deployment.yml --tags media,utilities
 ```
 
-### Performance Validation
+### Phase 5: Final Validation
 
 ```bash
-# Run performance tests
-ansible-playbook -i inventory/production.yml tests/automated/test_runner.yml
+# Run comprehensive tests
+ansible-playbook tests/integration/test_deployment.yml
 
-# Check resource utilization
-ansible-playbook -i inventory/production.yml tasks/monitor_performance.yml
-
-# Validate security compliance
-ansible-playbook -i inventory/production.yml tasks/advanced_security_hardening.yml
+# Generate deployment report
+ansible-playbook site.yml --tags stage4
 ```
+
+## Post-Deployment Configuration
+
+### 1. SSL Certificate Verification
+
+```bash
+# Check certificate status
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
+
+# Verify certificate chain
+openssl s_client -connect your-domain.com:443 -servername your-domain.com -showcerts
+```
+
+### 2. Security Hardening
+
+```bash
+# Review firewall rules
+sudo ufw status verbose
+
+# Check fail2ban status
+sudo fail2ban-client status
+
+# Verify SSH configuration
+sudo sshd -T | grep -E "permitrootlogin|passwordauthentication"
+```
+
+### 3. Monitoring Setup
+
+```bash
+# Access monitoring dashboards
+# Grafana: https://grafana.your-domain.com
+# Prometheus: https://prometheus.your-domain.com
+# AlertManager: https://alerts.your-domain.com
+
+# Configure alerting channels
+# Edit: group_vars/all/vault.yml
+# Add: Slack, Discord, Telegram, or email webhooks
+```
+
+### 4. Backup Configuration
+
+```bash
+# Test backup functionality
+sudo /opt/backups/backup.sh --test
+
+# Schedule automated backups
+sudo crontab -e
+# Add: 0 2 * * * /opt/backups/backup.sh
+
+# Verify backup retention
+ls -la /opt/backups/
+```
+
+## Security Best Practices
+
+### 1. Access Control
+
+- Use SSH keys only (disable password authentication)
+- Restrict SSH access to specific IP addresses
+- Use VPN for remote access
+- Implement two-factor authentication where possible
+
+### 2. Network Security
+
+- Configure firewall rules properly
+- Use VLANs for network segmentation
+- Monitor network traffic
+- Implement intrusion detection
+
+### 3. Application Security
+
+- Keep all services updated
+- Use strong passwords and API keys
+- Implement rate limiting
+- Monitor application logs
+
+### 4. Data Protection
+
+- Encrypt sensitive data at rest
+- Use secure communication protocols
+- Implement backup encryption
+- Regular security audits
 
 ## Monitoring and Alerting
 
-### Monitoring Stack Configuration
-
-The monitoring stack includes:
-
-- **Prometheus**: Metrics collection and storage
-- **Grafana**: Visualization and dashboards
-- **Loki**: Log aggregation
-- **AlertManager**: Alert routing and notification
-
-### Alert Configuration
-
-```yaml
-# group_vars/all/monitoring/alerts.yml
-alerting:
-  enabled: true
-  
-  # Critical alerts
-  critical:
-    - service_down
-    - disk_space_critical
-    - memory_critical
-    - backup_failure
-    - security_violation
-  
-  # Warning alerts
-  warning:
-    - high_cpu_usage
-    - high_memory_usage
-    - disk_space_warning
-    - service_degraded
-  
-  # Notification channels
-  notifications:
-    email:
-      enabled: true
-      recipients:
-        - admin@yourdomain.com
-    slack:
-      enabled: true
-      webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK') }}"
-    pagerduty:
-      enabled: true
-      api_key: "{{ lookup('env', 'PAGERDUTY_API_KEY') }}"
-```
-
-### Dashboard Configuration
-
-```yaml
-# group_vars/all/monitoring/dashboards.yml
-dashboards:
-  - name: "Homelab Overview"
-    description: "Main dashboard for homelab services"
-    panels:
-      - system_metrics
-      - service_status
-      - resource_utilization
-      - network_traffic
-  
-  - name: "Security Dashboard"
-    description: "Security monitoring and compliance"
-    panels:
-      - security_events
-      - compliance_status
-      - firewall_logs
-      - authentication_events
-```
-
-## Security Hardening
-
-### System Hardening
+### 1. Service Monitoring
 
 ```bash
-# Apply security hardening
-ansible-playbook -i inventory/production.yml tasks/advanced_security_hardening.yml
+# Check service status
+docker ps
 
-# Configure firewall
-ansible-playbook -i inventory/production.yml roles/security/tasks/firewall.yml
+# View service logs
+docker logs <container-name>
 
-# Set up authentication
-ansible-playbook -i inventory/production.yml roles/security/tasks/authentication.yml
-
-# Configure VPN
-ansible-playbook -i inventory/production.yml roles/security/tasks/vpn.yml
+# Monitor resource usage
+docker stats
 ```
 
-### Compliance Configuration
-
-```yaml
-# group_vars/all/security/compliance.yml
-compliance:
-  enabled: true
-  
-  frameworks:
-    cis_docker_benchmark:
-      enabled: true
-      scan_schedule: "weekly"
-    
-    nist_cybersecurity_framework:
-      enabled: true
-      controls:
-        - identify
-        - protect
-        - detect
-        - respond
-        - recover
-    
-    gdpr_compliance:
-      enabled: true
-      data_retention: 365
-      encryption: true
-```
-
-## Backup and Recovery
-
-### Backup Configuration
-
-```yaml
-# group_vars/all/backup/strategy.yml
-backup_strategies:
-  incremental:
-    enabled: true
-    schedule: "0 2 * * *"  # Daily at 2 AM
-    retention_days: 365
-    compression: true
-    encryption: true
-    
-  full_backup:
-    schedule: "0 2 * * 0"  # Weekly on Sunday
-    retention_weeks: 52
-    
-  disaster_recovery:
-    enabled: true
-    replication: true
-    offsite_backup: true
-```
-
-### Recovery Procedures
+### 2. System Monitoring
 
 ```bash
-# Test backup restoration
-ansible-playbook -i inventory/production.yml tasks/verify_backups.yml
+# Check system resources
+htop
+iotop
+nethogs
 
-# Perform disaster recovery test
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery_test.yml
+# Monitor disk usage
+df -h
+du -sh /opt/docker/*
 
-# Restore from backup (if needed)
-ansible-playbook -i inventory/production.yml tasks/restore_from_backup.yml \
-  --extra-vars "backup_date=2024-01-15"
+# Check network connectivity
+ping -c 4 8.8.8.8
 ```
 
-## Performance Tuning
+### 3. Alert Configuration
 
-### System Optimization
-
-```yaml
-# group_vars/all/performance/tuning.yml
-performance_tuning:
-  system:
-    kernel_parameters:
-      vm.swappiness: 10
-      vm.dirty_ratio: 15
-      vm.dirty_background_ratio: 5
-    
-    io_scheduler: "deadline"
-    cpu_governor: "performance"
-    
-  docker:
-    storage_driver: "overlay2"
-    log_driver: "json-file"
-    log_max_size: "10m"
-    log_max_files: 3
-```
-
-### Resource Optimization
-
-```bash
-# Apply performance tuning
-ansible-playbook -i inventory/production.yml tasks/performance_tuning.yml
-
-# Monitor performance
-ansible-playbook -i inventory/production.yml tasks/monitor_performance.yml
-
-# Optimize based on metrics
-ansible-playbook -i inventory/production.yml tasks/optimize_resources.yml
-```
-
-## Scaling Strategies
-
-### Horizontal Scaling
-
-```yaml
-# inventory/scaled_production.yml
-all:
-  children:
-    production:
-      hosts:
-        homelab-prod-01:
-          role: main_server
-          services: [databases, monitoring, core_services]
-          
-        homelab-prod-02:
-          role: media_server
-          services: [media_services, processing]
-          
-        homelab-prod-03:
-          role: backup_server
-          services: [backup, archive]
-          
-        homelab-prod-04:
-          role: load_balancer
-          services: [nginx, haproxy]
-```
-
-### Vertical Scaling
-
-```yaml
-# group_vars/all/scaling/vertical.yml
-vertical_scaling:
-  enabled: true
-  
-  resource_upgrades:
-    memory:
-      threshold: 85
-      increment: "4G"
-      max_memory: "64G"
-    
-    cpu:
-      threshold: 80
-      increment: 2
-      max_cores: 16
-    
-    storage:
-      threshold: 80
-      increment: "100G"
-      max_storage: "10T"
-```
-
-## Maintenance Procedures
-
-### Regular Maintenance
-
-```bash
-# Weekly maintenance
-ansible-playbook -i inventory/production.yml tasks/maintenance/weekly.yml
-
-# Monthly maintenance
-ansible-playbook -i inventory/production.yml tasks/maintenance/monthly.yml
-
-# Quarterly maintenance
-ansible-playbook -i inventory/production.yml tasks/maintenance/quarterly.yml
-```
-
-### Update Procedures
-
-```bash
-# Update system packages
-ansible-playbook -i inventory/production.yml tasks/update_system.yml
-
-# Update Docker images
-ansible-playbook -i inventory/production.yml tasks/update_containers.yml
-
-# Update Ansible roles
-ansible-galaxy install -r requirements.yml --force
-```
+Configure alerts for:
+- High CPU/Memory usage (>80%)
+- High disk usage (>85%)
+- Service failures
+- Security events
+- Backup failures
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Service Failures**
+1. **SSL Certificate Issues**
    ```bash
-   # Check service status
-   ansible-playbook -i inventory/production.yml tasks/troubleshoot_services.yml
+   # Check certificate status
+   docker logs traefik
    
-   # View logs
-   ansible-playbook -i inventory/production.yml tasks/view_logs.yml
+   # Verify DNS configuration
+   nslookup your-domain.com
+   
+   # Test certificate renewal
+   docker exec traefik traefik version
    ```
 
-2. **Performance Issues**
+2. **Service Startup Failures**
    ```bash
-   # Analyze performance
-   ansible-playbook -i inventory/production.yml tasks/analyze_performance.yml
+   # Check service logs
+   docker logs <service-name>
    
-   # Optimize resources
-   ansible-playbook -i inventory/production.yml tasks/optimize_resources.yml
+   # Verify dependencies
+   docker-compose ps
+   
+   # Check resource constraints
+   docker stats
    ```
 
-3. **Security Issues**
+3. **Network Connectivity Issues**
    ```bash
-   # Security audit
-   ansible-playbook -i inventory/production.yml tasks/security_audit.yml
+   # Test internal connectivity
+   docker exec <container> ping <target>
    
-   # Compliance check
-   ansible-playbook -i inventory/production.yml tasks/compliance_check.yml
+   # Check firewall rules
+   sudo ufw status
+   
+   # Verify DNS resolution
+   docker exec <container> nslookup google.com
    ```
-
-### Diagnostic Tools
-
-```bash
-# Run diagnostics
-ansible-playbook -i inventory/production.yml tasks/diagnostics.yml
-
-# Generate health report
-ansible-playbook -i inventory/production.yml tasks/health_report.yml
-
-# Export logs for analysis
-ansible-playbook -i inventory/production.yml tasks/export_logs.yml
-```
-
-## Disaster Recovery
 
 ### Recovery Procedures
 
+1. **Service Recovery**
+   ```bash
+   # Restart failed service
+   docker-compose restart <service>
+   
+   # Check service health
+   docker-compose ps
+   ```
+
+2. **System Recovery**
+   ```bash
+   # Restore from backup
+   sudo /opt/backups/restore.sh --service <service-name>
+   
+   # Rollback deployment
+   ansible-playbook rollback.yml
+   ```
+
+3. **Emergency Procedures**
+   ```bash
+   # Stop all services
+   docker-compose down
+   
+   # Emergency maintenance mode
+   ansible-playbook site.yml --tags maintenance
+   ```
+
+## Maintenance
+
+### Regular Maintenance Tasks
+
+1. **Weekly**
+   - Review system logs
+   - Check backup status
+   - Update security packages
+   - Monitor resource usage
+
+2. **Monthly**
+   - Review security configurations
+   - Update application containers
+   - Test disaster recovery procedures
+   - Review monitoring alerts
+
+3. **Quarterly**
+   - Security audit
+   - Performance optimization
+   - Capacity planning
+   - Documentation updates
+
+### Update Procedures
+
 ```bash
-# Full system recovery
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery/full_recovery.yml
+# Update containers
+docker-compose pull
+docker-compose up -d
 
-# Service-specific recovery
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery/service_recovery.yml
+# Update system packages
+sudo apt update && sudo apt upgrade
 
-# Data recovery
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery/data_recovery.yml
+# Update Ansible playbooks
+git pull origin main
+ansible-playbook site.yml --tags update
 ```
 
-### Recovery Testing
+## Support and Resources
 
-```bash
-# Test recovery procedures
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery/test_recovery.yml
-
-# Validate recovery
-ansible-playbook -i inventory/production.yml tasks/disaster_recovery/validate_recovery.yml
-```
-
-## Conclusion
-
-This production deployment guide provides comprehensive procedures for deploying and maintaining your Ansible homelab infrastructure in production environments. Follow these procedures carefully and always test in staging environments before deploying to production.
-
-For additional information, refer to:
-- [Advanced Best Practices](ADVANCED_BEST_PRACTICES.md)
+### Documentation
 - [Troubleshooting Guide](TROUBLESHOOTING.md)
-- [Security Guide](SECURITY.md)
-- [Monitoring Guide](MONITORING.md)
-- [Maintenance Guide](MAINTENANCE.md) 
+- [Security Guide](docs/SECURITY.md)
+- [Monitoring Guide](docs/MONITORING.md)
+- [Backup Guide](docs/BACKUP_ORCHESTRATION.md)
+
+### Community Support
+- GitHub Issues
+- Discord Community
+- Reddit r/homelab
+
+### Professional Support
+- Email: support@your-domain.com
+- Phone: +1-XXX-XXX-XXXX
+- Emergency: +1-XXX-XXX-XXXX
+
+## Compliance and Auditing
+
+### Security Compliance
+- Regular vulnerability scans
+- Penetration testing
+- Security policy enforcement
+- Incident response procedures
+
+### Audit Logging
+- System access logs
+- Application activity logs
+- Security event logs
+- Change management logs
+
+### Data Protection
+- GDPR compliance (if applicable)
+- Data retention policies
+- Privacy protection measures
+- Regular compliance audits
+
+---
+
+**Note:** This guide assumes a production environment with proper security measures. Always test in a staging environment before deploying to production. 

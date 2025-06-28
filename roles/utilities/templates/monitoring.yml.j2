@@ -1,28 +1,27 @@
 # Utilities Stack Monitoring Rules (Prometheus/Loki)
-# Placeholder template
 
 # Prometheus scrape configs for utility services
 scrape_configs:
   - job_name: 'portainer'
     metrics_path: /api/status
     static_configs:
-      - targets: ['localhost:{{ portainer_port }}']
+      - targets: ['localhost:{{ portainer_port | default(9000) }}']
 
   - job_name: 'tdarr'
     metrics_path: /api/v2/status
     static_configs:
-      - targets: ['localhost:{{ tdarr_port }}']
+      - targets: ['localhost:{{ tdarr_port | default(8265) }}']
 
   - job_name: 'tautulli'
     metrics_path: /api/v2?cmd=get_server_info
     static_configs:
-      - targets: ['localhost:{{ tautulli_port }}']
+      - targets: ['localhost:{{ tautulli_port | default(8181) }}']
 
 # Alert rules
 rule_files:
   - 'alert.rules.yml'
 
-# Example alert.rules.yml content:
+# Alert rule groups
 groups:
   - name: utilities-alerts
     rules:
@@ -33,7 +32,7 @@ groups:
           severity: critical
         annotations:
           summary: "Portainer is down"
-          description: "Portainer API is not responding on port {{ portainer_port }}."
+          description: "Portainer API is not responding on port {{ portainer_port | default(9000) }}."
 
       - alert: TdarrDown
         expr: up{job="tdarr"} == 0
@@ -42,7 +41,7 @@ groups:
           severity: critical
         annotations:
           summary: "Tdarr is down"
-          description: "Tdarr API is not responding on port {{ tdarr_port }}."
+          description: "Tdarr API is not responding on port {{ tdarr_port | default(8265) }}."
 
       - alert: TautulliDown
         expr: up{job="tautulli"} == 0
@@ -51,14 +50,13 @@ groups:
           severity: critical
         annotations:
           summary: "Tautulli is down"
-          description: "Tautulli API is not responding on port {{ tautulli_port }}."
+          description: "Tautulli API is not responding on port {{ tautulli_port | default(8181) }}."
 
-# Example alert rule
-- alert: UtilitiesServiceDown
-  expr: up{job="utilities"} == 0
-  for: 5m
-  labels:
-    severity: critical
-  annotations:
-    summary: "Utility service is down"
-    description: "A utility service has not been running for 5 minutes." 
+      - alert: UtilitiesServiceDown
+        expr: up{job="utilities"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Utility service is down"
+          description: "A utility service has not been running for 5 minutes." 

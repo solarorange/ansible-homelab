@@ -1,0 +1,1021 @@
+[
+  {
+    "name": "High CPU Usage",
+    "message": "CPU usage is above 80% for more than 5 minutes",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            80
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Memory Usage",
+    "message": "Memory usage is above 85% for more than 5 minutes",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            85
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Disk Usage",
+    "message": "Disk usage is above 90%",
+    "frequency": "5m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            90
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Service Down",
+    "message": "Service {{ $labels.service }} is down",
+    "frequency": "30s",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            1
+          ]
+        }
+      }
+    ],
+    "for": "2m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Network Traffic",
+    "message": "Network traffic is unusually high",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            1000000000
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Database Connection Issues",
+    "message": "Database connection pool is nearly exhausted",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            80
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "SSL Certificate Expiring Soon",
+    "message": "SSL certificate for {{ $labels.domain }} expires in less than 30 days",
+    "frequency": "1h",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1h",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            2592000
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Backup Failed",
+    "message": "Backup job {{ $labels.job }} failed",
+    "frequency": "1h",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1h",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            1
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Security Event Detected",
+    "message": "Security event detected: {{ $labels.event_type }}",
+    "frequency": "30s",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            0
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Authentication Failure",
+    "message": "Multiple authentication failures detected",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "sum",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            10
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Container Restart",
+    "message": "Container {{ $labels.container }} has restarted multiple times",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "10m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "sum",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            3
+          ]
+        }
+      }
+    ],
+    "for": "10m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Response Time",
+    "message": "Service {{ $labels.service }} response time is above 2 seconds",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            2
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Low Disk Space",
+    "message": "Disk space is critically low on {{ $labels.mountpoint }}",
+    "frequency": "5m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            1073741824
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Error Rate",
+    "message": "Error rate is above 5% for service {{ $labels.service }}",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            5
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Temperature Warning",
+    "message": "System temperature is above 70°C",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            70
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Fan Failure",
+    "message": "Fan speed is below threshold",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            1000
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Power Supply Issue",
+    "message": "Power supply voltage is outside normal range",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            11.5
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "UPS Battery Low",
+    "message": "UPS battery level is below 20%",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            20
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Network Interface Down",
+    "message": "Network interface {{ $labels.interface }} is down",
+    "frequency": "30s",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "lt",
+          "params": [
+            1
+          ]
+        }
+      }
+    ],
+    "for": "2m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "DNS Resolution Failure",
+    "message": "DNS resolution is failing",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            0
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "High Load Average",
+    "message": "System load average is above 5",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            5
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Process Count High",
+    "message": "Number of processes is unusually high",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            1000
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Swap Usage High",
+    "message": "Swap usage is above 50%",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            50
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "File Descriptor Limit",
+    "message": "File descriptor usage is above 80%",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            80
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Inode Usage High",
+    "message": "Inode usage is above 90%",
+    "frequency": "5m",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            90
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Zombie Processes",
+    "message": "Zombie processes detected",
+    "frequency": "1m",
+    "handler": 1,
+    "severity": "warning",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "5m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "avg",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            0
+          ]
+        }
+      }
+    ],
+    "for": "5m",
+    "notifications": [
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "Kernel Panic",
+    "message": "Kernel panic detected",
+    "frequency": "30s",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            0
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  },
+  {
+    "name": "OOM Killer",
+    "message": "Out of memory killer was triggered",
+    "frequency": "30s",
+    "handler": 1,
+    "severity": "critical",
+    "conditions": [
+      {
+        "type": "query",
+        "query": {
+          "params": [
+            "A",
+            "1m",
+            "now"
+          ]
+        },
+        "reducer": {
+          "type": "last",
+          "params": []
+        },
+        "evaluator": {
+          "type": "gt",
+          "params": [
+            0
+          ]
+        }
+      }
+    ],
+    "for": "0s",
+    "notifications": [
+      {
+        "uid": "discord-critical"
+      },
+      {
+        "uid": "email-admin"
+      }
+    ]
+  }
+] 

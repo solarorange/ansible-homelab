@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""
+Authentik Application Provisioning Script
+Handles automated application creation and configuration
+"""
+
+import os
+import sys
+import json
+import yaml
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('{{ logs_dir }}/security/authentik/application_provisioning.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class ApplicationConfig:
+    """Application configuration structure"""
+    name: str
+    slug: str
+    provider: str
+    launch_url: str
+    redirect_uris: List[str]
+    client_type: str
+    authorization_flow: str
+    property_mappings: List[str]
+    scopes: List[str]
+    enabled: bool
+
+class ApplicationProvisioner:
+    """Authentik application provisioning automation"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.authentik_url = "http://localhost:{{ authentik_port }}"
+        self.admin_user = "{{ authentik_admin_user | default('admin') }}"
+        self.admin_password = "{{ authentik_admin_password | default('changeme') }}"
+        self.api_token = "{{ authentik_api_token | default('') }}"
+        self.session = self.create_session()
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def create_session(self) -> requests.Session:
+        """Create requests session with authentication"""
+        session = requests.Session()
+        session.verify = False
+        session.timeout = 30
+        
+        if self.api_token:
+            session.headers.update({
+                'Authorization': f'Bearer {self.api_token}',
+                'Content-Type': 'application/json'
+            })
+        else:
+            session.auth = (self.admin_user, self.admin_password)
+            session.headers.update({'Content-Type': 'application/json'})
+        
+        return session
+    
+    def test_connection(self) -> bool:
+        """Test Authentik API connection"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/applications/")
+            if response.status_code in [200, 302, 401]:
+                logger.info("Authentik API connection successful")
+                return True
+            else:
+                logger.error(f"Authentik API connection failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error connecting to Authentik API: {e}")
+            return False
+    
+    def get_property_mappings(self) -> Dict[str, str]:
+        """Get property mappings from Authentik"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/propertymappings/oauth2/")
+            if response.status_code == 200:
+                mappings = response.json()['results']
+                return {mapping['name']: mapping['pk'] for mapping in mappings}
+            else:
+                logger.error(f"Failed to get property mappings: {response.status_code}")
+                return {}
+        except Exception as e:
+            logger.error(f"Error getting property mappings: {e}")
+            return {}
+    
+    def get_authorization_flows(self) -> Dict[str, str]:
+        """Get authorization flows from Authentik"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/flows/instances/")
+            if response.status_code == 200:
+                flows = response.json()['results']
+                return {flow['title']: flow['pk'] for flow in flows}
+            else:
+                logger.error(f"Failed to get authorization flows: {response.status_code}")
+                return {}
+        except Exception as e:
+            logger.error(f"Error getting authorization flows: {e}")
+            return {}
+    
+    def create_oauth2_provider(self, app_config: Dict[str, Any]) -> bool:
+        """Create OAuth2 provider for application"""
+        try:
+            # Get property mappings
+            property_mappings = self.get_property_mappings()
+            default_mapping = property_mappings.get("authentik default OAuth2/OpenID Mapping")
+            
+            # Get authorization flows
+            auth_flows = self.get_authorization_flows()
+            default_flow = auth_flows.get("default-provider-authorization-implicit-consent")
+            
+            # Create provider data
+            provider_data = {
+                'name': app_config['name'],
+                'authorization_flow': default_flow,
+                'property_mappings': [default_mapping] if default_mapping else [],
+                'client_type': app_config.get('client_type', 'confidential'),
+                'client_id': app_config.get('client_id', ''),
+                'client_secret': app_config.get('client_secret', ''),
+                'redirect_uris': app_config.get('redirect_uris', []),
+                'scopes': app_config.get('scopes', ['openid', 'profile', 'email']),
+                'include_in_authorization_code': True,
+                'include_in_implicit': True,
+                'include_in_client_credentials': False,
+                'include_in_refresh_token': True,
+                'signing_key': None,
+                'sub_mode': 'user_username',
+                'issuer_mode': 'per_provider',
+                'jwks_sources': [],
+                'subject_mode': 'user_username'
+            }
+            
+            # Create provider
+            response = self.session.post(
+                f"{self.authentik_url}/api/v3/providers/oauth2/",
+                json=provider_data
+            )
+            
+            if response.status_code == 201:
+                provider = response.json()
+                logger.info(f"Created OAuth2 provider: {app_config['name']}")
+                return provider['pk']
+            elif response.status_code == 400:
+                logger.warning(f"OAuth2 provider {app_config['name']} may already exist")
+                return self.get_existing_provider_id(app_config['name'])
+            else:
+                logger.error(f"Failed to create OAuth2 provider {app_config['name']}: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating OAuth2 provider {app_config['name']}: {e}")
+            return None
+    
+    def get_existing_provider_id(self, provider_name: str) -> Optional[str]:
+        """Get existing provider ID by name"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/providers/oauth2/?name={provider_name}")
+            if response.status_code == 200:
+                providers = response.json()['results']
+                if providers:
+                    return providers[0]['pk']
+            return None
+        except Exception as e:
+            logger.error(f"Error getting existing provider ID: {e}")
+            return None
+    
+    def create_application(self, app_config: Dict[str, Any]) -> bool:
+        """Create application in Authentik"""
+        try:
+            # Create OAuth2 provider first
+            provider_id = self.create_oauth2_provider(app_config)
+            if not provider_id:
+                logger.error(f"Failed to create provider for application {app_config['name']}")
+                return False
+            
+            # Create application data
+            app_data = {
+                'name': app_config['name'],
+                'slug': app_config['slug'],
+                'provider': provider_id,
+                'launch_url': app_config.get('launch_url', ''),
+                'open_in_new_tab': app_config.get('open_in_new_tab', False),
+                'meta_launch_url': app_config.get('meta_launch_url', ''),
+                'meta_description': app_config.get('meta_description', ''),
+                'meta_publisher': app_config.get('meta_publisher', ''),
+                'policy_engine_mode': app_config.get('policy_engine_mode', 'any'),
+                'group': app_config.get('group', '')
+            }
+            
+            # Create application
+            response = self.session.post(
+                f"{self.authentik_url}/api/v3/core/applications/",
+                json=app_data
+            )
+            
+            if response.status_code == 201:
+                application = response.json()
+                logger.info(f"Created application: {app_config['name']} (ID: {application['pk']})")
+                return True
+            elif response.status_code == 400:
+                logger.warning(f"Application {app_config['name']} may already exist")
+                return True
+            else:
+                logger.error(f"Failed to create application {app_config['name']}: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error creating application {app_config['name']}: {e}")
+            return False
+    
+    def provision_applications(self) -> bool:
+        """Provision all configured applications"""
+        logger.info("Starting application provisioning")
+        
+        # Test connection
+        if not self.test_connection():
+            logger.error("Cannot connect to Authentik API")
+            return False
+        
+        # Get application templates
+        templates_config = self.config.get('applications', {}).get('templates', {})
+        success_count = 0
+        total_count = 0
+        
+        for name, app_config in templates_config.items():
+            if not app_config.get('enabled', False):
+                continue
+                
+            total_count += 1
+            
+            try:
+                if self.create_application(app_config):
+                    success_count += 1
+                else:
+                    logger.error(f"Failed to provision application {name}")
+                    
+            except Exception as e:
+                logger.error(f"Error provisioning application {name}: {e}")
+        
+        logger.info(f"Application provisioning completed: {success_count}/{total_count} successful")
+        return success_count > 0
+    
+    def validate_applications(self) -> bool:
+        """Validate provisioned applications"""
+        try:
+            # Get all applications
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/applications/")
+            if response.status_code != 200:
+                logger.error(f"Failed to get applications: {response.status_code}")
+                return False
+            
+            applications = response.json()['results']
+            logger.info(f"Found {len(applications)} applications in Authentik")
+            
+            # Check for expected applications
+            expected_applications = []
+            templates_config = self.config.get('applications', {}).get('templates', {})
+            
+            for name, app_config in templates_config.items():
+                if app_config.get('enabled', False):
+                    expected_applications.append(app_config['name'])
+            
+            found_applications = [app['name'] for app in applications]
+            missing_applications = [name for name in expected_applications if name not in found_applications]
+            
+            if missing_applications:
+                logger.warning(f"Missing applications: {missing_applications}")
+                return False
+            
+            logger.info("Application validation successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Application validation failed: {e}")
+            return False
+    
+    def run_provisioning(self) -> bool:
+        """Run the complete application provisioning process"""
+        logger.info("Starting Authentik application provisioning")
+        
+        try:
+            # Provision applications
+            if not self.provision_applications():
+                logger.error("Application provisioning failed")
+                return False
+            
+            # Validate applications
+            if not self.validate_applications():
+                logger.warning("Application validation failed")
+            
+            logger.info("Application provisioning completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Application provisioning failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Authentik Application Provisioning')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing applications')
+    
+    args = parser.parse_args()
+    
+    # Initialize provisioner
+    provisioner = ApplicationProvisioner(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        if provisioner.test_connection():
+            print("Authentik API connection successful")
+            return 0
+        else:
+            print("Authentik API connection failed")
+            return 1
+    
+    elif args.validate:
+        logger.info("Validating existing applications")
+        success = provisioner.validate_applications()
+        return 0 if success else 1
+    
+    else:
+        # Run full provisioning
+        success = provisioner.run_provisioning()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

@@ -1,0 +1,539 @@
+# Authentik Backup Integration Configuration
+# Configures database, configuration, and certificate backup procedures
+
+# =============================================================================
+# DATABASE BACKUP CONFIGURATION
+# =============================================================================
+
+database:
+  enabled: true
+  
+  # Backup Schedule
+  schedule:
+    enabled: true
+    cron: "0 2 * * *"  # Daily at 2 AM
+    timezone: "{{ timezone | default('UTC') }}"
+    
+  # Backup Configuration
+  configuration:
+    # PostgreSQL Backup
+    postgresql:
+      enabled: true
+      host: "authentik-db"
+      port: 5432
+      database: "authentik"
+      username: "authentik"
+      password: "{{ authentik_db_password | default('authentik') }}"
+      
+    # Backup Format
+    format:
+      type: "sql"  # sql, custom, plain
+      compression: "gzip"
+      include_schema: true
+      include_data: true
+      include_indexes: true
+      
+    # Backup Storage
+    storage:
+      local:
+        enabled: true
+        path: "{{ backup_dir }}/authentik/database"
+        retention_days: 30
+        max_size: "10GB"
+        
+      remote:
+        enabled: false
+        type: "s3"  # s3, ftp, scp
+        endpoint: ""
+        bucket: ""
+        access_key: ""
+        secret_key: ""
+        
+    # Backup Verification
+    verification:
+      enabled: true
+      test_restore: false
+      validate_schema: true
+      validate_data: true
+      
+# =============================================================================
+# CONFIGURATION BACKUP CONFIGURATION
+# =============================================================================
+
+configuration:
+  enabled: true
+  
+  # Backup Schedule
+  schedule:
+    enabled: true
+    cron: "0 3 * * *"  # Daily at 3 AM
+    timezone: "{{ timezone | default('UTC') }}"
+    
+  # Backup Configuration
+  configuration:
+    # Files to Backup
+    files:
+      - "{{ docker_dir }}/authentik/authentik.yml"
+      - "{{ docker_dir }}/authentik/docker-compose.yml"
+      - "{{ docker_dir }}/authentik/scripts/automation_config.yml"
+      - "{{ docker_dir }}/authentik/config/*.yml"
+      - "{{ docker_dir }}/authentik/templates/*"
+      - "{{ docker_dir }}/authentik/media/*"
+      
+    # Directories to Backup
+    directories:
+      - "{{ docker_dir }}/authentik/custom_templates"
+      - "{{ docker_dir }}/authentik/custom_media"
+      - "{{ docker_dir }}/authentik/scripts"
+      - "{{ docker_dir }}/authentik/config"
+      
+    # Exclude Patterns
+    exclude:
+      - "*.tmp"
+      - "*.log"
+      - "*.cache"
+      - ".git/*"
+      - "node_modules/*"
+      
+    # Backup Format
+    format:
+      type: "tar"
+      compression: "gzip"
+      encryption: false
+      password: ""
+      
+    # Backup Storage
+    storage:
+      local:
+        enabled: true
+        path: "{{ backup_dir }}/authentik/configuration"
+        retention_days: 90
+        max_size: "5GB"
+        
+      remote:
+        enabled: false
+        type: "s3"  # s3, ftp, scp
+        endpoint: ""
+        bucket: ""
+        access_key: ""
+        secret_key: ""
+        
+    # Backup Verification
+    verification:
+      enabled: true
+      validate_files: true
+      check_integrity: true
+      
+# =============================================================================
+# CERTIFICATE BACKUP CONFIGURATION
+# =============================================================================
+
+certificates:
+  enabled: true
+  
+  # Backup Schedule
+  schedule:
+    enabled: true
+    cron: "0 4 * * *"  # Daily at 4 AM
+    timezone: "{{ timezone | default('UTC') }}"
+    
+  # Backup Configuration
+  configuration:
+    # SSL Certificates
+    ssl:
+      enabled: true
+      include_certs: true
+      include_keys: false
+      include_ca: true
+      include_intermediates: true
+      
+    # Certificate Locations
+    locations:
+      - "{{ docker_dir }}/authentik/certs/*.crt"
+      - "{{ docker_dir }}/authentik/certs/*.pem"
+      - "{{ docker_dir }}/authentik/certs/*.key"
+      - "{{ docker_dir }}/authentik/certs/*.p12"
+      - "{{ docker_dir }}/authentik/certs/*.pfx"
+      
+    # Certificate Validation
+    validation:
+      enabled: true
+      check_expiry: true
+      check_validity: true
+      check_chain: true
+      
+    # Backup Format
+    format:
+      type: "tar"
+      compression: "gzip"
+      encryption: true
+      password: "{{ backup_encryption_password | default('') }}"
+      
+    # Backup Storage
+    storage:
+      local:
+        enabled: true
+        path: "{{ backup_dir }}/authentik/certificates"
+        retention_days: 365
+        max_size: "1GB"
+        
+      remote:
+        enabled: false
+        type: "s3"  # s3, ftp, scp
+        endpoint: ""
+        bucket: ""
+        access_key: ""
+        secret_key: ""
+        
+    # Backup Verification
+    verification:
+      enabled: true
+      validate_certificates: true
+      check_expiry: true
+      
+# =============================================================================
+# USER DATA BACKUP CONFIGURATION
+# =============================================================================
+
+user_data:
+  enabled: true
+  
+  # Backup Schedule
+  schedule:
+    enabled: true
+    cron: "0 5 * * *"  # Daily at 5 AM
+    timezone: "{{ timezone | default('UTC') }}"
+    
+  # Backup Configuration
+  configuration:
+    # User Data to Backup
+    data:
+      users: true
+      groups: true
+      applications: true
+      policies: true
+      flows: true
+      stages: true
+      providers: true
+      events: true
+      
+    # Backup Format
+    format:
+      type: "json"
+      compression: "gzip"
+      encryption: true
+      password: "{{ backup_encryption_password | default('') }}"
+      
+    # Backup Storage
+    storage:
+      local:
+        enabled: true
+        path: "{{ backup_dir }}/authentik/user_data"
+        retention_days: 30
+        max_size: "2GB"
+        
+      remote:
+        enabled: false
+        type: "s3"  # s3, ftp, scp
+        endpoint: ""
+        bucket: ""
+        access_key: ""
+        secret_key: ""
+        
+    # Backup Verification
+    verification:
+      enabled: true
+      validate_data: true
+      check_integrity: true
+      
+# =============================================================================
+# MONITORING DATA BACKUP CONFIGURATION
+# =============================================================================
+
+monitoring_data:
+  enabled: true
+  
+  # Backup Schedule
+  schedule:
+    enabled: true
+    cron: "0 1 * * *"  # Daily at 1 AM
+    timezone: "{{ timezone | default('UTC') }}"
+    
+  # Backup Configuration
+  configuration:
+    # Monitoring Data to Backup
+    data:
+      metrics: true
+      logs: true
+      alerts: true
+      dashboards: true
+      alert_rules: true
+      
+    # Backup Format
+    format:
+      type: "tar"
+      compression: "gzip"
+      encryption: false
+      password: ""
+      
+    # Backup Storage
+    storage:
+      local:
+        enabled: true
+        path: "{{ backup_dir }}/authentik/monitoring"
+        retention_days: 30
+        max_size: "5GB"
+        
+      remote:
+        enabled: false
+        type: "s3"  # s3, ftp, scp
+        endpoint: ""
+        bucket: ""
+        access_key: ""
+        secret_key: ""
+        
+    # Backup Verification
+    verification:
+      enabled: true
+      validate_data: true
+      check_integrity: true
+      
+# =============================================================================
+# BACKUP SCRIPT CONFIGURATION
+# =============================================================================
+
+backup_script:
+  enabled: true
+  
+  # Script Configuration
+  configuration:
+    # Script Location
+    script_path: "{{ docker_dir }}/authentik/scripts/backup.sh"
+    log_path: "{{ logs_dir }}/security/authentik/backup.log"
+    
+    # Script Permissions
+    permissions:
+      owner: "{{ username }}"
+      group: "{{ username }}"
+      mode: "0755"
+      
+    # Script Environment
+    environment:
+      BACKUP_DIR: "{{ backup_dir }}/authentik"
+      LOGS_DIR: "{{ logs_dir }}/security/authentik"
+      DOCKER_DIR: "{{ docker_dir }}/authentik"
+      DATA_DIR: "{{ data_dir }}/authentik"
+      
+    # Script Options
+    options:
+      verbose: true
+      dry_run: false
+      parallel: true
+      max_parallel: 3
+      
+# =============================================================================
+# RESTORE CONFIGURATION
+# =============================================================================
+
+restore:
+  enabled: true
+  
+  # Restore Configuration
+  configuration:
+    # Auto Restore
+    auto_restore:
+      enabled: false
+      trigger_conditions:
+        - "database_corruption"
+        - "configuration_loss"
+        - "certificate_expiry"
+        
+    # Manual Restore
+    manual_restore:
+      enabled: true
+      require_confirmation: true
+      backup_validation: true
+      
+    # Restore Options
+    options:
+      # Database Restore
+      database:
+        enabled: true
+        drop_existing: false
+        create_backup: true
+        validate_after_restore: true
+        
+      # Configuration Restore
+      configuration:
+        enabled: true
+        overwrite_existing: false
+        backup_existing: true
+        validate_after_restore: true
+        
+      # Certificate Restore
+      certificates:
+        enabled: true
+        overwrite_existing: false
+        backup_existing: true
+        validate_after_restore: true
+        
+      # User Data Restore
+      user_data:
+        enabled: true
+        overwrite_existing: false
+        backup_existing: true
+        validate_after_restore: true
+        
+    # Restore Verification
+    verification:
+      enabled: true
+      validate_database: true
+      validate_configuration: true
+      validate_certificates: true
+      validate_user_data: true
+      test_connectivity: true
+      
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+notifications:
+  enabled: true
+  
+  # Notification Configuration
+  configuration:
+    # Email Notifications
+    email:
+      enabled: true
+      smtp_host: "{{ smtp_host | default('localhost') }}"
+      smtp_port: "{{ smtp_port | default(587) }}"
+      smtp_username: "{{ smtp_username | default('') }}"
+      smtp_password: "{{ smtp_password | default('') }}"
+      from_email: "authentik-backup@{{ domain }}"
+      to_emails:
+        - "admin@{{ domain }}"
+        - "{{ username }}@{{ domain }}"
+        
+    # Discord Notifications
+    discord:
+      enabled: false
+      webhook_url: "{{ discord_webhook_url | default('') }}"
+      
+    # Slack Notifications
+    slack:
+      enabled: false
+      webhook_url: "{{ slack_webhook_url | default('') }}"
+      
+  # Notification Events
+  events:
+    # Backup Events
+    backup:
+      success: true
+      failure: true
+      warning: true
+      
+    # Restore Events
+    restore:
+      success: true
+      failure: true
+      warning: true
+      
+    # Verification Events
+    verification:
+      success: false
+      failure: true
+      warning: true
+      
+# =============================================================================
+# MONITORING AND ALERTING
+# =============================================================================
+
+monitoring:
+  enabled: true
+  
+  # Monitoring Configuration
+  configuration:
+    # Backup Monitoring
+    backup_monitoring:
+      enabled: true
+      check_backup_status: true
+      check_backup_size: true
+      check_backup_age: true
+      check_backup_integrity: true
+      
+    # Restore Monitoring
+    restore_monitoring:
+      enabled: true
+      check_restore_status: true
+      check_restore_verification: true
+      
+    # Storage Monitoring
+    storage_monitoring:
+      enabled: true
+      check_disk_space: true
+      check_backup_retention: true
+      check_backup_cleanup: true
+      
+  # Alerting Configuration
+  alerting:
+    enabled: true
+    
+    # Alert Rules
+    rules:
+      # Backup Alerts
+      - name: "Backup Failure"
+        condition: "backup_status == 'failed'"
+        severity: "critical"
+        description: "Backup operation failed"
+        
+      - name: "Backup Too Old"
+        condition: "backup_age > 86400"  # 24 hours
+        severity: "warning"
+        description: "Backup is older than 24 hours"
+        
+      - name: "Backup Size Too Large"
+        condition: "backup_size > 10737418240"  # 10GB
+        severity: "warning"
+        description: "Backup size exceeds 10GB"
+        
+      - name: "Low Disk Space"
+        condition: "disk_usage > 90"
+        severity: "critical"
+        description: "Low disk space for backups"
+        
+      - name: "Restore Failure"
+        condition: "restore_status == 'failed'"
+        severity: "critical"
+        description: "Restore operation failed"
+        
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+integration:
+  # Prometheus Integration
+  prometheus:
+    enabled: true
+    metrics:
+      backup_duration: true
+      backup_size: true
+      backup_status: true
+      restore_duration: true
+      restore_status: true
+      
+  # Grafana Integration
+  grafana:
+    enabled: true
+    dashboards:
+      backup_overview: true
+      restore_overview: true
+      storage_overview: true
+      
+  # AlertManager Integration
+  alertmanager:
+    enabled: true
+    receiver: "authentik-backup-alerts"
+    group_by: ["alertname", "severity"]
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h" 

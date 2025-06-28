@@ -1,0 +1,259 @@
+#!/bin/bash
+
+# Homepage Management Script
+# Provides easy management commands for Homepage
+
+set -e
+
+# Configuration
+DOCKER_DIR="{{ homepage_docker_dir }}"
+CONFIG_DIR="{{ homepage_config_dir }}"
+LOGS_DIR="{{ homepage_logs_dir }}"
+CONTAINER_NAME="{{ homepage_container_name }}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_header() {
+    echo -e "${BLUE}================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}================================${NC}"
+}
+
+show_help() {
+    print_header "Homepage Management Script"
+    echo "Usage: $0 [command] [options]"
+    echo ""
+    echo "Commands:"
+    echo "  status      - Show Homepage status"
+    echo "  logs        - Show Homepage logs"
+    echo "  restart     - Restart Homepage services"
+    echo "  stop        - Stop Homepage services"
+    echo "  start       - Start Homepage services"
+    echo "  update      - Update Homepage to latest version"
+    echo "  backup      - Create backup"
+    echo "  restore     - Restore from backup"
+    echo "  config      - Show current configuration"
+    echo "  health      - Check Homepage health"
+    echo "  api         - Test Homepage API"
+    echo "  help        - Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 status"
+    echo "  $0 logs -f"
+    echo "  $0 backup"
+    echo "  $0 restore /path/to/backup.tar.gz"
+}
+
+check_container() {
+    if ! docker ps --format "table {{.Names}}" | grep -q "$CONTAINER_NAME"; then
+        print_error "Homepage container is not running"
+        return 1
+    fi
+    return 0
+}
+
+case "$1" in
+    status)
+        print_header "Homepage Status"
+        cd "$DOCKER_DIR"
+        docker-compose ps
+        echo ""
+        print_status "Container Status:"
+        if check_container; then
+            print_status "✅ Homepage is running"
+            CONTAINER_ID=$(docker ps --filter "name=$CONTAINER_NAME" --format "{{.ID}}")
+            print_status "Container ID: $CONTAINER_ID"
+            print_status "Image: $(docker inspect --format='{{.Config.Image}}' "$CONTAINER_ID")"
+            print_status "Created: $(docker inspect --format='{{.Created}}' "$CONTAINER_ID")"
+        else
+            print_error "❌ Homepage is not running"
+        fi
+        ;;
+        
+    logs)
+        print_header "Homepage Logs"
+        if check_container; then
+            docker logs "$CONTAINER_NAME" "${@:2}"
+        else
+            print_error "Cannot show logs - container is not running"
+            exit 1
+        fi
+        ;;
+        
+    restart)
+        print_header "Restarting Homepage"
+        cd "$DOCKER_DIR"
+        docker-compose restart
+        print_status "Homepage restarted successfully"
+        ;;
+        
+    stop)
+        print_header "Stopping Homepage"
+        cd "$DOCKER_DIR"
+        docker-compose stop
+        print_status "Homepage stopped successfully"
+        ;;
+        
+    start)
+        print_header "Starting Homepage"
+        cd "$DOCKER_DIR"
+        docker-compose up -d
+        print_status "Homepage started successfully"
+        ;;
+        
+    update)
+        print_header "Updating Homepage"
+        cd "$DOCKER_DIR"
+        print_status "Pulling latest image..."
+        docker-compose pull
+        print_status "Stopping current container..."
+        docker-compose down
+        print_status "Starting with new image..."
+        docker-compose up -d
+        print_status "Homepage updated successfully"
+        ;;
+        
+    backup)
+        print_header "Creating Homepage Backup"
+        "$DOCKER_DIR/scripts/backup.sh"
+        ;;
+        
+    restore)
+        if [ -z "$2" ]; then
+            print_error "Please specify backup file"
+            echo "Usage: $0 restore <backup_file>"
+            exit 1
+        fi
+        
+        print_header "Restoring Homepage from Backup"
+        BACKUP_FILE="$2"
+        
+        if [ ! -f "$BACKUP_FILE" ]; then
+            print_error "Backup file not found: $BACKUP_FILE"
+            exit 1
+        fi
+        
+        print_warning "This will overwrite current configuration!"
+        read -p "Are you sure? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Restore cancelled"
+            exit 0
+        fi
+        
+        cd "$DOCKER_DIR"
+        docker-compose down
+        
+        print_status "Extracting backup..."
+        tar -xzf "$BACKUP_FILE" -C "$CONFIG_DIR"
+        
+        print_status "Starting Homepage..."
+        docker-compose up -d
+        
+        print_status "Restore completed successfully"
+        ;;
+        
+    config)
+        print_header "Homepage Configuration"
+        echo "Configuration Directory: $CONFIG_DIR"
+        echo ""
+        print_status "Configuration Files:"
+        ls -la "$CONFIG_DIR"/
+        echo ""
+        print_status "Main Configuration:"
+        if [ -f "$CONFIG_DIR/config.yml" ]; then
+            cat "$CONFIG_DIR/config.yml"
+        else
+            print_error "config.yml not found"
+        fi
+        ;;
+        
+    health)
+        print_header "Homepage Health Check"
+        
+        # Check container status
+        if check_container; then
+            print_status "✅ Container is running"
+        else
+            print_error "❌ Container is not running"
+            exit 1
+        fi
+        
+        # Check API health
+        print_status "Checking API health..."
+        if curl -s -f "http://localhost:{{ homepage_port }}/api/health" >/dev/null; then
+            print_status "✅ API is responding"
+        else
+            print_error "❌ API is not responding"
+            exit 1
+        fi
+        
+        # Check web interface
+        print_status "Checking web interface..."
+        if curl -s -f "http://localhost:{{ homepage_port }}" >/dev/null; then
+            print_status "✅ Web interface is accessible"
+        else
+            print_error "❌ Web interface is not accessible"
+            exit 1
+        fi
+        
+        print_status "✅ All health checks passed"
+        ;;
+        
+    api)
+        print_header "Homepage API Test"
+        
+        API_BASE="http://localhost:{{ homepage_port }}/api"
+        
+        print_status "Testing API endpoints..."
+        
+        # Health endpoint
+        if curl -s "$API_BASE/health" >/dev/null; then
+            print_status "✅ Health endpoint: OK"
+        else
+            print_error "❌ Health endpoint: FAILED"
+        fi
+        
+        # Services endpoint
+        if curl -s "$API_BASE/services" >/dev/null; then
+            print_status "✅ Services endpoint: OK"
+        else
+            print_error "❌ Services endpoint: FAILED"
+        fi
+        
+        # Bookmarks endpoint
+        if curl -s "$API_BASE/bookmarks" >/dev/null; then
+            print_status "✅ Bookmarks endpoint: OK"
+        else
+            print_error "❌ Bookmarks endpoint: FAILED"
+        fi
+        
+        # Weather endpoint (optional)
+        if curl -s "$API_BASE/weather" >/dev/null 2>&1; then
+            print_status "✅ Weather endpoint: OK"
+        else
+            print_warning "⚠️  Weather endpoint: Not configured"
+        fi
+        ;;
+        
+    help|*)
+        show_help
+        ;;
+esac 

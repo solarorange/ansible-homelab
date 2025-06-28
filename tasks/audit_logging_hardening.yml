@@ -1,0 +1,31 @@
+---
+# Audit Logging Hardening
+# Enables and configures audit logging for critical system events
+
+- name: Ensure auditd is installed
+  ansible.builtin.package:
+    name: auditd
+    state: present
+  tags: [security, audit, logging]
+
+- name: Deploy audit rules
+  ansible.builtin.template:
+    src: templates/audit.rules.j2
+    dest: /etc/audit/rules.d/homelab.rules
+    mode: '0640'
+  tags: [security, audit, logging]
+
+- name: Ensure auditd service is enabled and started
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+  tags: [security, audit, logging]
+
+- name: Configure log retention for audit logs
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^max_log_file ='
+    line: 'max_log_file = 100'
+    state: present
+  tags: [security, audit, logging] 

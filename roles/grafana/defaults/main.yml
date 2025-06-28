@@ -1,0 +1,417 @@
+---
+# Grafana Role Default Variables
+
+# =============================================================================
+# CORE CONFIGURATION
+# =============================================================================
+
+# Grafana Application Settings
+grafana_enabled: true
+grafana_version: "10.2.0"
+grafana_image: "grafana/grafana-oss:{{ grafana_version }}"
+grafana_container_name: "grafana"
+grafana_port: 3000
+grafana_admin_user: "admin"
+grafana_admin_password: "{{ vault_grafana_admin_password | default('admin') }}"
+grafana_secret_key: "{{ vault_grafana_secret_key | default('your-secret-key-change-this') }}"
+grafana_domain: "grafana.{{ domain | default('localhost') }}"
+
+# Database Configuration
+grafana_database_type: "sqlite3"  # sqlite3, mysql, postgres
+grafana_database_host: "localhost"
+grafana_database_name: "grafana"
+grafana_database_user: "grafana"
+grafana_database_password: "{{ vault_grafana_db_password | default('grafana') }}"
+grafana_database_port: 5432
+
+# Security Settings
+grafana_allow_sign_up: false
+grafana_allow_org_create: false
+grafana_auto_assign_org: true
+grafana_auto_assign_org_role: "Viewer"
+grafana_disable_gravatar: true
+grafana_cookie_secure: true
+grafana_cookie_samesite: "strict"
+
+# =============================================================================
+# DATA SOURCES CONFIGURATION
+# =============================================================================
+
+# Data Sources Configuration
+grafana_datasources:
+  prometheus:
+    enabled: true
+    name: "Prometheus"
+    type: "prometheus"
+    url: "http://prometheus:9090"
+    access: "proxy"
+    is_default: true
+    editable: true
+    json_data:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+    secure_json_data: {}
+    
+  loki:
+    enabled: true
+    name: "Loki"
+    type: "loki"
+    url: "http://loki:3100"
+    access: "proxy"
+    is_default: false
+    editable: true
+    json_data:
+      maxLines: 1000
+    secure_json_data: {}
+    
+  postgresql:
+    enabled: true
+    name: "PostgreSQL"
+    type: "postgres"
+    url: "postgresql:5432"
+    access: "proxy"
+    is_default: false
+    editable: true
+    json_data:
+      database: "{{ grafana_database_name }}"
+      sslmode: "disable"
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+    secure_json_data:
+      password: "{{ grafana_database_password }}"
+      
+  redis:
+    enabled: true
+    name: "Redis"
+    type: "redis-datasource"
+    url: "http://redis:6379"
+    access: "proxy"
+    is_default: false
+    editable: true
+    json_data:
+      client: "standalone"
+      poolSize: 5
+    secure_json_data: {}
+    
+  node_exporter:
+    enabled: true
+    name: "Node Exporter"
+    type: "prometheus"
+    url: "http://node-exporter:9100"
+    access: "proxy"
+    is_default: false
+    editable: true
+    json_data:
+      timeInterval: "15s"
+    secure_json_data: {}
+
+# =============================================================================
+# DASHBOARD CONFIGURATION
+# =============================================================================
+
+# Dashboard Settings
+grafana_dashboards_enabled: true
+grafana_dashboard_auto_refresh: "30s"
+grafana_dashboard_timezone: "{{ timezone | default('UTC') }}"
+grafana_dashboard_theme: "dark"
+
+# Dashboard Folders
+grafana_dashboard_folders:
+  - name: "System Overview"
+    description: "System-level monitoring dashboards"
+    uid: "system-overview"
+  - name: "Services"
+    description: "Service-specific dashboards"
+    uid: "services"
+  - name: "Security"
+    description: "Security monitoring dashboards"
+    uid: "security"
+  - name: "Media"
+    description: "Media service dashboards"
+    uid: "media"
+  - name: "Network"
+    description: "Network and infrastructure dashboards"
+    uid: "network"
+  - name: "Databases"
+    description: "Database monitoring dashboards"
+    uid: "databases"
+  - name: "Storage"
+    description: "Storage and backup dashboards"
+    uid: "storage"
+
+# Dashboard Categories
+grafana_dashboard_categories:
+  system_overview:
+    enabled: true
+    folder: "System Overview"
+    refresh: "30s"
+  services:
+    enabled: true
+    folder: "Services"
+    refresh: "30s"
+  security:
+    enabled: true
+    folder: "Security"
+    refresh: "15s"
+  media:
+    enabled: true
+    folder: "Media"
+    refresh: "30s"
+  network:
+    enabled: true
+    folder: "Network"
+    refresh: "30s"
+  databases:
+    enabled: true
+    folder: "Databases"
+    refresh: "30s"
+  storage:
+    enabled: true
+    folder: "Storage"
+    refresh: "60s"
+
+# =============================================================================
+# USER MANAGEMENT
+# =============================================================================
+
+# User Configuration
+grafana_users_enabled: true
+grafana_default_users:
+  - username: "admin"
+    email: "admin@{{ domain | default('localhost') }}"
+    password: "{{ grafana_admin_password }}"
+    role: "Admin"
+    enabled: true
+  - username: "viewer"
+    email: "viewer@{{ domain | default('localhost') }}"
+    password: "{{ vault_grafana_viewer_password | default('viewer') }}"
+    role: "Viewer"
+    enabled: true
+  - username: "editor"
+    email: "editor@{{ domain | default('localhost') }}"
+    password: "{{ vault_grafana_editor_password | default('editor') }}"
+    role: "Editor"
+    enabled: true
+
+# Teams Configuration
+grafana_teams_enabled: true
+grafana_teams:
+  - name: "Administrators"
+    email: "admins@{{ domain | default('localhost') }}"
+    members:
+      - "admin"
+  - name: "Viewers"
+    email: "viewers@{{ domain | default('localhost') }}"
+    members:
+      - "viewer"
+  - name: "Editors"
+    email: "editors@{{ domain | default('localhost') }}"
+    members:
+      - "editor"
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+# Alerting Settings
+grafana_alerting_enabled: true
+grafana_alerting_execution_timeout: "30s"
+grafana_alerting_evaluation_timeout: "30s"
+grafana_alerting_max_attempts: 3
+
+# Notification Channels
+grafana_notification_channels:
+  email:
+    enabled: true
+    name: "Email"
+    type: "email"
+    settings:
+      addresses: "admin@{{ domain | default('localhost') }}"
+    is_default: true
+    
+  slack:
+    enabled: false
+    name: "Slack"
+    type: "slack"
+    settings:
+      url: "{{ vault_slack_webhook_url | default('') }}"
+    is_default: false
+    
+  discord:
+    enabled: false
+    name: "Discord"
+    type: "discord"
+    settings:
+      url: "{{ vault_discord_webhook_url | default('') }}"
+    is_default: false
+    
+  webhook:
+    enabled: false
+    name: "Webhook"
+    type: "webhook"
+    settings:
+      url: "{{ vault_webhook_url | default('') }}"
+    is_default: false
+
+# Alert Rules
+grafana_alert_rules:
+  high_cpu:
+    enabled: true
+    name: "High CPU Usage"
+    condition: "avg(rate(node_cpu_seconds_total{mode!='idle'}[5m])) * 100 > 90"
+    for: "5m"
+    severity: "critical"
+    
+  high_memory:
+    enabled: true
+    name: "High Memory Usage"
+    condition: "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90"
+    for: "5m"
+    severity: "critical"
+    
+  high_disk:
+    enabled: true
+    name: "High Disk Usage"
+    condition: "(1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90"
+    for: "5m"
+    severity: "critical"
+    
+  service_down:
+    enabled: true
+    name: "Service Down"
+    condition: "up == 0"
+    for: "2m"
+    severity: "critical"
+    
+  ssl_expiry:
+    enabled: true
+    name: "SSL Certificate Expiry"
+    condition: "probe_ssl_earliest_cert_expiry - time() < 86400 * 30"
+    for: "1m"
+    severity: "warning"
+
+# =============================================================================
+# PLUGINS CONFIGURATION
+# =============================================================================
+
+# Plugin Installation
+grafana_plugins_enabled: true
+grafana_plugins:
+  - "grafana-clock-panel"
+  - "grafana-simple-json-datasource"
+  - "grafana-worldmap-panel"
+  - "grafana-piechart-panel"
+  - "redis-datasource"
+  - "grafana-discrete-panel"
+  - "grafana-graph-panel"
+  - "grafana-table-panel"
+
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+
+# Health Monitoring
+grafana_health_check_enabled: true
+grafana_health_check_interval: "30s"
+grafana_health_check_timeout: "10s"
+grafana_health_check_retries: 3
+
+# Performance Monitoring
+grafana_performance_monitoring_enabled: true
+grafana_metrics_enabled: true
+grafana_logging_level: "info"
+grafana_logging_mode: "console"
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+
+# Backup Settings
+grafana_backup_enabled: true
+grafana_backup_retention_days: 30
+grafana_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+grafana_backup_path: "{{ backup_dir | default('/backups') }}/grafana"
+
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+# Traefik Integration
+grafana_traefik_enabled: true
+grafana_traefik_middleware: "authentik@docker"
+
+# Authentication Integration
+grafana_auth_enabled: false
+grafana_auth_provider: "authentik"  # authentik, oauth, ldap
+grafana_auth_config: {}
+
+# =============================================================================
+# RESOURCE LIMITS
+# =============================================================================
+
+# Container Resources
+grafana_memory_limit: "1G"
+grafana_memory_reservation: "512M"
+grafana_cpu_limit: "1.0"
+grafana_cpu_reservation: "0.5"
+
+# Storage Configuration
+grafana_data_volume: "grafana_data"
+grafana_config_volume: "grafana_config"
+grafana_logs_volume: "grafana_logs"
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+
+# Network Settings
+grafana_networks:
+  - "monitoring"
+  - "homelab"
+
+# Port Configuration
+grafana_external_port: "{{ grafana_port }}"
+grafana_internal_port: "3000"
+
+# =============================================================================
+# DEPLOYMENT SETTINGS
+# =============================================================================
+
+# Deployment Configuration
+grafana_restart_policy: "unless-stopped"
+grafana_healthcheck_enabled: true
+grafana_healthcheck_interval: "30s"
+grafana_healthcheck_timeout: "10s"
+grafana_healthcheck_retries: 3
+grafana_healthcheck_start_period: "30s"
+
+# Environment Variables
+grafana_environment:
+  GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+  GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+  GF_SECURITY_SECRET_KEY: "{{ grafana_secret_key }}"
+  GF_USERS_ALLOW_SIGN_UP: "{{ grafana_allow_sign_up | lower }}"
+  GF_USERS_ALLOW_ORG_CREATE: "{{ grafana_allow_org_create | lower }}"
+  GF_USERS_AUTO_ASSIGN_ORG: "{{ grafana_auto_assign_org | lower }}"
+  GF_USERS_AUTO_ASSIGN_ORG_ROLE: "{{ grafana_auto_assign_org_role }}"
+  GF_SECURITY_DISABLE_GRAVATAR: "{{ grafana_disable_gravatar | lower }}"
+  GF_SERVER_DOMAIN: "{{ grafana_domain }}"
+  GF_SERVER_ROOT_URL: "https://{{ grafana_domain }}"
+  GF_DATABASE_TYPE: "{{ grafana_database_type }}"
+  GF_LOG_MODE: "{{ grafana_logging_mode }}"
+  GF_LOG_LEVEL: "{{ grafana_logging_level }}"
+  GF_ANALYTICS_REPORTING_ENABLED: "false"
+  GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+  GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+
+# =============================================================================
+# VALIDATION SETTINGS
+# =============================================================================
+
+# Validation Configuration
+grafana_validation_enabled: true
+grafana_validation_timeout: 300
+grafana_validation_retries: 3
+grafana_validation_interval: 10 

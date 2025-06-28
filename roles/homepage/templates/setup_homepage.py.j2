@@ -1,0 +1,813 @@
+#!/usr/bin/env python3
+"""
+Homepage Configuration Script
+Automatically configures Homepage with homelab services, bookmarks, and widgets
+"""
+
+import os
+import sys
+import time
+import requests
+import json
+import yaml
+from urllib.parse import urljoin
+from typing import Dict, List, Any, Optional
+
+# Configuration
+HOMEPAGE_URL = os.getenv('HOMEPAGE_URL', 'http://localhost:3000')
+DOMAIN = os.getenv('DOMAIN')
+WEATHER_LAT = os.getenv('WEATHER_LAT', '40.7128')
+WEATHER_LON = os.getenv('WEATHER_LON', '-74.0060')
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '')
+HOMEPAGE_API_SECRET = os.getenv('HOMEPAGE_API_SECRET', '')
+
+if not all([HOMEPAGE_URL, DOMAIN]):
+    print("Error: Missing required environment variables")
+    print("Required: HOMEPAGE_URL, DOMAIN")
+    sys.exit(1)
+
+# Service configurations with proper icons and widgets
+SERVICES = [
+    # Infrastructure Services
+    {
+        'name': 'Traefik',
+        'icon': 'traefik.png',
+        'href': f'https://traefik.{DOMAIN}',
+        'description': 'Reverse Proxy and Load Balancer',
+        'group': 'Infrastructure',
+        'widget': {
+            'type': 'traefik',
+            'url': 'http://traefik:8080',
+            'key': 'your_traefik_api_key'
+        }
+    },
+    {
+        'name': 'Authentik',
+        'icon': 'authentik.png',
+        'href': f'https://auth.{DOMAIN}',
+        'description': 'Identity Provider and SSO',
+        'group': 'Infrastructure',
+        'widget': {
+            'type': 'authentik',
+            'url': 'http://authentik:9000',
+            'key': 'your_authentik_api_key'
+        }
+    },
+    {
+        'name': 'Portainer',
+        'icon': 'portainer.png',
+        'href': f'https://portainer.{DOMAIN}',
+        'description': 'Container Management',
+        'group': 'Infrastructure',
+        'widget': {
+            'type': 'portainer',
+            'url': 'http://portainer:9000',
+            'key': 'your_portainer_api_key'
+        }
+    },
+    
+    # Monitoring Services
+    {
+        'name': 'Grafana',
+        'icon': 'grafana.png',
+        'href': f'https://grafana.{DOMAIN}',
+        'description': 'Metrics Dashboard and Visualization',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'grafana',
+            'url': 'http://grafana:3000',
+            'key': 'your_grafana_api_key'
+        }
+    },
+    {
+        'name': 'Prometheus',
+        'icon': 'prometheus.png',
+        'href': f'https://prometheus.{DOMAIN}',
+        'description': 'Metrics Collection and Storage',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'prometheus',
+            'url': 'http://prometheus:9090'
+        }
+    },
+    {
+        'name': 'AlertManager',
+        'icon': 'alertmanager.png',
+        'href': f'https://alertmanager.{DOMAIN}',
+        'description': 'Alert Management',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'alertmanager',
+            'url': 'http://alertmanager:9093'
+        }
+    },
+    {
+        'name': 'Loki',
+        'icon': 'loki.png',
+        'href': f'https://loki.{DOMAIN}',
+        'description': 'Log Aggregation',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'loki',
+            'url': 'http://loki:3100'
+        }
+    },
+    {
+        'name': 'Uptime Kuma',
+        'icon': 'uptimekuma.png',
+        'href': f'https://uptime.{DOMAIN}',
+        'description': 'Uptime Monitoring',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'uptimekuma',
+            'url': 'http://uptime-kuma:3001',
+            'key': 'your_uptimekuma_api_key'
+        }
+    },
+    {
+        'name': 'Dashdot',
+        'icon': 'dashdot.png',
+        'href': f'https://dashdot.{DOMAIN}',
+        'description': 'System Dashboard',
+        'group': 'Monitoring',
+        'widget': {
+            'type': 'dashdot',
+            'url': 'http://dashdot:3001'
+        }
+    },
+    
+    # Media Services
+    {
+        'name': 'Jellyfin',
+        'icon': 'jellyfin.png',
+        'href': f'https://jellyfin.{DOMAIN}',
+        'description': 'Media Server and Streaming',
+        'group': 'Media',
+        'widget': {
+            'type': 'jellyfin',
+            'url': 'http://jellyfin:8096',
+            'key': 'your_jellyfin_api_key'
+        }
+    },
+    {
+        'name': 'Sonarr',
+        'icon': 'sonarr.png',
+        'href': f'https://sonarr.{DOMAIN}',
+        'description': 'TV Show Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'sonarr',
+            'url': 'http://sonarr:8989',
+            'key': 'your_sonarr_api_key'
+        }
+    },
+    {
+        'name': 'Radarr',
+        'icon': 'radarr.png',
+        'href': f'https://radarr.{DOMAIN}',
+        'description': 'Movie Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'radarr',
+            'url': 'http://radarr:7878',
+            'key': 'your_radarr_api_key'
+        }
+    },
+    {
+        'name': 'Lidarr',
+        'icon': 'lidarr.png',
+        'href': f'https://lidarr.{DOMAIN}',
+        'description': 'Music Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'lidarr',
+            'url': 'http://lidarr:8686',
+            'key': 'your_lidarr_api_key'
+        }
+    },
+    {
+        'name': 'Readarr',
+        'icon': 'readarr.png',
+        'href': f'https://readarr.{DOMAIN}',
+        'description': 'Book Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'readarr',
+            'url': 'http://readarr:8787',
+            'key': 'your_readarr_api_key'
+        }
+    },
+    {
+        'name': 'Prowlarr',
+        'icon': 'prowlarr.png',
+        'href': f'https://prowlarr.{DOMAIN}',
+        'description': 'Indexer Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'prowlarr',
+            'url': 'http://prowlarr:9696',
+            'key': 'your_prowlarr_api_key'
+        }
+    },
+    {
+        'name': 'Bazarr',
+        'icon': 'bazarr.png',
+        'href': f'https://bazarr.{DOMAIN}',
+        'description': 'Subtitle Management',
+        'group': 'Media',
+        'widget': {
+            'type': 'bazarr',
+            'url': 'http://bazarr:6767',
+            'key': 'your_bazarr_api_key'
+        }
+    },
+    {
+        'name': 'Tautulli',
+        'icon': 'tautulli.png',
+        'href': f'https://tautulli.{DOMAIN}',
+        'description': 'Media Statistics',
+        'group': 'Media',
+        'widget': {
+            'type': 'tautulli',
+            'url': 'http://tautulli:8181',
+            'key': 'your_tautulli_api_key'
+        }
+    },
+    {
+        'name': 'Overseerr',
+        'icon': 'overseerr.png',
+        'href': f'https://overseerr.{DOMAIN}',
+        'description': 'Media Requests',
+        'group': 'Media',
+        'widget': {
+            'type': 'overseerr',
+            'url': 'http://overseerr:5055',
+            'key': 'your_overseerr_api_key'
+        }
+    },
+    {
+        'name': 'Requestrr',
+        'icon': 'requestrr.png',
+        'href': f'https://requestrr.{DOMAIN}',
+        'description': 'Discord Media Requests',
+        'group': 'Media',
+        'widget': {
+            'type': 'requestrr',
+            'url': 'http://requestrr:4545',
+            'key': 'your_requestrr_api_key'
+        }
+    },
+    {
+        'name': 'Unmanic',
+        'icon': 'unmanic.png',
+        'href': f'https://unmanic.{DOMAIN}',
+        'description': 'Media Processing',
+        'group': 'Media',
+        'widget': {
+            'type': 'unmanic',
+            'url': 'http://unmanic:8888',
+            'key': 'your_unmanic_api_key'
+        }
+    },
+    
+    # Storage Services
+    {
+        'name': 'Nextcloud',
+        'icon': 'nextcloud.png',
+        'href': f'https://nextcloud.{DOMAIN}',
+        'description': 'File Storage and Sync',
+        'group': 'Storage',
+        'widget': {
+            'type': 'nextcloud',
+            'url': 'http://nextcloud:8080',
+            'key': 'your_nextcloud_api_key'
+        }
+    },
+    {
+        'name': 'FileBrowser',
+        'icon': 'filebrowser.png',
+        'href': f'https://files.{DOMAIN}',
+        'description': 'Web File Manager',
+        'group': 'Storage',
+        'widget': {
+            'type': 'filebrowser',
+            'url': 'http://filebrowser:80',
+            'key': 'your_filebrowser_api_key'
+        }
+    },
+    {
+        'name': 'MinIO',
+        'icon': 'minio.png',
+        'href': f'https://minio.{DOMAIN}',
+        'description': 'Object Storage',
+        'group': 'Storage',
+        'widget': {
+            'type': 'minio',
+            'url': 'http://minio:9000',
+            'key': 'your_minio_api_key'
+        }
+    },
+    {
+        'name': 'Paperless',
+        'icon': 'paperless.png',
+        'href': f'https://paperless.{DOMAIN}',
+        'description': 'Document Management',
+        'group': 'Storage',
+        'widget': {
+            'type': 'paperless',
+            'url': 'http://paperless:8000',
+            'key': 'your_paperless_api_key'
+        }
+    },
+    {
+        'name': 'BookStack',
+        'icon': 'bookstack.png',
+        'href': f'https://bookstack.{DOMAIN}',
+        'description': 'Wiki and Documentation',
+        'group': 'Storage',
+        'widget': {
+            'type': 'bookstack',
+            'url': 'http://bookstack:80',
+            'key': 'your_bookstack_api_key'
+        }
+    },
+    {
+        'name': 'Immich',
+        'icon': 'immich.png',
+        'href': f'https://immich.{DOMAIN}',
+        'description': 'Photo Management',
+        'group': 'Storage',
+        'widget': {
+            'type': 'immich',
+            'url': 'http://immich:3001',
+            'key': 'your_immich_api_key'
+        }
+    },
+    {
+        'name': 'Kopia',
+        'icon': 'kopia.png',
+        'href': f'https://kopia.{DOMAIN}',
+        'description': 'Backup System',
+        'group': 'Storage',
+        'widget': {
+            'type': 'kopia',
+            'url': 'http://kopia:51515',
+            'key': 'your_kopia_api_key'
+        }
+    },
+    {
+        'name': 'Duplicati',
+        'icon': 'duplicati.png',
+        'href': f'https://duplicati.{DOMAIN}',
+        'description': 'Backup System',
+        'group': 'Storage',
+        'widget': {
+            'type': 'duplicati',
+            'url': 'http://duplicati:8200',
+            'key': 'your_duplicati_api_key'
+        }
+    },
+    
+    # Security Services
+    {
+        'name': 'CrowdSec',
+        'icon': 'crowdsec.png',
+        'href': f'https://crowdsec.{DOMAIN}',
+        'description': 'Security Monitoring',
+        'group': 'Security',
+        'widget': {
+            'type': 'crowdsec',
+            'url': 'http://crowdsec:8080',
+            'key': 'your_crowdsec_api_key'
+        }
+    },
+    {
+        'name': 'Fail2ban',
+        'icon': 'fail2ban.png',
+        'href': f'https://fail2ban.{DOMAIN}',
+        'description': 'Intrusion Prevention',
+        'group': 'Security',
+        'widget': {
+            'type': 'fail2ban',
+            'url': 'http://fail2ban:8080',
+            'key': 'your_fail2ban_api_key'
+        }
+    },
+    {
+        'name': 'Vaultwarden',
+        'icon': 'vaultwarden.png',
+        'href': f'https://vault.{DOMAIN}',
+        'description': 'Password Manager',
+        'group': 'Security',
+        'widget': {
+            'type': 'vaultwarden',
+            'url': 'http://vaultwarden:80'
+        }
+    },
+    
+    # Development Services
+    {
+        'name': 'GitLab',
+        'icon': 'gitlab.png',
+        'href': f'https://gitlab.{DOMAIN}',
+        'description': 'Git Repository Management',
+        'group': 'Development',
+        'widget': {
+            'type': 'gitlab',
+            'url': 'http://gitlab:80',
+            'key': 'your_gitlab_api_key'
+        }
+    },
+    {
+        'name': 'Harbor',
+        'icon': 'harbor.png',
+        'href': f'https://harbor.{DOMAIN}',
+        'description': 'Container Registry',
+        'group': 'Development',
+        'widget': {
+            'type': 'harbor',
+            'url': 'http://harbor:80',
+            'key': 'your_harbor_api_key'
+        }
+    },
+    {
+        'name': 'Code Server',
+        'icon': 'codeserver.png',
+        'href': f'https://code.{DOMAIN}',
+        'description': 'Web IDE',
+        'group': 'Development',
+        'widget': {
+            'type': 'codeserver',
+            'url': 'http://code-server:8080'
+        }
+    },
+    {
+        'name': 'Guacamole',
+        'icon': 'guacamole.png',
+        'href': f'https://guac.{DOMAIN}',
+        'description': 'Remote Desktop Gateway',
+        'group': 'Development',
+        'widget': {
+            'type': 'guacamole',
+            'url': 'http://guacamole:8080',
+            'key': 'your_guacamole_api_key'
+        }
+    },
+    
+    # Automation Services
+    {
+        'name': 'Home Assistant',
+        'icon': 'homeassistant.png',
+        'href': f'https://homeassistant.{DOMAIN}',
+        'description': 'Home Automation',
+        'group': 'Automation',
+        'widget': {
+            'type': 'homeassistant',
+            'url': 'http://homeassistant:8123',
+            'key': 'your_homeassistant_api_key'
+        }
+    },
+    {
+        'name': 'Zigbee2MQTT',
+        'icon': 'zigbee2mqtt.png',
+        'href': f'https://zigbee2mqtt.{DOMAIN}',
+        'description': 'Zigbee Gateway',
+        'group': 'Automation',
+        'widget': {
+            'type': 'zigbee2mqtt',
+            'url': 'http://zigbee2mqtt:8080'
+        }
+    },
+    {
+        'name': 'Node-RED',
+        'icon': 'nodered.png',
+        'href': f'https://nodered.{DOMAIN}',
+        'description': 'Flow Automation',
+        'group': 'Automation',
+        'widget': {
+            'type': 'nodered',
+            'url': 'http://nodered:1880'
+        }
+    },
+    {
+        'name': 'n8n',
+        'icon': 'n8n.png',
+        'href': f'https://n8n.{DOMAIN}',
+        'description': 'Workflow Automation',
+        'group': 'Automation',
+        'widget': {
+            'type': 'n8n',
+            'url': 'http://n8n:5678'
+        }
+    },
+    
+    # Utility Services
+    {
+        'name': 'Homepage',
+        'icon': 'homepage.png',
+        'href': f'https://homepage.{DOMAIN}',
+        'description': 'Dashboard',
+        'group': 'Utilities'
+    },
+    {
+        'name': 'Watchtower',
+        'icon': 'watchtower.png',
+        'href': f'https://watchtower.{DOMAIN}',
+        'description': 'Container Updates',
+        'group': 'Utilities'
+    },
+    {
+        'name': 'Heimdall',
+        'icon': 'heimdall.png',
+        'href': f'https://heimdall.{DOMAIN}',
+        'description': 'Application Dashboard',
+        'group': 'Utilities',
+        'widget': {
+            'type': 'heimdall',
+            'url': 'http://heimdall:80'
+        }
+    },
+    {
+        'name': 'Homarr',
+        'icon': 'homarr.png',
+        'href': f'https://homarr.{DOMAIN}',
+        'description': 'Dashboard',
+        'group': 'Utilities',
+        'widget': {
+            'type': 'homarr',
+            'url': 'http://homarr:7575'
+        }
+    }
+]
+
+# Bookmark configurations
+BOOKMARKS = {
+    'Infrastructure': {
+        'Dashboard': [
+            {'name': 'Homepage', 'url': f'https://homepage.{DOMAIN}'},
+            {'name': 'Heimdall', 'url': f'https://heimdall.{DOMAIN}'},
+            {'name': 'Homarr', 'url': f'https://homarr.{DOMAIN}'}
+        ],
+        'Monitoring': [
+            {'name': 'Grafana', 'url': f'https://grafana.{DOMAIN}'},
+            {'name': 'Prometheus', 'url': f'https://prometheus.{DOMAIN}'},
+            {'name': 'Uptime Kuma', 'url': f'https://uptime.{DOMAIN}'},
+            {'name': 'Dashdot', 'url': f'https://dashdot.{DOMAIN}'}
+        ],
+        'Management': [
+            {'name': 'Portainer', 'url': f'https://portainer.{DOMAIN}'},
+            {'name': 'Traefik', 'url': f'https://traefik.{DOMAIN}'},
+            {'name': 'Authentik', 'url': f'https://auth.{DOMAIN}'},
+            {'name': 'GitLab', 'url': f'https://gitlab.{DOMAIN}'},
+            {'name': 'Harbor', 'url': f'https://harbor.{DOMAIN}'}
+        ]
+    },
+    'Media': {
+        'Streaming': [
+            {'name': 'Jellyfin', 'url': f'https://jellyfin.{DOMAIN}'},
+            {'name': 'Overseerr', 'url': f'https://overseerr.{DOMAIN}'},
+            {'name': 'Tautulli', 'url': f'https://tautulli.{DOMAIN}'}
+        ],
+        'Management': [
+            {'name': 'Sonarr', 'url': f'https://sonarr.{DOMAIN}'},
+            {'name': 'Radarr', 'url': f'https://radarr.{DOMAIN}'},
+            {'name': 'Lidarr', 'url': f'https://lidarr.{DOMAIN}'},
+            {'name': 'Readarr', 'url': f'https://readarr.{DOMAIN}'},
+            {'name': 'Prowlarr', 'url': f'https://prowlarr.{DOMAIN}'},
+            {'name': 'Bazarr', 'url': f'https://bazarr.{DOMAIN}'},
+            {'name': 'Requestrr', 'url': f'https://requestrr.{DOMAIN}'},
+            {'name': 'Unmanic', 'url': f'https://unmanic.{DOMAIN}'}
+        ]
+    },
+    'Storage': {
+        'Files': [
+            {'name': 'Nextcloud', 'url': f'https://nextcloud.{DOMAIN}'},
+            {'name': 'FileBrowser', 'url': f'https://files.{DOMAIN}'},
+            {'name': 'MinIO', 'url': f'https://minio.{DOMAIN}'}
+        ],
+        'Documents': [
+            {'name': 'Paperless', 'url': f'https://paperless.{DOMAIN}'},
+            {'name': 'BookStack', 'url': f'https://bookstack.{DOMAIN}'}
+        ],
+        'Photos': [
+            {'name': 'Immich', 'url': f'https://immich.{DOMAIN}'}
+        ],
+        'Backup': [
+            {'name': 'Kopia', 'url': f'https://kopia.{DOMAIN}'},
+            {'name': 'Duplicati', 'url': f'https://duplicati.{DOMAIN}'}
+        ]
+    },
+    'Automation': {
+        'Smart Home': [
+            {'name': 'Home Assistant', 'url': f'https://homeassistant.{DOMAIN}'},
+            {'name': 'Zigbee2MQTT', 'url': f'https://zigbee2mqtt.{DOMAIN}'}
+        ],
+        'Workflows': [
+            {'name': 'Node-RED', 'url': f'https://nodered.{DOMAIN}'},
+            {'name': 'n8n', 'url': f'https://n8n.{DOMAIN}'}
+        ]
+    },
+    'Development': {
+        'Tools': [
+            {'name': 'Code Server', 'url': f'https://code.{DOMAIN}'},
+            {'name': 'Guacamole', 'url': f'https://guac.{DOMAIN}'}
+        ],
+        'Security': [
+            {'name': 'Vaultwarden', 'url': f'https://vault.{DOMAIN}'}
+        ]
+    },
+    'External': {
+        'Documentation': [
+            {'name': 'Homepage Docs', 'url': 'https://gethomepage.dev'},
+            {'name': 'Ansible Docs', 'url': 'https://docs.ansible.com'},
+            {'name': 'Docker Docs', 'url': 'https://docs.docker.com'},
+            {'name': 'Traefik Docs', 'url': 'https://doc.traefik.io'}
+        ],
+        'Community': [
+            {'name': 'Reddit r/homelab', 'url': 'https://reddit.com/r/homelab'},
+            {'name': 'Reddit r/selfhosted', 'url': 'https://reddit.com/r/selfhosted'},
+            {'name': 'Discord', 'url': 'https://discord.gg/homelab'}
+        ]
+    }
+}
+
+class HomepageAPI:
+    def __init__(self, base_url, api_secret=None):
+        self.base_url = base_url
+        self.api_secret = api_secret
+        self.session = requests.Session()
+        
+        if api_secret:
+            self.session.headers.update({'Authorization': f'Bearer {api_secret}'})
+        
+    def wait_for_homepage(self):
+        """Wait for Homepage to be ready"""
+        print("Waiting for Homepage to be ready...")
+        max_attempts = 30
+        for attempt in range(max_attempts):
+            try:
+                response = self.session.get(f"{self.base_url}/api/health", timeout=10)
+                if response.status_code in [200, 302, 401]:
+                    print("Homepage is ready!")
+                    return True
+            except requests.exceptions.RequestException:
+                pass
+            
+            print(f"Attempt {attempt + 1}/{max_attempts}: Homepage not ready yet...")
+            time.sleep(10)
+        
+        print("Error: Homepage did not become ready in time")
+        return False
+    
+    def configure_services(self, services):
+        """Configure services in Homepage"""
+        print("Configuring services...")
+        
+        for service in services:
+            try:
+                # Create service configuration
+                service_data = {
+                    'name': service['name'],
+                    'icon': service['icon'],
+                    'href': service['href'],
+                    'description': service['description'],
+                    'group': service['group']
+                }
+                
+                if 'widget' in service:
+                    service_data['widget'] = service['widget']
+                
+                # Send to Homepage API
+                response = self.session.post(
+                    f"{self.base_url}/api/services",
+                    json=service_data,
+                    timeout=30
+                )
+                
+                if response.status_code in [200, 201]:
+                    print(f"Configured service: {service['name']}")
+                elif response.status_code == 409:
+                    print(f"Service {service['name']} already exists")
+                else:
+                    print(f"Error configuring service {service['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                print(f"Error configuring service {service['name']}: {str(e)}")
+    
+    def configure_bookmarks(self, bookmarks):
+        """Configure bookmarks in Homepage"""
+        print("Configuring bookmarks...")
+        
+        for category, subcategories in bookmarks.items():
+            for subcategory, links in subcategories.items():
+                try:
+                    bookmark_data = {
+                        'category': category,
+                        'subcategory': subcategory,
+                        'links': links
+                    }
+                    
+                    # Send to Homepage API
+                    response = self.session.post(
+                        f"{self.base_url}/api/bookmarks",
+                        json=bookmark_data,
+                        timeout=30
+                    )
+                    
+                    if response.status_code in [200, 201]:
+                        print(f"Configured bookmarks: {category} > {subcategory}")
+                    elif response.status_code == 409:
+                        print(f"Bookmarks {category} > {subcategory} already exist")
+                    else:
+                        print(f"Error configuring bookmarks {category} > {subcategory}: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"Error configuring bookmarks {category} > {subcategory}: {str(e)}")
+    
+    def configure_weather(self, lat, lon, api_key):
+        """Configure weather widget"""
+        if not api_key:
+            print("Weather API key not provided, skipping weather configuration")
+            return
+        
+        print("Configuring weather widget...")
+        
+        try:
+            weather_data = {
+                'lat': lat,
+                'lon': lon,
+                'api_key': api_key
+            }
+            
+            response = self.session.post(
+                f"{self.base_url}/api/weather",
+                json=weather_data,
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                print("Weather widget configured successfully")
+            else:
+                print(f"Error configuring weather widget: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error configuring weather widget: {str(e)}")
+    
+    def configure_theme(self, theme_config):
+        """Configure theme and appearance"""
+        print("Configuring theme...")
+        
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/config",
+                json=theme_config,
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                print("Theme configured successfully")
+            else:
+                print(f"Error configuring theme: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error configuring theme: {str(e)}")
+
+def main():
+    print("Starting Homepage configuration...")
+    
+    # Initialize API client
+    api = HomepageAPI(HOMEPAGE_URL, HOMEPAGE_API_SECRET)
+    
+    # Wait for Homepage to be ready
+    if not api.wait_for_homepage():
+        sys.exit(1)
+    
+    # Configure services
+    api.configure_services(SERVICES)
+    
+    # Configure bookmarks
+    api.configure_bookmarks(BOOKMARKS)
+    
+    # Configure weather widget
+    api.configure_weather(WEATHER_LAT, WEATHER_LON, WEATHER_API_KEY)
+    
+    # Configure theme
+    theme_config = {
+        'title': 'Homelab Dashboard',
+        'description': 'Enhanced Homelab Infrastructure Dashboard',
+        'theme': 'dark',
+        'language': 'en',
+        'units': 'metric',
+        'timezone': 'America/New_York',
+        'background': 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop',
+        'favicon': 'https://raw.githubusercontent.com/gethomepage/homepage/main/public/favicon.ico',
+        'icons': 'https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons'
+    }
+    api.configure_theme(theme_config)
+    
+    print("\nHomepage configuration completed successfully!")
+    print(f"Access Homepage at: https://homepage.{DOMAIN}")
+    print("All services and bookmarks have been configured")
+
+if __name__ == "__main__":
+    main() 

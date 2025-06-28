@@ -1,0 +1,352 @@
+# Homepage Traefik Integration Configuration
+# Configures reverse proxy, SSL, and authentication middleware
+
+# =============================================================================
+# REVERSE PROXY CONFIGURATION
+# =============================================================================
+
+reverse_proxy:
+  enabled: true
+  
+  # Service Configuration
+  service:
+    name: "homepage"
+    port: "{{ homepage_port }}"
+    protocol: "http"
+    
+  # Domain Configuration
+  domain:
+    primary: "{{ homepage_subdomain }}.{{ domain }}"
+    aliases: []
+    redirect_www: false
+    
+  # SSL Configuration
+  ssl:
+    enabled: true
+    cert_resolver: "letsencrypt"
+    force_redirect: true
+    hsts_enabled: true
+    hsts_max_age: 31536000
+    hsts_include_subdomains: true
+    hsts_preload: true
+    
+  # Health Check Configuration
+  health_check:
+    enabled: true
+    path: "/api/health"
+    interval: "30s"
+    timeout: "5s"
+    retries: 3
+    headers:
+      Host: "{{ homepage_subdomain }}.{{ domain }}"
+      
+# =============================================================================
+# MIDDLEWARE CONFIGURATION
+# =============================================================================
+
+middleware:
+  # Authentication Forward Middleware
+  auth_forward:
+    enabled: true
+    name: "homepage-auth"
+    address: "https://{{ authentik_subdomain }}.{{ domain }}/outpost.goauthentik.io/auth/traefik"
+    trust_forward_header: true
+    auth_response_headers:
+      - "X-User"
+      - "X-Email"
+      - "X-Groups"
+      - "X-Authentik-Username"
+      - "X-Authentik-Groups"
+      - "X-Authentik-Email"
+    auth_response_headers_set: true
+    auth_response_headers_remove: false
+    
+  # Security Headers Middleware
+  security_headers:
+    enabled: true
+    name: "homepage-security-headers"
+    headers:
+      X-Frame-Options: "DENY"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+      
+  # Rate Limiting Middleware
+  rate_limiting:
+    enabled: true
+    name: "homepage-rate-limit"
+    rate_limit:
+      burst: 100
+      average: 50
+      
+  # Compression Middleware
+  compression:
+    enabled: true
+    name: "homepage-compression"
+    compress:
+      excluded_content_types:
+        - "text/event-stream"
+        
+  # CORS Middleware
+  cors:
+    enabled: false
+    name: "homepage-cors"
+    cors:
+      allowed_origins:
+        - "https://{{ homepage_subdomain }}.{{ domain }}"
+      allowed_methods:
+        - "GET"
+        - "POST"
+        - "PUT"
+        - "DELETE"
+        - "OPTIONS"
+      allowed_headers:
+        - "Content-Type"
+        - "Authorization"
+        - "X-Requested-With"
+      allow_credentials: true
+      max_age: 86400
+      
+# =============================================================================
+# ROUTER CONFIGURATION
+# =============================================================================
+
+router:
+  enabled: true
+  name: "homepage-router"
+  
+  # Router Rules
+  rules:
+    - rule: "Host(`{{ homepage_subdomain }}.{{ domain }}`)"
+      priority: 1
+      service: "homepage"
+      middlewares:
+        - "homepage-security-headers"
+        - "homepage-compression"
+        - "homepage-rate-limit"
+        
+  # TLS Configuration
+  tls:
+    enabled: true
+    cert_resolver: "letsencrypt"
+    domains:
+      - main: "{{ homepage_subdomain }}.{{ domain }}"
+        
+  # Entry Points
+  entry_points:
+    - "websecure"
+    
+# =============================================================================
+# SERVICE CONFIGURATION
+# =============================================================================
+
+service:
+  enabled: true
+  name: "homepage-service"
+  
+  # Load Balancer Configuration
+  load_balancer:
+    servers:
+      - url: "http://homepage:{{ homepage_port }}"
+    health_check:
+      path: "/api/health"
+      interval: "30s"
+      timeout: "5s"
+      retries: 3
+      
+  # Service Discovery
+  discovery:
+    enabled: true
+    type: "docker"
+    network: "{{ homepage_network }}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`{{ homepage_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.homepage.tls=true"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homepage.loadbalancer.server.port={{ homepage_port }}"
+      
+# =============================================================================
+# AUTHENTICATION INTEGRATION
+# =============================================================================
+
+authentication:
+  enabled: true
+  
+  # Forward Authentication
+  forward_auth:
+    enabled: true
+    address: "https://{{ authentik_subdomain }}.{{ domain }}/outpost.goauthentik.io/auth/traefik"
+    trust_forward_header: true
+    auth_response_headers:
+      - "X-User"
+      - "X-Email"
+      - "X-Groups"
+      
+  # Public Routes (No Authentication Required)
+  public_routes:
+    - "/api/health"
+    - "/health"
+    - "/metrics"
+    - "/favicon.ico"
+    - "/robots.txt"
+    
+  # Protected Routes
+  protected_routes:
+    - "/"
+    - "/api/*"
+    - "/admin/*"
+    
+# =============================================================================
+# MONITORING INTEGRATION
+# =============================================================================
+
+monitoring:
+  enabled: true
+  
+  # Metrics Configuration
+  metrics:
+    enabled: true
+    prometheus: true
+    statsd: false
+    
+  # Access Logs
+  access_logs:
+    enabled: true
+    format: "json"
+    fields:
+      default_mode: "keep"
+      headers:
+        default_mode: "drop"
+        
+  # Health Check Monitoring
+  health_checks:
+    enabled: true
+    interval: "30s"
+    timeout: "5s"
+    retries: 3
+    
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+security:
+  # IP Whitelist
+  ip_whitelist:
+    enabled: false
+    source_range:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+      
+  # IP Blacklist
+  ip_blacklist:
+    enabled: false
+    source_range: []
+    
+  # Request Filtering
+  request_filtering:
+    enabled: true
+    max_body_size: "10MB"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      
+  # DDoS Protection
+  ddos_protection:
+    enabled: true
+    rate_limit:
+      burst: 100
+      average: 50
+    connection_limit: 1000
+    
+# =============================================================================
+# PERFORMANCE OPTIMIZATION
+# =============================================================================
+
+performance:
+  # Caching
+  caching:
+    enabled: true
+    headers:
+      - "Cache-Control"
+      - "ETag"
+      - "Last-Modified"
+    static_files:
+      - "*.css"
+      - "*.js"
+      - "*.png"
+      - "*.jpg"
+      - "*.ico"
+      
+  # Compression
+  compression:
+    enabled: true
+    min_size: 1024
+    excluded_content_types:
+      - "text/event-stream"
+      
+  # Connection Optimization
+  connection:
+    keep_alive: true
+    keep_alive_timeout: "30s"
+    max_idle_conns: 100
+    idle_conn_timeout: "90s"
+    
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+
+error_handling:
+  enabled: true
+  
+  # Error Pages
+  error_pages:
+    enabled: true
+    pages:
+      "404": "/404.html"
+      "500": "/500.html"
+      "502": "/502.html"
+      "503": "/503.html"
+      
+  # Circuit Breaker
+  circuit_breaker:
+    enabled: true
+    expression: "NetworkErrorRatio() > 0.5"
+    
+  # Retry Configuration
+  retry:
+    enabled: true
+    attempts: 3
+    initial_interval: "100ms"
+    
+# =============================================================================
+# BACKUP AND RECOVERY
+# =============================================================================
+
+backup:
+  enabled: true
+  
+  # Configuration Backup
+  config_backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention_days: 30
+    
+  # SSL Certificate Backup
+  ssl_backup:
+    enabled: true
+    include_certs: true
+    include_keys: false
+    
+  # Recovery Procedures
+  recovery:
+    enabled: true
+    auto_restore: false
+    validate_backup: true 

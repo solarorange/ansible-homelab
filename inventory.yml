@@ -1,48 +1,56 @@
-# Enhanced Watchtower Inventory
-# Configure your Proxmox VM details here
+---
+# Homelab Inventory Configuration
+# Production-ready inventory for homelab deployment
 
-# Single VM deployment (recommended for most Watchtower deployments)
-[watchtower_all]
-watchtower ansible_host=192.168.40.100 ansible_user=watchtower
+all:
+  children:
+    homelab_core:
+      hosts:
+        core1:
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_1') | default('192.168.1.100') }}"
+          ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+        core2:
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_2') | default('192.168.1.101') }}"
+          ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+        core3:
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_3') | default('192.168.1.102') }}"
+          ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+        core4:
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_4') | default('192.168.1.103') }}"
+          ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+      vars:
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_ssh_private_key_file: "{{ lookup('env', 'SSH_PRIVATE_KEY_FILE') | default('~/.ssh/homelab_key') }}"
+        ansible_ssh_pipelining: true
+        ansible_ssh_retries: 3
+        ansible_become: true
+        ansible_become_method: sudo
+        ansible_become_user: root
+        ansible_gather_timeout: 30
+        ansible_timeout: 300
 
-# Group all Watchtower servers
-[watchtower:children]
-watchtower_all
+    ansible_control:
+      hosts:
+        ansible:
+          ansible_host: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('192.168.1.99') }}"
+          ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+      vars:
+        ansible_connection: local
 
-# Common variables for all Watchtower servers
-[watchtower:vars]
-# SSH Configuration
-ansible_ssh_private_key_file=~/.ssh/watchtower_key
-ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
-ansible_python_interpreter=/usr/bin/python3
-
-# Connection settings
-ansible_connection=ssh
-ansible_ssh_pipelining=true
-ansible_ssh_retries=3
-
-# Privilege escalation
-ansible_become=true
-ansible_become_method=sudo
-ansible_become_user=root
-
-# Performance tuning
-ansible_gather_timeout=30
-ansible_timeout=300
-
-# Network segmentation
+# Network segmentation configuration
 network_segments:
-  - name: watchtower
-    subnet: 192.168.40.0/24
-    gateway: 192.168.40.1
+  - name: homelab
+    subnet: "{{ lookup('env', 'HOMELAB_SUBNET') | default('192.168.1.0/24') }}"
+    gateway: "{{ lookup('env', 'HOMELAB_GATEWAY') | default('192.168.1.1') }}"
 
 # Resource limits
 resource_limits:
-  cpu_shares: 1024
-  memory_limit: 2G
-  memory_swap: 4G
-  memory_reservation: 1G
-  cpus: 2
+  cpu_shares: "{{ lookup('env', 'CPU_SHARES') | default('1024') | int }}"
+  memory_limit: "{{ lookup('env', 'MEMORY_LIMIT') | default('2G') }}"
+  memory_swap: "{{ lookup('env', 'MEMORY_SWAP') | default('4G') }}"
+  memory_reservation: "{{ lookup('env', 'MEMORY_RESERVATION') | default('1G') }}"
+  cpus: "{{ lookup('env', 'CPU_LIMIT') | default('2') | int }}"
 
 # Service configuration
 enabled_services:
@@ -55,59 +63,7 @@ enabled_services:
   - automation_stack
 
 # Feature toggles
-monitoring_enabled: true
-media_enabled: true
-security_enhanced: true
-automation_enabled: true
-
-# Example configurations for different deployment scenarios:
-
-# Multi-VM deployment (for larger setups)
-# [watchtower_core]
-# watchtower-core ansible_host=192.168.40.100 ansible_user=watchtower
-# 
-# [watchtower_monitoring]
-# watchtower-mon ansible_host=192.168.40.101 ansible_user=watchtower
-# 
-# [watchtower_automation]
-# watchtower-auto ansible_host=192.168.40.102 ansible_user=watchtower
-# 
-# [watchtower_security]
-# watchtower-sec ansible_host=192.168.40.103 ansible_user=watchtower
-
-# Cloud deployment (VPS/dedicated servers)
-# [watchtower_cloud]
-# watchtower ansible_host=your.domain.com ansible_user=ubuntu ansible_port=22
-
-# Development/testing environment
-# [watchtower_dev]
-# dev ansible_host=127.0.0.1 ansible_user=vagrant ansible_port=2222
-
----
-all:
-  children:
-    homelab_core:
-      hosts:
-        core1:
-          ansible_host: 192.168.40.100
-          ansible_user: homelab
-        core2:
-          ansible_host: 192.168.40.101
-          ansible_user: homelab
-        core3:
-          ansible_host: 192.168.40.102
-          ansible_user: homelab
-        core4:
-          ansible_host: 192.168.40.103
-          ansible_user: homelab
-      vars:
-        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-        ansible_python_interpreter: /usr/bin/python3
-
-    ansible_control:
-      hosts:
-        ansible:
-          ansible_host: 192.168.40.99
-          ansible_user: homelab
-      vars:
-        ansible_connection: local
+monitoring_enabled: "{{ lookup('env', 'MONITORING_ENABLED') | default('true') | bool }}"
+media_enabled: "{{ lookup('env', 'MEDIA_ENABLED') | default('true') | bool }}"
+security_enhanced: "{{ lookup('env', 'SECURITY_ENHANCED') | default('true') | bool }}"
+automation_enabled: "{{ lookup('env', 'AUTOMATION_ENABLED') | default('true') | bool }}"

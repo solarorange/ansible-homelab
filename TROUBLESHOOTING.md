@@ -1,500 +1,542 @@
-# Troubleshooting Guide
-
-This guide provides solutions for common issues that may arise during deployment and operation of the homelab environment.
-
-## Table of Contents
-- [Common Issues](#common-issues)
-- [Debugging Procedures](#debugging-procedures)
-- [Log Analysis](#log-analysis)
-- [Network Troubleshooting](#network-troubleshooting)
-- [Service-Specific Issues](#service-specific-issues)
-- [Recovery Procedures](#recovery-procedures)
-
-## Common Issues
-
-### Ansible Playbook Issues
-
-1. **Playbook Syntax Errors**
-   ```bash
-   # Check playbook syntax
-   ansible-playbook main.yml --syntax-check
-   
-   # Validate variable files
-   ansible-playbook main.yml --check
-   ```
-
-2. **Connection Issues**
-   ```bash
-   # Test SSH connectivity
-   ansible all -m ping
-   
-   # Check SSH configuration
-   ansible all -m shell -a "cat /etc/ssh/sshd_config"
-   
-   # Verify SSH keys
-   ansible all -m shell -a "ls -la ~/.ssh/"
-   ```
-
-3. **Permission Issues**
-   ```bash
-   # Check file permissions
-   ansible all -m shell -a "ls -la /etc/ansible/"
-   
-   # Verify sudo access
-   ansible all -m shell -a "sudo -l"
-   ```
-
-### Proxmox Issues
-
-1. **API Connection Issues**
-   ```bash
-   # Test Proxmox API connection
-   curl -k -s https://proxmox:8006/api2/json/cluster/status \
-     -H "Authorization: PVEAPIToken=root@pam!tokenid=tokensecret"
-   
-   # Check API token validity
-   pveum token list
-   ```
-
-2. **Resource Allocation Issues**
-   ```bash
-   # Check available resources
-   pvesh get /cluster/resources
-   
-   # Verify storage space
-   pvesh get /storage
-   ```
-
-3. **VM Deployment Issues**
-   ```bash
-   # Check VM status
-   qm list
-   
-   # View VM configuration
-   qm config <vmid>
-   
-   # Check VM logs
-   tail -f /var/log/pve/tasks/<vmid>.log
-   ```
-
-### Docker Issues
-
-1. **Container Startup Issues**
-   ```bash
-   # Check container status
-   docker ps -a
-   
-   # View container logs
-   docker logs <container_id>
-   
-   # Check container configuration
-   docker inspect <container_id>
-   ```
-
-2. **Network Issues**
-   ```bash
-   # Check Docker network
-   docker network ls
-   docker network inspect bridge
-   
-   # Verify port mappings
-   docker port <container_id>
-   ```
-
-3. **Volume Issues**
-   ```bash
-   # Check volume status
-   docker volume ls
-   docker volume inspect <volume_name>
-   
-   # Verify mount points
-   mount | grep docker
-   ```
-
-## Debugging Procedures
-
-### System Debugging
-
-1. **Check System Resources**
-   ```bash
-   # CPU usage
-   top -b -n 1
-   
-   # Memory usage
-   free -h
-   
-   # Disk usage
-   df -h
-   
-   # Network usage
-   iftop
-   ```
-
-2. **Check System Logs**
-   ```bash
-   # System logs
-   journalctl -xe
-   
-   # Kernel logs
-   dmesg | tail
-   
-   # Service logs
-   systemctl status <service_name>
-   ```
-
-3. **Check Network Configuration**
-   ```bash
-   # Network interfaces
-   ip a
-   
-   # Routing table
-   ip route
-   
-   # DNS configuration
-   cat /etc/resolv.conf
-   ```
-
-### Service Debugging
-
-1. **Check Service Status**
-   ```bash
-   # All services
-   systemctl list-units --type=service --state=failed
-   
-   # Specific service
-   systemctl status <service_name>
-   ```
-
-2. **Check Service Logs**
-   ```bash
-   # Service logs
-   journalctl -u <service_name>
-   
-   # Application logs
-   tail -f /var/log/<service_name>/error.log
-   ```
-
-3. **Check Service Configuration**
-   ```bash
-   # Service configuration
-   systemctl cat <service_name>
-   
-   # Environment variables
-   systemctl show <service_name>
-   ```
-
-## Log Analysis
-
-### Ansible Logs
-
-1. **Enable Verbose Logging**
-   ```bash
-   # Run playbook with verbose output
-   ansible-playbook main.yml -vvv
-   
-   # Save output to log file
-   ansible-playbook main.yml -vvv > ansible.log 2>&1
-   ```
-
-2. **Check Ansible Logs**
-   ```bash
-   # View Ansible log
-   tail -f ansible.log
-   
-   # Search for errors
-   grep -i "error" ansible.log
-   ```
-
-### System Logs
-
-1. **Check System Logs**
-   ```bash
-   # View system log
-   journalctl -xe
-   
-   # View kernel log
-   dmesg | tail
-   
-   # View boot log
-   journalctl -b
-   ```
-
-2. **Check Application Logs**
-   ```bash
-   # View application logs
-   tail -f /var/log/<application>/error.log
-   
-   # Search for errors
-   grep -i "error" /var/log/<application>/*.log
-   ```
-
-## Network Troubleshooting
-
-### Basic Network Checks
-
-1. **Check Network Connectivity**
-   ```bash
-   # Ping test
-   ping -c 4 <host>
-   
-   # Traceroute
-   traceroute <host>
-   
-   # DNS resolution
-   dig <host>
-   ```
-
-2. **Check Port Availability**
-   ```bash
-   # Port scan
-   nc -zv <host> <port>
-   
-   # Check listening ports
-   netstat -tulpn
-   ```
-
-3. **Check Firewall Rules**
-   ```bash
-   # View iptables rules
-   iptables -L -n -v
-   
-   # Check UFW status
-   ufw status
-   ```
-
-### Advanced Network Debugging
-
-1. **Packet Capture**
-   ```bash
-   # Capture packets
-   tcpdump -i any -w capture.pcap
-   
-   # Analyze packets
-   tcpdump -r capture.pcap -n
-   ```
-
-2. **Network Performance**
-   ```bash
-   # Bandwidth test
-   iperf3 -c <server>
-   
-   # Network quality
-   mtr <host>
-   ```
-
-## Service-Specific Issues
-
-### Traefik Issues
-
-1. **Check Traefik Status**
-   ```bash
-   # View Traefik status
-   curl -k https://traefik.your-domain.com/api/rawdata
-   
-   # Check Traefik logs
-   docker logs traefik
-   ```
-
-2. **Common Traefik Issues**
-   - SSL certificate issues
-   - Routing configuration problems
-   - Middleware configuration errors
-
-### Monitoring Stack Issues
-
-1. **Prometheus Issues**
-   ```bash
-   # Check Prometheus status
-   curl -k https://prometheus.your-domain.com/api/v1/status/config
-   
-   # Check target status
-   curl -k https://prometheus.your-domain.com/api/v1/targets
-   ```
-
-2. **Grafana Issues**
-   ```bash
-   # Check Grafana status
-   curl -k https://grafana.your-domain.com/api/health
-   
-   # Check dashboard status
-   curl -k https://grafana.your-domain.com/api/dashboards
-   ```
-
-### Security Services Issues
-
-1. **CrowdSec Issues**
-   ```bash
-   # Check CrowdSec status
-   systemctl status crowdsec
-   
-   # View decisions
-   curl -k https://crowdsec.your-domain.com/v1/decisions
-   ```
-
-2. **Vault Issues**
-   ```bash
-   # Check Vault status
-   curl -k https://vault.your-domain.com/v1/sys/health
-   
-   # Check Vault logs
-   journalctl -u vault
-   ```
-
-### Certificate Management Issues
-
-1. **Certificate Renewal Issues**
-   ```bash
-   # Check certificate status
-   ansible-playbook main.yml --tags certificate_management -e "check_status=true"
-   
-   # View certificate logs
-   journalctl -u cert-manager
-   
-   # Check certificate configuration
-   kubectl get certificates -A
-   ```
-
-2. **SSL/TLS Issues**
-   ```bash
-   # Test SSL configuration
-   curl -vI https://your-domain.com
-   
-   # Check certificate chain
-   openssl s_client -connect your-domain.com:443 -servername your-domain.com
-   
-   # Verify certificate validity
-   openssl x509 -in /path/to/cert.pem -text -noout
-   ```
-
-### Logging Stack Issues
-
-1. **Log Aggregation Issues**
-   ```bash
-   # Check log shipping status
-   systemctl status filebeat
-   
-   # View log shipping logs
-   journalctl -u filebeat
-   
-   # Test log shipping
-   ansible-playbook main.yml --tags logging -e "test_shipping=true"
-   ```
-
-2. **Log Storage Issues**
-   ```bash
-   # Check log storage status
-   curl -k https://logging.your-domain.com/api/storage
-   
-   # Verify log retention
-   curl -k https://logging.your-domain.com/api/retention
-   
-   # Check disk space
-   df -h /var/log
-   ```
-
-3. **Log Analysis Issues**
-   ```bash
-   # Check log analysis status
-   curl -k https://logging.your-domain.com/api/analysis
-   
-   # View analysis logs
-   journalctl -u log-analysis
-   
-   # Test log analysis
-   ansible-playbook main.yml --tags logging -e "test_analysis=true"
-   ```
-
-## Recovery Procedures
-
-### System Recovery
-
-1. **Restore from Backup**
-   ```bash
-   # Restore VM
-   ansible-playbook main.yml --tags proxmox -e "vm_restore=true"
-   
-   # Restore service
-   ansible-playbook main.yml --tags "{{ service_name }}" -e "restore=true"
-   ```
-
-2. **Reset Configuration**
-   ```bash
-   # Reset service configuration
-   ansible-playbook main.yml --tags "{{ service_name }}" -e "reset=true"
-   
-   # Reset system configuration
-   ansible-playbook main.yml --tags reset
-   ```
-
-### Data Recovery
-
-1. **Restore Data**
-   ```bash
-   # Restore from backup
-   ansible-playbook main.yml --tags backup -e "restore=true"
-   
-   # Verify data integrity
-   ansible-playbook main.yml --tags backup -e "verify=true"
-   ```
-
-2. **Data Migration**
-   ```bash
-   # Migrate data
-   ansible-playbook main.yml --tags migrate
-   
-   # Verify migration
-   ansible-playbook main.yml --tags migrate -e "verify=true"
-   ```
-
-### Certificate Recovery
-
-1. **Restore Certificates**
-   ```bash
-   # Restore from backup
-   ansible-playbook main.yml --tags certificate_management -e "restore=true"
-   
-   # Verify certificate chain
-   openssl verify -CAfile /path/to/ca.pem /path/to/cert.pem
-   ```
-
-2. **Reset Certificate Management**
-   ```bash
-   # Reset configuration
-   ansible-playbook main.yml --tags certificate_management -e "reset=true"
-   
-   # Reinitialize certificates
-   ansible-playbook main.yml --tags certificate_management -e "reinitialize=true"
-   ```
-
-### Logging Recovery
-
-1. **Restore Logging System**
-   ```bash
-   # Restore from backup
-   ansible-playbook main.yml --tags logging -e "restore=true"
-   
-   # Verify log integrity
-   ansible-playbook main.yml --tags logging -e "verify=true"
-   ```
-
-2. **Reset Logging Configuration**
-   ```bash
-   # Reset configuration
-   ansible-playbook main.yml --tags logging -e "reset=true"
-   
-   # Reinitialize logging
-   ansible-playbook main.yml --tags logging -e "reinitialize=true"
-   ```
-
-## Getting Help
-
-If you encounter issues not covered in this guide:
-
-1. Check the [GitHub Issues](https://github.com/yourusername/ansible_homelab/issues) page
-2. Search the [Discussions](https://github.com/yourusername/ansible_homelab/discussions) forum
-3. Join our [Discord Server](https://discord.gg/your-server) for real-time support
-4. Submit a new issue with:
-   - Detailed error message
-   - Relevant logs
-   - System information
-   - Steps to reproduce 
+# 🔧 Troubleshooting Guide
+
+This guide covers common issues and their solutions for the Ansible Homelab deployment.
+
+## 📋 **Quick Diagnostic Commands**
+
+### System Health Check
+```bash
+# Check system resources
+htop
+df -h
+free -h
+
+# Check Docker status
+docker ps -a
+docker system df
+
+# Check service logs
+docker logs <service-name>
+
+# Check network connectivity
+ping 8.8.8.8
+nslookup your-domain.com
+```
+
+### Service Status Check
+```bash
+# Check all running services
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# Check specific service
+docker ps | grep <service-name>
+
+# Check service health
+docker inspect <service-name> | grep -A 10 "Health"
+```
+
+## 🚨 **Common Issues & Solutions**
+
+### Issue 1: Services Won't Start
+
+#### Symptoms
+- Services show "Exited" status
+- Docker containers fail to start
+- Error messages in logs
+
+#### Solutions
+
+**Check Docker Status:**
+```bash
+# Check Docker daemon
+systemctl status docker
+
+# Restart Docker if needed
+sudo systemctl restart docker
+
+# Check Docker logs
+journalctl -u docker -f
+```
+
+**Check Resource Limits:**
+```bash
+# Check available memory
+free -h
+
+# Check available disk space
+df -h
+
+# Check CPU usage
+top
+```
+
+**Check Port Conflicts:**
+```bash
+# Check what's using a port
+sudo netstat -tulpn | grep :<port>
+
+# Kill process using port (if needed)
+sudo kill -9 <PID>
+```
+
+**Check Service Logs:**
+```bash
+# View service logs
+docker logs <service-name>
+
+# Follow logs in real-time
+docker logs -f <service-name>
+
+# Check logs for specific time
+docker logs --since 1h <service-name>
+```
+
+### Issue 2: Domain Not Accessible
+
+#### Symptoms
+- Can't access services via domain
+- SSL certificate errors
+- DNS resolution issues
+
+#### Solutions
+
+**Check DNS Configuration:**
+```bash
+# Test DNS resolution
+nslookup your-domain.com
+dig your-domain.com
+
+# Check if DNS is pointing to your server
+nslookup traefik.your-domain.com
+```
+
+**Check Traefik Configuration:**
+```bash
+# Check Traefik logs
+docker logs traefik
+
+# Check Traefik configuration
+docker exec traefik traefik version
+docker exec traefik traefik healthcheck
+```
+
+**Check Firewall Settings:**
+```bash
+# Check UFW status
+sudo ufw status
+
+# Check if ports are open
+sudo netstat -tulpn | grep :80
+sudo netstat -tulpn | grep :443
+```
+
+**Check Cloudflare Settings:**
+1. Ensure SSL/TLS is set to "Full" or "Full (strict)"
+2. Check if DNS records are pointing to your server IP
+3. Verify API token has correct permissions
+
+### Issue 3: SSL Certificate Problems
+
+#### Symptoms
+- Browser shows SSL errors
+- Certificate not trusted
+- Mixed content warnings
+
+#### Solutions
+
+**Check Certificate Status:**
+```bash
+# Check certificate in Traefik
+docker logs traefik | grep -i cert
+
+# Check certificate expiration
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
+```
+
+**Verify Cloudflare Configuration:**
+1. **SSL/TLS Mode**: Set to "Full" or "Full (strict)"
+2. **Always Use HTTPS**: Enable
+3. **Minimum TLS Version**: Set to 1.2 or higher
+
+**Check Let's Encrypt Rate Limits:**
+```bash
+# Check certificate requests
+docker logs traefik | grep -i "rate limit"
+
+# Wait if rate limited (Let's Encrypt has limits)
+# Try again after 1 hour
+```
+
+**Manual Certificate Check:**
+```bash
+# Test certificate chain
+openssl s_client -connect your-domain.com:443 -servername your-domain.com -showcerts
+
+# Check certificate details
+echo | openssl s_client -servername your-domain.com -connect your-domain.com:443 2>/dev/null | openssl x509 -noout -dates
+```
+
+### Issue 4: Database Connection Errors
+
+#### Symptoms
+- Services can't connect to databases
+- Database connection timeout
+- Authentication failures
+
+#### Solutions
+
+**Check Database Status:**
+```bash
+# Check PostgreSQL
+docker ps | grep postgres
+docker logs postgresql
+
+# Check Redis
+docker ps | grep redis
+docker logs redis
+
+# Test database connections
+docker exec postgresql pg_isready
+docker exec redis redis-cli ping
+```
+
+**Check Database Credentials:**
+```bash
+# Test PostgreSQL connection
+docker exec postgresql psql -U homelab -d homelab -c "SELECT version();"
+
+# Test Redis connection
+docker exec redis redis-cli -a <password> ping
+```
+
+**Check Network Connectivity:**
+```bash
+# Test inter-container communication
+docker exec sonarr ping postgresql
+docker exec sonarr ping redis
+
+# Check Docker networks
+docker network ls
+docker network inspect homelab
+```
+
+### Issue 5: Authentication Issues
+
+#### Symptoms
+- Can't login to services
+- Authentik not working
+- Forward auth failures
+
+#### Solutions
+
+**Check Authentik Status:**
+```bash
+# Check Authentik logs
+docker logs authentik
+
+# Check Authentik health
+curl -f http://localhost:9000/if/user/
+
+# Check Authentik configuration
+docker exec authentik authentik version
+```
+
+**Verify Authentik Configuration:**
+1. Check admin credentials in vault
+2. Verify database connection
+3. Check application configuration
+
+**Check Traefik Forward Auth:**
+```bash
+# Check Traefik logs for auth errors
+docker logs traefik | grep -i auth
+
+# Test forward auth endpoint
+curl -I http://localhost:9000/outpost.goauthentik.io/auth/traefik
+```
+
+### Issue 6: Monitoring Not Working
+
+#### Symptoms
+- Grafana dashboards empty
+- Prometheus targets down
+- No metrics available
+
+#### Solutions
+
+**Check Prometheus:**
+```bash
+# Check Prometheus status
+docker logs prometheus
+
+# Check targets
+curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+
+# Check Prometheus configuration
+docker exec prometheus cat /etc/prometheus/prometheus.yml
+```
+
+**Check Grafana:**
+```bash
+# Check Grafana logs
+docker logs grafana
+
+# Check data sources
+curl -s -u admin:<password> http://localhost:3000/api/datasources
+
+# Test data source connections
+curl -s -u admin:<password> http://localhost:3000/api/datasources/1/health
+```
+
+**Check Exporters:**
+```bash
+# Check node exporter
+curl -s http://localhost:9100/metrics | head -10
+
+# Check postgres exporter
+curl -s http://localhost:9187/metrics | head -10
+
+# Check redis exporter
+curl -s http://localhost:9121/metrics | head -10
+```
+
+### Issue 7: Backup Failures
+
+#### Symptoms
+- Backup jobs failing
+- Backup files corrupted
+- Backup storage full
+
+#### Solutions
+
+**Check Backup Scripts:**
+```bash
+# Check backup script permissions
+ls -la /opt/scripts/backup/
+
+# Test backup script manually
+/opt/scripts/backup/backup.sh --test
+
+# Check backup logs
+tail -f /opt/logs/backup.log
+```
+
+**Check Storage Space:**
+```bash
+# Check backup directory space
+df -h /opt/backup
+
+# Check for old backups
+ls -la /opt/backup/
+
+# Clean up old backups if needed
+find /opt/backup -name "*.tar.gz" -mtime +30 -delete
+```
+
+**Check Database Backups:**
+```bash
+# Test PostgreSQL backup
+docker exec postgresql pg_dump -U homelab homelab > /tmp/test_backup.sql
+
+# Test Redis backup
+docker exec redis redis-cli --rdb /tmp/test_backup.rdb
+```
+
+### Issue 8: Performance Issues
+
+#### Symptoms
+- Slow service response
+- High resource usage
+- Timeout errors
+
+#### Solutions
+
+**Check Resource Usage:**
+```bash
+# Monitor system resources
+htop
+iotop
+nload
+
+# Check Docker resource usage
+docker stats
+
+# Check specific container resources
+docker stats <service-name>
+```
+
+**Optimize Resource Limits:**
+```bash
+# Check current resource limits
+docker inspect <service-name> | grep -A 10 "HostConfig"
+
+# Update resource limits in docker-compose.yml
+# Example:
+# deploy:
+#   resources:
+#     limits:
+#       memory: 1G
+#       cpus: '0.5'
+```
+
+**Check for Resource Leaks:**
+```bash
+# Check for zombie processes
+ps aux | grep defunct
+
+# Check for memory leaks
+free -h
+cat /proc/meminfo
+
+# Check disk I/O
+iostat -x 1 5
+```
+
+## 🔍 **Advanced Diagnostics**
+
+### Network Diagnostics
+```bash
+# Check Docker networks
+docker network ls
+docker network inspect homelab
+docker network inspect monitoring
+
+# Check routing
+ip route show
+ip addr show
+
+# Check DNS resolution
+cat /etc/resolv.conf
+systemd-resolve --status
+```
+
+### Service Dependencies
+```bash
+# Check service dependencies
+docker-compose -f /opt/docker/traefik/docker-compose.yml config
+
+# Check service startup order
+docker-compose -f /opt/docker/traefik/docker-compose.yml ps
+
+# Check service health
+docker-compose -f /opt/docker/traefik/docker-compose.yml exec traefik traefik healthcheck
+```
+
+### Log Analysis
+```bash
+# Search for errors in all logs
+find /opt/logs -name "*.log" -exec grep -l "ERROR\|FATAL\|CRITICAL" {} \;
+
+# Check recent errors
+find /opt/logs -name "*.log" -exec grep -H "ERROR" {} \; | tail -20
+
+# Monitor logs in real-time
+tail -f /opt/logs/*.log | grep -E "(ERROR|WARN|FATAL)"
+```
+
+### Configuration Validation
+```bash
+# Validate Ansible configuration
+ansible-playbook site.yml --syntax-check
+
+# Validate Docker Compose files
+docker-compose -f /opt/docker/*/docker-compose.yml config
+
+# Check environment variables
+env | grep -E "(DOMAIN|PASSWORD|TOKEN)"
+```
+
+## 🛠 **Recovery Procedures**
+
+### Service Recovery
+```bash
+# Restart a specific service
+docker-compose -f /opt/docker/<service>/docker-compose.yml restart
+
+# Restart all services
+docker-compose -f /opt/docker/*/docker-compose.yml restart
+
+# Force recreate a service
+docker-compose -f /opt/docker/<service>/docker-compose.yml up -d --force-recreate
+```
+
+### Database Recovery
+```bash
+# Restore PostgreSQL from backup
+docker exec -i postgresql psql -U homelab -d homelab < /opt/backup/postgresql_backup.sql
+
+# Restore Redis from backup
+docker exec redis redis-cli --rdb /opt/backup/redis_backup.rdb
+```
+
+### Configuration Recovery
+```bash
+# Restore from backup
+cp /opt/backup/config_backup.tar.gz /tmp/
+cd /tmp && tar -xzf config_backup.tar.gz
+
+# Restore specific configuration
+cp /opt/backup/traefik.yml /opt/config/traefik/
+```
+
+## 📞 **Getting Help**
+
+### Before Asking for Help
+1. **Check this troubleshooting guide**
+2. **Run diagnostic commands**
+3. **Collect relevant logs**
+4. **Note exact error messages**
+5. **Document your environment**
+
+### Information to Provide
+- **OS and version**
+- **Docker version**
+- **Ansible version**
+- **Error messages**
+- **Service logs**
+- **Configuration files**
+- **Steps to reproduce**
+
+### Support Channels
+- **GitHub Issues**: For bugs and feature requests
+- **GitHub Discussions**: For questions and help
+- **Documentation**: Check the main README and guides
+- **Community**: Join the community for support
+
+## 🔄 **Prevention Tips**
+
+### Regular Maintenance
+```bash
+# Weekly maintenance script
+#!/bin/bash
+# Update system packages
+apt update && apt upgrade -y
+
+# Update Docker images
+docker-compose -f /opt/docker/*/docker-compose.yml pull
+
+# Clean up Docker
+docker system prune -f
+
+# Check disk space
+df -h
+
+# Run health checks
+ansible-playbook tasks/health_check.yml --ask-vault-pass
+```
+
+### Monitoring Setup
+- Set up alerts for critical services
+- Monitor disk space and memory usage
+- Check SSL certificate expiration
+- Monitor backup success/failure
+
+### Backup Strategy
+- Regular automated backups
+- Test backup restoration
+- Store backups in multiple locations
+- Monitor backup storage space
+
+---
+
+**Remember**: Most issues can be resolved by checking logs and following the diagnostic steps above. When in doubt, start with the basic health checks and work your way through the troubleshooting process systematically. 

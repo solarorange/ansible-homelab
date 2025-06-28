@@ -1,0 +1,455 @@
+# Homepage Automation Configuration
+# Comprehensive configuration for automated Homepage setup and integration
+
+# =============================================================================
+# CORE AUTOMATION SETTINGS
+# =============================================================================
+
+automation:
+  enabled: true
+  mode: "auto"  # auto, manual, validate
+  log_level: "info"
+  backup_before_changes: true
+  validate_after_changes: true
+  retry_failed_operations: true
+  max_retries: 3
+  retry_delay: 30
+
+# =============================================================================
+# SERVICE DISCOVERY CONFIGURATION
+# =============================================================================
+
+service_discovery:
+  enabled: true
+  scan_interval: 300  # seconds
+  auto_add_services: true
+  auto_configure_widgets: true
+  exclude_patterns:
+    - ".*_backup"
+    - ".*_test"
+    - ".*_dev"
+    - "watchtower"
+    - "portainer_agent"
+  
+  docker_integration:
+    enabled: true
+    socket_path: "/var/run/docker.sock"
+    network_name: "{{ homepage_network }}"
+    label_prefix: "homepage"
+    
+  service_templates:
+    traefik:
+      icon: "traefik"
+      group: "Infrastructure"
+      widget: "traefik"
+      health_check: true
+      
+    authentik:
+      icon: "authentik"
+      group: "Security"
+      widget: "authentik"
+      health_check: true
+      
+    grafana:
+      icon: "grafana"
+      group: "Monitoring"
+      widget: "grafana"
+      health_check: true
+      
+    prometheus:
+      icon: "prometheus"
+      group: "Monitoring"
+      widget: "prometheus"
+      health_check: true
+      
+    loki:
+      icon: "loki"
+      group: "Monitoring"
+      widget: "loki"
+      health_check: true
+      
+    alertmanager:
+      icon: "alertmanager"
+      group: "Monitoring"
+      widget: "alertmanager"
+      health_check: true
+      
+    portainer:
+      icon: "portainer"
+      group: "Infrastructure"
+      widget: "portainer"
+      health_check: true
+      
+    jellyfin:
+      icon: "jellyfin"
+      group: "Media"
+      widget: "jellyfin"
+      health_check: true
+      
+    sonarr:
+      icon: "sonarr"
+      group: "Media"
+      widget: "sonarr"
+      health_check: true
+      
+    radarr:
+      icon: "radarr"
+      group: "Media"
+      widget: "radarr"
+      health_check: true
+      
+    lidarr:
+      icon: "lidarr"
+      group: "Media"
+      widget: "lidarr"
+      health_check: true
+      
+    readarr:
+      icon: "readarr"
+      group: "Media"
+      widget: "readarr"
+      health_check: true
+      
+    prowlarr:
+      icon: "prowlarr"
+      group: "Media"
+      widget: "prowlarr"
+      health_check: true
+      
+    bazarr:
+      icon: "bazarr"
+      group: "Media"
+      widget: "bazarr"
+      health_check: true
+      
+    tautulli:
+      icon: "tautulli"
+      group: "Media"
+      widget: "tautulli"
+      health_check: true
+      
+    overseerr:
+      icon: "overseerr"
+      group: "Media"
+      widget: "overseerr"
+      health_check: true
+      
+    nextcloud:
+      icon: "nextcloud"
+      group: "Storage"
+      widget: "nextcloud"
+      health_check: true
+      
+    paperless:
+      icon: "paperless"
+      group: "Storage"
+      widget: "paperless"
+      health_check: true
+      
+    vaultwarden:
+      icon: "vaultwarden"
+      group: "Security"
+      widget: "vaultwarden"
+      health_check: true
+      
+    gitlab:
+      icon: "gitlab"
+      group: "Development"
+      widget: "gitlab"
+      health_check: true
+      
+    homeassistant:
+      icon: "homeassistant"
+      group: "Automation"
+      widget: "homeassistant"
+      health_check: true
+      
+    zigbee2mqtt:
+      icon: "zigbee2mqtt"
+      group: "Automation"
+      widget: "zigbee2mqtt"
+      health_check: true
+      
+    nodered:
+      icon: "nodered"
+      group: "Automation"
+      widget: "nodered"
+      health_check: true
+      
+    n8n:
+      icon: "n8n"
+      group: "Automation"
+      widget: "n8n"
+      health_check: true
+
+# =============================================================================
+# MONITORING INTEGRATION
+# =============================================================================
+
+monitoring_integration:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    url: "http://prometheus:9090"
+    metrics_path: "/metrics"
+    scrape_interval: 30
+    
+  grafana:
+    enabled: true
+    url: "http://grafana:3000"
+    api_key: "{{ grafana_api_key | default('') }}"
+    dashboard_uid: "homepage-overview"
+    
+  loki:
+    enabled: true
+    url: "http://loki:3100"
+    query_timeout: 30
+    
+  alertmanager:
+    enabled: true
+    url: "http://alertmanager:9093"
+    api_version: "v2"
+    
+  health_checks:
+    enabled: true
+    interval: 60
+    timeout: 10
+    retries: 3
+    
+  metrics_collection:
+    enabled: true
+    collect_service_metrics: true
+    collect_system_metrics: true
+    collect_docker_metrics: true
+    collect_network_metrics: true
+
+# =============================================================================
+# AUTHENTICATION INTEGRATION
+# =============================================================================
+
+authentication_integration:
+  enabled: true
+  
+  authentik:
+    enabled: true
+    url: "https://{{ authentik_subdomain }}.{{ domain }}"
+    client_id: "{{ authentik_client_id | default('homepage') }}"
+    client_secret: "{{ authentik_client_secret | default('') }}"
+    redirect_uri: "https://{{ homepage_subdomain }}.{{ domain }}/oauth/callback"
+    scope: "openid profile email"
+    
+  oauth_providers:
+    - name: "authentik"
+      type: "oidc"
+      enabled: true
+      config:
+        issuer: "https://{{ authentik_subdomain }}.{{ domain }}"
+        client_id: "{{ authentik_client_id | default('homepage') }}"
+        client_secret: "{{ authentik_client_secret | default('') }}"
+        redirect_uri: "https://{{ homepage_subdomain }}.{{ domain }}/oauth/callback"
+        
+  user_management:
+    enabled: true
+    auto_create_users: true
+    default_role: "viewer"
+    admin_users:
+      - "admin@{{ domain }}"
+    allowed_domains:
+      - "{{ domain }}"
+
+# =============================================================================
+# TRAEFIK INTEGRATION
+# =============================================================================
+
+traefik_integration:
+  enabled: true
+  
+  reverse_proxy:
+    enabled: true
+    domain: "{{ homepage_subdomain }}.{{ domain }}"
+    port: "{{ homepage_port }}"
+    ssl_enabled: true
+    ssl_cert_resolver: "letsencrypt"
+    
+  middleware:
+    auth_forward:
+      enabled: true
+      address: "https://{{ authentik_subdomain }}.{{ domain }}"
+      trust_forward_header: true
+      auth_response_headers:
+        - "X-User"
+        - "X-Email"
+        - "X-Groups"
+        
+    security_headers:
+      enabled: true
+      headers:
+        X-Frame-Options: "DENY"
+        X-Content-Type-Options: "nosniff"
+        X-XSS-Protection: "1; mode=block"
+        Referrer-Policy: "strict-origin-when-cross-origin"
+        Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        
+  health_check:
+    enabled: true
+    path: "/api/health"
+    interval: "30s"
+    timeout: "5s"
+    retries: 3
+
+# =============================================================================
+# WIDGET CONFIGURATION
+# =============================================================================
+
+widget_configuration:
+  enabled: true
+  
+  system_widgets:
+    resources:
+      enabled: true
+      refresh_interval: 30
+      show_cpu: true
+      show_memory: true
+      show_disk: true
+      show_network: true
+      
+    weather:
+      enabled: {{ homepage_weather_enabled }}
+      api_key: "{{ homepage_weather_api_key }}"
+      lat: "{{ homepage_weather_lat }}"
+      lon: "{{ homepage_weather_lon }}"
+      units: "{{ homepage_units }}"
+      refresh_interval: 300
+      
+    search:
+      enabled: true
+      providers:
+        - "google"
+        - "duckduckgo"
+        - "bing"
+        
+    calendar:
+      enabled: true
+      providers:
+        - "google"
+        - "outlook"
+        - "ical"
+        
+  service_widgets:
+    docker:
+      enabled: true
+      socket_path: "/var/run/docker.sock"
+      show_containers: true
+      show_images: true
+      show_volumes: true
+      show_networks: true
+      
+    kubernetes:
+      enabled: false
+      config_path: "~/.kube/config"
+      show_pods: true
+      show_services: true
+      show_deployments: true
+      
+    pihole:
+      enabled: true
+      url: "http://pihole:80"
+      api_token: "{{ pihole_api_token | default('') }}"
+      
+    traefik:
+      enabled: true
+      url: "http://traefik:8080"
+      show_routers: true
+      show_services: true
+      show_middlewares: true
+
+# =============================================================================
+# BACKUP AND RECOVERY
+# =============================================================================
+
+backup_and_recovery:
+  enabled: true
+  
+  backup:
+    enabled: true
+    schedule: "{{ homepage_backup_schedule }}"
+    retention_days: "{{ homepage_backup_retention_days }}"
+    include_config: true
+    include_data: true
+    include_logs: false
+    compression: true
+    
+  recovery:
+    enabled: true
+    auto_restore: false
+    validate_backup: true
+    test_restore: false
+    
+  monitoring:
+    enabled: true
+    check_backup_status: true
+    alert_on_backup_failure: true
+    alert_on_restore_failure: true
+
+# =============================================================================
+# LOGGING AND DEBUGGING
+# =============================================================================
+
+logging:
+  level: "{{ homepage_log_level }}"
+  file: "{{ homepage_logs_dir }}/automation.log"
+  max_size: "10MB"
+  max_files: 5
+  format: "json"
+  
+  debug:
+    enabled: false
+    log_requests: false
+    log_responses: false
+    log_configuration: true
+    
+  performance:
+    enabled: true
+    log_slow_operations: true
+    slow_operation_threshold: 5.0
+    log_memory_usage: true
+    log_cpu_usage: true
+
+# =============================================================================
+# NOTIFICATIONS
+# =============================================================================
+
+notifications:
+  enabled: true
+  
+  channels:
+    discord:
+      enabled: false
+      webhook_url: "{{ discord_webhook_url | default('') }}"
+      username: "Homepage Automation"
+      avatar_url: ""
+      
+    email:
+      enabled: false
+      smtp_host: "{{ smtp_host | default('') }}"
+      smtp_port: "{{ smtp_port | default(587) }}"
+      smtp_user: "{{ smtp_user | default('') }}"
+      smtp_password: "{{ smtp_password | default('') }}"
+      from_email: "{{ from_email | default('homepage@' + domain) }}"
+      to_email: "{{ to_email | default('admin@' + domain) }}"
+      
+    slack:
+      enabled: false
+      webhook_url: "{{ slack_webhook_url | default('') }}"
+      channel: "{{ slack_channel | default('#homepage') }}"
+      username: "Homepage Automation"
+      
+  events:
+    service_discovered: true
+    service_configured: true
+    service_failed: true
+    backup_completed: true
+    backup_failed: true
+    health_check_failed: true
+    configuration_changed: true 

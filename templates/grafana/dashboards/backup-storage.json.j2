@@ -1,0 +1,485 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Backup & Storage",
+    "tags": ["backup", "storage", "data", "integrity", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "backup_job",
+          "type": "query",
+          "query": "label_values(backup_jobs_total, job)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Backup Job"
+        },
+        {
+          "name": "storage_mount",
+          "type": "query",
+          "query": "label_values(node_filesystem_size_bytes, mountpoint)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Storage Mount"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Backup Jobs Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "backup_jobs_successful_total{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Successful"
+          },
+          {
+            "expr": "backup_jobs_failed_total{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Failed"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Storage Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=~\"$storage_mount\"} / node_filesystem_size_bytes{mountpoint=~\"$storage_mount\"})) * 100",
+            "legendFormat": "{{mountpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Backup Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(backup_jobs_successful_total{job=~\"$backup_job\"} / backup_jobs_total{job=~\"$backup_job\"}) * 100",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Last Backup Age",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "time() - backup_last_success_timestamp{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 86400},
+                {"color": "red", "value": 604800}
+              ]
+            },
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Backup Jobs Timeline",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(backup_jobs_successful_total{job=~\"$backup_job\"}[5m])",
+            "legendFormat": "{{job}} - Successful"
+          },
+          {
+            "expr": "rate(backup_jobs_failed_total{job=~\"$backup_job\"}[5m])",
+            "legendFormat": "{{job}} - Failed"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Storage Usage Timeline",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=~\"$storage_mount\"} / node_filesystem_size_bytes{mountpoint=~\"$storage_mount\"})) * 100",
+            "legendFormat": "{{mountpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Backup Size",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "backup_size_bytes{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "bytes",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Backup Duration",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "backup_duration_seconds{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 3600},
+                {"color": "red", "value": 7200}
+              ]
+            },
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Data Integrity Checks",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "backup_integrity_checks_passed{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Passed"
+          },
+          {
+            "expr": "backup_integrity_checks_failed{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Failed"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Storage I/O",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_disk_read_bytes_total{device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}[5m])",
+            "legendFormat": "{{device}} - Read"
+          },
+          {
+            "expr": "rate(node_disk_written_bytes_total{device=~\"sd[a-z]|nvme[0-9]n[0-9]\"}[5m])",
+            "legendFormat": "{{device}} - Write"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Backup Jobs Status Table",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "backup_jobs_total{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Total",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "backup_jobs_successful_total{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Successful",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "backup_jobs_failed_total{job=~\"$backup_job\"}",
+            "legendFormat": "{{job}} - Failed",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Job"
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "title": "Storage Mounts Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "node_filesystem_avail_bytes{mountpoint=~\"$storage_mount\"}",
+            "legendFormat": "{{mountpoint}} - Available",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "node_filesystem_size_bytes{mountpoint=~\"$storage_mount\"}",
+            "legendFormat": "{{mountpoint}} - Total",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "bytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Mount"
+            }
+          ]
+        }
+      }
+    ],
+    "schemaVersion": 30,
+    "version": 1
+  },
+  "folderTitle": "{{ grafana_dashboard_categories.backup_storage.folder | default('Backup & Storage') }}",
+  "overwrite": true
+} 

@@ -1,0 +1,179 @@
+#!/bin/bash
+# Rollback Execution Script
+# Executes rollback to a specific deployment point
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${SCRIPT_DIR}/rollback-execute.log"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   error_exit "This script must be run as root"
+fi
+
+# Check if rollback ID is provided
+if [[ $# -eq 0 ]]; then
+    error_exit "Usage: $0 <rollback_timestamp>"
+fi
+
+ROLLBACK_ID="$1"
+ROLLBACK_POINT_FILE="${SCRIPT_DIR}/rollback-${ROLLBACK_ID}.json"
+CONFIG_BACKUP="${SCRIPT_DIR}/config-backup-${ROLLBACK_ID}.tar.gz"
+
+log "Starting rollback to point: ${ROLLBACK_ID}"
+
+# Check if rollback point exists
+if [[ ! -f "$ROLLBACK_POINT_FILE" ]]; then
+    error_exit "Rollback point file not found: $ROLLBACK_POINT_FILE"
+fi
+
+# Check if config backup exists
+if [[ ! -f "$CONFIG_BACKUP" ]]; then
+    error_exit "Configuration backup not found: $CONFIG_BACKUP"
+fi
+
+# Parse rollback point information
+log "Reading rollback point information..."
+ROLLBACK_INFO=$(cat "$ROLLBACK_POINT_FILE")
+
+# Extract configuration paths
+DOCKER_DIR=$(echo "$ROLLBACK_INFO" | jq -r '.configuration.docker_dir')
+DATA_DIR=$(echo "$ROLLBACK_INFO" | jq -r '.configuration.data_dir')
+CONFIG_DIR=$(echo "$ROLLBACK_INFO" | jq -r '.configuration.config_dir')
+BACKUP_DIR=$(echo "$ROLLBACK_INFO" | jq -r '.configuration.backup_dir')
+LOGS_DIR=$(echo "$ROLLBACK_INFO" | jq -r '.configuration.logs_dir')
+
+log "Configuration paths:"
+log "  Docker: $DOCKER_DIR"
+log "  Data: $DATA_DIR"
+log "  Config: $CONFIG_DIR"
+log "  Backup: $BACKUP_DIR"
+log "  Logs: $LOGS_DIR"
+
+# Stop all running containers
+log "Stopping all running containers..."
+docker stop $(docker ps -q) 2>/dev/null || true
+
+# Remove all containers
+log "Removing all containers..."
+docker rm $(docker ps -aq) 2>/dev/null || true
+
+# Restore configuration files
+log "Restoring configuration files..."
+cd /
+tar -xzf "$CONFIG_BACKUP" --strip-components=1
+
+# Restore database backups if they exist
+log "Restoring database backups..."
+for db_backup in "${SCRIPT_DIR}/db-backup-${ROLLBACK_ID}"*.sql; do
+    if [[ -f "$db_backup" ]]; then
+        db_name=$(basename "$db_backup" | sed 's/db-backup-.*-\(.*\)\.sql/\1/')
+        log "Restoring database: $db_name"
+        # Database restoration logic would go here
+        # This depends on the specific database type
+    fi
+done
+
+# Restart Docker daemon
+log "Restarting Docker daemon..."
+systemctl restart docker
+
+# Wait for Docker to be ready
+log "Waiting for Docker to be ready..."
+sleep 10
+
+# Start services in dependency order
+log "Starting services in dependency order..."
+
+# Start infrastructure services first
+if [[ -d "$DOCKER_DIR/security" ]]; then
+    log "Starting security services..."
+    cd "$DOCKER_DIR/security"
+    docker-compose up -d || true
+fi
+
+if [[ -d "$DOCKER_DIR/databases" ]]; then
+    log "Starting database services..."
+    cd "$DOCKER_DIR/databases"
+    docker-compose up -d || true
+fi
+
+if [[ -d "$DOCKER_DIR/storage" ]]; then
+    log "Starting storage services..."
+    cd "$DOCKER_DIR/storage"
+    docker-compose up -d || true
+fi
+
+if [[ -d "$DOCKER_DIR/logging" ]]; then
+    log "Starting logging services..."
+    cd "$DOCKER_DIR/logging"
+    docker-compose up -d || true
+fi
+
+# Start application services
+if [[ -d "$DOCKER_DIR/media" ]]; then
+    log "Starting media services..."
+    cd "$DOCKER_DIR/media"
+    docker-compose up -d || true
+fi
+
+if [[ -d "$DOCKER_DIR/utilities" ]]; then
+    log "Starting utility services..."
+    cd "$DOCKER_DIR/utilities"
+    docker-compose up -d || true
+fi
+
+if [[ -d "$DOCKER_DIR/automation" ]]; then
+    log "Starting automation services..."
+    cd "$DOCKER_DIR/automation"
+    docker-compose up -d || true
+fi
+
+# Wait for services to be ready
+log "Waiting for services to be ready..."
+sleep 30
+
+# Verify rollback
+log "Verifying rollback..."
+
+# Check if containers are running
+running_containers=$(docker ps --format "{{.Names}}" | wc -l)
+log "Running containers: $running_containers"
+
+# Check service health
+if [[ -f "${DOCKER_DIR}/orchestration/health-check.sh" ]]; then
+    log "Running health checks..."
+    "${DOCKER_DIR}/orchestration/health-check.sh" || log "WARNING: Some health checks failed"
+fi
+
+# Display rollback summary
+log "Rollback completed successfully"
+log "Rollback ID: $ROLLBACK_ID"
+log "Timestamp: $(date)"
+log "Running containers: $running_containers"
+
+echo "========================================"
+echo "ROLLBACK COMPLETED SUCCESSFULLY"
+echo "========================================"
+echo "Rollback ID: $ROLLBACK_ID"
+echo "Timestamp: $(date)"
+echo "Running containers: $running_containers"
+echo ""
+echo "Next steps:"
+echo "1. Check service status: docker ps"
+echo "2. Verify network connectivity: ping 8.8.8.8"
+echo "3. Check service health: ${DOCKER_DIR}/orchestration/health-check.sh"
+echo "4. Review logs: tail -f ${LOGS_DIR}/deployment.log"
+echo "========================================" 

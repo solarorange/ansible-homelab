@@ -26,14 +26,14 @@
   tags: [paperless-ngx, deploy]
 
 - name: Deploy Paperless-ngx with Docker Compose
-  ansible.builtin.command: >
-    docker-compose up -d
-  args:
-    chdir: "{{ docker_dir }}/paperless-ngx"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/paperless-ngx"
+    state: present
   register: docker_compose_result
   changed_when: docker_compose_result.rc == 0
   failed_when: docker_compose_result.rc != 0
   tags: [paperless-ngx, deploy]
+  notify: restart paperless-ngx
 
 - name: Wait for Paperless-ngx to start
   ansible.builtin.wait_for:
@@ -80,6 +80,7 @@
         headers:
           Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
         status_code: [200, 401, 403]
+        timeout: 30
       register: admin_check
       ignore_errors: true
 
@@ -97,11 +98,16 @@
           is_superuser: true
           is_staff: true
         status_code: [201, 400]
+        timeout: 30
       register: admin_create
-      when: admin_check.status == 401 or admin_check.status == 403
+      when: 
+        - paperless_ngx_auth_method != "authentik"
+        - admin_check.status == 401 or admin_check.status == 403
       ignore_errors: true
 
-  when: paperless_ngx_auth_method != "authentik"
+  when: 
+    - paperless_ngx_auth_method != "authentik"
+    - paperless_ngx_admin_password | default('') != ''
   tags: [paperless-ngx, deploy]
 
 - name: Configure Paperless-ngx initial settings
@@ -117,8 +123,10 @@
         body:
           TIME_ZONE: "{{ timezone | default('UTC') }}"
         status_code: [200, 401, 403]
+        timeout: 30
       register: timezone_setting
       ignore_errors: true
+      when: paperless_ngx_admin_token | default('') != ''
 
     - name: Set Paperless-ngx OCR language
       ansible.builtin.uri:
@@ -131,8 +139,10 @@
         body:
           OCR_LANGUAGE: "{{ paperless_ngx_ocr_language }}"
         status_code: [200, 401, 403]
+        timeout: 30
       register: ocr_setting
       ignore_errors: true
+      when: paperless_ngx_admin_token | default('') != ''
 
     - name: Set Paperless-ngx consumer polling
       ansible.builtin.uri:
@@ -145,10 +155,14 @@
         body:
           CONSUMER_POLLING: "{{ paperless_ngx_consumer_polling }}"
         status_code: [200, 401, 403]
+        timeout: 30
       register: polling_setting
       ignore_errors: true
+      when: paperless_ngx_admin_token | default('') != ''
 
-  when: paperless_ngx_auth_method != "authentik"
+  when: 
+    - paperless_ngx_auth_method != "authentik"
+    - paperless_ngx_admin_token | default('') != ''
   tags: [paperless-ngx, deploy]
 
 - name: Create Paperless-ngx consume directory symlink

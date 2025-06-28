@@ -1,2 +1,34 @@
-# Utilities Stack Backup Retention Policy (Placeholder)
-retention_days: {{ utilities_backup_retention }} 
+# Utilities Stack Backup Retention Policy
+
+# Retention settings for utility services
+retention_policy:
+  # General retention settings
+  retention_days: {{ utilities_backup_retention | default(7) }}
+  retention_weeks: {{ utilities_backup_retention_weeks | default(4) }}
+  retention_months: {{ utilities_backup_retention_months | default(12) }}
+  
+  # Service-specific retention
+  portainer:
+    retention_days: {{ portainer_backup_retention | default(7) }}
+    compression: true
+    encryption: true
+    
+  tdarr:
+    retention_days: {{ tdarr_backup_retention | default(7) }}
+    compression: true
+    encryption: false
+    
+  tautulli:
+    retention_days: {{ tautulli_backup_retention | default(30) }}
+    compression: true
+    encryption: false
+    
+  # Cleanup settings
+  cleanup_enabled: true
+  cleanup_schedule: "0 3 * * *"  # Daily at 3 AM
+  cleanup_older_than: "{{ utilities_backup_retention | default(7) }}d"
+  
+  # Notification settings
+  notify_on_cleanup: true
+  notify_on_failure: true
+  notification_email: "{{ admin_email | default('admin@' + domain) }}" 

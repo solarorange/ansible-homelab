@@ -1,0 +1,31 @@
+---
+# Service Monitoring
+# Monitors the health and status of all critical services
+
+- name: Ensure monitoring directory exists
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/monitoring/services"
+    state: directory
+    mode: '0755'
+  tags: [monitoring, service, setup]
+
+- name: Run service health check script
+  ansible.builtin.shell: |
+    {{ docker_dir }}/orchestration/health-check.sh
+  register: service_health_check
+  changed_when: false
+  failed_when: service_health_check.rc != 0
+  tags: [monitoring, service, health]
+
+- name: Log service health check results
+  ansible.builtin.copy:
+    content: "{{ service_health_check.stdout }}"
+    dest: "{{ logs_dir }}/service-health-check.log"
+    mode: '0644'
+  tags: [monitoring, service, log]
+
+- name: Notify on unhealthy services
+  ansible.builtin.debug:
+    msg: "One or more services are unhealthy. Check {{ logs_dir }}/service-health-check.log for details."
+  when: service_health_check.rc != 0
+  tags: [monitoring, service, notify] 

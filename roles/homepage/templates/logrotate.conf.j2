@@ -1,0 +1,32 @@
+{{ homepage_logs_dir }}/*.log {
+    daily
+    rotate {{ homepage_log_retention_days | default(7) }}
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+    postrotate
+        docker restart {{ homepage_container_name }} >/dev/null 2>&1 || true
+    endscript
+}
+
+{{ homepage_logs_dir }}/backup.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+}
+
+{{ homepage_logs_dir }}/healthcheck.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ username }} {{ username }}
+} 

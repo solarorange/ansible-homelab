@@ -1,200 +1,90 @@
 ---
-# Backup Orchestration Setup
-# Implements staggered backup scheduling with resource management and monitoring
+# Backup Orchestration
+# Manages comprehensive backup scheduling and coordination
 
-- name: Create backup orchestration directories
+- name: Create backup orchestration directory
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ docker_dir }}/backup/orchestration"
     state: directory
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-  loop:
-    - "{{ backup_dir }}/orchestration"
-    - "{{ backup_dir }}/orchestration/logs"
-    - "{{ backup_dir }}/orchestration/status"
-    - "{{ backup_dir }}/orchestration/scripts"
-    - "{{ backup_dir }}/orchestration/config"
+    mode: '0755'
+  tags: [backup, orchestration, setup]
 
-- name: Create backup orchestration configuration
+- name: Configure backup schedule
   ansible.builtin.template:
-    src: templates/backup_orchestration_config.yml.j2
-    dest: "{{ backup_dir }}/orchestration/config.yml"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0644"
+    src: templates/backup/backup-schedule.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/schedule.yml"
+    mode: '0644'
+  tags: [backup, orchestration, schedule]
 
-- name: Create backup orchestrator script
+- name: Create backup orchestration script
   ansible.builtin.template:
-    src: templates/backup_orchestrator.sh.j2
-    dest: "{{ backup_dir }}/orchestration/backup_orchestrator.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
+    src: templates/backup/backup-orchestrator.sh.j2
+    dest: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh"
+    mode: '0755'
+  tags: [backup, orchestration, script]
 
-- name: Create dependency checker script
-  ansible.builtin.template:
-    src: templates/backup_dependency_checker.sh.j2
-    dest: "{{ backup_dir }}/orchestration/dependency_checker.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Create resource monitor script
-  ansible.builtin.template:
-    src: templates/backup_resource_monitor.sh.j2
-    dest: "{{ backup_dir }}/orchestration/resource_monitor.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Create notification script
-  ansible.builtin.template:
-    src: templates/backup_notifications.sh.j2
-    dest: "{{ backup_dir }}/orchestration/notifications.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Create status tracker script
-  ansible.builtin.template:
-    src: templates/backup_status_tracker.sh.j2
-    dest: "{{ backup_dir }}/orchestration/status_tracker.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Create cleanup script
-  ansible.builtin.template:
-    src: templates/backup_cleanup.sh.j2
-    dest: "{{ backup_dir }}/orchestration/cleanup.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Create health check script
-  ansible.builtin.template:
-    src: templates/backup_health_check.sh.j2
-    dest: "{{ backup_dir }}/orchestration/health_check.sh"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-
-- name: Setup backup orchestration cron jobs
+- name: Setup backup cron jobs
   ansible.builtin.cron:
     name: "{{ item.name }}"
     minute: "{{ item.minute }}"
     hour: "{{ item.hour }}"
     day: "{{ item.day }}"
     job: "{{ item.job }}"
-    user: "{{ username }}"
-    state: present
+    user: root
   loop:
-    - name: "Backup Orchestrator"
+    - name: "Daily Backup"
       minute: "0"
-      hour: "*"
+      hour: "2"
       day: "*"
-      job: "cd {{ backup_dir }}/orchestration && ./backup_orchestrator.sh >> logs/orchestrator.log 2>&1"
-    
-    - name: "Backup Resource Monitor"
-      minute: "*/5"
-      hour: "*"
-      day: "*"
-      job: "cd {{ backup_dir }}/orchestration && ./resource_monitor.sh >> logs/resource_monitor.log 2>&1"
-    
-    - name: "Backup Status Tracker"
-      minute: "*/2"
-      hour: "*"
-      day: "*"
-      job: "cd {{ backup_dir }}/orchestration && ./status_tracker.sh >> logs/status_tracker.log 2>&1"
-    
-    - name: "Backup Cleanup"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh daily"
+    - name: "Weekly Backup"
       minute: "0"
-      hour: "6"
-      day: "*"
-      job: "cd {{ backup_dir }}/orchestration && ./cleanup.sh >> logs/cleanup.log 2>&1"
-    
-    - name: "Backup Health Check"
+      hour: "3"
+      day: "0"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh weekly"
+    - name: "Monthly Backup"
       minute: "0"
-      hour: "*/4"
-      day: "*"
-      job: "cd {{ backup_dir }}/orchestration && ./health_check.sh >> logs/health_check.log 2>&1"
+      hour: "4"
+      day: "1"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh monthly"
+  tags: [backup, orchestration, cron]
 
-- name: Create backup orchestration systemd service
+- name: Configure backup retention
   ansible.builtin.template:
-    src: templates/backup-orchestration.service.j2
-    dest: /etc/systemd/system/backup-orchestration.service
-    owner: root
-    group: root
-    mode: "0644"
-  notify: reload systemd
+    src: templates/backup/retention-policy.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/retention.yml"
+    mode: '0644'
+  tags: [backup, orchestration, retention]
 
-- name: Create backup orchestration timer
+- name: Setup backup monitoring
   ansible.builtin.template:
-    src: templates/backup-orchestration.timer.j2
-    dest: /etc/systemd/system/backup-orchestration.timer
-    owner: root
-    group: root
-    mode: "0644"
-  notify: reload systemd
+    src: templates/backup/backup-monitoring.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/monitoring.yml"
+    mode: '0644'
+  tags: [backup, orchestration, monitoring]
 
-- name: Enable and start backup orchestration timer
-  ansible.builtin.systemd:
-    name: backup-orchestration.timer
-    enabled: yes
-    state: started
-    daemon_reload: yes
-
-- name: Create backup orchestration log rotation
-  ansible.builtin.template:
-    src: templates/backup-orchestration-logrotate.j2
-    dest: /etc/logrotate.d/backup-orchestration
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Display backup orchestration setup summary
+- name: Display backup orchestration status
   ansible.builtin.debug:
     msg: |
-      Backup Orchestration Setup Complete!
+      ========================================
+      BACKUP ORCHESTRATION CONFIGURED
+      ========================================
       
-      Staggered Schedule:
-      - 1:00 AM: Critical Services ({{ backup_schedule.critical | length }} services)
-      - 2:00 AM: High Priority ({{ backup_schedule.high_priority | length }} services)
-      - 3:00 AM: Media Core ({{ backup_schedule.media_core | length }} services)
-      - 4:00 AM: Media Download ({{ backup_schedule.media_download | length }} services)
-      - 5:00 AM: Media Playback ({{ backup_schedule.media_playback | length }} services)
-      - 6:00 AM: File Services ({{ backup_schedule.file_services | length }} services)
-      - 7:00 AM: Utilities ({{ backup_schedule.utilities | length }} services)
+      Backup Directory: {{ docker_dir }}/backup/orchestration
+      Schedule Configuration: {{ docker_dir }}/backup/orchestration/schedule.yml
+      Orchestrator Script: {{ docker_dir }}/backup/orchestration/backup-orchestrator.sh
+      Retention Policy: {{ docker_dir }}/backup/orchestration/retention.yml
+      Monitoring Configuration: {{ docker_dir }}/backup/orchestration/monitoring.yml
       
-      Resource Limits:
-      - Max concurrent backups: {{ backup_resource_limits.max_concurrent_backups }}
-      - Max backup duration: {{ backup_resource_limits.max_backup_duration_minutes }} minutes
-      - CPU threshold: {{ backup_resource_limits.cpu_threshold }}%
-      - Memory threshold: {{ backup_resource_limits.memory_threshold }}%
-      - Disk I/O threshold: {{ backup_resource_limits.disk_io_threshold }}%
+      Backup Schedule:
+      - Daily: 2:00 AM
+      - Weekly: Sunday 3:00 AM
+      - Monthly: 1st of month 4:00 AM
       
-      Monitoring Integration:
-      - Notifications: Alertmanager, Loki, Prometheus
-      - Status tracking: Real-time backup progress
-      - Health checks: Every 4 hours
-      - Cleanup: Daily at 6:00 AM
+      Retention:
+      - Daily: {{ backup_retention_days | default(7) }} days
+      - Weekly: {{ backup_retention_weeks | default(4) }} weeks
+      - Monthly: {{ backup_retention_months | default(12) }} months
       
-      Scripts:
-      - Orchestrator: {{ backup_dir }}/orchestration/backup_orchestrator.sh
-      - Dependency Checker: {{ backup_dir }}/orchestration/dependency_checker.sh
-      - Resource Monitor: {{ backup_dir }}/orchestration/resource_monitor.sh
-      - Notifications: {{ backup_dir }}/orchestration/notifications.sh
-      - Status Tracker: {{ backup_dir }}/orchestration/status_tracker.sh
-      - Cleanup: {{ backup_dir }}/orchestration/cleanup.sh
-      - Health Check: {{ backup_dir }}/orchestration/health_check.sh
-      
-      Logs: {{ backup_dir }}/orchestration/logs/
-      Status: {{ backup_dir }}/orchestration/status/
-      Config: {{ backup_dir }}/orchestration/config.yml
-      
-      Next Steps:
-      1. Monitor the first backup cycle
-      2. Check logs for any issues
-      3. Verify notifications are working
-      4. Adjust resource limits if needed 
+      ========================================
+  tags: [backup, orchestration, summary] 

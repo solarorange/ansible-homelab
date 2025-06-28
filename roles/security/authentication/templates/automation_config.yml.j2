@@ -1,0 +1,463 @@
+# Authentik Automation Configuration
+# Comprehensive configuration for Authentik automation and integration
+
+# =============================================================================
+# AUTHENTIK CORE CONFIGURATION
+# =============================================================================
+
+authentik:
+  # API Configuration
+  api:
+    url: "http://localhost:{{ authentik_port }}"
+    admin_user: "{{ authentik_admin_user | default('admin') }}"
+    admin_password: "{{ authentik_admin_password | default('changeme') }}"
+    token: "{{ authentik_api_token | default('') }}"
+    timeout: 30
+    verify_ssl: false
+    
+  # Domain Configuration
+  domain:
+    primary: "{{ authentik_subdomain }}.{{ domain }}"
+    internal: "authentik"
+    port: "{{ authentik_port }}"
+    
+  # Database Configuration
+  database:
+    type: "postgresql"
+    host: "authentik-db"
+    port: 5432
+    name: "authentik"
+    user: "authentik"
+    password: "{{ authentik_db_password | default('authentik') }}"
+    
+# =============================================================================
+# APPLICATION PROVISIONING
+# =============================================================================
+
+applications:
+  enabled: true
+  
+  # Default Application Settings
+  defaults:
+    launch_url: ""
+    open_in_new_tab: false
+    meta_launch_url: ""
+    meta_description: ""
+    meta_publisher: ""
+    policy_engine_mode: "any"
+    group: ""
+    
+  # Application Templates
+  templates:
+    homepage:
+      name: "Homepage"
+      slug: "homepage"
+      provider: "authentik.providers.oauth2.OAuth2Provider"
+      launch_url: "https://{{ homepage_subdomain }}.{{ domain }}"
+      redirect_uris:
+        - "https://{{ homepage_subdomain }}.{{ domain }}/oauth/callback"
+      client_type: "confidential"
+      authorization_flow: "default-provider-authorization-implicit-consent"
+      property_mappings:
+        - "authentik default OAuth2/OpenID Mapping"
+      scopes:
+        - "openid"
+        - "profile"
+        - "email"
+      enabled: true
+      
+    grafana:
+      name: "Grafana"
+      slug: "grafana"
+      provider: "authentik.providers.oauth2.OAuth2Provider"
+      launch_url: "https://{{ grafana_subdomain }}.{{ domain }}"
+      redirect_uris:
+        - "https://{{ grafana_subdomain }}.{{ domain }}/login/generic_oauth"
+      client_type: "confidential"
+      authorization_flow: "default-provider-authorization-implicit-consent"
+      property_mappings:
+        - "authentik default OAuth2/OpenID Mapping"
+      scopes:
+        - "openid"
+        - "profile"
+        - "email"
+      enabled: true
+      
+    paperless:
+      name: "Paperless-ngx"
+      slug: "paperless"
+      provider: "authentik.providers.oauth2.OAuth2Provider"
+      launch_url: "https://{{ paperless_subdomain }}.{{ domain }}"
+      redirect_uris:
+        - "https://{{ paperless_subdomain }}.{{ domain }}/accounts/authentik/login/callback/"
+      client_type: "confidential"
+      authorization_flow: "default-provider-authorization-implicit-consent"
+      property_mappings:
+        - "authentik default OAuth2/OpenID Mapping"
+      scopes:
+        - "openid"
+        - "profile"
+        - "email"
+      enabled: true
+      
+    media_services:
+      name: "Media Services"
+      slug: "media-services"
+      provider: "authentik.providers.oauth2.OAuth2Provider"
+      launch_url: "https://{{ media_subdomain }}.{{ domain }}"
+      redirect_uris:
+        - "https://{{ media_subdomain }}.{{ domain }}/oauth/callback"
+      client_type: "confidential"
+      authorization_flow: "default-provider-authorization-implicit-consent"
+      property_mappings:
+        - "authentik default OAuth2/OpenID Mapping"
+      scopes:
+        - "openid"
+        - "profile"
+        - "email"
+      enabled: true
+      
+    monitoring:
+      name: "Monitoring Stack"
+      slug: "monitoring"
+      provider: "authentik.providers.oauth2.OAuth2Provider"
+      launch_url: "https://{{ monitoring_subdomain }}.{{ domain }}"
+      redirect_uris:
+        - "https://{{ monitoring_subdomain }}.{{ domain }}/oauth/callback"
+      client_type: "confidential"
+      authorization_flow: "default-provider-authorization-implicit-consent"
+      property_mappings:
+        - "authentik default OAuth2/OpenID Mapping"
+      scopes:
+        - "openid"
+        - "profile"
+        - "email"
+      enabled: true
+      
+# =============================================================================
+# USER MANAGEMENT
+# =============================================================================
+
+users:
+  enabled: true
+  
+  # Default User Settings
+  defaults:
+    is_active: true
+    is_superuser: false
+    type: "internal"
+    path: "users"
+    
+  # Admin Users
+  admin_users:
+    - username: "admin"
+      email: "admin@{{ domain }}"
+      name: "Administrator"
+      is_superuser: true
+      is_active: true
+      password: "{{ authentik_admin_password | default('changeme') }}"
+      
+    - username: "{{ username }}"
+      email: "{{ username }}@{{ domain }}"
+      name: "{{ username | title }}"
+      is_superuser: true
+      is_active: true
+      password: "{{ user_password | default('changeme') }}"
+      
+  # Regular Users
+  regular_users:
+    - username: "user1"
+      email: "user1@{{ domain }}"
+      name: "User One"
+      is_superuser: false
+      is_active: true
+      password: "changeme"
+      
+    - username: "user2"
+      email: "user2@{{ domain }}"
+      name: "User Two"
+      is_superuser: false
+      is_active: true
+      password: "changeme"
+      
+# =============================================================================
+# GROUP MANAGEMENT
+# =============================================================================
+
+groups:
+  enabled: true
+  
+  # Default Groups
+  default_groups:
+    - name: "authentik-admin"
+      description: "Authentik Administrators"
+      is_superuser: true
+      parent: ""
+      
+    - name: "authentik-editor"
+      description: "Authentik Editors"
+      is_superuser: false
+      parent: ""
+      
+    - name: "authentik-viewer"
+      description: "Authentik Viewers"
+      is_superuser: false
+      parent: ""
+      
+    - name: "homepage-users"
+      description: "Homepage Users"
+      is_superuser: false
+      parent: ""
+      
+    - name: "grafana-users"
+      description: "Grafana Users"
+      is_superuser: false
+      parent: ""
+      
+    - name: "media-users"
+      description: "Media Service Users"
+      is_superuser: false
+      parent: ""
+      
+# =============================================================================
+# POLICY MANAGEMENT
+# =============================================================================
+
+policies:
+  enabled: true
+  
+  # Default Policies
+  default_policies:
+    - name: "Allow All Authenticated Users"
+      type: "authentik.policies.user.UserPolicy"
+      expression: "return True"
+      execution_logging: false
+      
+    - name: "Deny Anonymous Users"
+      type: "authentik.policies.user.UserPolicy"
+      expression: "return request.user.is_authenticated"
+      execution_logging: false
+      
+    - name: "Admin Only"
+      type: "authentik.policies.user.UserPolicy"
+      expression: "return request.user.is_superuser"
+      execution_logging: false
+      
+# =============================================================================
+# MONITORING INTEGRATION
+# =============================================================================
+
+monitoring:
+  enabled: true
+  
+  # Prometheus Metrics
+  prometheus:
+    enabled: true
+    endpoint: "/metrics"
+    port: "{{ authentik_port }}"
+    
+  # Health Checks
+  health_checks:
+    enabled: true
+    endpoint: "/health"
+    interval: 60
+    timeout: 10
+    
+  # Logging Configuration
+  logging:
+    enabled: true
+    level: "INFO"
+    format: "json"
+    output: "stdout"
+    
+  # Performance Monitoring
+  performance:
+    enabled: true
+    collect_metrics: true
+    collect_logs: true
+    collect_events: true
+    
+# =============================================================================
+# TRAEFIK INTEGRATION
+# =============================================================================
+
+traefik:
+  enabled: true
+  
+  # Forward Authentication
+  forward_auth:
+    enabled: true
+    endpoint: "/outpost.goauthentik.io/auth/traefik"
+    headers:
+      - "X-User"
+      - "X-Email"
+      - "X-Groups"
+      - "X-Authentik-Username"
+      - "X-Authentik-Groups"
+      - "X-Authentik-Email"
+      
+  # SSL Configuration
+  ssl:
+    enabled: true
+    cert_resolver: "letsencrypt"
+    force_redirect: true
+    
+  # Security Headers
+  security_headers:
+    enabled: true
+    headers:
+      X-Frame-Options: "DENY"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
+      Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+      
+# =============================================================================
+# BACKUP INTEGRATION
+# =============================================================================
+
+backup:
+  enabled: true
+  
+  # Database Backup
+  database:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention_days: 30
+    include_data: true
+    include_schema: true
+    
+  # Configuration Backup
+  configuration:
+    enabled: true
+    schedule: "0 3 * * *"
+    retention_days: 90
+    include_files:
+      - "authentik.yml"
+      - "custom_templates"
+      - "media"
+      
+  # SSL Certificate Backup
+  certificates:
+    enabled: true
+    schedule: "0 4 * * *"
+    retention_days: 365
+    include_certs: true
+    include_keys: false
+    
+  # Recovery Procedures
+  recovery:
+    enabled: true
+    auto_restore: false
+    validate_backup: true
+    test_restore: false
+    
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+security:
+  # Session Configuration
+  session:
+    timeout: 3600
+    max_sessions: 10
+    secure_cookies: true
+    http_only_cookies: true
+    same_site: "strict"
+    
+  # Password Policy
+  password_policy:
+    enabled: true
+    min_length: 12
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special: true
+    prevent_common: true
+    
+  # MFA Configuration
+  mfa:
+    enabled: true
+    methods:
+      - "authentik.flows.stage.AuthenticatorTOTPStage"
+      - "authentik.flows.stage.AuthenticatorStaticStage"
+    required_for_admin: true
+    required_for_users: false
+    
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    login_attempts: 5
+    login_window: 300
+    block_duration: 900
+    
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+notifications:
+  enabled: true
+  
+  # Email Notifications
+  email:
+    enabled: true
+    host: "{{ smtp_host | default('localhost') }}"
+    port: "{{ smtp_port | default(587) }}"
+    username: "{{ smtp_username | default('') }}"
+    password: "{{ smtp_password | default('') }}"
+    use_tls: true
+    from_email: "authentik@{{ domain }}"
+    
+  # Discord Notifications
+  discord:
+    enabled: false
+    webhook_url: "{{ discord_webhook_url | default('') }}"
+    
+  # Slack Notifications
+  slack:
+    enabled: false
+    webhook_url: "{{ slack_webhook_url | default('') }}"
+    
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+integration:
+  # LDAP Integration
+  ldap:
+    enabled: false
+    server: ""
+    port: 389
+    bind_dn: ""
+    bind_password: ""
+    base_dn: ""
+    user_search_base: ""
+    group_search_base: ""
+    
+  # SAML Integration
+  saml:
+    enabled: false
+    entity_id: ""
+    sso_url: ""
+    x509_cert: ""
+    
+  # OAuth2 Integration
+  oauth2:
+    enabled: true
+    providers:
+      - name: "Google"
+        enabled: false
+        client_id: ""
+        client_secret: ""
+        authorization_url: "https://accounts.google.com/o/oauth2/auth"
+        token_url: "https://oauth2.googleapis.com/token"
+        userinfo_url: "https://www.googleapis.com/oauth2/v2/userinfo"
+        
+      - name: "GitHub"
+        enabled: false
+        client_id: ""
+        client_secret: ""
+        authorization_url: "https://github.com/login/oauth/authorize"
+        token_url: "https://github.com/login/oauth/access_token"
+        userinfo_url: "https://api.github.com/user" 

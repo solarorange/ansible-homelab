@@ -1,0 +1,110 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+  monitoring:
+    name: monitoring
+    external: true
+
+services:
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment:
+      - PUID={{ puid | default(1000) }}
+      - PGID={{ pgid | default(1000) }}
+      - TZ={{ timezone | default('UTC') }}
+      - DOCKER_MODS=linuxserver/mods:universal-calibre
+    volumes:
+      - "{{ config_dir }}/sonarr:/config"
+      - "{{ media_dir }}/tv:/tv"
+      - "{{ downloads_dir }}:/downloads"
+      - "{{ logs_dir }}/sonarr:/var/log/sonarr"
+    ports:
+      - "8989:8989"
+    networks:
+      - homelab
+      - monitoring
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.{{ domain }}`)"
+      - "traefik.http.routers.sonarr.entrypoints=https"
+      - "traefik.http.routers.sonarr.tls=true"
+      - "traefik.http.routers.sonarr.tls.certresolver=cloudflare"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+      - "traefik.http.middlewares.sonarr-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.sonarr-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.sonarr.middlewares=sonarr-auth"
+      - "prometheus.enable=true"
+      - "prometheus.job=sonarr"
+      - "prometheus.port=8989"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/api/v3/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 26677
+        hard: 46677
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  sonarr-exporter:
+    image: ghcr.io/onedr0p/exportarr:latest
+    container_name: sonarr_exporter
+    restart: unless-stopped
+    environment:
+      - EXPORTER__LOG_LEVEL=info
+      - EXPORTER__PORT=9705
+      - EXPORTER__CONFIG_PATH=/config/exporter.yml
+    volumes:
+      - "{{ config_dir }}/sonarr-exporter:/config"
+    ports:
+      - "9705:9705"
+    networks:
+      - monitoring
+    labels:
+      - "traefik.enable=false"
+      - "prometheus.enable=true"
+      - "prometheus.job=sonarr_exporter"
+      - "prometheus.port=9705"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9705/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    depends_on:
+      sonarr:
+        condition: service_healthy 

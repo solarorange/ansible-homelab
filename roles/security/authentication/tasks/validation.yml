@@ -1,0 +1,256 @@
+---
+# Authentik Automation Integration Validation Tasks
+# Validates configuration, connectivity, and integration status
+
+- name: Validate Authentik service status
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_health_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: authentik_config_validation
+  loop:
+    - "{{ docker_dir }}/security/authentik/docker-compose.yml"
+    - "{{ docker_dir }}/security/authentik/scripts/automation_config.yml"
+    - "{{ docker_dir }}/security/authentik/scripts/authentik_automation.py"
+    - "{{ docker_dir }}/security/authentik/scripts/application_provisioning.py"
+    - "{{ docker_dir }}/security/authentik/scripts/user_management.py"
+    - "{{ docker_dir }}/security/authentik/config/monitoring.yml"
+    - "{{ docker_dir }}/security/authentik/config/traefik.yml"
+    - "{{ docker_dir }}/security/authentik/config/backup.yml"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Test Authentik automation script
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/authentik_automation.py --validate"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_automation_test
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Test Authentik application provisioning script
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/application_provisioning.py --validate"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_app_provisioning_test
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Test Authentik user management script
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/user_management.py --validate"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_user_management_test
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik API endpoints
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_api_validation
+  loop:
+    - "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    - "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
+    - "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    - "http://localhost:{{ security_authentik.port }}/api/v3/policies/user/"
+    - "http://localhost:{{ security_authentik.port }}/api/v3/core/tokens/"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik users
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_users_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik groups
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_groups_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik applications
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_applications_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik policies
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/policies/user/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_policies_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik monitoring integration
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/metrics"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_monitoring_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/health"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_health_endpoint_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik Traefik integration
+  ansible.builtin.uri:
+    url: "https://{{ security_authentik.subdomain }}.{{ domain }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+    validate_certs: false
+  register: authentik_traefik_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Check Authentik container logs for errors
+  community.docker.docker_container_info:
+    name: "{{ security_authentik.container_name }}"
+  register: authentik_container_info
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik container health
+  ansible.builtin.assert:
+    that:
+      - authentik_container_info.exists
+      - authentik_container_info.container.State.Status == "running"
+      - authentik_container_info.container.State.Health.Status in ["healthy", "none"]
+    fail_msg: "Authentik container is not healthy"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik database connection
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_db_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Display Authentik validation summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      AUTHENTIK VALIDATION SUMMARY
+      ========================================
+      
+      Service Health:
+      - API Health: {{ authentik_health_validation.status | default('Unknown') }}
+      - Container Status: {{ authentik_container_info.container.State.Status | default('Unknown') }}
+      - Container Health: {{ authentik_container_info.container.State.Health.Status | default('Unknown') }}
+      - Database Connection: {{ authentik_db_validation.status | default('Unknown') }}
+      
+      Configuration Files:
+      - Docker Compose: {{ authentik_config_validation.results[0].stat.exists | default(false) }}
+      - Automation Config: {{ authentik_config_validation.results[1].stat.exists | default(false) }}
+      - Automation Script: {{ authentik_config_validation.results[2].stat.exists | default(false) }}
+      - App Provisioning: {{ authentik_config_validation.results[3].stat.exists | default(false) }}
+      - User Management: {{ authentik_config_validation.results[4].stat.exists | default(false) }}
+      - Monitoring Config: {{ authentik_config_validation.results[5].stat.exists | default(false) }}
+      - Traefik Config: {{ authentik_config_validation.results[6].stat.exists | default(false) }}
+      - Backup Config: {{ authentik_config_validation.results[7].stat.exists | default(false) }}
+      
+      Script Tests:
+      - Automation Test: {{ authentik_automation_test.rc == 0 if authentik_automation_test.rc is defined else 'Not Run' }}
+      - App Provisioning Test: {{ authentik_app_provisioning_test.rc == 0 if authentik_app_provisioning_test.rc is defined else 'Not Run' }}
+      - User Management Test: {{ authentik_user_management_test.rc == 0 if authentik_user_management_test.rc is defined else 'Not Run' }}
+      
+      API Endpoints:
+      - Users API: {{ authentik_api_validation.results[0].status | default('Unknown') }}
+      - Groups API: {{ authentik_api_validation.results[1].status | default('Unknown') }}
+      - Applications API: {{ authentik_api_validation.results[2].status | default('Unknown') }}
+      - Policies API: {{ authentik_api_validation.results[3].status | default('Unknown') }}
+      - Tokens API: {{ authentik_api_validation.results[4].status | default('Unknown') }}
+      
+      Integration Status:
+      - Users: {{ authentik_users_validation.status | default('Unknown') }}
+      - Groups: {{ authentik_groups_validation.status | default('Unknown') }}
+      - Applications: {{ authentik_applications_validation.status | default('Unknown') }}
+      - Policies: {{ authentik_policies_validation.status | default('Unknown') }}
+      - Monitoring: {{ authentik_monitoring_validation.status | default('Unknown') }}
+      - Health Endpoint: {{ authentik_health_endpoint_validation.status | default('Unknown') }}
+      - Traefik: {{ authentik_traefik_validation.status | default('Unknown') }}
+      
+      Data Counts:
+      - Users: {{ authentik_users_validation.json.results | length if authentik_users_validation.json.results else 0 }}
+      - Groups: {{ authentik_groups_validation.json.results | length if authentik_groups_validation.json.results else 0 }}
+      - Applications: {{ authentik_applications_validation.json.results | length if authentik_applications_validation.json.results else 0 }}
+      - Policies: {{ authentik_policies_validation.json.results | length if authentik_policies_validation.json.results else 0 }}
+      
+      Validation Results:
+      - All Config Files Present: {{ authentik_config_validation.results | map(attribute='stat.exists') | list | all }}
+      - Service Healthy: {{ authentik_health_validation.status in [200, 302, 401] if authentik_health_validation.status is defined else false }}
+      - Container Healthy: {{ authentik_container_info.container.State.Health.Status in ['healthy', 'none'] if authentik_container_info.container.State.Health.Status is defined else false }}
+      - Users Configured: {{ authentik_users_validation.json.results | length > 0 if authentik_users_validation.json.results else false }}
+      - Groups Configured: {{ authentik_groups_validation.json.results | length > 0 if authentik_groups_validation.json.results else false }}
+      - Applications Configured: {{ authentik_applications_validation.json.results | length > 0 if authentik_applications_validation.json.results else false }}
+      - Policies Configured: {{ authentik_policies_validation.json.results | length > 0 if authentik_policies_validation.json.results else false }}
+      
+      ========================================
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate, summary]
+
+- name: Set Authentik validation result
+  ansible.builtin.set_fact:
+    authentik_validation_success: "{{ 
+      authentik_health_validation.status in [200, 302, 401] and
+      authentik_config_validation.results | map(attribute='stat.exists') | list | all and
+      authentik_container_info.container.State.Status == 'running' and
+      authentik_users_validation.json.results | length > 0 and
+      authentik_groups_validation.json.results | length > 0
+    }}"
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Fail if Authentik validation fails
+  ansible.builtin.fail:
+    msg: "Authentik validation failed. Check the validation summary above for details."
+  when: 
+    - security_authentik.automation_enabled | default(true)
+    - not authentik_validation_success
+  tags: [authentik, automation, validate] 

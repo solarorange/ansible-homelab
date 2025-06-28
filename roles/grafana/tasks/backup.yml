@@ -1,0 +1,61 @@
+---
+# Grafana Backup Configuration
+# Configures automated backup of Grafana data and configuration
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ grafana_backup_path }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  tags: [grafana, backup, directories]
+
+- name: Create backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, backup, scripts]
+
+- name: Create restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, backup, scripts]
+
+- name: Setup backup cron job
+  ansible.builtin.cron:
+    name: "Grafana Backup"
+    minute: "0"
+    hour: "2"
+    job: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+    user: "{{ username }}"
+  tags: [grafana, backup, cron]
+
+- name: Test backup script
+  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+  register: backup_test
+  changed_when: backup_test.rc == 0
+  failed_when: backup_test.rc != 0
+  tags: [grafana, backup, test]
+
+- name: Display backup configuration status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Backup Configuration:
+      
+      Backup Path: {{ grafana_backup_path }}
+      Backup Script: {{ docker_dir }}/monitoring/grafana/scripts/backup.sh
+      Restore Script: {{ docker_dir }}/monitoring/grafana/scripts/restore.sh
+      
+      Schedule: {{ grafana_backup_schedule }}
+      Retention: {{ grafana_backup_retention_days }} days
+      
+      Test Result: {{ backup_test.rc == 0 | ternary('OK', 'Failed') }}
+  tags: [grafana, backup, summary] 

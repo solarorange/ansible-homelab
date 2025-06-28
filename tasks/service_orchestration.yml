@@ -1,88 +1,168 @@
 ---
-# Service Orchestration Tasks
+# Service Orchestration Management
+# Manages service dependencies and startup order
 
 - name: Create service orchestration directory
   ansible.builtin.file:
-    path: /etc/ansible/service_management/orchestration
+    path: "{{ docker_dir }}/orchestration"
     state: directory
     mode: '0755'
-  tags: [service_orchestration]
+  tags: [orchestration, setup]
 
-- name: Create service dependency graph
-  ansible.builtin.template:
-    src: templates/service_dependencies.json.j2
-    dest: /etc/ansible/service_management/orchestration/dependencies.json
-    mode: '0644'
-  tags: [service_orchestration]
+- name: Define service dependencies
+  ansible.builtin.set_fact:
+    service_dependencies:
+      # Infrastructure services (no dependencies)
+      traefik: []
+      authentik: []
+      portainer: []
+      
+      # Database services (depend on infrastructure)
+      postgresql: [traefik]
+      mariadb: [traefik]
+      redis: [traefik]
+      elasticsearch: [traefik]
+      
+      # Monitoring services (depend on databases)
+      influxdb: [postgresql]
+      prometheus: [postgresql]
+      grafana: [postgresql, influxdb]
+      loki: [postgresql]
+      alertmanager: [postgresql]
+      
+      # Security services (depend on infrastructure)
+      crowdsec: [traefik]
+      fail2ban: [traefik]
+      vault: [traefik]
+      wireguard: [traefik]
+      
+      # Media services (depend on databases and monitoring)
+      sonarr: [postgresql, grafana]
+      radarr: [postgresql, grafana]
+      prowlarr: [postgresql, grafana]
+      bazarr: [postgresql, grafana]
+      lidarr: [postgresql, grafana]
+      readarr: [postgresql, grafana]
+      jellyfin: [postgresql, grafana]
+      plex: [postgresql, grafana]
+      emby: [postgresql, grafana]
+      
+      # Storage services (depend on infrastructure)
+      nextcloud: [traefik, postgresql]
+      samba: [traefik]
+      syncthing: [traefik]
+      
+      # Utility services (depend on infrastructure)
+      watchtower: [traefik]
+      tdarr: [traefik, grafana]
+      tautulli: [traefik, grafana]
+      
+      # Application services (depend on databases)
+      paperless: [postgresql, grafana]
+      fing: [postgresql, grafana]
+  tags: [orchestration, dependencies]
 
-- name: Create service startup order file
+- name: Create service startup script
   ansible.builtin.template:
-    src: templates/service_startup_order.json.j2
-    dest: /etc/ansible/service_management/orchestration/startup_order.json
-    mode: '0644'
-  tags: [service_orchestration]
-
-- name: Create service orchestration script
-  ansible.builtin.template:
-    src: templates/service_orchestrator.sh.j2
-    dest: /usr/local/bin/service_orchestrator.sh
+    src: templates/service-startup.sh.j2
+    dest: "{{ docker_dir }}/orchestration/startup.sh"
     mode: '0755'
-  tags: [service_orchestration]
+  tags: [orchestration, scripts]
+
+- name: Create service shutdown script
+  ansible.builtin.template:
+    src: templates/service-shutdown.sh.j2
+    dest: "{{ docker_dir }}/orchestration/shutdown.sh"
+    mode: '0755'
+  tags: [orchestration, scripts]
+
+- name: Create service health check script
+  ansible.builtin.template:
+    src: templates/service-health-check.sh.j2
+    dest: "{{ docker_dir }}/orchestration/health-check.sh"
+    mode: '0755'
+  tags: [orchestration, scripts]
 
 - name: Create systemd service for orchestration
   ansible.builtin.template:
-    src: templates/service-orchestrator.service.j2
-    dest: /etc/systemd/system/service-orchestrator.service
+    src: templates/homelab-orchestration.service.j2
+    dest: /etc/systemd/system/homelab-orchestration.service
     mode: '0644'
-  tags: [service_orchestration]
+  tags: [orchestration, systemd]
 
-- name: Enable and start service orchestrator
+- name: Enable and start orchestration service
   ansible.builtin.systemd:
-    name: service-orchestrator
+    name: homelab-orchestration
     state: started
     enabled: yes
     daemon_reload: yes
-  tags: [service_orchestration]
+  tags: [orchestration, systemd]
 
-- name: Create service orchestration monitoring
-  ansible.builtin.template:
-    src: templates/service_orchestration_monitor.sh.j2
-    dest: /usr/local/bin/service_orchestration_monitor.sh
-    mode: '0755'
-  tags: [service_orchestration]
+- name: Wait for infrastructure services to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ item.port }}"
+    timeout: 60
+    delay: 10
+  loop:
+    - { name: "Traefik", port: 80 }
+    - { name: "Traefik HTTPS", port: 443 }
+  when: item.name in enabled_services
+  tags: [orchestration, wait]
 
-- name: Create systemd timer for orchestration monitoring
-  ansible.builtin.template:
-    src: templates/service-orchestration-monitor.timer.j2
-    dest: /etc/systemd/system/service-orchestration-monitor.timer
-    mode: '0644'
-  tags: [service_orchestration]
+- name: Wait for database services to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ item.port }}"
+    timeout: 60
+    delay: 10
+  loop:
+    - { name: "PostgreSQL", port: 5432 }
+    - { name: "MariaDB", port: 3306 }
+    - { name: "Redis", port: 6379 }
+  when: item.name in enabled_services
+  tags: [orchestration, wait]
 
-- name: Create systemd service for orchestration monitoring
-  ansible.builtin.template:
-    src: templates/service-orchestration-monitor.service.j2
-    dest: /etc/systemd/system/service-orchestration-monitor.service
-    mode: '0644'
-  tags: [service_orchestration]
+- name: Wait for monitoring services to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ item.port }}"
+    timeout: 60
+    delay: 10
+  loop:
+    - { name: "InfluxDB", port: 8086 }
+    - { name: "Prometheus", port: 9090 }
+    - { name: "Grafana", port: 3000 }
+    - { name: "Loki", port: 3100 }
+  when: item.name in enabled_services
+  tags: [orchestration, wait]
 
-- name: Enable and start orchestration monitoring
-  ansible.builtin.systemd:
-    name: service-orchestration-monitor.timer
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  tags: [service_orchestration]
+- name: Verify service orchestration
+  ansible.builtin.shell: "{{ docker_dir }}/orchestration/health-check.sh"
+  register: health_check_result
+  changed_when: false
+  tags: [orchestration, verify]
 
-- name: Create service orchestration logs directory
-  ansible.builtin.file:
-    path: /var/log/service_orchestration
-    state: directory
-    mode: '0755'
-  tags: [service_orchestration]
-
-- name: Setup log rotation for orchestration logs
-  ansible.builtin.template:
-    src: templates/service-orchestration-logs
-    dest: /etc/logrotate.d/service-orchestration-logs
-    mode: '0644'
-  tags: [service_orchestration] 
+- name: Display orchestration status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      SERVICE ORCHESTRATION STATUS
+      ========================================
+      
+      Orchestration Service: {{ 'RUNNING' if health_check_result.rc == 0 else 'FAILED' }}
+      Health Check Output: {{ health_check_result.stdout }}
+      
+      Service Dependencies Configured:
+      {% for service, deps in service_dependencies.items() %}
+      - {{ service }}: {{ deps | join(', ') if deps else 'No dependencies' }}
+      {% endfor %}
+      
+      Startup Script: {{ docker_dir }}/orchestration/startup.sh
+      Shutdown Script: {{ docker_dir }}/orchestration/shutdown.sh
+      Health Check Script: {{ docker_dir }}/orchestration/health-check.sh
+      
+      Systemd Service: homelab-orchestration.service
+      
+      ========================================
+  tags: [orchestration, summary] 

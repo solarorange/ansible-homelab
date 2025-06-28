@@ -1,0 +1,451 @@
+---
+# Comprehensive Integration Tests for Ansible Homelab Deployment
+# Tests all services and their interactions
+
+- name: Integration Tests for Homelab Deployment
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    test_timeout: 30
+    health_check_retries: 3
+    health_check_delay: 10
+
+  tasks:
+    #==============================================================================
+    # INFRASTRUCTURE TESTS
+    #==============================================================================
+    
+    - name: Test Docker installation and functionality
+      block:
+        - name: Verify Docker is running
+          ansible.builtin.systemd:
+            name: docker
+            state: started
+          register: docker_status
+          
+        - name: Test Docker functionality
+          ansible.builtin.docker_container:
+            name: test-container
+            image: hello-world
+            state: started
+            auto_remove: yes
+          register: docker_test
+          
+        - name: Verify Docker test passed
+          ansible.builtin.assert:
+            that:
+              - docker_test.status.State.Running is defined
+              - docker_test.status.State.Running == false
+              - docker_test.status.State.ExitCode == 0
+            fail_msg: "Docker functionality test failed"
+            
+    - name: Test network connectivity
+      block:
+        - name: Test internet connectivity
+          ansible.builtin.uri:
+            url: https://www.google.com
+            method: GET
+            timeout: 10
+          register: internet_test
+          
+        - name: Test DNS resolution
+          ansible.builtin.shell: "nslookup {{ domain }}"
+          register: dns_test
+          changed_when: false
+          
+        - name: Verify network tests passed
+          ansible.builtin.assert:
+            that:
+              - internet_test.status == 200
+              - dns_test.rc == 0
+            fail_msg: "Network connectivity test failed"
+            
+    - name: Test system resources
+      block:
+        - name: Check available disk space
+          ansible.builtin.shell: "df -BG {{ docker_root }} | tail -1 | awk '{print $4}' | sed 's/G//'"
+          register: disk_space
+          changed_when: false
+          
+        - name: Check available memory
+          ansible.builtin.shell: "free -g | grep Mem | awk '{print $2}'"
+          register: memory
+          changed_when: false
+          
+        - name: Verify system resources
+          ansible.builtin.assert:
+            that:
+              - disk_space.stdout | int >= 20
+              - memory.stdout | int >= 2
+            fail_msg: "Insufficient system resources"
+            
+    #==============================================================================
+    # SECURITY TESTS
+    #==============================================================================
+    
+    - name: Test security services
+      block:
+        - name: Test Traefik accessibility
+          ansible.builtin.uri:
+            url: https://traefik.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: traefik_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: traefik_test is success
+          
+        - name: Test Authentik accessibility
+          ansible.builtin.uri:
+            url: https://auth.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: authentik_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: authentik_test is success
+          
+        - name: Test Pi-hole accessibility
+          ansible.builtin.uri:
+            url: https://dns.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: pihole_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: pihole_test is success
+          
+        - name: Verify security services
+          ansible.builtin.assert:
+            that:
+              - traefik_test.status in [200, 401, 403]
+              - authentik_test.status in [200, 401, 403]
+              - pihole_test.status in [200, 401, 403]
+            fail_msg: "Security services test failed"
+            
+    - name: Test SSL/TLS configuration
+      block:
+        - name: Test SSL certificate validity
+          ansible.builtin.shell: |
+            echo | openssl s_client -connect {{ domain }}:443 -servername {{ domain }} 2>/dev/null | openssl x509 -noout -dates
+          register: ssl_test
+          changed_when: false
+          
+        - name: Test SSL certificate strength
+          ansible.builtin.shell: |
+            echo | openssl s_client -connect {{ domain }}:443 -servername {{ domain }} -cipher 'HIGH:!aNULL:!MD5:!RC4' 2>/dev/null | grep -q "Cipher is"
+          register: ssl_strength_test
+          changed_when: false
+          
+        - name: Verify SSL/TLS configuration
+          ansible.builtin.assert:
+            that:
+              - ssl_test.rc == 0
+              - ssl_strength_test.rc == 0
+            fail_msg: "SSL/TLS configuration test failed"
+            
+    #==============================================================================
+    # DATABASE TESTS
+    #==============================================================================
+    
+    - name: Test database services
+      block:
+        - name: Test PostgreSQL connectivity
+          ansible.builtin.wait_for:
+            host: localhost
+            port: 5432
+            timeout: 10
+          register: postgres_test
+          
+        - name: Test Redis connectivity
+          ansible.builtin.wait_for:
+            host: localhost
+            port: 6379
+            timeout: 10
+          register: redis_test
+          
+        - name: Test MariaDB connectivity
+          ansible.builtin.wait_for:
+            host: localhost
+            port: 3306
+            timeout: 10
+          register: mariadb_test
+          
+        - name: Verify database services
+          ansible.builtin.assert:
+            that:
+              - postgres_test is success
+              - redis_test is success
+              - mariadb_test is success
+            fail_msg: "Database services test failed"
+            
+    #==============================================================================
+    # MONITORING TESTS
+    #==============================================================================
+    
+    - name: Test monitoring services
+      block:
+        - name: Test Prometheus accessibility
+          ansible.builtin.uri:
+            url: http://localhost:9090/-/healthy
+            method: GET
+            timeout: "{{ test_timeout }}"
+          register: prometheus_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: prometheus_test is success
+          
+        - name: Test Grafana accessibility
+          ansible.builtin.uri:
+            url: http://localhost:3000/api/health
+            method: GET
+            timeout: "{{ test_timeout }}"
+          register: grafana_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: grafana_test is success
+          
+        - name: Test Loki accessibility
+          ansible.builtin.uri:
+            url: http://localhost:3100/ready
+            method: GET
+            timeout: "{{ test_timeout }}"
+          register: loki_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: loki_test is success
+          
+        - name: Verify monitoring services
+          ansible.builtin.assert:
+            that:
+              - prometheus_test.status == 200
+              - grafana_test.status == 200
+              - loki_test.status == 200
+            fail_msg: "Monitoring services test failed"
+            
+    #==============================================================================
+    # MEDIA SERVICES TESTS
+    #==============================================================================
+    
+    - name: Test media services
+      block:
+        - name: Test Plex accessibility
+          ansible.builtin.uri:
+            url: https://plex.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: plex_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: plex_test is success
+          
+        - name: Test Jellyfin accessibility
+          ansible.builtin.uri:
+            url: https://jellyfin.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: jellyfin_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: jellyfin_test is success
+          
+        - name: Test Sonarr accessibility
+          ansible.builtin.uri:
+            url: https://sonarr.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: sonarr_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: sonarr_test is success
+          
+        - name: Verify media services
+          ansible.builtin.assert:
+            that:
+              - plex_test.status in [200, 401, 403]
+              - jellyfin_test.status in [200, 401, 403]
+              - sonarr_test.status in [200, 401, 403]
+            fail_msg: "Media services test failed"
+            
+    #==============================================================================
+    # UTILITY SERVICES TESTS
+    #==============================================================================
+    
+    - name: Test utility services
+      block:
+        - name: Test Portainer accessibility
+          ansible.builtin.uri:
+            url: https://portainer.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: portainer_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: portainer_test is success
+          
+        - name: Test Homepage accessibility
+          ansible.builtin.uri:
+            url: https://dash.{{ domain }}
+            method: GET
+            timeout: "{{ test_timeout }}"
+            status_code: [200, 401, 403]
+          register: homepage_test
+          retries: "{{ health_check_retries }}"
+          delay: "{{ health_check_delay }}"
+          until: homepage_test is success
+          
+        - name: Verify utility services
+          ansible.builtin.assert:
+            that:
+              - portainer_test.status in [200, 401, 403]
+              - homepage_test.status in [200, 401, 403]
+            fail_msg: "Utility services test failed"
+            
+    #==============================================================================
+    # PERFORMANCE TESTS
+    #==============================================================================
+    
+    - name: Test system performance
+      block:
+        - name: Check container resource usage
+          ansible.builtin.shell: |
+            docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+          register: container_stats
+          changed_when: false
+          
+        - name: Check system load
+          ansible.builtin.shell: "uptime"
+          register: system_load
+          changed_when: false
+          
+        - name: Check disk I/O
+          ansible.builtin.shell: "iostat -x 1 1"
+          register: disk_io
+          changed_when: false
+          
+        - name: Verify performance metrics
+          ansible.builtin.assert:
+            that:
+              - container_stats.rc == 0
+              - system_load.rc == 0
+              - disk_io.rc == 0
+            fail_msg: "Performance test failed"
+            
+    #==============================================================================
+    # BACKUP TESTS
+    #==============================================================================
+    
+    - name: Test backup functionality
+      block:
+        - name: Check backup directory exists
+          ansible.builtin.stat:
+            path: "{{ backup_dir }}"
+          register: backup_dir_check
+          
+        - name: Check backup script permissions
+          ansible.builtin.stat:
+            path: "{{ backup_dir }}/backup.sh"
+          register: backup_script_check
+          
+        - name: Verify backup configuration
+          ansible.builtin.assert:
+            that:
+              - backup_dir_check.stat.exists
+              - backup_script_check.stat.exists
+            fail_msg: "Backup configuration test failed"
+            
+    #==============================================================================
+    # FINAL VALIDATION
+    #==============================================================================
+    
+    - name: Generate test report
+      ansible.builtin.template:
+        src: test_report.j2
+        dest: "{{ playbook_dir }}/test_report_{{ ansible_date_time.epoch }}.html"
+        mode: '0644'
+      vars:
+        test_results:
+          infrastructure:
+            docker: "{{ docker_test is defined and docker_test.status.State.ExitCode == 0 }}"
+            network: "{{ internet_test is defined and internet_test.status == 200 }}"
+            resources: "{{ disk_space is defined and disk_space.stdout | int >= 20 }}"
+          security:
+            traefik: "{{ traefik_test is defined and traefik_test.status in [200, 401, 403] }}"
+            authentik: "{{ authentik_test is defined and authentik_test.status in [200, 401, 403] }}"
+            ssl: "{{ ssl_test is defined and ssl_test.rc == 0 }}"
+          databases:
+            postgresql: "{{ postgres_test is defined and postgres_test is success }}"
+            redis: "{{ redis_test is defined and redis_test is success }}"
+            mariadb: "{{ mariadb_test is defined and mariadb_test is success }}"
+          monitoring:
+            prometheus: "{{ prometheus_test is defined and prometheus_test.status == 200 }}"
+            grafana: "{{ grafana_test is defined and grafana_test.status == 200 }}"
+            loki: "{{ loki_test is defined and loki_test.status == 200 }}"
+          media:
+            plex: "{{ plex_test is defined and plex_test.status in [200, 401, 403] }}"
+            jellyfin: "{{ jellyfin_test is defined and jellyfin_test.status in [200, 401, 403] }}"
+            sonarr: "{{ sonarr_test is defined and sonarr_test.status in [200, 401, 403] }}"
+          utilities:
+            portainer: "{{ portainer_test is defined and portainer_test.status in [200, 401, 403] }}"
+            homepage: "{{ homepage_test is defined and homepage_test.status in [200, 401, 403] }}"
+          performance:
+            containers: "{{ container_stats is defined and container_stats.rc == 0 }}"
+            system: "{{ system_load is defined and system_load.rc == 0 }}"
+          backup:
+            configuration: "{{ backup_dir_check is defined and backup_dir_check.stat.exists }}"
+            
+    - name: Display test summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          INTEGRATION TEST SUMMARY
+          ========================================
+          
+          Infrastructure Tests:
+          - Docker: {{ 'PASS' if docker_test is defined and docker_test.status.State.ExitCode == 0 else 'FAIL' }}
+          - Network: {{ 'PASS' if internet_test is defined and internet_test.status == 200 else 'FAIL' }}
+          - Resources: {{ 'PASS' if disk_space is defined and disk_space.stdout | int >= 20 else 'FAIL' }}
+          
+          Security Tests:
+          - Traefik: {{ 'PASS' if traefik_test is defined and traefik_test.status in [200, 401, 403] else 'FAIL' }}
+          - Authentik: {{ 'PASS' if authentik_test is defined and authentik_test.status in [200, 401, 403] else 'FAIL' }}
+          - SSL/TLS: {{ 'PASS' if ssl_test is defined and ssl_test.rc == 0 else 'FAIL' }}
+          
+          Database Tests:
+          - PostgreSQL: {{ 'PASS' if postgres_test is defined and postgres_test is success else 'FAIL' }}
+          - Redis: {{ 'PASS' if redis_test is defined and redis_test is success else 'FAIL' }}
+          - MariaDB: {{ 'PASS' if mariadb_test is defined and mariadb_test is success else 'FAIL' }}
+          
+          Monitoring Tests:
+          - Prometheus: {{ 'PASS' if prometheus_test is defined and prometheus_test.status == 200 else 'FAIL' }}
+          - Grafana: {{ 'PASS' if grafana_test is defined and grafana_test.status == 200 else 'FAIL' }}
+          - Loki: {{ 'PASS' if loki_test is defined and loki_test.status == 200 else 'FAIL' }}
+          
+          Media Tests:
+          - Plex: {{ 'PASS' if plex_test is defined and plex_test.status in [200, 401, 403] else 'FAIL' }}
+          - Jellyfin: {{ 'PASS' if jellyfin_test is defined and jellyfin_test.status in [200, 401, 403] else 'FAIL' }}
+          - Sonarr: {{ 'PASS' if sonarr_test is defined and sonarr_test.status in [200, 401, 403] else 'FAIL' }}
+          
+          Utility Tests:
+          - Portainer: {{ 'PASS' if portainer_test is defined and portainer_test.status in [200, 401, 403] else 'FAIL' }}
+          - Homepage: {{ 'PASS' if homepage_test is defined and homepage_test.status in [200, 401, 403] else 'FAIL' }}
+          
+          Performance Tests:
+          - Containers: {{ 'PASS' if container_stats is defined and container_stats.rc == 0 else 'FAIL' }}
+          - System: {{ 'PASS' if system_load is defined and system_load.rc == 0 else 'FAIL' }}
+          
+          Backup Tests:
+          - Configuration: {{ 'PASS' if backup_dir_check is defined and backup_dir_check.stat.exists else 'FAIL' }}
+          
+          ========================================
+          Test Report: test_report_{{ ansible_date_time.epoch }}.html
+          ======================================== 

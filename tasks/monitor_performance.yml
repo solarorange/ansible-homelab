@@ -1,4 +1,68 @@
 ---
+# Performance Monitoring Setup
+# Configures comprehensive performance monitoring for the homelab
+
+- name: Create performance monitoring directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/monitoring/performance"
+    state: directory
+    mode: '0755'
+  tags: [monitoring, performance, setup]
+
+- name: Configure Prometheus performance monitoring
+  ansible.builtin.template:
+    src: templates/monitoring/prometheus-performance.yml.j2
+    dest: "{{ docker_dir }}/monitoring/performance/prometheus.yml"
+    mode: '0644'
+  tags: [monitoring, performance, prometheus]
+
+- name: Configure Grafana performance dashboards
+  ansible.builtin.template:
+    src: templates/monitoring/grafana-performance-dashboard.json.j2
+    dest: "{{ docker_dir }}/monitoring/performance/grafana-dashboard.json"
+    mode: '0644'
+  tags: [monitoring, performance, grafana]
+
+- name: Setup performance alerting rules
+  ansible.builtin.template:
+    src: templates/monitoring/performance-alerts.yml.j2
+    dest: "{{ docker_dir }}/monitoring/performance/alerts.yml"
+    mode: '0644'
+  tags: [monitoring, performance, alerts]
+
+- name: Configure system performance monitoring
+  ansible.builtin.template:
+    src: templates/monitoring/system-performance.sh.j2
+    dest: "{{ docker_dir }}/monitoring/performance/system-monitor.sh"
+    mode: '0755'
+  tags: [monitoring, performance, system]
+
+- name: Create performance monitoring cron job
+  ansible.builtin.cron:
+    name: "Performance Monitoring"
+    minute: "*/5"
+    job: "{{ docker_dir }}/monitoring/performance/system-monitor.sh"
+    user: root
+  tags: [monitoring, performance, cron]
+
+- name: Display performance monitoring status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      PERFORMANCE MONITORING CONFIGURED
+      ========================================
+      
+      Prometheus Configuration: {{ docker_dir }}/monitoring/performance/prometheus.yml
+      Grafana Dashboard: {{ docker_dir }}/monitoring/performance/grafana-dashboard.json
+      Alert Rules: {{ docker_dir }}/monitoring/performance/alerts.yml
+      System Monitor: {{ docker_dir }}/monitoring/performance/system-monitor.sh
+      
+      Monitoring Schedule: Every 5 minutes
+      Dashboard URL: https://grafana.{{ domain }}
+      
+      ========================================
+  tags: [monitoring, performance, summary]
+
 # Performance monitoring tasks
 - name: Collect system metrics
   ansible.builtin.shell: |

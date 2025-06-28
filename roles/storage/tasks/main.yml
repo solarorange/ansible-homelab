@@ -1,36 +1,45 @@
 ---
 - name: Run storage prerequisites
-  import_tasks: prerequisites.yml
+  ansible.builtin.include_tasks: prerequisites.yml
 
 - name: Configure filesystems
-  import_tasks: ../filesystems/tasks/main.yml
+  ansible.builtin.include_tasks: filesystems/main.yml
+  when: storage_filesystems_enabled | default(true)
 
 - name: Configure Samba
-  import_tasks: samba.yml
+  ansible.builtin.include_tasks: samba.yml
+  when: samba_enabled | default(true)
 
 - name: Configure Syncthing
-  import_tasks: syncthing.yml
+  ansible.builtin.include_tasks: syncthing.yml
+  when: syncthing_enabled | default(true)
 
 - name: Configure Nextcloud
-  import_tasks: nextcloud.yml
+  ansible.builtin.include_tasks: nextcloud.yml
+  when: nextcloud_enabled | default(true)
 
 - name: Apply backup procedures
-  import_tasks: backup.yml
+  ansible.builtin.include_tasks: backup.yml
+  when: storage_backup_enabled | default(true)
 
 - name: Integrate monitoring
-  import_tasks: monitoring.yml
+  ansible.builtin.include_tasks: monitoring.yml
+  when: storage_monitoring_enabled | default(true)
 
 - name: Apply security hardening
-  import_tasks: security.yml
+  ansible.builtin.include_tasks: security.yml
+  when: storage_security_enabled | default(true)
 
 - name: Integrate with homepage
-  import_tasks: homepage.yml
+  ansible.builtin.include_tasks: homepage.yml
+  when: storage_homepage_enabled | default(true)
 
 - name: Configure alerts
-  import_tasks: alerts.yml
+  ansible.builtin.include_tasks: alerts.yml
+  when: storage_alerting_enabled | default(true)
 
 - name: Validate storage stack
-  import_tasks: validate.yml
+  ansible.builtin.include_tasks: validate.yml
 
 - name: Validate storage deployment
-  import_tasks: validate_deployment.yml 
+  ansible.builtin.include_tasks: validate_deployment.yml 

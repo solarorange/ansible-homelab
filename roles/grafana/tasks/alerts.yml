@@ -1,0 +1,98 @@
+---
+# Grafana Alerting Configuration
+# Configures alert rules and notification channels
+
+- name: Wait for Grafana alerting API to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/alert-notifications"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: alerting_api_check
+  retries: 3
+  delay: 10
+  until: alerting_api_check.status == 200
+  tags: [grafana, alerts, api]
+
+- name: Create notification channels via Python script
+  ansible.builtin.command: >
+    python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
+    --url http://localhost:{{ grafana_port }}
+    --username {{ grafana_admin_user }}
+    --password {{ grafana_admin_password }}
+    --config-dir {{ docker_dir }}/monitoring/grafana/config
+    notifications
+  register: notifications_setup
+  changed_when: notifications_setup.rc == 0
+  failed_when: notifications_setup.rc != 0
+  tags: [grafana, alerts, notifications]
+
+- name: Create alert rules via Python script
+  ansible.builtin.command: >
+    python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
+    --url http://localhost:{{ grafana_port }}
+    --username {{ grafana_admin_user }}
+    --password {{ grafana_admin_password }}
+    --config-dir {{ docker_dir }}/monitoring/grafana/config
+    alerts
+  register: alerts_setup
+  changed_when: alerts_setup.rc == 0
+  failed_when: alerts_setup.rc != 0
+  tags: [grafana, alerts, rules]
+
+- name: Validate notification channels
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/alert-notifications"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: notifications_validation
+  tags: [grafana, alerts, validation]
+
+- name: Validate alert rules
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/alerts"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: alerts_validation
+  tags: [grafana, alerts, validation]
+
+- name: Display alerting configuration status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Alerting Configuration:
+      
+      Notification Channels:
+      {% for name, config in grafana_notification_channels.items() %}
+      {% if config.enabled | default(false) %}
+      - {{ name }} ({{ config.type }})
+      {% endif %}
+      {% endfor %}
+      
+      Alert Rules:
+      {% for name, config in grafana_alert_rules.items() %}
+      {% if config.enabled | default(false) %}
+      - {{ name }} ({{ config.severity }})
+      {% endif %}
+      {% endfor %}
+      
+      Validation Results:
+      - Notifications API: {{ notifications_validation.status == 200 | ternary('OK', 'Failed') }}
+      - Alerts API: {{ alerts_validation.status == 200 | ternary('OK', 'Failed') }}
+      - Total Channels: {{ notifications_validation.json | length }}
+      - Total Rules: {{ alerts_validation.json | length }}
+      
+      Configuration Files:
+      - Notifications Config: {{ docker_dir }}/monitoring/grafana/config/notification_channels.json
+      - Alert Rules Config: {{ docker_dir }}/monitoring/grafana/config/alert_rules.json
+  tags: [grafana, alerts, summary] 

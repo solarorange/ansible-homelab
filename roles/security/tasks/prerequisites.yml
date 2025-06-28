@@ -1,62 +1,102 @@
 ---
 # Security Stack Prerequisites
-# System requirements and setup for security stack deployment
+# Setup required packages and configurations for security services
 
-- name: Update system packages
-  ansible.builtin.apt:
-    update_cache: yes
-    upgrade: yes
-  become: true
-
-- name: Install required packages
+- name: Install required packages for security stack
   ansible.builtin.apt:
     name:
-      - "docker.io"
-      - "docker-compose"
-      - "curl"
-      - "jq"
-      - "logrotate"
-      - "iptables"
-      - "wireguard-tools"
-      - "fail2ban"
-      - "unzip"
-      - "wget"
-      - "git"
-      - "vim"
-      - "nano"
-      - "tree"
-      - "rsync"
-      - "openssl"
+      - ufw
+      - fail2ban
+      - iptables-persistent
+      - python3-pip
+      - curl
+      - wget
+      - gnupg
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
     state: present
-  become: true
+    update_cache: yes
+  tags: [security, prerequisites, packages]
 
-- name: Ensure required directories exist
+- name: Install Docker Compose if not present
+  ansible.builtin.pip:
+    name: docker-compose
+    state: present
+  tags: [security, prerequisites, docker]
+
+- name: Create security directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
+    mode: '0755'
   loop:
-    - "{{ docker_dir }}"
-    - "{{ config_dir }}"
-    - "{{ backup_dir }}"
-    - "{{ logs_dir }}"
-    - "/home/{{ username }}/.config"
-    - "/home/{{ username }}/.cache"
+    - "{{ docker_dir }}/security"
+    - "{{ docker_dir }}/security/authentik"
+    - "{{ docker_dir }}/security/traefik"
+    - "{{ docker_dir }}/security/pihole"
+    - "{{ docker_dir }}/security/crowdsec"
+    - "{{ docker_dir }}/security/wireguard"
+    - "{{ docker_dir }}/security/fail2ban"
+    - "{{ logs_dir }}/security"
+  tags: [security, prerequisites, directories]
 
-- name: Configure Docker network for security stack
-  community.docker.docker_network:
-    name: "security"
+- name: Configure firewall (UFW)
+  ansible.builtin.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  tags: [security, prerequisites, firewall]
+
+- name: Allow SSH through firewall
+  ansible.builtin.ufw:
+    rule: allow
+    port: ssh
+    proto: tcp
+  tags: [security, prerequisites, firewall]
+
+- name: Allow HTTP and HTTPS through firewall
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 80
+    - 443
+  tags: [security, prerequisites, firewall]
+
+- name: Configure SSH security
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
     state: present
-    driver: bridge
-    ipam_config:
-      - subnet: "172.30.0.0/16"
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?AllowUsers', line: 'AllowUsers {{ username }}' }
+  notify: restart ssh
+  tags: [security, prerequisites, ssh]
 
-- name: Display security prerequisites summary
+- name: Create security network
+  community.docker.docker_network:
+    name: security
+    state: present
+  tags: [security, prerequisites, network]
+
+- name: Verify prerequisites installation
   ansible.builtin.debug:
     msg: |
-      Security Prerequisites Setup Complete:
-      - Packages Installed
-      - Directories Created
-      - Docker Network Created 
+      ========================================
+      SECURITY PREREQUISITES COMPLETED
+      ========================================
+      
+      Packages installed: ufw, fail2ban, iptables-persistent, docker-compose
+      Directories created: {{ docker_dir }}/security/*
+      Firewall configured: UFW enabled with SSH, HTTP, HTTPS allowed
+      SSH secured: Root login disabled, password auth disabled
+      Docker network: security network created
+      
+      ========================================
+  tags: [security, prerequisites, summary] 

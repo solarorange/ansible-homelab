@@ -24,8 +24,8 @@ paperless_ngx_domain: "{{ paperless_ngx_subdomain }}.{{ domain }}"
 paperless_ngx_auth_enabled: true
 paperless_ngx_auth_method: "authentik"  # Options: authentik, basic, none
 paperless_ngx_admin_email: "{{ admin_email | default('admin@' + domain) }}"
-paperless_ngx_admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-paperless_ngx_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+paperless_ngx_admin_password: "{{ vault_paperless_admin_password | default('') }}"
+paperless_ngx_secret_key: "{{ vault_paperless_secret_key | default('') }}"
 
 # Database Configuration
 paperless_ngx_database_type: "postgresql"  # Options: postgresql, sqlite
@@ -33,12 +33,12 @@ paperless_ngx_database_host: "{{ postgresql_host | default('postgresql') }}"
 paperless_ngx_database_port: "{{ postgresql_port | default(5432) }}"
 paperless_ngx_database_name: "paperless"
 paperless_ngx_database_user: "paperless"
-paperless_ngx_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+paperless_ngx_database_password: "{{ vault_paperless_database_password | default('') }}"
 
 # Redis Configuration
 paperless_ngx_redis_host: "{{ redis_host | default('redis') }}"
 paperless_ngx_redis_port: "{{ redis_port | default(6379) }}"
-paperless_ngx_redis_password: "{{ redis_password | default('') }}"
+paperless_ngx_redis_password: "{{ vault_redis_password | default('') }}"
 paperless_ngx_redis_db: 0
 
 # OCR Configuration
@@ -82,6 +82,11 @@ paperless_ngx_backup_retention: 7  # Keep backups for 7 days
 paperless_ngx_backup_compression: true
 paperless_ngx_backup_include_media: true
 paperless_ngx_backup_include_database: true
+paperless_ngx_backup_dir: "{{ backup_dir }}/paperless-ngx"
+paperless_ngx_backup_retention_days: 7
+paperless_ngx_backup_log_file: "{{ logs_dir }}/paperless-ngx/backup/backup.log"
+paperless_ngx_backup_max_log_size: "10M"
+paperless_ngx_backup_notifications_enabled: true
 
 # Logging Configuration
 paperless_ngx_log_level: "info"  # Options: debug, info, warn, error
@@ -96,11 +101,11 @@ paperless_ngx_storage_limit: "50g"
 
 # Traefik Configuration
 paperless_ngx_traefik_enabled: true
-paperless_ngx_traefik_network: "traefik"
+paperless_ngx_traefik_network: "{{ traefik_network | default('homelab') }}"
 paperless_ngx_traefik_middleware: "secure-headers,compress"
 paperless_ngx_traefik_auth_middleware: "authentik-forward-auth"
 paperless_ngx_traefik_ssl_enabled: true
-paperless_ngx_traefik_ssl_resolver: "cloudflare"
+paperless_ngx_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
 
 # Homepage Integration
 paperless_ngx_homepage_enabled: true
@@ -166,12 +171,16 @@ paperless_ngx_dependencies:
 paperless_ngx_health_check_url: "/api/health/"
 paperless_ngx_health_check_timeout: 10
 paperless_ngx_health_check_retries: 3
+paperless_ngx_health_check_log_file: "{{ logs_dir }}/paperless-ngx/health/health.log"
+paperless_ngx_health_check_max_log_size: "10M"
+paperless_ngx_health_check_retention_days: 7
 
 # API Configuration
 paperless_ngx_api_enabled: true
 paperless_ngx_api_version: "v1"
 paperless_ngx_api_rate_limit: 1000
 paperless_ngx_api_rate_limit_window: 3600
+paperless_ngx_admin_token: "{{ vault_paperless_admin_token | default('') }}"
 
 # Webhook Configuration
 paperless_ngx_webhooks_enabled: true
@@ -195,18 +204,18 @@ paperless_ngx_notification_channels:
 paperless_ngx_email_enabled: false
 paperless_ngx_smtp_host: "{{ smtp_host | default('localhost') }}"
 paperless_ngx_smtp_port: "{{ smtp_port | default(587) }}"
-paperless_ngx_smtp_username: "{{ smtp_username | default('') }}"
-paperless_ngx_smtp_password: "{{ smtp_password | default('') }}"
+paperless_ngx_smtp_username: "{{ vault_smtp_username | default('') }}"
+paperless_ngx_smtp_password: "{{ vault_smtp_password | default('') }}"
 paperless_ngx_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
 
 # Slack Configuration
 paperless_ngx_slack_enabled: false
-paperless_ngx_slack_webhook: "{{ slack_webhook | default('') }}"
+paperless_ngx_slack_webhook: "{{ vault_slack_webhook | default('') }}"
 paperless_ngx_slack_channel: "{{ slack_channel | default('#alerts') }}"
 
 # Discord Configuration
 paperless_ngx_discord_enabled: false
-paperless_ngx_discord_webhook: "{{ discord_webhook | default('') }}"
+paperless_ngx_discord_webhook: "{{ vault_discord_webhook | default('') }}"
 paperless_ngx_discord_channel: "{{ discord_channel | default('alerts') }}"
 
 # Custom Configuration

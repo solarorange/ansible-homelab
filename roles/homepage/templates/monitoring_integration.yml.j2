@@ -1,0 +1,348 @@
+# Homepage Monitoring Integration Configuration
+# Integrates Homepage with the monitoring stack
+
+# =============================================================================
+# PROMETHEUS INTEGRATION
+# =============================================================================
+
+prometheus:
+  enabled: true
+  url: "http://prometheus:9090"
+  metrics_path: "/metrics"
+  scrape_interval: 30
+  query_timeout: 60
+  
+  # Service metrics collection
+  service_metrics:
+    enabled: true
+    collect_container_metrics: true
+    collect_service_metrics: true
+    collect_network_metrics: true
+    
+  # System metrics collection
+  system_metrics:
+    enabled: true
+    collect_cpu_metrics: true
+    collect_memory_metrics: true
+    collect_disk_metrics: true
+    collect_network_metrics: true
+
+# =============================================================================
+# GRAFANA INTEGRATION
+# =============================================================================
+
+grafana:
+  enabled: true
+  url: "http://grafana:3000"
+  api_key: "{{ grafana_api_key | default('') }}"
+  dashboard_uid: "homepage-overview"
+  
+  # Dashboard integration
+  dashboards:
+    enabled: true
+    auto_create_dashboard: true
+    dashboard_title: "Homepage Overview"
+    dashboard_uid: "homepage-overview"
+    refresh_interval: "30s"
+    
+  # Metrics integration
+  metrics:
+    enabled: true
+    collect_service_metrics: true
+    collect_system_metrics: true
+    collect_user_metrics: true
+
+# =============================================================================
+# LOKI INTEGRATION
+# =============================================================================
+
+loki:
+  enabled: true
+  url: "http://loki:3100"
+  query_timeout: 30
+  max_lines: 1000
+  
+  # Log collection
+  logs:
+    enabled: true
+    collect_service_logs: true
+    collect_system_logs: true
+    collect_access_logs: true
+    
+  # Log queries
+  queries:
+    enabled: true
+    default_query: '{job="homepage"}'
+    error_query: '{job="homepage", level="error"}'
+    access_query: '{job="homepage", type="access"}'
+
+# =============================================================================
+# ALERTMANAGER INTEGRATION
+# =============================================================================
+
+alertmanager:
+  enabled: true
+  url: "http://alertmanager:9093"
+  api_version: "v2"
+  timeout: 30
+  
+  # Alert forwarding
+  alerts:
+    enabled: true
+    forward_service_alerts: true
+    forward_system_alerts: true
+    forward_user_alerts: true
+    
+  # Notification channels
+  notifications:
+    enabled: true
+    discord_webhook: "{{ discord_webhook_url | default('') }}"
+    email_address: "{{ alert_email | default('admin@' + domain) }}"
+    slack_webhook: "{{ slack_webhook_url | default('') }}"
+
+# =============================================================================
+# HEALTH CHECKS
+# =============================================================================
+
+health_checks:
+  enabled: true
+  interval: 60
+  timeout: 10
+  retries: 3
+  
+  # Service health checks
+  services:
+    enabled: true
+    check_all_services: true
+    check_interval: 60
+    check_timeout: 10
+    
+  # System health checks
+  system:
+    enabled: true
+    check_cpu_usage: true
+    check_memory_usage: true
+    check_disk_usage: true
+    check_network_status: true
+    
+  # Integration health checks
+  integrations:
+    enabled: true
+    check_prometheus: true
+    check_grafana: true
+    check_loki: true
+    check_alertmanager: true
+
+# =============================================================================
+# METRICS COLLECTION
+# =============================================================================
+
+metrics_collection:
+  enabled: true
+  
+  # Service metrics
+  service_metrics:
+    enabled: true
+    collect_container_metrics: true
+    collect_service_metrics: true
+    collect_network_metrics: true
+    collect_volume_metrics: true
+    
+  # System metrics
+  system_metrics:
+    enabled: true
+    collect_cpu_metrics: true
+    collect_memory_metrics: true
+    collect_disk_metrics: true
+    collect_network_metrics: true
+    collect_load_metrics: true
+    
+  # User metrics
+  user_metrics:
+    enabled: true
+    collect_access_metrics: true
+    collect_session_metrics: true
+    collect_error_metrics: true
+    
+  # Performance metrics
+  performance_metrics:
+    enabled: true
+    collect_response_time: true
+    collect_throughput: true
+    collect_error_rate: true
+    collect_availability: true
+
+# =============================================================================
+# ALERTING RULES
+# =============================================================================
+
+alerting_rules:
+  enabled: true
+  
+  # Service alerts
+  service_alerts:
+    enabled: true
+    service_down_threshold: 1
+    service_unhealthy_threshold: 3
+    service_high_latency_threshold: 5000
+    
+  # System alerts
+  system_alerts:
+    enabled: true
+    cpu_usage_threshold: 80
+    memory_usage_threshold: 90
+    disk_usage_threshold: 90
+    network_error_threshold: 10
+    
+  # Integration alerts
+  integration_alerts:
+    enabled: true
+    prometheus_down_threshold: 1
+    grafana_down_threshold: 1
+    loki_down_threshold: 1
+    alertmanager_down_threshold: 1
+
+# =============================================================================
+# DASHBOARD WIDGETS
+# =============================================================================
+
+dashboard_widgets:
+  enabled: true
+  
+  # System widgets
+  system_widgets:
+    resources:
+      enabled: true
+      refresh_interval: 30
+      show_cpu: true
+      show_memory: true
+      show_disk: true
+      show_network: true
+      
+    services:
+      enabled: true
+      refresh_interval: 60
+      show_running: true
+      show_stopped: true
+      show_health: true
+      
+    alerts:
+      enabled: true
+      refresh_interval: 30
+      show_active: true
+      show_resolved: true
+      show_pending: true
+      
+  # Integration widgets
+  integration_widgets:
+    prometheus:
+      enabled: true
+      refresh_interval: 30
+      show_metrics: true
+      show_targets: true
+      
+    grafana:
+      enabled: true
+      refresh_interval: 60
+      show_dashboards: true
+      show_users: true
+      
+    loki:
+      enabled: true
+      refresh_interval: 30
+      show_logs: true
+      show_errors: true
+      
+    alertmanager:
+      enabled: true
+      refresh_interval: 30
+      show_alerts: true
+      show_silences: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+logging:
+  level: "{{ homepage_log_level | default('info') }}"
+  format: "json"
+  
+  # File logging
+  file:
+    enabled: true
+    path: "{{ homepage_logs_dir }}/monitoring.log"
+    max_size: "10MB"
+    max_files: 5
+    
+  # Console logging
+  console:
+    enabled: true
+    format: "text"
+    
+  # Remote logging
+  remote:
+    enabled: true
+    loki_url: "http://loki:3100"
+    labels:
+      job: "homepage"
+      service: "homepage"
+      environment: "production"
+
+# =============================================================================
+# PERFORMANCE MONITORING
+# =============================================================================
+
+performance_monitoring:
+  enabled: true
+  
+  # Application performance
+  application:
+    enabled: true
+    collect_response_times: true
+    collect_throughput: true
+    collect_error_rates: true
+    collect_memory_usage: true
+    
+  # Database performance
+  database:
+    enabled: false
+    collect_query_times: true
+    collect_connection_pool: true
+    collect_cache_hit_ratio: true
+    
+  # Network performance
+  network:
+    enabled: true
+    collect_bandwidth: true
+    collect_latency: true
+    collect_packet_loss: true
+    collect_connection_count: true
+
+# =============================================================================
+# SECURITY MONITORING
+# =============================================================================
+
+security_monitoring:
+  enabled: true
+  
+  # Access monitoring
+  access:
+    enabled: true
+    collect_login_attempts: true
+    collect_failed_logins: true
+    collect_successful_logins: true
+    collect_session_duration: true
+    
+  # Threat detection
+  threats:
+    enabled: true
+    detect_brute_force: true
+    detect_suspicious_activity: true
+    detect_unauthorized_access: true
+    
+  # Compliance monitoring
+  compliance:
+    enabled: true
+    track_user_activity: true
+    track_configuration_changes: true
+    track_security_events: true 

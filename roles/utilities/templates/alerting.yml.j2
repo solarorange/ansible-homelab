@@ -1,10 +1,41 @@
-# Utilities Stack Alertmanager Rules (Placeholder)
+# Utilities Stack Alertmanager Rules
 
-- alert: UtilitiesBackupFailed
-  expr: utilities_backup_status == 0
-  for: 10m
-  labels:
-    severity: warning
-  annotations:
-    summary: "Utilities backup failed"
-    description: "The utilities backup job has failed." 
+groups:
+  - name: utilities
+    rules:
+      # Utilities Stack Alerts
+      - alert: UtilitiesBackupFailed
+        expr: utilities_backup_status == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Utilities backup failed"
+          description: "The utilities backup job has failed."
+
+      - alert: UtilitiesServiceDown
+        expr: up{job="utilities"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Utilities service {{ $labels.instance }} is down"
+          description: "Utilities service has been down for more than 1 minute"
+
+      - alert: UtilitiesHighMemory
+        expr: container_memory_usage_bytes{container=~"portainer|tdarr|tautulli"} / container_spec_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Utilities service {{ $labels.container }} high memory usage"
+          description: "Utilities service memory usage is above 90% for 5 minutes"
+
+      - alert: UtilitiesHighCPU
+        expr: rate(container_cpu_usage_seconds_total{container=~"portainer|tdarr|tautulli"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Utilities service {{ $labels.container }} high CPU usage"
+          description: "Utilities service CPU usage is above 80% for 5 minutes" 

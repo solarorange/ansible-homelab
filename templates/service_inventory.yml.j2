@@ -1,0 +1,139 @@
+---
+# Service Inventory
+# Generated on {{ ansible_date_time.iso8601 }}
+
+services:
+  infrastructure:
+    - name: "traefik"
+      status: "{{ 'enabled' if security_proxy_enabled | default(false) else 'disabled' }}"
+      port: "80,443"
+      subdomain: "traefik"
+      health_check: "http://localhost:8080/ping"
+    
+    - name: "authentik"
+      status: "{{ 'enabled' if security_authentication_enabled | default(false) else 'disabled' }}"
+      port: "9000"
+      subdomain: "auth"
+      health_check: "http://localhost:9000/if/user/#/"
+    
+    - name: "portainer"
+      status: "{{ 'enabled' if portainer_enabled | default(false) else 'disabled' }}"
+      port: "9000"
+      subdomain: "portainer"
+      health_check: "http://localhost:9000/api/status"
+
+  monitoring:
+    - name: "prometheus"
+      status: "{{ 'enabled' if prometheus_enabled | default(false) else 'disabled' }}"
+      port: "9090"
+      subdomain: "prometheus"
+      health_check: "http://localhost:9090/-/healthy"
+    
+    - name: "grafana"
+      status: "{{ 'enabled' if grafana_enabled | default(false) else 'disabled' }}"
+      port: "3000"
+      subdomain: "grafana"
+      health_check: "http://localhost:3000/api/health"
+    
+    - name: "loki"
+      status: "{{ 'enabled' if loki_enabled | default(false) else 'disabled' }}"
+      port: "3100"
+      subdomain: "loki"
+      health_check: "http://localhost:3100/ready"
+    
+    - name: "alertmanager"
+      status: "{{ 'enabled' if alertmanager_enabled | default(false) else 'disabled' }}"
+      port: "9093"
+      subdomain: "alerts"
+      health_check: "http://localhost:9093/-/healthy"
+
+  databases:
+    - name: "postgresql"
+      status: "{{ 'enabled' if postgresql_enabled | default(false) else 'disabled' }}"
+      port: "5432"
+      health_check: "pg_isready -U {{ postgresql_admin_user | default('postgres') }}"
+    
+    - name: "mariadb"
+      status: "{{ 'enabled' if mariadb_enabled | default(false) else 'disabled' }}"
+      port: "3306"
+      health_check: "mysqladmin ping -u root -p{{ mariadb_root_password }}"
+    
+    - name: "redis"
+      status: "{{ 'enabled' if redis_enabled | default(false) else 'disabled' }}"
+      port: "6379"
+      health_check: "redis-cli ping"
+
+  media:
+    - name: "plex"
+      status: "{{ 'enabled' if plex_enabled | default(false) else 'disabled' }}"
+      port: "32400"
+      subdomain: "plex"
+      health_check: "http://localhost:32400/web/index.html"
+    
+    - name: "jellyfin"
+      status: "{{ 'enabled' if jellyfin_enabled | default(false) else 'disabled' }}"
+      port: "8096"
+      subdomain: "jellyfin"
+      health_check: "http://localhost:8096/health"
+    
+    - name: "sonarr"
+      status: "{{ 'enabled' if sonarr_enabled | default(false) else 'disabled' }}"
+      port: "8989"
+      subdomain: "sonarr"
+      health_check: "http://localhost:8989/health"
+    
+    - name: "radarr"
+      status: "{{ 'enabled' if radarr_enabled | default(false) else 'disabled' }}"
+      port: "7878"
+      subdomain: "radarr"
+      health_check: "http://localhost:7878/health"
+    
+    - name: "prowlarr"
+      status: "{{ 'enabled' if prowlarr_enabled | default(false) else 'disabled' }}"
+      port: "9696"
+      subdomain: "prowlarr"
+      health_check: "http://localhost:9696/health"
+
+  storage:
+    - name: "nextcloud"
+      status: "{{ 'enabled' if nextcloud_enabled | default(false) else 'disabled' }}"
+      port: "8080"
+      subdomain: "cloud"
+      health_check: "http://localhost:8080/status.php"
+    
+    - name: "samba"
+      status: "{{ 'enabled' if samba_enabled | default(false) else 'disabled' }}"
+      port: "445,139"
+      health_check: "smbclient -L //localhost"
+    
+    - name: "syncthing"
+      status: "{{ 'enabled' if syncthing_enabled | default(false) else 'disabled' }}"
+      port: "8384"
+      subdomain: "sync"
+      health_check: "http://localhost:8384/rest/system/status"
+
+  security:
+    - name: "pihole"
+      status: "{{ 'enabled' if security_dns_enabled | default(false) else 'disabled' }}"
+      port: "53,80"
+      subdomain: "dns"
+      health_check: "http://localhost/admin/api.php?status"
+    
+    - name: "fail2ban"
+      status: "{{ 'enabled' if security_firewall_enabled | default(false) else 'disabled' }}"
+      health_check: "fail2ban-client status"
+    
+    - name: "wireguard"
+      status: "{{ 'enabled' if security_vpn_enabled | default(false) else 'disabled' }}"
+      port: "51820"
+      health_check: "wg show"
+
+service_counts:
+  total: "{{ services.values() | map('length') | sum }}"
+  enabled: "{{ services.values() | map('selectattr', 'status', 'equalto', 'enabled') | map('length') | sum }}"
+  disabled: "{{ services.values() | map('selectattr', 'status', 'equalto', 'disabled') | map('length') | sum }}"
+
+service_health:
+  healthy: "{{ services.values() | map('selectattr', 'health_status', 'equalto', 'healthy') | map('length') | sum }}"
+  unhealthy: "{{ services.values() | map('selectattr', 'health_status', 'equalto', 'unhealthy') | map('length') | sum }}"
+  unknown: "{{ services.values() | map('selectattr', 'health_status', 'equalto', 'unknown') | map('length') | sum }}" 

@@ -12,6 +12,21 @@ LOG_FILE="{{ media_backup_log_file }}"
 MAX_LOG_SIZE="{{ media_backup_max_log_size | default('10M') }}"
 NOTIFICATION_ENABLED="{{ media_backup_notifications_enabled | default(true) | lower }}"
 
+# Service configuration directories
+SABNZBD_CONFIG_DIR="{{ media_sabnzbd_config_dir }}"
+QBITTORRENT_CONFIG_DIR="{{ media_qbittorrent_config_dir }}"
+SONARR_CONFIG_DIR="{{ media_sonarr_config_dir }}"
+RADARR_CONFIG_DIR="{{ media_radarr_config_dir }}"
+LIDARR_CONFIG_DIR="{{ media_lidarr_config_dir }}"
+READARR_CONFIG_DIR="{{ media_readarr_config_dir }}"
+PROWLARR_CONFIG_DIR="{{ media_prowlarr_config_dir }}"
+BAZARR_CONFIG_DIR="{{ media_bazarr_config_dir }}"
+PULSARR_CONFIG_DIR="{{ media_pulsarr_config_dir }}"
+OVERSEERR_CONFIG_DIR="{{ media_overseerr_config_dir }}"
+PLEX_CONFIG_DIR="{{ media_plex_config_dir }}"
+JELLYFIN_CONFIG_DIR="{{ media_jellyfin_config_dir }}"
+IMMICH_CONFIG_DIR="{{ media_immich_config_dir }}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -145,118 +160,118 @@ main() {
 {% if media_enable_downloaders %}
     # Backup downloaders
 {% if media_enable_sabnzbd %}
-    if ! backup_service_config "SABnzbd" "{{ media_sabnzbd_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "SABnzbd" "$SABNZBD_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "SABnzbd: {{ media_sabnzbd_config_dir }}" >> "$manifest_file"
+    echo "SABnzbd: $SABNZBD_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_qbittorrent %}
-    if ! backup_service_config "qBittorrent" "{{ media_qbittorrent_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "qBittorrent" "$QBITTORRENT_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "qBittorrent: {{ media_qbittorrent_config_dir }}" >> "$manifest_file"
+    echo "qBittorrent: $QBITTORRENT_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% endif %}
 {% if media_enable_arr_services %}
     # Backup ARR services
 {% if media_enable_sonarr %}
-    if ! backup_service_config "Sonarr" "{{ media_sonarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Sonarr" "$SONARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Sonarr" "{{ media_sonarr_config_dir }}/nzbdrone.db" "$backup_path"; then
+    if ! backup_database "Sonarr" "$SONARR_CONFIG_DIR/nzbdrone.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Sonarr: {{ media_sonarr_config_dir }}" >> "$manifest_file"
+    echo "Sonarr: $SONARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_radarr %}
-    if ! backup_service_config "Radarr" "{{ media_radarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Radarr" "$RADARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Radarr" "{{ media_radarr_config_dir }}/radarr.db" "$backup_path"; then
+    if ! backup_database "Radarr" "$RADARR_CONFIG_DIR/radarr.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Radarr: {{ media_radarr_config_dir }}" >> "$manifest_file"
+    echo "Radarr: $RADARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_lidarr %}
-    if ! backup_service_config "Lidarr" "{{ media_lidarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Lidarr" "$LIDARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Lidarr" "{{ media_lidarr_config_dir }}/lidarr.db" "$backup_path"; then
+    if ! backup_database "Lidarr" "$LIDARR_CONFIG_DIR/lidarr.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Lidarr: {{ media_lidarr_config_dir }}" >> "$manifest_file"
+    echo "Lidarr: $LIDARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_readarr %}
-    if ! backup_service_config "Readarr" "{{ media_readarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Readarr" "$READARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Readarr" "{{ media_readarr_config_dir }}/readarr.db" "$backup_path"; then
+    if ! backup_database "Readarr" "$READARR_CONFIG_DIR/readarr.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Readarr: {{ media_readarr_config_dir }}" >> "$manifest_file"
+    echo "Readarr: $READARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_prowlarr %}
-    if ! backup_service_config "Prowlarr" "{{ media_prowlarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Prowlarr" "$PROWLARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Prowlarr" "{{ media_prowlarr_config_dir }}/prowlarr.db" "$backup_path"; then
+    if ! backup_database "Prowlarr" "$PROWLARR_CONFIG_DIR/prowlarr.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Prowlarr: {{ media_prowlarr_config_dir }}" >> "$manifest_file"
+    echo "Prowlarr: $PROWLARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_bazarr %}
-    if ! backup_service_config "Bazarr" "{{ media_bazarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Bazarr" "$BAZARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Bazarr" "{{ media_bazarr_config_dir }}/bazarr.db" "$backup_path"; then
+    if ! backup_database "Bazarr" "$BAZARR_CONFIG_DIR/bazarr.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Bazarr: {{ media_bazarr_config_dir }}" >> "$manifest_file"
+    echo "Bazarr: $BAZARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_pulsarr %}
-    if ! backup_service_config "Pulsarr" "{{ media_pulsarr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Pulsarr" "$PULSARR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Pulsarr: {{ media_pulsarr_config_dir }}" >> "$manifest_file"
+    echo "Pulsarr: $PULSARR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_overseerr %}
-    if ! backup_service_config "Overseerr" "{{ media_overseerr_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Overseerr" "$OVERSEERR_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Overseerr: {{ media_overseerr_config_dir }}" >> "$manifest_file"
+    echo "Overseerr: $OVERSEERR_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% endif %}
 {% if media_enable_players %}
     # Backup media players
 {% if media_enable_plex %}
-    if ! backup_service_config "Plex" "{{ media_plex_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Plex" "$PLEX_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Plex: {{ media_plex_config_dir }}" >> "$manifest_file"
+    echo "Plex: $PLEX_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_jellyfin %}
-    if ! backup_service_config "Jellyfin" "{{ media_jellyfin_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Jellyfin" "$JELLYFIN_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Jellyfin: {{ media_jellyfin_config_dir }}" >> "$manifest_file"
+    echo "Jellyfin: $JELLYFIN_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% if media_enable_emby %}
-    if ! backup_service_config "Emby" "{{ media_emby_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Emby" "$IMMICH_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Emby: {{ media_emby_config_dir }}" >> "$manifest_file"
+    echo "Emby: $IMMICH_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% endif %}
 {% if media_enable_monitoring %}
     # Backup monitoring services
 {% if media_enable_tautulli %}
-    if ! backup_service_config "Tautulli" "{{ media_tautulli_config_dir }}" "$backup_path"; then
+    if ! backup_service_config "Tautulli" "$IMMICH_CONFIG_DIR" "$backup_path"; then
         ((failed_backups++))
     fi
-    if ! backup_database "Tautulli" "{{ media_tautulli_config_dir }}/tautulli.db" "$backup_path"; then
+    if ! backup_database "Tautulli" "$IMMICH_CONFIG_DIR/tautulli.db" "$backup_path"; then
         ((failed_backups++))
     fi
-    echo "Tautulli: {{ media_tautulli_config_dir }}" >> "$manifest_file"
+    echo "Tautulli: $IMMICH_CONFIG_DIR" >> "$manifest_file"
 {% endif %}
 {% endif %}
     

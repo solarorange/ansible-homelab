@@ -1,0 +1,90 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+  monitoring:
+    name: monitoring
+    external: true
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server --requirepass {{ vault_redis_password }} --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - "{{ data_dir }}/redis:/data"
+      - "{{ config_dir }}/redis/redis.conf:/usr/local/etc/redis/redis.conf"
+      - "{{ logs_dir }}/redis:/var/log/redis"
+    ports:
+      - "6379:6379"
+    networks:
+      - homelab
+      - monitoring
+    labels:
+      - "traefik.enable=false"
+      - "prometheus.enable=true"
+      - "prometheus.job=redis"
+      - "prometheus.port=6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 26677
+        hard: 46677
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis_exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://:{{ vault_redis_password }}@redis:6379
+      - REDIS_PASSWORD={{ vault_redis_password }}
+    ports:
+      - "9121:9121"
+    networks:
+      - monitoring
+    labels:
+      - "traefik.enable=false"
+      - "prometheus.enable=true"
+      - "prometheus.job=redis_exporter"
+      - "prometheus.port=9121"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9121/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05' 

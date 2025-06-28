@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+"""
+Authentik Configuration Script
+Automatically sets up Authentik with applications, users, and groups
+"""
+
+import os
+import sys
+import time
+import requests
+import json
+from urllib.parse import urljoin
+
+# Configuration
+AUTHENTIK_URL = os.getenv('AUTHENTIK_URL', 'http://localhost:9000')
+ADMIN_PASSWORD = os.getenv('AUTHENTIK_ADMIN_PASSWORD')
+DOMAIN = os.getenv('DOMAIN')
+
+if not all([AUTHENTIK_URL, ADMIN_PASSWORD, DOMAIN]):
+    print("Error: Missing required environment variables")
+    print("Required: AUTHENTIK_URL, AUTHENTIK_ADMIN_PASSWORD, DOMAIN")
+    sys.exit(1)
+
+# Service configurations
+SERVICES = [
+    {
+        'name': 'Grafana',
+        'slug': 'grafana',
+        'url': f'https://grafana.{DOMAIN}',
+        'description': 'Monitoring and visualization platform',
+        'publisher': 'Grafana Labs',
+        'group': 'Monitoring'
+    },
+    {
+        'name': 'Sonarr',
+        'slug': 'sonarr',
+        'url': f'https://sonarr.{DOMAIN}',
+        'description': 'TV show management and automation',
+        'publisher': 'Sonarr',
+        'group': 'Media'
+    },
+    {
+        'name': 'Radarr',
+        'slug': 'radarr',
+        'url': f'https://radarr.{DOMAIN}',
+        'description': 'Movie management and automation',
+        'publisher': 'Radarr',
+        'group': 'Media'
+    },
+    {
+        'name': 'Jellyfin',
+        'slug': 'jellyfin',
+        'url': f'https://jellyfin.{DOMAIN}',
+        'description': 'Media server and streaming platform',
+        'publisher': 'Jellyfin',
+        'group': 'Media'
+    },
+    {
+        'name': 'Overseerr',
+        'slug': 'overseerr',
+        'url': f'https://overseerr.{DOMAIN}',
+        'description': 'Media request management',
+        'publisher': 'Overseerr',
+        'group': 'Media'
+    },
+    {
+        'name': 'Portainer',
+        'slug': 'portainer',
+        'url': f'https://portainer.{DOMAIN}',
+        'description': 'Docker container management',
+        'publisher': 'Portainer',
+        'group': 'Management'
+    },
+    {
+        'name': 'Homepage',
+        'slug': 'homepage',
+        'url': f'https://homepage.{DOMAIN}',
+        'description': 'Service dashboard and homepage',
+        'publisher': 'Homepage',
+        'group': 'Management'
+    },
+    {
+        'name': 'Prowlarr',
+        'slug': 'prowlarr',
+        'url': f'https://prowlarr.{DOMAIN}',
+        'description': 'Indexer management',
+        'publisher': 'Prowlarr',
+        'group': 'Media'
+    },
+    {
+        'name': 'Bazarr',
+        'slug': 'bazarr',
+        'url': f'https://bazarr.{DOMAIN}',
+        'description': 'Subtitle management',
+        'publisher': 'Bazarr',
+        'group': 'Media'
+    },
+    {
+        'name': 'Tautulli',
+        'slug': 'tautulli',
+        'url': f'https://tautulli.{DOMAIN}',
+        'description': 'Media statistics and monitoring',
+        'publisher': 'Tautulli',
+        'group': 'Media'
+    }
+]
+
+class AuthentikAPI:
+    def __init__(self, base_url, admin_password):
+        self.base_url = base_url
+        self.admin_password = admin_password
+        self.session = requests.Session()
+        self.token = None
+        
+    def wait_for_authentik(self):
+        """Wait for Authentik to be ready"""
+        print("Waiting for Authentik to be ready...")
+        max_attempts = 30
+        for attempt in range(max_attempts):
+            try:
+                response = self.session.get(f"{self.base_url}/if/user/", timeout=10)
+                if response.status_code in [200, 302, 401]:
+                    print("Authentik is ready!")
+                    return True
+            except requests.exceptions.RequestException:
+                pass
+            
+            print(f"Attempt {attempt + 1}/{max_attempts}: Authentik not ready yet...")
+            time.sleep(10)
+        
+        print("Error: Authentik did not become ready in time")
+        return False
+    
+    def login(self):
+        """Login to Authentik and get API token"""
+        print("Logging in to Authentik...")
+        
+        # Get CSRF token
+        response = self.session.get(f"{self.base_url}/if/user/")
+        if response.status_code != 200:
+            print("Error: Could not access Authentik login page")
+            return False
+        
+        # Login
+        login_data = {
+            'username': 'akadmin',
+            'password': self.admin_password
+        }
+        
+        response = self.session.post(f"{self.base_url}/if/user/", data=login_data)
+        if response.status_code != 200:
+            print("Error: Login failed")
+            return False
+        
+        # Get API token
+        token_data = {
+            'identifier': 'bootstrap-token',
+            'intent': 'api',
+            'user': 1,
+            'expiring': False
+        }
+        
+        response = self.session.post(f"{self.base_url}/api/v3/core/tokens/", json=token_data)
+        if response.status_code != 201:
+            print("Error: Could not create API token")
+            return False
+        
+        self.token = response.json()['key']
+        self.session.headers.update({'Authorization': f'Bearer {self.token}'})
+        print("Successfully logged in and obtained API token")
+        return True
+    
+    def create_group(self, name, slug, is_superuser=False):
+        """Create a user group"""
+        group_data = {
+            'name': name,
+            'slug': slug,
+            'is_superuser': is_superuser,
+            'attributes': {}
+        }
+        
+        response = self.session.post(f"{self.base_url}/api/v3/core/groups/", json=group_data)
+        if response.status_code == 201:
+            print(f"Created group: {name}")
+            return response.json()['pk']
+        elif response.status_code == 400 and 'already exists' in response.text:
+            print(f"Group {name} already exists")
+            return None
+        else:
+            print(f"Error creating group {name}: {response.status_code}")
+            return None
+    
+    def create_user(self, username, email, name, password, group_pk=None):
+        """Create a user"""
+        user_data = {
+            'username': username,
+            'email': email,
+            'name': name,
+            'is_active': True,
+            'is_superuser': True,
+            'attributes': {}
+        }
+        
+        if group_pk:
+            user_data['groups'] = [group_pk]
+        
+        response = self.session.post(f"{self.base_url}/api/v3/core/users/", json=user_data)
+        if response.status_code == 201:
+            user_pk = response.json()['pk']
+            print(f"Created user: {username}")
+            
+            # Set password
+            password_data = {'password': password}
+            password_response = self.session.post(
+                f"{self.base_url}/api/v3/core/users/{user_pk}/set_password/",
+                json=password_data
+            )
+            
+            if password_response.status_code == 204:
+                print(f"Set password for user: {username}")
+            else:
+                print(f"Warning: Could not set password for user {username}")
+            
+            return user_pk
+        elif response.status_code == 400 and 'already exists' in response.text:
+            print(f"User {username} already exists")
+            return None
+        else:
+            print(f"Error creating user {username}: {response.status_code}")
+            return None
+    
+    def create_application(self, service):
+        """Create an application in Authentik"""
+        app_data = {
+            'name': service['name'],
+            'slug': service['slug'],
+            'launch_url': service['url'],
+            'open_in_new_tab': True,
+            'meta_launch_url': service['url'],
+            'meta_description': service['description'],
+            'meta_publisher': service['publisher'],
+            'policy_engine_mode': 'any',
+            'group': service['group']
+        }
+        
+        response = self.session.post(f"{self.base_url}/api/v3/core/applications/", json=app_data)
+        if response.status_code == 201:
+            print(f"Created application: {service['name']}")
+            return response.json()['pk']
+        elif response.status_code == 400 and 'already exists' in response.text:
+            print(f"Application {service['name']} already exists")
+            return None
+        else:
+            print(f"Error creating application {service['name']}: {response.status_code}")
+            return None
+
+def main():
+    print("Starting Authentik configuration...")
+    
+    # Initialize API client
+    api = AuthentikAPI(AUTHENTIK_URL, ADMIN_PASSWORD)
+    
+    # Wait for Authentik to be ready
+    if not api.wait_for_authentik():
+        sys.exit(1)
+    
+    # Login and get token
+    if not api.login():
+        sys.exit(1)
+    
+    # Create groups
+    print("\nCreating user groups...")
+    admin_group_pk = api.create_group("Admin", "admin", is_superuser=True)
+    api.create_group("Media Users", "media-users", is_superuser=False)
+    api.create_group("Monitoring Users", "monitoring-users", is_superuser=False)
+    
+    # Create default user
+    print("\nCreating default user...")
+    username = os.getenv('USERNAME', 'homelab')
+    api.create_user(
+        username=username,
+        email=f"admin@{DOMAIN}",
+        name=username,
+        password=ADMIN_PASSWORD,
+        group_pk=admin_group_pk
+    )
+    
+    # Create applications
+    print("\nCreating applications...")
+    for service in SERVICES:
+        api.create_application(service)
+    
+    print("\nAuthentik configuration completed successfully!")
+    print(f"Access Authentik at: https://auth.{DOMAIN}")
+    print(f"Default admin user: {username}")
+    print("All applications are now available in the Authentik dashboard")
+
+if __name__ == "__main__":
+    main() 

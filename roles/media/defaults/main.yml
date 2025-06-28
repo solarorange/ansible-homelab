@@ -58,12 +58,12 @@ media_database_host: "{{ postgresql_host | default('postgresql') }}"
 media_database_port: "{{ postgresql_port | default(5432) }}"
 media_database_name: "media"
 media_database_user: "media"
-media_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+media_database_password: "{{ vault_media_database_password | default('') }}"
 
 # Redis Configuration
 media_redis_host: "{{ redis_host | default('redis') }}"
 media_redis_port: "{{ redis_port | default(6379) }}"
-media_redis_password: "{{ redis_password | default('') }}"
+media_redis_password: "{{ vault_redis_password | default('') }}"
 media_redis_db: 0
 
 # Downloader Configuration
@@ -452,12 +452,22 @@ media_backup_compression: true
 media_backup_include_media: true
 media_backup_include_database: true
 media_backup_include_config: true
+media_backup_dir: "{{ backup_dir }}/media"
+media_backup_retention_days: 7
+media_backup_compression: true
+media_backup_log_file: "{{ logs_dir }}/media/backup/backup.log"
+media_backup_max_log_size: "10M"
+media_backup_notifications_enabled: true
 
 # Logging Configuration
 media_log_level: "info"  # Options: debug, info, warn, error
 media_log_format: "json"
 media_log_retention: 30  # Days
 media_log_rotation: true
+media_health_check_log_file: "{{ logs_dir }}/media/health/health.log"
+media_health_check_max_log_size: "10M"
+media_health_check_retention_days: 7
+media_health_check_timeout: 30
 
 # Resource Limits
 media_memory_limit: "8g"
@@ -466,11 +476,11 @@ media_storage_limit: "500g"
 
 # Traefik Configuration
 media_traefik_enabled: true
-media_traefik_network: "homelab"
+media_traefik_network: "{{ traefik_network | default('homelab') }}"
 media_traefik_middleware: "secure-headers,compress"
 media_traefik_auth_middleware: "authentik@docker"
 media_traefik_ssl_enabled: true
-media_traefik_ssl_resolver: "cloudflare"
+media_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
 
 # Homepage Integration
 media_homepage_enabled: true
@@ -551,18 +561,18 @@ media_notification_channels:
 media_email_enabled: false
 media_smtp_host: "{{ smtp_host | default('localhost') }}"
 media_smtp_port: "{{ smtp_port | default(587) }}"
-media_smtp_username: "{{ smtp_username | default('') }}"
-media_smtp_password: "{{ smtp_password | default('') }}"
+media_smtp_username: "{{ vault_smtp_username | default('') }}"
+media_smtp_password: "{{ vault_smtp_password | default('') }}"
 media_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
 
 # Slack Configuration
 media_slack_enabled: false
-media_slack_webhook: "{{ slack_webhook | default('') }}"
+media_slack_webhook: "{{ vault_slack_webhook | default('') }}"
 media_slack_channel: "{{ slack_channel | default('#alerts') }}"
 
 # Discord Configuration
 media_discord_enabled: false
-media_discord_webhook: "{{ discord_webhook | default('') }}"
+media_discord_webhook: "{{ vault_discord_webhook | default('') }}"
 media_discord_channel: "{{ discord_channel | default('alerts') }}"
 
 # Custom Configuration
@@ -599,10 +609,10 @@ media_update_backup_before: true
 media_update_rollback_on_failure: true
 
 # Watchtower Configuration
-media_watchtower_enabled: "{{ media_update_enabled }}"
-media_watchtower_image: "containrrr/watchtower"
-media_watchtower_container_name: "watchtower-media"
-media_watchtower_schedule: "{{ media_update_schedule }}"
+media_watchtower_enabled: false
+media_watchtower_image: "containrrr/watchtower:latest"
+media_watchtower_container_name: "media-watchtower"
+media_watchtower_schedule: "0 4 * * 0"
 media_watchtower_cleanup: true
 media_watchtower_include_restarting: true
 media_watchtower_include_stopped: false
@@ -610,4 +620,76 @@ media_watchtower_revive_stopped: false
 media_watchtower_remove_volumes: false
 media_watchtower_no_pull: false
 media_watchtower_no_startup_message: false
-media_watchtower_http_api_token: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+media_watchtower_http_api_token: "{{ vault_watchtower_token | default('') }}"
+
+# Service-specific configuration variables for templates
+media_enable_downloaders: true
+media_enable_sabnzbd: true
+media_enable_qbittorrent: true
+media_enable_arr_services: true
+media_enable_sonarr: true
+media_enable_radarr: true
+media_enable_lidarr: true
+media_enable_readarr: true
+media_enable_prowlarr: true
+media_enable_bazarr: true
+media_enable_pulsarr: true
+media_enable_overseerr: true
+media_enable_players: true
+media_enable_plex: true
+media_enable_jellyfin: true
+media_enable_immich: true
+
+# Service configuration directories
+media_sabnzbd_config_dir: "{{ docker_dir }}/sabnzbd/config"
+media_qbittorrent_config_dir: "{{ docker_dir }}/qbittorrent/config"
+media_sonarr_config_dir: "{{ docker_dir }}/sonarr/config"
+media_radarr_config_dir: "{{ docker_dir }}/radarr/config"
+media_lidarr_config_dir: "{{ docker_dir }}/lidarr/config"
+media_readarr_config_dir: "{{ docker_dir }}/readarr/config"
+media_prowlarr_config_dir: "{{ docker_dir }}/prowlarr/config"
+media_bazarr_config_dir: "{{ docker_dir }}/bazarr/config"
+media_pulsarr_config_dir: "{{ docker_dir }}/pulsarr/config"
+media_overseerr_config_dir: "{{ docker_dir }}/overseerr/config"
+media_plex_config_dir: "{{ docker_dir }}/plex/config"
+media_jellyfin_config_dir: "{{ docker_dir }}/jellyfin/config"
+media_immich_config_dir: "{{ docker_dir }}/immich/config"
+
+# Service container names
+media_sabnzbd_container_name: "sabnzbd"
+media_qbittorrent_container_name: "qbittorrent"
+media_sonarr_container_name: "sonarr"
+media_radarr_container_name: "radarr"
+media_lidarr_container_name: "lidarr"
+media_readarr_container_name: "readarr"
+media_prowlarr_container_name: "prowlarr"
+media_bazarr_container_name: "bazarr"
+media_pulsarr_container_name: "pulsarr"
+media_overseerr_container_name: "overseerr"
+media_plex_container_name: "plex"
+media_jellyfin_container_name: "jellyfin"
+media_immich_container_name: "immich"
+
+# Service ports
+media_sabnzbd_port: 8080
+media_qbittorrent_port: 8081
+media_sonarr_port: 8989
+media_radarr_port: 7878
+media_lidarr_port: 8686
+media_readarr_port: 8787
+media_prowlarr_port: 9696
+media_bazarr_port: 6767
+media_pulsarr_port: 8088
+media_overseerr_port: 5055
+media_plex_port: 32400
+media_jellyfin_port: 8096
+media_immich_port: 3001
+
+# Service API keys (should be in vault)
+media_sabnzbd_api_key: "{{ vault_sabnzbd_api_key | default('') }}"
+media_sonarr_api_key: "{{ vault_sonarr_api_key | default('') }}"
+media_radarr_api_key: "{{ vault_radarr_api_key | default('') }}"
+media_lidarr_api_key: "{{ vault_lidarr_api_key | default('') }}"
+media_readarr_api_key: "{{ vault_readarr_api_key | default('') }}"
+media_prowlarr_api_key: "{{ vault_prowlarr_api_key | default('') }}"
+media_bazarr_api_key: "{{ vault_bazarr_api_key | default('') }}"

@@ -1,0 +1,141 @@
+---
+# Documentation Generation
+# Creates comprehensive documentation for the deployed homelab
+
+- name: Create documentation directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/documentation"
+    state: directory
+    mode: '0755'
+  tags: [documentation, setup]
+
+- name: Generate deployment documentation
+  ansible.builtin.template:
+    src: templates/advanced_documentation.yml.j2
+    dest: "{{ docker_dir }}/documentation/deployment-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, deployment]
+
+- name: Generate service inventory
+  ansible.builtin.template:
+    src: templates/service_inventory.yml.j2
+    dest: "{{ docker_dir }}/documentation/service-inventory-{{ ansible_date_time.epoch }}.yml"
+    mode: '0644'
+  tags: [documentation, inventory]
+
+- name: Generate network diagram configuration
+  ansible.builtin.template:
+    src: templates/network_diagram.yml.j2
+    dest: "{{ docker_dir }}/documentation/network-diagram-{{ ansible_date_time.epoch }}.yml"
+    mode: '0644'
+  tags: [documentation, network]
+
+- name: Generate security audit report
+  ansible.builtin.template:
+    src: templates/security_audit.yml.j2
+    dest: "{{ docker_dir }}/documentation/security-audit-{{ ansible_date_time.epoch }}.yml"
+    mode: '0644'
+  tags: [documentation, security]
+
+- name: Generate backup documentation
+  ansible.builtin.template:
+    src: templates/backup_documentation.yml.j2
+    dest: "{{ docker_dir }}/documentation/backup-procedures-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, backup]
+
+- name: Create documentation index
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/documentation/README.md"
+    content: |
+      # Homelab Documentation
+      
+      Generated on: {{ ansible_date_time.iso8601 }}
+      Deployment ID: {{ ansible_date_time.epoch }}
+      Ansible Version: {{ ansible_version.full }}
+      
+      ## Documentation Files
+      
+      - [Deployment Documentation](deployment-{{ ansible_date_time.epoch }}.md)
+      - [Service Inventory](service-inventory-{{ ansible_date_time.epoch }}.yml)
+      - [Network Diagram](network-diagram-{{ ansible_date_time.epoch }}.yml)
+      - [Security Audit](security-audit-{{ ansible_date_time.epoch }}.yml)
+      - [Backup Procedures](backup-procedures-{{ ansible_date_time.epoch }}.md)
+      
+      ## Quick Access
+      
+      - **Traefik Dashboard**: https://traefik.{{ domain }}
+      - **Grafana Dashboard**: https://grafana.{{ domain }}
+      - **Portainer**: https://portainer.{{ domain }}
+      - **Authentik**: https://auth.{{ domain }}
+      
+      ## Service Status
+      
+      {% for service in enabled_services %}
+      - {{ service }}: {{ 'ENABLED' if service in enabled_services else 'DISABLED' }}
+      {% endfor %}
+      
+      ## Environment Information
+      
+      - Domain: {{ domain }}
+      - Timezone: {{ timezone }}
+      - Docker Root: {{ docker_root }}
+      - Data Directory: {{ data_dir }}
+      - Backup Directory: {{ backup_dir }}
+      
+      ## Support
+      
+      For issues and support, check the troubleshooting documentation or create an issue in the project repository.
+    mode: '0644'
+  tags: [documentation, index]
+
+- name: Create service documentation
+  ansible.builtin.template:
+    src: templates/documentation/services-guide.md.j2
+    dest: "{{ docker_dir }}/documentation/services-guide-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, services]
+
+- name: Create deployment guide
+  ansible.builtin.template:
+    src: templates/documentation/deployment-guide.md.j2
+    dest: "{{ docker_dir }}/documentation/deployment-guide-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, guide]
+
+- name: Generate load test report
+  ansible.builtin.template:
+    src: templates/load_test_report.j2
+    dest: "{{ docker_dir }}/documentation/load-test-report-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, testing]
+
+- name: Generate security report
+  ansible.builtin.template:
+    src: templates/security_report.j2
+    dest: "{{ docker_dir }}/documentation/security-report-{{ ansible_date_time.epoch }}.md"
+    mode: '0644'
+  tags: [documentation, security]
+
+- name: Display documentation status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      DOCUMENTATION GENERATED
+      ========================================
+      
+      Documentation Directory: {{ docker_dir }}/documentation/
+      Deployment Documentation: deployment-{{ ansible_date_time.epoch }}.md
+      Service Inventory: service-inventory-{{ ansible_date_time.epoch }}.yml
+      Network Diagram: network-diagram-{{ ansible_date_time.epoch }}.yml
+      Security Audit: security-audit-{{ ansible_date_time.epoch }}.yml
+      Backup Procedures: backup-procedures-{{ ansible_date_time.epoch }}.md
+      Services Guide: services-guide-{{ ansible_date_time.epoch }}.md
+      Deployment Guide: deployment-guide-{{ ansible_date_time.epoch }}.md
+      Load Test Report: load-test-report-{{ ansible_date_time.epoch }}.md
+      Security Report: security-report-{{ ansible_date_time.epoch }}.md
+      
+      Documentation Index: {{ docker_dir }}/documentation/README.md
+      
+      ========================================
+  tags: [documentation, summary] 

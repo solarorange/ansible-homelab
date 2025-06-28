@@ -1,0 +1,191 @@
+# Backup Schedule Configuration
+# Defines automated backup schedules for different services
+
+backup_schedules:
+  # System Configuration Backups
+  system_config:
+    frequency: "daily"
+    time: "02:00"
+    retention: 30
+    enabled: true
+    components:
+      - docker_configs
+      - systemd_services
+      - network_configs
+      - security_configs
+
+  # Database Backups
+  databases:
+    postgresql:
+      frequency: "daily"
+      time: "03:00"
+      retention: 7
+      enabled: {{ databases_enabled | default(false) }}
+      compression: true
+      encryption: true
+    
+    redis:
+      frequency: "daily"
+      time: "03:15"
+      retention: 7
+      enabled: {{ databases_enabled | default(false) }}
+      compression: true
+      encryption: true
+    
+    mariadb:
+      frequency: "daily"
+      time: "03:30"
+      retention: 7
+      enabled: {{ databases_enabled | default(false) }}
+      compression: true
+      encryption: true
+
+  # Application Data Backups
+  applications:
+    nextcloud:
+      frequency: "daily"
+      time: "04:00"
+      retention: 7
+      enabled: {{ storage_enabled | default(false) }}
+      compression: true
+      encryption: true
+    
+    paperless:
+      frequency: "daily"
+      time: "04:30"
+      retention: 7
+      enabled: {{ paperless_ngx_enabled | default(false) }}
+      compression: true
+      encryption: true
+    
+    authentik:
+      frequency: "daily"
+      time: "05:00"
+      retention: 7
+      enabled: {{ security_enabled | default(false) }}
+      compression: true
+      encryption: true
+
+  # Media Service Backups
+  media_services:
+    sonarr:
+      frequency: "daily"
+      time: "06:00"
+      retention: 7
+      enabled: {{ media_enabled | default(false) }}
+      compression: true
+      encryption: false
+    
+    radarr:
+      frequency: "daily"
+      time: "06:15"
+      retention: 7
+      enabled: {{ media_enabled | default(false) }}
+      compression: true
+      encryption: false
+    
+    jellyfin:
+      frequency: "daily"
+      time: "06:30"
+      retention: 7
+      enabled: {{ media_enabled | default(false) }}
+      compression: true
+      encryption: false
+
+  # Monitoring Data Backups
+  monitoring:
+    prometheus:
+      frequency: "weekly"
+      day: "sunday"
+      time: "07:00"
+      retention: 4
+      enabled: {{ logging_enabled | default(false) }}
+      compression: true
+      encryption: false
+    
+    grafana:
+      frequency: "weekly"
+      day: "sunday"
+      time: "07:30"
+      retention: 4
+      enabled: {{ logging_enabled | default(false) }}
+      compression: true
+      encryption: false
+    
+    influxdb:
+      frequency: "weekly"
+      day: "sunday"
+      time: "08:00"
+      retention: 4
+      enabled: {{ logging_enabled | default(false) }}
+      compression: true
+      encryption: false
+
+  # Full System Backups
+  full_system:
+    frequency: "weekly"
+    day: "saturday"
+    time: "22:00"
+    retention: 4
+    enabled: true
+    compression: true
+    encryption: true
+    components:
+      - all_databases
+      - all_configs
+      - all_data
+      - system_state
+
+# Backup Storage Configuration
+storage:
+  local:
+    path: "{{ backup_dir }}"
+    max_size: "100GB"
+    enabled: true
+  
+  remote:
+    type: "{{ backup_remote_type | default('none') }}"
+    enabled: {{ backup_remote_enabled | default(false) }}
+    
+    # S3 Configuration
+    s3:
+      bucket: "{{ vault_backup_s3_bucket | default('') }}"
+      region: "{{ vault_backup_s3_region | default('us-east-1') }}"
+      access_key: "{{ vault_backup_s3_access_key | default('') }}"
+      secret_key: "{{ vault_backup_s3_secret_key | default('') }}"
+    
+    # SFTP Configuration
+    sftp:
+      host: "{{ vault_backup_sftp_host | default('') }}"
+      port: "{{ vault_backup_sftp_port | default(22) }}"
+      username: "{{ vault_backup_sftp_username | default('') }}"
+      password: "{{ vault_backup_sftp_password | default('') }}"
+      path: "{{ vault_backup_sftp_path | default('/backups') }}"
+
+# Backup Verification
+verification:
+  enabled: true
+  check_integrity: true
+  test_restore: false
+  notify_on_failure: true
+  notify_on_success: false
+
+# Backup Notifications
+notifications:
+  email:
+    enabled: {{ backup_email_enabled | default(false) }}
+    smtp_server: "{{ vault_backup_smtp_server | default('') }}"
+    smtp_port: "{{ vault_backup_smtp_port | default(587) }}"
+    username: "{{ vault_backup_smtp_username | default('') }}"
+    password: "{{ vault_backup_smtp_password | default('') }}"
+    from_address: "{{ vault_backup_from_address | default('backup@' + domain) }}"
+    to_address: "{{ vault_backup_to_address | default('admin@' + domain) }}"
+  
+  slack:
+    enabled: {{ backup_slack_enabled | default(false) }}
+    webhook: "{{ vault_backup_slack_webhook | default('') }}"
+  
+  telegram:
+    enabled: {{ backup_telegram_enabled | default(false) }}
+    bot_token: "{{ vault_backup_telegram_bot_token | default('') }}"
+    chat_id: "{{ vault_backup_telegram_chat_id | default('') }}" 

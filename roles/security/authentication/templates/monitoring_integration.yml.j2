@@ -1,0 +1,468 @@
+# Authentik Monitoring Integration Configuration
+# Configures Prometheus metrics, health checks, and logging integration
+
+# =============================================================================
+# PROMETHEUS METRICS CONFIGURATION
+# =============================================================================
+
+prometheus:
+  enabled: true
+  
+  # Metrics Endpoint
+  endpoint:
+    path: "/metrics"
+    port: "{{ authentik_port }}"
+    enabled: true
+    
+  # Metrics Collection
+  metrics:
+    # Authentication Metrics
+    authentication:
+      enabled: true
+      login_attempts: true
+      login_successes: true
+      login_failures: true
+      logout_events: true
+      session_events: true
+      
+    # Application Metrics
+    applications:
+      enabled: true
+      application_access: true
+      application_errors: true
+      oauth_flows: true
+      token_events: true
+      
+    # User Metrics
+    users:
+      enabled: true
+      user_creation: true
+      user_deletion: true
+      user_modification: true
+      group_membership: true
+      
+    # Policy Metrics
+    policies:
+      enabled: true
+      policy_evaluations: true
+      policy_denials: true
+      policy_execution_time: true
+      
+    # System Metrics
+    system:
+      enabled: true
+      database_connections: true
+      cache_hits: true
+      cache_misses: true
+      memory_usage: true
+      cpu_usage: true
+      
+# =============================================================================
+# HEALTH CHECK CONFIGURATION
+# =============================================================================
+
+health_checks:
+  enabled: true
+  
+  # Health Check Endpoint
+  endpoint:
+    path: "/health"
+    port: "{{ authentik_port }}"
+    enabled: true
+    
+  # Health Check Components
+  components:
+    # Database Health
+    database:
+      enabled: true
+      check_connection: true
+      check_migrations: true
+      check_performance: true
+      
+    # Cache Health
+    cache:
+      enabled: true
+      check_redis: true
+      check_memory: true
+      
+    # External Services
+    external_services:
+      enabled: true
+      check_ldap: false
+      check_smtp: false
+      check_oauth_providers: true
+      
+    # Application Health
+    application:
+      enabled: true
+      check_web_server: true
+      check_worker_processes: true
+      check_background_tasks: true
+      
+  # Health Check Schedule
+  schedule:
+    interval: 60  # seconds
+    timeout: 10   # seconds
+    retries: 3
+    
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+logging:
+  enabled: true
+  
+  # Log Level Configuration
+  levels:
+    root: "INFO"
+    authentik: "INFO"
+    django: "WARNING"
+    celery: "INFO"
+    
+  # Log Format
+  format:
+    type: "json"
+    include_timestamp: true
+    include_level: true
+    include_module: true
+    include_function: true
+    include_line: true
+    
+  # Log Output
+  output:
+    # Console Logging
+    console:
+      enabled: true
+      level: "INFO"
+      
+    # File Logging
+    file:
+      enabled: true
+      level: "INFO"
+      path: "{{ logs_dir }}/security/authentik/authentik.log"
+      max_size: "100MB"
+      backup_count: 5
+      
+    # Syslog Logging
+    syslog:
+      enabled: false
+      level: "WARNING"
+      facility: "local0"
+      
+  # Log Categories
+  categories:
+    # Authentication Logs
+    authentication:
+      enabled: true
+      level: "INFO"
+      include_success: false
+      include_failure: true
+      
+    # Application Logs
+    applications:
+      enabled: true
+      level: "INFO"
+      include_access: true
+      include_errors: true
+      
+    # User Management Logs
+    user_management:
+      enabled: true
+      level: "INFO"
+      include_creation: true
+      include_modification: true
+      include_deletion: true
+      
+    # Policy Logs
+    policies:
+      enabled: true
+      level: "INFO"
+      include_evaluations: false
+      include_denials: true
+      
+    # Security Logs
+    security:
+      enabled: true
+      level: "WARNING"
+      include_attacks: true
+      include_suspicious: true
+      
+# =============================================================================
+# PERFORMANCE MONITORING
+# =============================================================================
+
+performance:
+  enabled: true
+  
+  # Performance Metrics
+  metrics:
+    # Response Time Metrics
+    response_time:
+      enabled: true
+      track_api_calls: true
+      track_web_requests: true
+      track_background_tasks: true
+      
+    # Throughput Metrics
+    throughput:
+      enabled: true
+      requests_per_second: true
+      concurrent_users: true
+      database_queries: true
+      
+    # Resource Usage Metrics
+    resource_usage:
+      enabled: true
+      memory_usage: true
+      cpu_usage: true
+      disk_usage: true
+      network_usage: true
+      
+    # Error Rate Metrics
+    error_rates:
+      enabled: true
+      http_errors: true
+      application_errors: true
+      database_errors: true
+      
+  # Performance Alerts
+  alerts:
+    enabled: true
+    
+    # Response Time Alerts
+    response_time:
+      enabled: true
+      warning_threshold: 1000  # ms
+      critical_threshold: 5000  # ms
+      
+    # Error Rate Alerts
+    error_rate:
+      enabled: true
+      warning_threshold: 5.0   # percentage
+      critical_threshold: 10.0  # percentage
+      
+    # Resource Usage Alerts
+    resource_usage:
+      enabled: true
+      memory_warning: 80.0     # percentage
+      memory_critical: 95.0    # percentage
+      cpu_warning: 80.0        # percentage
+      cpu_critical: 95.0       # percentage
+      
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+alerting:
+  enabled: true
+  
+  # Alert Manager Integration
+  alertmanager:
+    enabled: true
+    url: "http://alertmanager:9093"
+    timeout: 30
+    
+  # Alert Rules
+  rules:
+    # Authentication Alerts
+    authentication:
+      - name: "High Login Failure Rate"
+        condition: "rate(authentik_login_failures_total[5m]) > 0.1"
+        severity: "warning"
+        description: "High rate of login failures detected"
+        
+      - name: "Multiple Failed Login Attempts"
+        condition: "authentik_login_failures_total > 10"
+        severity: "critical"
+        description: "Multiple failed login attempts detected"
+        
+    # Application Alerts
+    applications:
+      - name: "Application Access Errors"
+        condition: "rate(authentik_application_errors_total[5m]) > 0.05"
+        severity: "warning"
+        description: "High rate of application access errors"
+        
+      - name: "OAuth Flow Failures"
+        condition: "rate(authentik_oauth_failures_total[5m]) > 0.1"
+        severity: "warning"
+        description: "High rate of OAuth flow failures"
+        
+    # System Alerts
+    system:
+      - name: "High Memory Usage"
+        condition: "authentik_memory_usage_percent > 80"
+        severity: "warning"
+        description: "High memory usage detected"
+        
+      - name: "High CPU Usage"
+        condition: "authentik_cpu_usage_percent > 80"
+        severity: "warning"
+        description: "High CPU usage detected"
+        
+      - name: "Database Connection Issues"
+        condition: "authentik_database_connection_errors > 0"
+        severity: "critical"
+        description: "Database connection issues detected"
+        
+# =============================================================================
+# DASHBOARD CONFIGURATION
+# =============================================================================
+
+dashboards:
+  enabled: true
+  
+  # Grafana Integration
+  grafana:
+    enabled: true
+    url: "http://grafana:3000"
+    api_key: "{{ grafana_api_key | default('') }}"
+    
+  # Dashboard Templates
+  templates:
+    # Authentication Dashboard
+    authentication:
+      enabled: true
+      title: "Authentik Authentication"
+      description: "Authentication metrics and events"
+      refresh: "30s"
+      
+    # Application Dashboard
+    applications:
+      enabled: true
+      title: "Authentik Applications"
+      description: "Application access and performance"
+      refresh: "30s"
+      
+    # User Management Dashboard
+    user_management:
+      enabled: true
+      title: "Authentik User Management"
+      description: "User management activities"
+      refresh: "30s"
+      
+    # System Dashboard
+    system:
+      enabled: true
+      title: "Authentik System"
+      description: "System performance and health"
+      refresh: "30s"
+      
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+integration:
+  # Prometheus Integration
+  prometheus:
+    enabled: true
+    scrape_interval: "30s"
+    scrape_timeout: "10s"
+    metrics_path: "/metrics"
+    
+  # Grafana Integration
+  grafana:
+    enabled: true
+    datasource_name: "Authentik"
+    datasource_type: "prometheus"
+    datasource_url: "http://authentik:{{ authentik_port }}/metrics"
+    
+  # AlertManager Integration
+  alertmanager:
+    enabled: true
+    receiver: "authentik-alerts"
+    group_by: ["alertname", "severity"]
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    
+  # Loki Integration
+  loki:
+    enabled: true
+    url: "http://loki:3100"
+    labels:
+      job: "authentik"
+      service: "authentication"
+      
+# =============================================================================
+# SECURITY MONITORING
+# =============================================================================
+
+security_monitoring:
+  enabled: true
+  
+  # Security Events
+  events:
+    # Authentication Events
+    authentication:
+      enabled: true
+      failed_logins: true
+      brute_force_attempts: true
+      account_lockouts: true
+      password_resets: true
+      
+    # Authorization Events
+    authorization:
+      enabled: true
+      access_denials: true
+      privilege_escalation: true
+      policy_violations: true
+      
+    # Application Events
+    applications:
+      enabled: true
+      unauthorized_access: true
+      suspicious_activity: true
+      data_access: true
+      
+  # Threat Detection
+  threat_detection:
+    enabled: true
+    
+    # Brute Force Detection
+    brute_force:
+      enabled: true
+      threshold: 5
+      window: "5m"
+      action: "block"
+      
+    # Suspicious Activity Detection
+    suspicious_activity:
+      enabled: true
+      patterns:
+        - "multiple_failed_logins"
+        - "unusual_access_patterns"
+        - "privilege_escalation"
+        
+    # Anomaly Detection
+    anomaly_detection:
+      enabled: true
+      algorithms:
+        - "statistical"
+        - "machine_learning"
+      sensitivity: "medium"
+      
+# =============================================================================
+# BACKUP AND RECOVERY
+# =============================================================================
+
+backup:
+  enabled: true
+  
+  # Monitoring Data Backup
+  monitoring_data:
+    enabled: true
+    schedule: "0 1 * * *"
+    retention_days: 30
+    include_metrics: true
+    include_logs: true
+    include_alerts: true
+    
+  # Configuration Backup
+  configuration:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention_days: 90
+    include_dashboards: true
+    include_alert_rules: true
+    include_grafana_config: true 

@@ -551,4 +551,114 @@ documentation:
         day: "sunday"
         time: "02:00"
       
-      output_directory: "{{ backup_dir }}/documentation/diagrams" 
+      output_directory: "{{ backup_dir }}/documentation/diagrams"
+
+# Advanced Homelab Deployment Documentation
+# Generated on {{ ansible_date_time.iso8601 }}
+
+deployment_info:
+  deployment_id: "{{ ansible_date_time.epoch }}"
+  deployment_date: "{{ ansible_date_time.iso8601 }}"
+  ansible_version: "{{ ansible_version.full }}"
+  environment: "{{ environment | default('production') }}"
+  target_hosts: "{{ ansible_play_hosts }}"
+
+system_information:
+  hostname: "{{ ansible_hostname }}"
+  architecture: "{{ ansible_architecture }}"
+  distribution: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+  kernel: "{{ ansible_kernel }}"
+  python_version: "{{ ansible_python_version }}"
+
+network_configuration:
+  domain: "{{ domain }}"
+  server_ip: "{{ ip_address }}"
+  timezone: "{{ timezone }}"
+  dns_servers: "{{ pihole_upstream_dns }}"
+
+deployed_services:
+  security:
+    enabled: "{{ security_enabled | default(false) }}"
+    services:
+      - authentik: "{{ security_authentication_enabled | default(false) }}"
+      - traefik: "{{ security_proxy_enabled | default(false) }}"
+      - pihole: "{{ security_dns_enabled | default(false) }}"
+      - fail2ban: "{{ security_firewall_enabled | default(false) }}"
+      - wireguard: "{{ security_vpn_enabled | default(false) }}"
+  
+  databases:
+    enabled: "{{ databases_enabled | default(false) }}"
+    services:
+      - postgresql: "{{ postgresql_enabled | default(false) }}"
+      - mariadb: "{{ mariadb_enabled | default(false) }}"
+      - redis: "{{ redis_enabled | default(false) }}"
+      - elasticsearch: "{{ elasticsearch_enabled | default(false) }}"
+  
+  storage:
+    enabled: "{{ storage_enabled | default(false) }}"
+    services:
+      - samba: "{{ samba_enabled | default(false) }}"
+      - syncthing: "{{ syncthing_enabled | default(false) }}"
+      - nextcloud: "{{ nextcloud_enabled | default(false) }}"
+  
+  media:
+    enabled: "{{ media_enabled | default(false) }}"
+    services:
+      - plex: "{{ plex_enabled | default(false) }}"
+      - jellyfin: "{{ jellyfin_enabled | default(false) }}"
+      - sonarr: "{{ sonarr_enabled | default(false) }}"
+      - radarr: "{{ radarr_enabled | default(false) }}"
+      - prowlarr: "{{ prowlarr_enabled | default(false) }}"
+  
+  monitoring:
+    enabled: "{{ logging_enabled | default(false) }}"
+    services:
+      - prometheus: "{{ prometheus_enabled | default(false) }}"
+      - grafana: "{{ grafana_enabled | default(false) }}"
+      - loki: "{{ loki_enabled | default(false) }}"
+      - alertmanager: "{{ alertmanager_enabled | default(false) }}"
+
+resource_usage:
+  cpu_cores: "{{ ansible_processor_cores }}"
+  memory_total: "{{ ansible_memtotal_mb }}MB"
+  disk_space: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_total') | first }}"
+  docker_storage: "{{ docker_root }}"
+
+security_status:
+  firewall_enabled: "{{ security_firewall_enabled | default(false) }}"
+  ssl_enabled: "{{ certificate_management_enabled | default(false) }}"
+  backup_encryption: "{{ backup_strategies.incremental.encryption | default(false) }}"
+  monitoring_enabled: "{{ health_monitoring.enabled | default(false) }}"
+
+backup_configuration:
+  backup_dir: "{{ backup_dir }}"
+  retention_days: "{{ backup_strategies.incremental.retention_days | default(30) }}"
+  compression: "{{ backup_strategies.incremental.compression | default(true) }}"
+  encryption: "{{ backup_strategies.incremental.encryption | default(false) }}"
+
+monitoring_configuration:
+  prometheus_retention: "{{ monitoring.retention_days | default(90) }}"
+  grafana_dashboards: "{{ grafana_enabled | default(false) }}"
+  alerting_enabled: "{{ alertmanager_enabled | default(false) }}"
+  log_retention: "{{ logging.retention_days | default(30) }}"
+
+deployment_summary:
+  total_services: "{{ enabled_services | length }}"
+  successful_deployments: "{{ (enabled_services | selectattr('status', 'equalto', 'success') | list) | length }}"
+  failed_deployments: "{{ (enabled_services | selectattr('status', 'equalto', 'failed') | list) | length }}"
+  warnings: "{{ (enabled_services | selectattr('status', 'equalto', 'warning') | list) | length }}"
+
+next_steps:
+  - "Monitor the health dashboard: http://{{ ip_address }}:3000"
+  - "Check service status: docker ps"
+  - "Review security scan results: /etc/security/hardening/"
+  - "Verify backup completion: {{ backup_dir }}/logs/"
+  - "Test rollback procedures if needed"
+  - "Review generated documentation: {{ backup_dir }}/documentation/"
+
+support_information:
+  health_monitoring: "{{ backup_dir }}/health/"
+  security_reports: "/etc/security/hardening/"
+  backup_logs: "{{ backup_dir }}/logs/"
+  documentation: "{{ backup_dir }}/documentation/"
+  troubleshooting_guide: "docs/ADVANCED_BEST_PRACTICES.md" 

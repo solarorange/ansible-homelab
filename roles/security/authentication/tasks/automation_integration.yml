@@ -1,0 +1,383 @@
+---
+# Authentik Automation Integration Tasks
+# Handles Python configuration script execution, service validation, and monitoring integration
+
+- name: Ensure Python dependencies are installed for Authentik automation
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+      - python3-requests
+      - python3-yaml
+      - python3-docker
+      - python3-psycopg2-binary
+    state: present
+  become: true
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, dependencies]
+
+- name: Install Python requirements for Authentik automation
+  ansible.builtin.pip:
+    name:
+      - requests
+      - pyyaml
+      - docker
+      - jinja2
+      - click
+      - rich
+      - tabulate
+      - psycopg2-binary
+      - ldap3
+      - cryptography
+    state: present
+  become: true
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, dependencies]
+
+- name: Create Authentik automation configuration
+  ansible.builtin.template:
+    src: automation_config.yml.j2
+    dest: "{{ docker_dir }}/security/authentik/scripts/automation_config.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: authentik_automation_config_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, config]
+
+- name: Create Authentik configuration automation script
+  ansible.builtin.template:
+    src: authentik_automation.py.j2
+    dest: "{{ docker_dir }}/security/authentik/scripts/authentik_automation.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: authentik_automation_script_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, scripts]
+
+- name: Create Authentik application provisioning script
+  ansible.builtin.template:
+    src: application_provisioning.py.j2
+    dest: "{{ docker_dir }}/security/authentik/scripts/application_provisioning.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: authentik_app_provisioning_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, scripts]
+
+- name: Create Authentik user management script
+  ansible.builtin.template:
+    src: user_management.py.j2
+    dest: "{{ docker_dir }}/security/authentik/scripts/user_management.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: authentik_user_management_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, scripts]
+
+- name: Wait for Authentik API to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_api_health_check
+  retries: 30
+  delay: 10
+  until: authentik_api_health_check.status in [200, 302, 401]
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, wait]
+
+- name: Configure Authentik initial admin credentials
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ security_authentik.automation_bootstrap_token | default('') }}"
+    body_format: json
+    body:
+      username: "{{ security_authentik.automation_admin_user }}"
+      email: "{{ security_authentik.automation_admin_email }}"
+      password: "{{ security_authentik.automation_admin_password }}"
+      is_superuser: true
+      is_active: true
+    status_code: [200, 201, 400]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_admin_credential_set
+  when: 
+    - security_authentik.automation_enabled | default(true)
+    - security_authentik.automation_bootstrap_token is defined
+  tags: [authentik, automation, admin]
+
+- name: Run Authentik configuration automation
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/authentik_automation.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_automation_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  retries: "{{ security_authentik.automation_retry_attempts | default(3) }}"
+  delay: "{{ security_authentik.automation_retry_delay | default(30) }}"
+  until: authentik_automation_result.rc == 0
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, configure]
+
+- name: Provision Authentik applications
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/application_provisioning.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_app_provisioning_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  retries: "{{ security_authentik.automation_retry_attempts | default(3) }}"
+  delay: "{{ security_authentik.automation_retry_delay | default(30) }}"
+  until: authentik_app_provisioning_result.rc == 0
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, provision]
+
+- name: Configure Authentik user management
+  ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/user_management.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/security/authentik/scripts"
+  register: authentik_user_management_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+  retries: "{{ security_authentik.automation_retry_attempts | default(3) }}"
+  delay: "{{ security_authentik.automation_retry_delay | default(30) }}"
+  until: authentik_user_management_result.rc == 0
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, users]
+
+- name: Validate Authentik service configuration
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_applications_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik users
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_users_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik groups
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_groups_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Validate Authentik policies
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/policies/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_policies_validation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Configure Authentik monitoring integration
+  ansible.builtin.template:
+    src: monitoring_integration.yml.j2
+    dest: "{{ docker_dir }}/security/authentik/config/monitoring.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: authentik_monitoring_integration_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, monitoring]
+
+- name: Configure Authentik Traefik integration
+  ansible.builtin.template:
+    src: traefik_integration.yml.j2
+    dest: "{{ docker_dir }}/security/authentik/config/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: authentik_traefik_integration_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, traefik]
+
+- name: Configure Authentik backup integration
+  ansible.builtin.template:
+    src: backup_integration.yml.j2
+    dest: "{{ docker_dir }}/security/authentik/config/backup.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: authentik_backup_integration_creation
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, backup]
+
+- name: Restart Authentik to apply configuration changes
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/security/authentik"
+    state: present
+    restarted: true
+  register: authentik_restart_result
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, restart]
+
+- name: Wait for Authentik to be ready after restart
+  ansible.builtin.uri:
+    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
+  register: authentik_post_restart_health_check
+  retries: 30
+  delay: 10
+  until: authentik_post_restart_health_check.status in [200, 302, 401]
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, wait]
+
+- name: Validate Authentik automation integration
+  ansible.builtin.include_tasks: validation.yml
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, validate]
+
+- name: Display Authentik automation integration summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      AUTHENTIK AUTOMATION INTEGRATION SUMMARY
+      ========================================
+      
+      Automation Status: {{ 'SUCCESS' if authentik_automation_result.rc == 0 else 'FAILED' }}
+      
+      Configuration Files Created:
+      - Automation Config: {{ authentik_automation_config_creation.changed }}
+      - Automation Script: {{ authentik_automation_script_creation.changed }}
+      - App Provisioning: {{ authentik_app_provisioning_creation.changed }}
+      - User Management: {{ authentik_user_management_creation.changed }}
+      - Monitoring Integration: {{ authentik_monitoring_integration_creation.changed }}
+      - Traefik Integration: {{ authentik_traefik_integration_creation.changed }}
+      - Backup Integration: {{ authentik_backup_integration_creation.changed }}
+      
+      Automation Results:
+      - Configuration Applied: {{ authentik_automation_result.stdout_lines | length if authentik_automation_result.stdout_lines else 0 }}
+      - Applications Provisioned: {{ authentik_app_provisioning_result.stdout_lines | length if authentik_app_provisioning_result.stdout_lines else 0 }}
+      - Users Managed: {{ authentik_user_management_result.stdout_lines | length if authentik_user_management_result.stdout_lines else 0 }}
+      
+      Integration Status:
+      - API Health: {{ authentik_post_restart_health_check.status | default('Unknown') }}
+      - Applications Validation: {{ authentik_applications_validation.status | default('Unknown') }}
+      - Users Validation: {{ authentik_users_validation.status | default('Unknown') }}
+      - Groups Validation: {{ authentik_groups_validation.status | default('Unknown') }}
+      - Policies Validation: {{ authentik_policies_validation.status | default('Unknown') }}
+      - Monitoring Integration: {{ authentik_monitoring_integration_creation.changed }}
+      - Traefik Integration: {{ authentik_traefik_integration_creation.changed }}
+      - Backup Integration: {{ authentik_backup_integration_creation.changed }}
+      
+      Automation Features:
+      - Configuration Automation: Enabled
+      - Application Provisioning: Enabled
+      - User Management: Enabled
+      - Group Management: Enabled
+      - Policy Management: Enabled
+      - OAuth2/OpenID Connect: Enabled
+      - Monitoring Integration: Enabled
+      - Traefik Integration: Enabled
+      - Backup Automation: Enabled
+      - Health Monitoring: Enabled
+      
+      ========================================
+  when: security_authentik.automation_enabled | default(true)
+  tags: [authentik, automation, summary]
+
+rescue:
+  - name: Log Authentik automation integration failure
+    ansible.builtin.debug:
+      msg: |
+        ========================================
+        AUTHENTIK AUTOMATION INTEGRATION FAILURE
+        ========================================
+        
+        Error Details:
+        - Error: {{ ansible_failed_result.msg | default('Unknown error') }}
+        - Task: {{ ansible_failed_task.name | default('Unknown task') }}
+        - Host: {{ inventory_hostname }}
+        - Timestamp: {{ ansible_date_time.iso8601 }}
+        
+        Failed Task Details:
+        - Task Name: {{ ansible_failed_task.name | default('Unknown') }}
+        - Task Args: {{ ansible_failed_task.args | default({}) }}
+        - Task Tags: {{ ansible_failed_task.tags | default([]) }}
+        
+        System Information:
+        - Python Dependencies: {{ 'Installed' if ansible_failed_task.name is not regex('.*dependencies.*') else 'Failed' }}
+        - Script Creation: {{ 'Success' if ansible_failed_task.name is not regex('.*script.*') else 'Failed' }}
+        - API Connectivity: {{ 'Available' if ansible_failed_task.name is not regex('.*api.*') else 'Failed' }}
+        - Configuration: {{ 'Valid' if ansible_failed_task.name is not regex('.*config.*') else 'Failed' }}
+        
+        Troubleshooting Steps:
+        1. Check Authentik container status and logs
+        2. Verify Python dependencies installation
+        3. Validate configuration file syntax
+        4. Test API connectivity and authentication
+        5. Check database connectivity and permissions
+        6. Verify network connectivity and firewall rules
+        7. Review automation script execution logs
+        
+        Recovery Commands:
+        1. Container Status: docker-compose -f {{ docker_dir }}/security/authentik/docker-compose.yml ps
+        2. Container Logs: docker-compose -f {{ docker_dir }}/security/authentik/docker-compose.yml logs -f
+        3. API Health Check: curl -v http://localhost:{{ security_authentik.port }}/api/v3/core/applications/
+        4. Python Dependencies: pip3 list | grep -E "(requests|pyyaml|docker|jinja2)"
+        5. Script Permissions: ls -la {{ docker_dir }}/security/authentik/scripts/
+        6. Config Validation: python3 {{ docker_dir }}/security/authentik/scripts/authentik_automation.py --validate
+        7. Manual Automation: {{ docker_dir }}/security/authentik/scripts/authentik_automation.py --config automation_config.yml --debug
+        
+        Common Issues:
+        - Bootstrap token not configured or expired
+        - Database connection issues or migration failures
+        - Python dependency conflicts or missing packages
+        - Network connectivity or firewall blocking API access
+        - Configuration file syntax errors or invalid values
+        - Permission issues with script execution or file access
+        - Container resource constraints (memory, CPU, disk)
+        
+        Support Information:
+        - Documentation: docs/AUTHENTIK_AUTOMATION.md
+        - Troubleshooting: docs/TROUBLESHOOTING.md
+        - Logs Location: {{ docker_dir }}/security/authentik/logs/
+        - Config Location: {{ docker_dir }}/security/authentik/config/
+        - Scripts Location: {{ docker_dir }}/security/authentik/scripts/
+        
+        ========================================
+  tags: [authentik, automation, error]
+
+  - name: Attempt Authentik service recovery
+    ansible.builtin.command: "{{ docker_dir }}/security/authentik/scripts/authentik_automation.py --recover"
+    args:
+      chdir: "{{ docker_dir }}/security/authentik/scripts"
+    register: authentik_recovery_result
+    environment:
+      PYTHONPATH: "{{ docker_dir }}/security/authentik/scripts"
+    ignore_errors: true
+  tags: [authentik, automation, recovery]
+
+  - name: Display recovery attempt result
+    ansible.builtin.debug:
+      msg: |
+        Recovery Attempt Result:
+        - Success: {{ authentik_recovery_result.rc == 0 }}
+        - Output: {{ authentik_recovery_result.stdout | default('No output') }}
+        - Error: {{ authentik_recovery_result.stderr | default('No error') }}
+  tags: [authentik, automation, recovery] 

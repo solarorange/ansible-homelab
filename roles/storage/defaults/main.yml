@@ -1,30 +1,30 @@
 ---
 # Default variables for storage role
-username: homelab
-timezone: UTC
-domain_name: zorg.media
+username: "{{ username | default('homelab') }}"
+timezone: "{{ timezone | default('UTC') }}"
+domain_name: "{{ domain | default('zorg.media') }}"
 
 # Directory paths
-base_dir: /srv
-config_dir: /srv/config
-data_dir: /srv/data
-docker_dir: /srv/docker
-backup_dir: /srv/backup
-logs_dir: /srv/logs
-scripts_dir: /srv/scripts
-docker_data_root: /srv/docker
-backup_root: /srv/backup
+base_dir: "{{ docker_root | default('/srv') }}"
+config_dir: "{{ docker_config_root | default('/srv/config') }}"
+data_dir: "{{ docker_data_root | default('/srv/data') }}"
+docker_dir: "{{ docker_root | default('/srv/docker') }}"
+backup_dir: "{{ backup_dir | default('/srv/backup') }}"
+logs_dir: "{{ logs_dir | default('/srv/logs') }}"
+scripts_dir: "{{ docker_root | default('/srv') }}/scripts"
+docker_data_root: "{{ docker_data_root | default('/srv/docker') }}"
+backup_root: "{{ backup_dir | default('/srv/backup') }}"
 
 # Media directories
 media_directories:
-  - /srv/data/media
-  - /srv/data/media/movies
-  - /srv/data/media/tv
-  - /srv/data/media/music
-  - /srv/data/media/books
-  - /srv/data/media/audiobooks
-  - /srv/data/media/photos
-  - /srv/data/media/backups
+  - "{{ data_dir }}/media"
+  - "{{ data_dir }}/media/movies"
+  - "{{ data_dir }}/media/tv"
+  - "{{ data_dir }}/media/music"
+  - "{{ data_dir }}/media/books"
+  - "{{ data_dir }}/media/audiobooks"
+  - "{{ data_dir }}/media/photos"
+  - "{{ data_dir }}/media/backups"
 
 # Enabled services
 enabled_services:
@@ -38,16 +38,16 @@ samba_server_string: Homelab Samba Server
 samba_security: user
 samba_map_to_guest: Bad User
 samba_shares:
-  - { name: "media", path: "/srv/data/media", browseable: "yes", read_only: "no", guest_ok: "yes" }
-  - { name: "backups", path: "/srv/data/backups", browseable: "yes", read_only: "no", guest_ok: "no" }
+  - { name: "media", path: "{{ data_dir }}/media", browseable: "yes", read_only: "no", guest_ok: "yes" }
+  - { name: "backups", path: "{{ backup_dir }}", browseable: "yes", read_only: "no", guest_ok: "no" }
 
-docker_compose_file: /srv/docker/docker-compose.yml
+docker_compose_file: "{{ docker_dir }}/docker-compose.yml"
 
 # Nextcloud
 nextcloud_admin_user: admin
-nextcloud_admin_password: vault_nextcloud_admin_password
-nextcloud_db_password: vault_nextcloud_db_password
-nextcloud_db_root_password: vault_nextcloud_db_root_password
+nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
+nextcloud_db_password: "{{ vault_nextcloud_db_password }}"
+nextcloud_db_root_password: "{{ vault_nextcloud_db_root_password }}"
 
 # Backup
 backup_schedules:
@@ -65,14 +65,14 @@ encryption_enabled: true
 # Homepage integration
 homepage_services:
   - name: Samba
-    url: http://samba.zorg.media
+    url: "http://samba.{{ domain_name }}"
     icon: samba
     description: Network file sharing
   - name: Syncthing
-    url: https://syncthing.zorg.media
+    url: "https://syncthing.{{ domain_name }}"
     icon: syncthing
     description: File synchronization
   - name: Nextcloud
-    url: https://nextcloud.zorg.media
+    url: "https://nextcloud.{{ domain_name }}"
     icon: nextcloud
     description: Cloud storage 

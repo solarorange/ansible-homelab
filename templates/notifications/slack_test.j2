@@ -1,0 +1,69 @@
+{
+  "text": "{{ alert.labels.service }} Alert",
+  "username": "Homelab Monitor",
+  "icon_emoji": ":house:",
+  "attachments": [
+    {
+      "color": "{% if alert.labels.severity == 'critical' %}danger{% elif alert.labels.severity == 'warning' %}warning{% else %}good{% endif %}",
+      "title": "{% if alert.labels.severity == 'critical' %}🚨 Critical Alert{% elif alert.labels.severity == 'warning' %}⚠️ Warning Alert{% else %}ℹ️ Info Alert{% endif %}: {{ alert.labels.service }}",
+      "text": "{{ alert.annotations.description }}",
+      "fields": [
+        {
+          "title": "Service",
+          "value": "{{ alert.labels.service }}",
+          "short": true
+        },
+        {
+          "title": "Instance",
+          "value": "{{ alert.labels.instance }}",
+          "short": true
+        },
+        {
+          "title": "Severity",
+          "value": "{{ alert.labels.severity | upper }}",
+          "short": true
+        },
+        {
+          "title": "Time",
+          "value": "{{ alert.startsAt }}",
+          "short": true
+        }
+        {% if alert.annotations.dashboard %},
+        {
+          "title": "Dashboard",
+          "value": "{{ alert.annotations.dashboard }}",
+          "short": false
+        }
+        {% endif %}
+        {% if alert.annotations.runbook %},
+        {
+          "title": "Runbook",
+          "value": "{{ alert.annotations.runbook }}",
+          "short": false
+        }
+        {% endif %}
+      ],
+      "actions": [
+        {% if alert.annotations.dashboard %}
+        {
+          "type": "button",
+          "text": "View Dashboard",
+          "url": "{{ alert.annotations.dashboard }}",
+          "style": "primary"
+        }
+        {% endif %}
+        {% if alert.annotations.runbook %}{% if alert.annotations.dashboard %},{% endif %}
+        {
+          "type": "button",
+          "text": "View Runbook",
+          "url": "{{ alert.annotations.runbook }}",
+          "style": "default"
+        }
+        {% endif %}
+      ],
+      "footer": "Homelab Monitor",
+      "footer_icon": "https://cdn.discordapp.com/emojis/1234567890.png",
+      "ts": "{{ alert.startsAt | regex_replace('.*T(.*)Z', '\\1') | regex_replace(':', '') | regex_replace('-', '') }}"
+    }
+  ]
+} 

@@ -1,0 +1,277 @@
+# Grafana Notification Channels Configuration
+# This file configures various notification channels for Grafana alerts
+
+# =============================================================================
+# EMAIL NOTIFICATION CHANNEL
+# =============================================================================
+email_notification:
+  name: "Email Alerts"
+  type: "email"
+  is_default: true
+  settings:
+    addresses: "{{ notifications.email.to_addresses | default('admin@' + domain) }}"
+    single_shot: false
+  secure_settings:
+    password: "{{ notifications.email.password | default('') }}"
+  send_reminder: true
+  frequency: "1m"
+  disable_resolve_message: false
+
+# =============================================================================
+# DISCORD NOTIFICATION CHANNEL
+# =============================================================================
+discord_notification:
+  name: "Discord Alerts"
+  type: "discord"
+  is_default: false
+  settings:
+    url: "{{ notifications.discord.webhook_url | default('') }}"
+    use_discord_username: true
+    discord_username: "{{ notifications.discord.username | default('Grafana Alerts') }}"
+  send_reminder: true
+  frequency: "5m"
+  disable_resolve_message: false
+
+# =============================================================================
+# SLACK NOTIFICATION CHANNEL
+# =============================================================================
+slack_notification:
+  name: "Slack Alerts"
+  type: "slack"
+  is_default: false
+  settings:
+    url: "{{ notifications.slack.webhook_url | default('') }}"
+    recipient: "{{ notifications.slack.channel | default('#alerts') }}"
+    mention_channel: "here"
+    mention_users: "{{ notifications.slack.mention_users | default('') }}"
+    icon_emoji: "{{ notifications.slack.icon_emoji | default(':warning:') }}"
+    icon_url: "{{ notifications.slack.icon_url | default('') }}"
+    username: "{{ notifications.slack.username | default('Grafana Alerts') }}"
+  send_reminder: true
+  frequency: "5m"
+  disable_resolve_message: false
+
+# =============================================================================
+# TELEGRAM NOTIFICATION CHANNEL
+# =============================================================================
+telegram_notification:
+  name: "Telegram Alerts"
+  type: "telegram"
+  is_default: false
+  settings:
+    bottoken: "{{ notifications.telegram.bot_token | default('') }}"
+    chatid: "{{ notifications.telegram.chat_id | default('') }}"
+    message: "{{ notifications.telegram.message_template | default('🚨 Alert: {{ .AlertName }}\n📝 {{ .Description }}\n🔗 {{ .DashboardURL }}') }}"
+    parse_mode: "HTML"
+  send_reminder: true
+  frequency: "5m"
+  disable_resolve_message: false
+
+# =============================================================================
+# WEBHOOK NOTIFICATION CHANNEL
+# =============================================================================
+webhook_notification:
+  name: "Webhook Alerts"
+  type: "webhook"
+  is_default: false
+  settings:
+    url: "{{ notifications.webhook.url | default('') }}"
+    http_method: "POST"
+    max_alerts: 0
+    authorization_credentials: "{{ notifications.webhook.auth_token | default('') }}"
+    authorization_scheme: "Bearer"
+  send_reminder: true
+  frequency: "5m"
+  disable_resolve_message: false
+
+# =============================================================================
+# PUSH NOTIFICATION CHANNEL (via Webhook)
+# =============================================================================
+push_notification:
+  name: "Push Notifications"
+  type: "webhook"
+  is_default: false
+  settings:
+    url: "{{ notifications.push.webhook_url | default('') }}"
+    http_method: "POST"
+    max_alerts: 0
+    authorization_credentials: "{{ notifications.push.auth_token | default('') }}"
+    authorization_scheme: "Bearer"
+  send_reminder: true
+  frequency: "10m"
+  disable_resolve_message: false
+
+# =============================================================================
+# NOTIFICATION TEMPLATES
+# =============================================================================
+notification_templates:
+  email_template: |
+    <h2>🚨 Alert: {{ .AlertName }}</h2>
+    <p><strong>Severity:</strong> {{ .Severity }}</p>
+    <p><strong>Description:</strong> {{ .Description }}</p>
+    <p><strong>Instance:</strong> {{ .Instance }}</p>
+    <p><strong>Time:</strong> {{ .StartsAt }}</p>
+    {% if .DashboardURL %}
+    <p><a href="{{ .DashboardURL }}">View Dashboard</a></p>
+    {% endif %}
+
+  discord_template: |
+    **🚨 Alert: {{ .AlertName }}**
+    **Severity:** {{ .Severity }}
+    **Description:** {{ .Description }}
+    **Instance:** {{ .Instance }}
+    **Time:** {{ .StartsAt }}
+    {% if .DashboardURL %}
+    **Dashboard:** {{ .DashboardURL }}
+    {% endif %}
+
+  slack_template: |
+    🚨 *Alert: {{ .AlertName }}*
+    *Severity:* {{ .Severity }}
+    *Description:* {{ .Description }}
+    *Instance:* {{ .Instance }}
+    *Time:* {{ .StartsAt }}
+    {% if .DashboardURL %}
+    *Dashboard:* {{ .DashboardURL }}
+    {% endif %}
+
+  telegram_template: |
+    🚨 <b>Alert: {{ .AlertName }}</b>
+    <b>Severity:</b> {{ .Severity }}
+    <b>Description:</b> {{ .Description }}
+    <b>Instance:</b> {{ .Instance }}
+    <b>Time:</b> {{ .StartsAt }}
+    {% if .DashboardURL %}
+    <b>Dashboard:</b> {{ .DashboardURL }}
+    {% endif %}
+
+# =============================================================================
+# ALERT ROUTING RULES
+# =============================================================================
+alert_routing:
+  critical_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+      - "Slack Alerts"
+      - "Telegram Alerts"
+      - "Push Notifications"
+    frequency: "1m"
+    send_resolved: true
+
+  warning_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+      - "Slack Alerts"
+    frequency: "5m"
+    send_resolved: true
+
+  info_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+    frequency: "10m"
+    send_resolved: false
+
+  service_health_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+      - "Slack Alerts"
+      - "Telegram Alerts"
+    frequency: "2m"
+    send_resolved: true
+
+  security_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+      - "Slack Alerts"
+      - "Telegram Alerts"
+      - "Push Notifications"
+    frequency: "1m"
+    send_resolved: true
+
+  backup_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+      - "Slack Alerts"
+    frequency: "15m"
+    send_resolved: true
+
+  media_alerts:
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+    frequency: "5m"
+    send_resolved: true
+
+# =============================================================================
+# TIME-BASED ROUTING
+# =============================================================================
+time_based_routing:
+  business_hours:
+    time_range: "09:00-17:00"
+    days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    channels:
+      - "Email Alerts"
+      - "Slack Alerts"
+      - "Discord Alerts"
+
+  after_hours:
+    time_range: "17:00-09:00"
+    days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    channels:
+      - "Email Alerts"
+      - "Telegram Alerts"
+      - "Push Notifications"
+
+  weekends:
+    days: ["saturday", "sunday"]
+    channels:
+      - "Email Alerts"
+      - "Telegram Alerts"
+      - "Push Notifications"
+
+# =============================================================================
+# ESCALATION RULES
+# =============================================================================
+escalation_rules:
+  critical_escalation:
+    initial_delay: "5m"
+    repeat_interval: "10m"
+    max_repeat: 5
+    channels:
+      - "Email Alerts"
+      - "Telegram Alerts"
+      - "Push Notifications"
+
+  warning_escalation:
+    initial_delay: "15m"
+    repeat_interval: "30m"
+    max_repeat: 3
+    channels:
+      - "Email Alerts"
+      - "Discord Alerts"
+
+# =============================================================================
+# SILENCE RULES
+# =============================================================================
+silence_rules:
+  maintenance_window:
+    matchers:
+      - severity: "info"
+      - category: "maintenance"
+    start_time: "{{ maintenance_start_time | default('2024-01-01T00:00:00Z') }}"
+    end_time: "{{ maintenance_end_time | default('2024-01-01T23:59:59Z') }}"
+    comment: "Scheduled maintenance window"
+
+  planned_outage:
+    matchers:
+      - severity: "warning"
+      - category: "planned_outage"
+    start_time: "{{ outage_start_time | default('2024-01-01T00:00:00Z') }}"
+    end_time: "{{ outage_end_time | default('2024-01-01T23:59:59Z') }}"
+    comment: "Planned system outage" 

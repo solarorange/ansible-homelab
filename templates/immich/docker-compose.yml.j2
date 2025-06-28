@@ -17,13 +17,13 @@ services:
       - TZ={{ timezone }}
       - DB_HOSTNAME=immich-postgres
       - DB_USERNAME=postgres
-      - DB_PASSWORD=postgres
+      - DB_PASSWORD={{ vault_immich_db_password }}
       - DB_DATABASE_NAME=immich
       - REDIS_HOSTNAME=immich-redis
       - REDIS_PORT=6379
       - REDIS_DBINDEX=0
-      - REDIS_PASSWORD=redis
-      - JWT_SECRET={{ jwt_secret.stdout }}
+      - REDIS_PASSWORD={{ vault_immich_redis_password }}
+      - JWT_SECRET={{ vault_immich_jwt_secret }}
       - NODE_ENV=production
     volumes:
       - {{ docker_dir }}/immich/server:/config
@@ -98,7 +98,7 @@ services:
     container_name: immich-postgres
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD={{ vault_immich_postgres_password }}
       - POSTGRES_DB=immich
     volumes:
       - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
@@ -115,7 +115,7 @@ services:
   immich-redis:
     image: redis:alpine
     container_name: immich-redis
-    command: redis-server --requirepass redis
+    command: redis-server --requirepass {{ vault_immich_redis_password }}
     volumes:
       - {{ docker_dir }}/immich/redis:/data
       - {{ logs_dir }}/immich/redis:/logs

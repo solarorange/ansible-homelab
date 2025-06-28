@@ -1,0 +1,38 @@
+---
+# Test Service Integrations
+# Tests integration between various services
+
+- name: Test Traefik to service routing
+  ansible.builtin.uri:
+    url: "https://{{ domain }}/health"
+    method: GET
+    status_code: [200, 302]
+    validate_certs: false
+  register: traefik_test
+  tags: [test, integration, traefik]
+
+- name: Test database connectivity
+  ansible.builtin.uri:
+    url: "http://localhost:5432"
+    method: GET
+    status_code: [200, 400]
+  register: postgres_test
+  tags: [test, integration, database]
+
+- name: Test monitoring stack integration
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/targets"
+    method: GET
+    status_code: 200
+  register: prometheus_test
+  tags: [test, integration, monitoring]
+
+- name: Log integration test results
+  ansible.builtin.copy:
+    content: |
+      Traefik: {{ traefik_test.status }}
+      PostgreSQL: {{ postgres_test.status }}
+      Prometheus: {{ prometheus_test.status }}
+    dest: "{{ logs_dir }}/integration-test-results.log"
+    mode: '0644'
+  tags: [test, integration, log] 

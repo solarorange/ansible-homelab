@@ -1,0 +1,83 @@
+# =============================================================================
+# HOMEPAGE DOCKER CONFIGURATION
+# =============================================================================
+
+# Docker Compose configuration for Homepage
+version: '3.8'
+
+services:
+  homepage:
+    image: ghcr.io/benphelps/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.{{ domain }}`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik"
+      - "homepage.group=Management & Control"
+      - "homepage.icon=homepage.png"
+      - "homepage.description=Dashboard & Service Discovery"
+
+  # Weather API service for enhanced weather widget
+  weather-api:
+    image: ghcr.io/benphelps/homepage-weather:latest
+    container_name: homepage-weather
+    restart: unless-stopped
+    environment:
+      - OPENWEATHER_API_KEY=your_openweathermap_api_key
+      - WEATHER_LAT=40.7128
+      - WEATHER_LON=-74.0060
+      - WEATHER_UNITS=metric
+    networks:
+      - traefik
+
+  # System monitoring for enhanced system widget
+  system-monitor:
+    image: ghcr.io/benphelps/homepage-system:latest
+    container_name: homepage-system
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - HOST_PROC=/host/proc
+      - HOST_SYS=/host/sys
+      - HOST_ETC=/host/etc
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true
+
+# Health check configuration
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# Resource limits
+deploy:
+  resources:
+    limits:
+      memory: 512M
+      cpus: '0.5'
+    reservations:
+      memory: 256M
+      cpus: '0.25' 

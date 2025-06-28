@@ -1,0 +1,29 @@
+# Docker Security Hardening Configuration
+# Comprehensive Docker security policies
+
+docker_security:
+  daemon_config:
+    user_namespace_remap: true
+    seccomp_profile: "unconfined"
+    apparmor_profile: "docker-default"
+    no_new_privileges: true
+    read_only_root_filesystem: true
+    capabilities_drop: ["ALL"]
+    security_opt:
+      - "no-new-privileges"
+      - "seccomp=unconfined"
+  
+  container_limits:
+    memory_limit: "2g"
+    cpu_limit: "1.0"
+    pids_limit: 100
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 2048
+  
+  network_security:
+    use_user_defined_networks: true
+    isolate_containers: true
+    disable_host_networking: true
+    use_bridge_networking: true 

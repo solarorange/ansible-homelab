@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+"""
+Authentik User Management Script
+Handles automated user and group creation and management
+"""
+
+import os
+import sys
+import json
+import yaml
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('{{ logs_dir }}/security/authentik/user_management.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class UserConfig:
+    """User configuration structure"""
+    username: str
+    email: str
+    name: str
+    is_active: bool
+    is_superuser: bool
+    type: str
+    path: str
+    password: str
+
+@dataclass
+class GroupConfig:
+    """Group configuration structure"""
+    name: str
+    description: str
+    is_superuser: bool
+    parent: str
+
+class UserManager:
+    """Authentik user management automation"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.authentik_url = "http://localhost:{{ authentik_port }}"
+        self.admin_user = "{{ authentik_admin_user | default('admin') }}"
+        self.admin_password = "{{ authentik_admin_password | default('changeme') }}"
+        self.api_token = "{{ authentik_api_token | default('') }}"
+        self.session = self.create_session()
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def create_session(self) -> requests.Session:
+        """Create requests session with authentication"""
+        session = requests.Session()
+        session.verify = False
+        session.timeout = 30
+        
+        if self.api_token:
+            session.headers.update({
+                'Authorization': f'Bearer {self.api_token}',
+                'Content-Type': 'application/json'
+            })
+        else:
+            session.auth = (self.admin_user, self.admin_password)
+            session.headers.update({'Content-Type': 'application/json'})
+        
+        return session
+    
+    def test_connection(self) -> bool:
+        """Test Authentik API connection"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/users/")
+            if response.status_code in [200, 302, 401]:
+                logger.info("Authentik API connection successful")
+                return True
+            else:
+                logger.error(f"Authentik API connection failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error connecting to Authentik API: {e}")
+            return False
+    
+    def create_group(self, group_config: Dict[str, Any]) -> Optional[str]:
+        """Create a group in Authentik"""
+        try:
+            group_data = {
+                'name': group_config['name'],
+                'description': group_config.get('description', ''),
+                'is_superuser': group_config.get('is_superuser', False),
+                'parent': group_config.get('parent', '')
+            }
+            
+            response = self.session.post(
+                f"{self.authentik_url}/api/v3/core/groups/",
+                json=group_data
+            )
+            
+            if response.status_code == 201:
+                group = response.json()
+                logger.info(f"Created group: {group_config['name']} (ID: {group['pk']})")
+                return group['pk']
+            elif response.status_code == 400:
+                logger.warning(f"Group {group_config['name']} may already exist")
+                return self.get_existing_group_id(group_config['name'])
+            else:
+                logger.error(f"Failed to create group {group_config['name']}: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating group {group_config['name']}: {e}")
+            return None
+    
+    def get_existing_group_id(self, group_name: str) -> Optional[str]:
+        """Get existing group ID by name"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/groups/?name={group_name}")
+            if response.status_code == 200:
+                groups = response.json()['results']
+                if groups:
+                    return groups[0]['pk']
+            return None
+        except Exception as e:
+            logger.error(f"Error getting existing group ID: {e}")
+            return None
+    
+    def create_user(self, user_config: Dict[str, Any]) -> Optional[str]:
+        """Create a user in Authentik"""
+        try:
+            user_data = {
+                'username': user_config['username'],
+                'email': user_config['email'],
+                'name': user_config['name'],
+                'is_active': user_config.get('is_active', True),
+                'is_superuser': user_config.get('is_superuser', False),
+                'type': user_config.get('type', 'internal'),
+                'path': user_config.get('path', 'users')
+            }
+            
+            response = self.session.post(
+                f"{self.authentik_url}/api/v3/core/users/",
+                json=user_data
+            )
+            
+            if response.status_code == 201:
+                user = response.json()
+                user_id = user['pk']
+                logger.info(f"Created user: {user_config['username']} (ID: {user_id})")
+                
+                # Set password if provided
+                if 'password' in user_config:
+                    self.set_user_password(user_id, user_config['password'])
+                
+                return user_id
+            elif response.status_code == 400:
+                logger.warning(f"User {user_config['username']} may already exist")
+                return self.get_existing_user_id(user_config['username'])
+            else:
+                logger.error(f"Failed to create user {user_config['username']}: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating user {user_config['username']}: {e}")
+            return None
+    
+    def get_existing_user_id(self, username: str) -> Optional[str]:
+        """Get existing user ID by username"""
+        try:
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/users/?username={username}")
+            if response.status_code == 200:
+                users = response.json()['results']
+                if users:
+                    return users[0]['pk']
+            return None
+        except Exception as e:
+            logger.error(f"Error getting existing user ID: {e}")
+            return None
+    
+    def set_user_password(self, user_id: str, password: str) -> bool:
+        """Set user password"""
+        try:
+            password_data = {
+                'password': password
+            }
+            
+            response = self.session.partial_update(
+                f"{self.authentik_url}/api/v3/core/users/{user_id}/",
+                json=password_data
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Set password for user ID: {user_id}")
+                return True
+            else:
+                logger.error(f"Failed to set password for user ID {user_id}: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error setting password for user ID {user_id}: {e}")
+            return False
+    
+    def add_user_to_group(self, user_id: str, group_id: str) -> bool:
+        """Add user to group"""
+        try:
+            response = self.session.post(
+                f"{self.authentik_url}/api/v3/core/users/{user_id}/groups/",
+                json={'group': group_id}
+            )
+            
+            if response.status_code == 201:
+                logger.info(f"Added user {user_id} to group {group_id}")
+                return True
+            elif response.status_code == 400:
+                logger.warning(f"User {user_id} may already be in group {group_id}")
+                return True
+            else:
+                logger.error(f"Failed to add user {user_id} to group {group_id}: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error adding user {user_id} to group {group_id}: {e}")
+            return False
+    
+    def create_groups(self) -> Dict[str, str]:
+        """Create all configured groups"""
+        logger.info("Starting group creation")
+        
+        groups_config = self.config.get('groups', {}).get('default_groups', [])
+        created_groups = {}
+        
+        for group_config in groups_config:
+            try:
+                group_id = self.create_group(group_config)
+                if group_id:
+                    created_groups[group_config['name']] = group_id
+                else:
+                    logger.error(f"Failed to create group {group_config['name']}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating group {group_config['name']}: {e}")
+        
+        logger.info(f"Group creation completed: {len(created_groups)} groups created")
+        return created_groups
+    
+    def create_users(self, groups: Dict[str, str]) -> Dict[str, str]:
+        """Create all configured users"""
+        logger.info("Starting user creation")
+        
+        users_config = self.config.get('users', {})
+        created_users = {}
+        
+        # Create admin users
+        admin_users = users_config.get('admin_users', [])
+        for user_config in admin_users:
+            try:
+                user_id = self.create_user(user_config)
+                if user_id:
+                    created_users[user_config['username']] = user_id
+                    
+                    # Add to admin group if it exists
+                    admin_group_id = groups.get('authentik-admin')
+                    if admin_group_id:
+                        self.add_user_to_group(user_id, admin_group_id)
+                else:
+                    logger.error(f"Failed to create admin user {user_config['username']}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating admin user {user_config['username']}: {e}")
+        
+        # Create regular users
+        regular_users = users_config.get('regular_users', [])
+        for user_config in regular_users:
+            try:
+                user_id = self.create_user(user_config)
+                if user_id:
+                    created_users[user_config['username']] = user_id
+                    
+                    # Add to viewer group if it exists
+                    viewer_group_id = groups.get('authentik-viewer')
+                    if viewer_group_id:
+                        self.add_user_to_group(user_id, viewer_group_id)
+                else:
+                    logger.error(f"Failed to create regular user {user_config['username']}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating regular user {user_config['username']}: {e}")
+        
+        logger.info(f"User creation completed: {len(created_users)} users created")
+        return created_users
+    
+    def validate_users_and_groups(self) -> bool:
+        """Validate created users and groups"""
+        try:
+            # Get all users
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/users/")
+            if response.status_code != 200:
+                logger.error(f"Failed to get users: {response.status_code}")
+                return False
+            
+            users = response.json()['results']
+            logger.info(f"Found {len(users)} users in Authentik")
+            
+            # Get all groups
+            response = self.session.get(f"{self.authentik_url}/api/v3/core/groups/")
+            if response.status_code != 200:
+                logger.error(f"Failed to get groups: {response.status_code}")
+                return False
+            
+            groups = response.json()['results']
+            logger.info(f"Found {len(groups)} groups in Authentik")
+            
+            # Check for expected users
+            expected_users = []
+            users_config = self.config.get('users', {})
+            
+            admin_users = users_config.get('admin_users', [])
+            for user_config in admin_users:
+                expected_users.append(user_config['username'])
+            
+            regular_users = users_config.get('regular_users', [])
+            for user_config in regular_users:
+                expected_users.append(user_config['username'])
+            
+            found_users = [user['username'] for user in users]
+            missing_users = [username for username in expected_users if username not in found_users]
+            
+            if missing_users:
+                logger.warning(f"Missing users: {missing_users}")
+                return False
+            
+            # Check for expected groups
+            expected_groups = []
+            groups_config = self.config.get('groups', {}).get('default_groups', [])
+            
+            for group_config in groups_config:
+                expected_groups.append(group_config['name'])
+            
+            found_groups = [group['name'] for group in groups]
+            missing_groups = [name for name in expected_groups if name not in found_groups]
+            
+            if missing_groups:
+                logger.warning(f"Missing groups: {missing_groups}")
+                return False
+            
+            logger.info("User and group validation successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"User and group validation failed: {e}")
+            return False
+    
+    def run_user_management(self) -> bool:
+        """Run the complete user management process"""
+        logger.info("Starting Authentik user management")
+        
+        try:
+            # Test connection
+            if not self.test_connection():
+                logger.error("Cannot connect to Authentik API")
+                return False
+            
+            # Create groups first
+            groups = self.create_groups()
+            
+            # Create users
+            users = self.create_users(groups)
+            
+            # Validate users and groups
+            if not self.validate_users_and_groups():
+                logger.warning("User and group validation failed")
+            
+            logger.info("User management completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"User management failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Authentik User Management')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing users and groups')
+    
+    args = parser.parse_args()
+    
+    # Initialize user manager
+    user_manager = UserManager(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        if user_manager.test_connection():
+            print("Authentik API connection successful")
+            return 0
+        else:
+            print("Authentik API connection failed")
+            return 1
+    
+    elif args.validate:
+        logger.info("Validating existing users and groups")
+        success = user_manager.validate_users_and_groups()
+        return 0 if success else 1
+    
+    else:
+        # Run full user management
+        success = user_manager.run_user_management()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

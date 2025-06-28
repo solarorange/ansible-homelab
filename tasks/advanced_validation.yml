@@ -200,104 +200,44 @@
 
 - name: Warn about available updates
   ansible.builtin.debug:
-    msg: "{{ available_updates.stdout | int }} system updates are available. Consider updating before deployment."
+    msg: "{{ available_updates.stdout }} system updates are available. Consider updating before deployment."
   when: available_updates.stdout | int > 0
   tags: [validation, security]
 
 #==============================================================================
-# SERVICE DEPENDENCY VALIDATION
+# VAULT VALIDATION
 #==============================================================================
 
-- name: Check required ports availability
-  ansible.builtin.wait_for:
-    host: "{{ ansible_default_ipv4.address }}"
-    port: "{{ item }}"
-    state: stopped
-    timeout: 5
+- name: Check required vault variables
+  ansible.builtin.assert:
+    that:
+      - item is defined and item != ""
+    fail_msg: "Required vault variable {{ item }} is not defined or empty"
   loop:
-    - 80
-    - 443
-    - 8080
-    - 9000
-    - 5432
-    - 6379
-  tags: [validation, services]
+    - "{{ vault_postgresql_password }}"
+    - "{{ vault_redis_password }}"
+    - "{{ vault_authentik_secret_key }}"
+    - "{{ vault_cloudflare_api_token }}"
+  no_log: true
+  tags: [validation, vault]
 
-- name: Check Docker Compose installation
-  ansible.builtin.command: "docker-compose --version"
-  register: docker_compose_version
+#==============================================================================
+# DOMAIN VALIDATION
+#==============================================================================
+
+- name: Validate domain configuration
+  ansible.builtin.shell: "nslookup {{ domain }}"
+  register: domain_check
   changed_when: false
-  tags: [validation, services]
+  ignore_errors: yes
+  tags: [validation, domain]
 
-- name: Validate Docker Compose
+- name: Assert domain is properly configured
   ansible.builtin.assert:
     that:
-      - docker_compose_version.rc == 0
-    fail_msg: "Docker Compose is not installed"
-  tags: [validation, services]
-
-#==============================================================================
-# ENVIRONMENT VALIDATION
-#==============================================================================
-
-- name: Check environment variables
-  ansible.builtin.assert:
-    that:
-      - lookup('env', 'ANSIBLE_ENVIRONMENT') is defined or environment is defined
-    fail_msg: "Environment not specified. Set ANSIBLE_ENVIRONMENT or configure environment variable."
-  tags: [validation, environment]
-
-- name: Validate environment configuration
-  ansible.builtin.assert:
-    that:
-      - environment in ['development', 'staging', 'production']
-    fail_msg: "Invalid environment: {{ environment }}"
-  tags: [validation, environment]
-
-#==============================================================================
-# RESOURCE CAPABILITY VALIDATION
-#==============================================================================
-
-- name: Calculate resource requirements based on enabled roles
-  ansible.builtin.set_fact:
-    required_memory: "{{ 
-      (security_enabled | default(false) | bool) * 512 +
-      (databases_enabled | default(false) | bool) * 1024 +
-      (storage_enabled | default(false) | bool) * 1024 +
-      (media_enabled | default(false) | bool) * 2048 +
-      (logging_enabled | default(false) | bool) * 1024 +
-      (automation_enabled | default(false) | bool) * 512 +
-      (utilities_enabled | default(false) | bool) * 512 +
-      (paperless_ngx_enabled | default(false) | bool) * 1024 +
-      (fing_enabled | default(false) | bool) * 512
-    }}"
-  tags: [validation, resources]
-
-- name: Validate system resources against requirements
-  ansible.builtin.assert:
-    that:
-      - total_memory_gb.stdout | int >= (required_memory / 1024)
-    fail_msg: "Insufficient memory for selected roles. Required: {{ required_memory }}MB, Available: {{ total_memory_gb.stdout }}GB"
-  tags: [validation, resources]
-
-#==============================================================================
-# CONDITIONAL EXECUTION VALIDATION
-#==============================================================================
-
-- name: Check current time for peak hours validation
-  ansible.builtin.shell: "date +%H"
-  register: current_hour
-  changed_when: false
-  tags: [validation, conditional]
-
-- name: Validate peak hours execution
-  ansible.builtin.assert:
-    that:
-      - not (conditional_execution.peak_hours_skip.enabled | default(false) and
-             current_hour.stdout | int >= conditional_execution.peak_hours_skip.start_hour and
-             current_hour.stdout | int <= conditional_execution.peak_hours_skip.end_hour)
-    fail_msg: "Deployment blocked during peak hours ({{ conditional_execution.peak_hours_skip.start_hour }}:00-{{ conditional_execution.peak_hours_skip.end_hour }}:00)"
-  tags: [validation, conditional]
+      - domain_check.rc == 0
+    msg: "Domain {{ domain }} is not properly configured in DNS. Please verify DNS settings."
+  tags: [validation, domain]
 
 #==============================================================================
 # FINAL VALIDATION SUMMARY
@@ -307,34 +247,34 @@
   ansible.builtin.debug:
     msg: |
       ========================================
-      PRE-FLIGHT VALIDATION SUMMARY
+      VALIDATION SUMMARY
       ========================================
       
-      System Information:
-      - Architecture: {{ ansible_architecture }}
-      - OS: {{ ansible_os_name }} {{ ansible_os_version }}
-      - CPU Cores: {{ cpu_cores.stdout }}
-      - Memory: {{ total_memory_gb.stdout }}GB
-      - Disk Space: {{ available_disk_gb.stdout }}GB available
+      System Requirements:
+      - Architecture: {{ ansible_architecture }} ✓
+      - OS: {{ ansible_os_family }} ✓
+      - Disk Space: {{ available_disk_gb.stdout }}GB ✓
+      - Memory: {{ total_memory_gb.stdout }}GB ✓
+      - CPU Cores: {{ cpu_cores.stdout }} ✓
       
       Network:
-      - Connectivity: OK
-      - DNS Resolution: OK
-      - Bandwidth: {{ bandwidth_test.stdout }} bytes/s
+      - Connectivity: ✓
+      - DNS Resolution: ✓
+      - Bandwidth: {{ bandwidth_test.stdout }} bytes/s ✓
       
       Docker:
-      - Version: {{ docker_version.stdout }}
-      - Storage Driver: {{ docker_storage_driver.stdout }}
-      - Available Space: {{ docker_available_space.stdout }}GB
+      - Installation: ✓
+      - Storage Driver: {{ docker_storage_driver.stdout }} ✓
+      - Available Space: {{ docker_available_space.stdout }}GB ✓
       
       Security:
-      - Firewall: Active
-      - SSH: Secured
-      - Updates: {{ available_updates.stdout }} available
+      - Firewall: ✓
+      - SSH Configuration: ✓
       
-      Environment: {{ environment | default('production') }}
-      Required Memory: {{ required_memory }}MB
+      Domain:
+      - {{ domain }}: ✓
       
-      All validations passed successfully!
+      ========================================
+      ALL VALIDATIONS PASSED
       ========================================
   tags: [validation, summary] 

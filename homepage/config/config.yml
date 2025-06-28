@@ -1,5 +1,5 @@
-title: Watchtower Dashboard
-description: Enhanced Watchtower Infrastructure Dashboard
+title: Homelab Dashboard
+description: Enhanced Homelab Infrastructure Dashboard
 theme: dark
 layout: default
 language: en
@@ -8,26 +8,91 @@ timezone: America/New_York
 background: https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop
 favicon: https://raw.githubusercontent.com/gethomepage/homepage/main/public/favicon.ico
 icons: https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons
+
+# Custom CSS for enhanced styling
+css: |
+  :root {
+    --primary-color: #3b82f6;
+    --secondary-color: #8b5cf6;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --info-color: #06b6d4;
+  }
+  
+  .service-group {
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .service-group:hover {
+    transform: translateY(-2px);
+  }
+  
+  .media-stack {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .monitoring-stack {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  }
+  
+  .management-stack {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  
+  .security-stack {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+  }
+  
+  .external-stack {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .widget-card {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .status-indicator {
+    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  
+  .status-online { background-color: var(--success-color); }
+  .status-offline { background-color: var(--danger-color); }
+  .status-warning { background-color: var(--warning-color); }
+
+# Comprehensive widget configuration
 widgets:
+  # System monitoring widgets
   - resources
+  - system
+  - docker
+  - kubernetes
+  
+  # Search and utility widgets
   - search
   - weather
   - calendar
-  - system
-  - kubernetes
-  - docker
-  - pihole
+  
+  # Infrastructure monitoring
   - traefik
   - authentik
   - portainer
+  
+  # Monitoring stack
   - grafana
   - prometheus
   - influxdb
   - loki
-  - homeassistant
-  - zigbee2mqtt
-  - nodered
-  - n8n
+  
+  # Media stack
   - jellyfin
   - sonarr
   - radarr
@@ -37,6 +102,8 @@ widgets:
   - bazarr
   - tautulli
   - overseerr
+  
+  # Storage and file services
   - nextcloud
   - vaultwarden
   - gitlab
@@ -46,13 +113,48 @@ widgets:
   - bookstack
   - immich
   - filebrowser
+  
+  # Backup and automation
   - kopia
   - duplicati
   - uptime_kuma
   - dashdot
+  
+  # Development and automation
   - code_server
   - guacamole
   - heimdall
   - homarr
   - requestrr
-  - unmanic 
+  - unmanic
+  
+  # Home automation
+  - homeassistant
+  - zigbee2mqtt
+  - nodered
+  - n8n
+
+# Weather configuration
+weather:
+  label: Weather
+  latitude: 40.7128
+  longitude: -74.0060
+  units: metric
+  provider: openweathermap
+  apiKey: your_openweathermap_api_key
+
+# Search configuration
+search:
+  provider: duckduckgo
+  target: _blank
+  query: "{{query}}"
+
+# System monitoring configuration
+system:
+  label: System Status
+  url: http://localhost:3001
+  cpu: true
+  memory: true
+  disk: true
+  network: true
+  temperature: true 

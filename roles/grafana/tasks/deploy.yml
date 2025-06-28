@@ -1,0 +1,145 @@
+---
+# Grafana Deployment Tasks
+# Handles the core deployment of Grafana container and configuration
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/grafana"
+    - "{{ docker_dir }}/monitoring/grafana/config"
+    - "{{ docker_dir }}/monitoring/grafana/data"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/datasources"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/notifiers"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/plugins"
+    - "{{ docker_dir }}/monitoring/grafana/scripts"
+    - "{{ docker_dir }}/monitoring/grafana/backups"
+    - "{{ logs_dir }}/monitoring/grafana"
+  tags: [grafana, deploy, directories]
+
+- name: Create Grafana configuration file
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/config/grafana.ini"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart grafana
+  tags: [grafana, deploy, config]
+
+- name: Create Grafana Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart grafana
+  tags: [grafana, deploy, docker]
+
+- name: Create Grafana environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/.env"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart grafana
+  tags: [grafana, deploy, env]
+
+- name: Create Grafana provisioning configuration
+  ansible.builtin.template:
+    src: provisioning.yml.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/provisioning.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart grafana
+  tags: [grafana, deploy, provisioning]
+
+- name: Create Grafana health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, deploy, scripts]
+
+- name: Create Grafana backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, deploy, scripts]
+
+- name: Create Grafana restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, deploy, scripts]
+
+- name: Create Grafana log rotation configuration
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/config/logrotate.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  tags: [grafana, deploy, config]
+
+- name: Create Grafana systemd service file
+  ansible.builtin.template:
+    src: grafana.service.j2
+    dest: "/etc/systemd/system/grafana-monitoring.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  become: true
+  tags: [grafana, deploy, systemd]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+  tags: [grafana, deploy, systemd]
+
+- name: Start Grafana container
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/monitoring/grafana"
+    state: present
+    pull: true
+  tags: [grafana, deploy, container]
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_health_check
+  retries: "{{ grafana_validation_retries | default(3) }}"
+  delay: "{{ grafana_validation_interval | default(10) }}"
+  until: grafana_health_check.status == 200
+  tags: [grafana, deploy, health]
+
+- name: Display Grafana deployment status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Deployment Status:
+      - Container: {{ grafana_container_name }}
+      - Status: {{ grafana_health_check.status | default('Unknown') }}
+      - URL: http://localhost:{{ grafana_port }}
+      - Health Check: {{ grafana_health_check.status == 200 | ternary('Healthy', 'Unhealthy') }}
+  tags: [grafana, deploy, status] 

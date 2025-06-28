@@ -1,0 +1,17 @@
+---
+# Homepage Role - Main Tasks
+# Deploys and configures Homepage with comprehensive homelab service integration
+
+- name: Include Homepage deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags: [homepage, homepage-deploy]
+
+- name: Include Homepage configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags: [homepage, homepage-config]
+  when: homepage_enabled | bool 
+
+- name: Include Homepage automation integration tasks
+  ansible.builtin.include_tasks: automation_integration.yml
+  tags: [homepage, homepage-automation]
+  when: homepage_enabled | bool and homepage_automation_enabled | default(true) 

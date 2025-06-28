@@ -1,0 +1,232 @@
+# System Security Policies Configuration
+# Defines comprehensive security policies for the homelab
+
+security_policies:
+  # User and Access Management
+  user_management:
+    password_policy:
+      min_length: 12
+      require_uppercase: true
+      require_lowercase: true
+      require_numbers: true
+      require_special_chars: true
+      max_age_days: 90
+      history_count: 5
+    
+    account_lockout:
+      max_failed_attempts: 5
+      lockout_duration_minutes: 30
+      reset_after_hours: 24
+    
+    session_management:
+      session_timeout_minutes: 30
+      max_concurrent_sessions: 3
+      force_logout_on_inactivity: true
+
+  # Network Security
+  network_security:
+    firewall_rules:
+      default_policy: "DROP"
+      allowed_inbound:
+        - port: 22
+          protocol: "tcp"
+          source: "{{ security_allowed_ssh_networks | default(['10.0.0.0/8']) }}"
+        - port: 80
+          protocol: "tcp"
+          source: "any"
+        - port: 443
+          protocol: "tcp"
+          source: "any"
+        - port: 8080
+          protocol: "tcp"
+          source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+        - port: 3000
+          protocol: "tcp"
+          source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+        - port: 9090
+          protocol: "tcp"
+          source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+      
+      allowed_outbound:
+        - port: 53
+          protocol: "udp"
+          destination: "any"
+        - port: 80
+          protocol: "tcp"
+          destination: "any"
+        - port: 443
+          protocol: "tcp"
+          destination: "any"
+        - port: 123
+          protocol: "udp"
+          destination: "any"
+    
+    dns_security:
+      use_secure_dns: true
+      dns_servers:
+        - "1.1.1.1"
+        - "8.8.8.8"
+        - "9.9.9.9"
+      block_malicious_domains: true
+      dns_over_https: true
+
+  # Docker Security
+  docker_security:
+    daemon_config:
+      user_namespace_remap: true
+      seccomp_profile: "unconfined"
+      apparmor_profile: "docker-default"
+      no_new_privileges: true
+      read_only_root_filesystem: true
+      capabilities_drop:
+        - "ALL"
+      security_opt:
+        - "no-new-privileges"
+        - "seccomp=unconfined"
+    
+    container_limits:
+      memory_limit: "2g"
+      cpu_limit: "1.0"
+      pids_limit: 100
+      ulimits:
+        nofile:
+          soft: 1024
+          hard: 2048
+    
+    network_security:
+      use_user_defined_networks: true
+      isolate_containers: true
+      disable_host_networking: true
+      use_bridge_networking: true
+
+  # File System Security
+  filesystem_security:
+    mount_options:
+      root_partition: "ro,noexec,nosuid,nodev"
+      tmp_partition: "noexec,nosuid,nodev"
+      var_tmp_partition: "noexec,nosuid,nodev"
+      home_partition: "noexec,nosuid,nodev"
+    
+    file_permissions:
+      sensitive_files:
+        - path: "/etc/passwd"
+          permissions: "644"
+        - path: "/etc/shadow"
+          permissions: "600"
+        - path: "/etc/group"
+          permissions: "644"
+        - path: "/etc/gshadow"
+          permissions: "600"
+        - path: "/etc/ssh/sshd_config"
+          permissions: "600"
+    
+    directory_permissions:
+      sensitive_dirs:
+        - path: "/etc/ssh"
+          permissions: "700"
+        - path: "/var/log"
+          permissions: "755"
+        - path: "{{ docker_dir }}"
+          permissions: "750"
+        - path: "{{ data_dir }}"
+          permissions: "750"
+
+  # Logging and Monitoring
+  logging_security:
+    log_retention:
+      system_logs_days: 30
+      application_logs_days: 7
+      security_logs_days: 90
+      audit_logs_days: 365
+    
+    log_integrity:
+      use_syslog: true
+      remote_logging: {{ security_remote_logging_enabled | default(false) }}
+      log_encryption: true
+      log_rotation: true
+    
+    audit_config:
+      audit_rules:
+        - "w /etc/passwd -p wa -k identity"
+        - "w /etc/group -p wa -k identity"
+        - "w /etc/shadow -p wa -k identity"
+        - "w /etc/gshadow -p wa -k identity"
+        - "w /etc/ssh/sshd_config -p wa -k sshd"
+        - "w {{ docker_dir }} -p wa -k docker"
+        - "w {{ data_dir }} -p wa -k data"
+
+  # Application Security
+  application_security:
+    web_application_security:
+      use_https_only: true
+      hsts_enabled: true
+      hsts_max_age: 31536000
+      csp_enabled: true
+      xss_protection: true
+      content_type_nosniff: true
+      frame_options: "DENY"
+    
+    api_security:
+      rate_limiting: true
+      rate_limit_requests: 100
+      rate_limit_window: 60
+      authentication_required: true
+      authorization_enabled: true
+    
+    database_security:
+      use_encrypted_connections: true
+      connection_pooling: true
+      prepared_statements: true
+      input_validation: true
+      output_encoding: true
+
+  # Backup and Recovery Security
+  backup_security:
+    backup_encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      key_rotation_days: 90
+    
+    backup_verification:
+      integrity_check: true
+      restore_testing: false
+      backup_monitoring: true
+    
+    backup_access_control:
+      backup_user_only: true
+      backup_network_isolation: true
+      backup_audit_logging: true
+
+  # Incident Response
+  incident_response:
+    automated_response:
+      enabled: true
+      block_suspicious_ips: true
+      isolate_compromised_containers: true
+      notify_admin: true
+    
+    incident_escalation:
+      level1_threshold: 5
+      level2_threshold: 10
+      level3_threshold: 20
+      escalation_timeout_minutes: 30
+    
+    forensics:
+      preserve_evidence: true
+      memory_dumps: false
+      disk_images: false
+      log_archiving: true
+
+  # Compliance and Standards
+  compliance:
+    gdpr_compliance:
+      data_encryption: true
+      data_minimization: true
+      right_to_erasure: true
+      data_portability: true
+    
+    security_standards:
+      follow_nist_framework: true
+      implement_cis_benchmarks: true
+      regular_security_assessments: true
+      penetration_testing: false 

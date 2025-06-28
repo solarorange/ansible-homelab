@@ -1,0 +1,392 @@
+#!/bin/bash
+# Backup Orchestrator Script
+# Manages automated backup scheduling and execution
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${SCRIPT_DIR}/backup-orchestrator.log"
+CONFIG_FILE="${SCRIPT_DIR}/schedule.yml"
+LOCK_FILE="${SCRIPT_DIR}/backup-orchestrator.lock"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    rm -f "$LOCK_FILE"
+    exit 1
+}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   error_exit "This script must be run as root"
+fi
+
+# Check if already running
+if [[ -f "$LOCK_FILE" ]]; then
+    PID=$(cat "$LOCK_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        error_exit "Backup orchestrator is already running (PID: $PID)"
+    else
+        log "Removing stale lock file"
+        rm -f "$LOCK_FILE"
+    fi
+fi
+
+# Create lock file
+echo $$ > "$LOCK_FILE"
+
+# Cleanup on exit
+trap 'rm -f "$LOCK_FILE"' EXIT
+
+# Load configuration
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    error_exit "Configuration file not found: $CONFIG_FILE"
+fi
+
+# Parse YAML configuration (simplified)
+parse_yaml() {
+    local prefix=$2
+    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+    sed -ne "s|^\($s\):|\1|" \
+        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+    awk -F$fs '{
+        indent = length($1)/2;
+        vname[indent] = $2;
+        for (i in vname) {if (i > indent) {delete vname[i]}}
+        if (length($3) > 0) {
+            vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+            printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+        }
+    }'
+}
+
+# Check if backup should run
+should_run_backup() {
+    local frequency=$1
+    local time=$2
+    local day=$3
+    
+    current_time=$(date '+%H:%M')
+    current_day=$(date '+%A' | tr '[:upper:]' '[:lower:]')
+    
+    case "$frequency" in
+        "daily")
+            [[ "$current_time" == "$time" ]]
+            ;;
+        "weekly")
+            [[ "$current_day" == "$day" && "$current_time" == "$time" ]]
+            ;;
+        "monthly")
+            [[ $(date '+%d') == "01" && "$current_time" == "$time" ]]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Execute backup
+execute_backup() {
+    local backup_type=$1
+    local config=$2
+    
+    log "Starting backup: $backup_type"
+    
+    case "$backup_type" in
+        "system_config")
+            backup_system_configs
+            ;;
+        "postgresql")
+            backup_postgresql
+            ;;
+        "redis")
+            backup_redis
+            ;;
+        "mariadb")
+            backup_mariadb
+            ;;
+        "nextcloud")
+            backup_nextcloud
+            ;;
+        "paperless")
+            backup_paperless
+            ;;
+        "authentik")
+            backup_authentik
+            ;;
+        "sonarr")
+            backup_sonarr
+            ;;
+        "radarr")
+            backup_radarr
+            ;;
+        "jellyfin")
+            backup_jellyfin
+            ;;
+        "prometheus")
+            backup_prometheus
+            ;;
+        "grafana")
+            backup_grafana
+            ;;
+        "influxdb")
+            backup_influxdb
+            ;;
+        "full_system")
+            backup_full_system
+            ;;
+        *)
+            log "Unknown backup type: $backup_type"
+            return 1
+            ;;
+    esac
+    
+    log "Completed backup: $backup_type"
+}
+
+# System configuration backup
+backup_system_configs() {
+    local backup_file="{{ backup_dir }}/system-config-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" \
+        {{ docker_dir }} \
+        {{ config_dir }} \
+        /etc/docker \
+        /etc/systemd/system \
+        /etc/network \
+        /etc/security \
+        2>/dev/null || log "Warning: Some files could not be backed up"
+    
+    log "System config backup created: $backup_file"
+}
+
+# Database backups
+backup_postgresql() {
+    local backup_file="{{ backup_dir }}/postgresql-$(date +%Y%m%d-%H%M%S).sql"
+    
+    docker exec postgresql pg_dumpall -U postgres > "$backup_file" 2>/dev/null || {
+        log "Failed to backup PostgreSQL"
+        return 1
+    }
+    
+    log "PostgreSQL backup created: $backup_file"
+}
+
+backup_redis() {
+    local backup_file="{{ backup_dir }}/redis-$(date +%Y%m%d-%H%M%S).rdb"
+    
+    docker exec redis redis-cli BGSAVE >/dev/null 2>&1
+    sleep 5
+    docker cp redis:/data/dump.rdb "$backup_file" 2>/dev/null || {
+        log "Failed to backup Redis"
+        return 1
+    }
+    
+    log "Redis backup created: $backup_file"
+}
+
+backup_mariadb() {
+    local backup_file="{{ backup_dir }}/mariadb-$(date +%Y%m%d-%H%M%S).sql"
+    
+    docker exec mariadb mysqldump -u root -p{{ vault_mariadb_root_password }} --all-databases > "$backup_file" 2>/dev/null || {
+        log "Failed to backup MariaDB"
+        return 1
+    }
+    
+    log "MariaDB backup created: $backup_file"
+}
+
+# Application backups
+backup_nextcloud() {
+    local backup_file="{{ backup_dir }}/nextcloud-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/nextcloud 2>/dev/null || {
+        log "Failed to backup Nextcloud"
+        return 1
+    }
+    
+    log "Nextcloud backup created: $backup_file"
+}
+
+backup_paperless() {
+    local backup_file="{{ backup_dir }}/paperless-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/paperless 2>/dev/null || {
+        log "Failed to backup Paperless"
+        return 1
+    }
+    
+    log "Paperless backup created: $backup_file"
+}
+
+backup_authentik() {
+    local backup_file="{{ backup_dir }}/authentik-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/authentik 2>/dev/null || {
+        log "Failed to backup Authentik"
+        return 1
+    }
+    
+    log "Authentik backup created: $backup_file"
+}
+
+# Media service backups
+backup_sonarr() {
+    local backup_file="{{ backup_dir }}/sonarr-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/sonarr 2>/dev/null || {
+        log "Failed to backup Sonarr"
+        return 1
+    }
+    
+    log "Sonarr backup created: $backup_file"
+}
+
+backup_radarr() {
+    local backup_file="{{ backup_dir }}/radarr-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/radarr 2>/dev/null || {
+        log "Failed to backup Radarr"
+        return 1
+    }
+    
+    log "Radarr backup created: $backup_file"
+}
+
+backup_jellyfin() {
+    local backup_file="{{ backup_dir }}/jellyfin-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/jellyfin 2>/dev/null || {
+        log "Failed to backup Jellyfin"
+        return 1
+    }
+    
+    log "Jellyfin backup created: $backup_file"
+}
+
+# Monitoring backups
+backup_prometheus() {
+    local backup_file="{{ backup_dir }}/prometheus-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/prometheus 2>/dev/null || {
+        log "Failed to backup Prometheus"
+        return 1
+    }
+    
+    log "Prometheus backup created: $backup_file"
+}
+
+backup_grafana() {
+    local backup_file="{{ backup_dir }}/grafana-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/grafana 2>/dev/null || {
+        log "Failed to backup Grafana"
+        return 1
+    }
+    
+    log "Grafana backup created: $backup_file"
+}
+
+backup_influxdb() {
+    local backup_file="{{ backup_dir }}/influxdb-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    tar -czf "$backup_file" {{ data_dir }}/influxdb 2>/dev/null || {
+        log "Failed to backup InfluxDB"
+        return 1
+    }
+    
+    log "InfluxDB backup created: $backup_file"
+}
+
+# Full system backup
+backup_full_system() {
+    local backup_file="{{ backup_dir }}/full-system-$(date +%Y%m%d-%H%M%S).tar.gz"
+    
+    # Stop non-essential services
+    log "Stopping non-essential services for full backup..."
+    docker stop $(docker ps -q --filter "label=backup.stop=true") 2>/dev/null || true
+    
+    # Create full backup
+    tar -czf "$backup_file" \
+        {{ docker_dir }} \
+        {{ data_dir }} \
+        {{ config_dir }} \
+        {{ backup_dir }} \
+        /etc/docker \
+        /etc/systemd/system \
+        2>/dev/null || log "Warning: Some files could not be backed up"
+    
+    # Restart services
+    log "Restarting services..."
+    docker start $(docker ps -aq --filter "label=backup.stop=true") 2>/dev/null || true
+    
+    log "Full system backup created: $backup_file"
+}
+
+# Cleanup old backups
+cleanup_old_backups() {
+    log "Cleaning up old backups..."
+    
+    # Remove backups older than retention period
+    find {{ backup_dir }} -name "*.tar.gz" -mtime +30 -delete 2>/dev/null || true
+    find {{ backup_dir }} -name "*.sql" -mtime +7 -delete 2>/dev/null || true
+    find {{ backup_dir }} -name "*.rdb" -mtime +7 -delete 2>/dev/null || true
+    
+    log "Cleanup completed"
+}
+
+# Main orchestration function
+main() {
+    log "Starting backup orchestration..."
+    
+    # Check if any backups should run
+    current_time=$(date '+%H:%M')
+    current_day=$(date '+%A' | tr '[:upper:]' '[:lower:]')
+    
+    # Simplified backup schedule check (in production, parse YAML properly)
+    if [[ "$current_time" == "02:00" ]]; then
+        execute_backup "system_config"
+    elif [[ "$current_time" == "03:00" ]]; then
+        execute_backup "postgresql"
+    elif [[ "$current_time" == "03:15" ]]; then
+        execute_backup "redis"
+    elif [[ "$current_time" == "03:30" ]]; then
+        execute_backup "mariadb"
+    elif [[ "$current_time" == "04:00" ]]; then
+        execute_backup "nextcloud"
+    elif [[ "$current_time" == "04:30" ]]; then
+        execute_backup "paperless"
+    elif [[ "$current_time" == "05:00" ]]; then
+        execute_backup "authentik"
+    elif [[ "$current_time" == "06:00" ]]; then
+        execute_backup "sonarr"
+    elif [[ "$current_time" == "06:15" ]]; then
+        execute_backup "radarr"
+    elif [[ "$current_time" == "06:30" ]]; then
+        execute_backup "jellyfin"
+    elif [[ "$current_day" == "sunday" && "$current_time" == "07:00" ]]; then
+        execute_backup "prometheus"
+    elif [[ "$current_day" == "sunday" && "$current_time" == "07:30" ]]; then
+        execute_backup "grafana"
+    elif [[ "$current_day" == "sunday" && "$current_time" == "08:00" ]]; then
+        execute_backup "influxdb"
+    elif [[ "$current_day" == "saturday" && "$current_time" == "22:00" ]]; then
+        execute_backup "full_system"
+    fi
+    
+    # Cleanup old backups (daily at 01:00)
+    if [[ "$current_time" == "01:00" ]]; then
+        cleanup_old_backups
+    fi
+    
+    log "Backup orchestration completed"
+}
+
+# Run main function
+main "$@" 

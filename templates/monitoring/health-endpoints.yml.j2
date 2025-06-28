@@ -1,0 +1,185 @@
+# Health Check Endpoints Configuration
+# Defines endpoints to monitor for service health
+
+health_checks:
+  # Infrastructure Services
+  infrastructure:
+    traefik:
+      url: "http://localhost:8080/api/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    authentik:
+      url: "http://localhost:9000/if/user/"
+      method: "GET"
+      expected_status: [200, 302]
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    portainer:
+      url: "http://localhost:9000/api/status"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 60
+      retries: 3
+
+  # Database Services
+  databases:
+    postgresql:
+      url: "localhost:5432"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+    
+    redis:
+      url: "localhost:6379"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+    
+    mariadb:
+      url: "localhost:3306"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+
+  # Monitoring Services
+  monitoring:
+    prometheus:
+      url: "http://localhost:9090/-/healthy"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    grafana:
+      url: "http://localhost:3000/api/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    influxdb:
+      url: "http://localhost:8086/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    loki:
+      url: "http://localhost:3100/ready"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+
+  # Media Services
+  media:
+    sonarr:
+      url: "http://localhost:8989/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    radarr:
+      url: "http://localhost:7878/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    jellyfin:
+      url: "http://localhost:8096/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    plex:
+      url: "http://localhost:32400/web/index.html"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+
+  # Storage Services
+  storage:
+    nextcloud:
+      url: "http://localhost:8080/status.php"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    samba:
+      url: "localhost:139"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 60
+      retries: 3
+
+  # Security Services
+  security:
+    crowdsec:
+      url: "http://localhost:6060/v1/decisions"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 60
+      retries: 3
+    
+    fail2ban:
+      url: "localhost:22"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 60
+      retries: 3
+
+# Health Check Thresholds
+thresholds:
+  cpu_warning: 80
+  cpu_critical: 90
+  memory_warning: 85
+  memory_critical: 95
+  disk_warning: 80
+  disk_critical: 90
+  network_latency_warning: 100
+  network_latency_critical: 500
+
+# Self-Healing Configuration
+self_healing:
+  enabled: true
+  max_attempts: 3
+  cooldown_period: 300
+  restart_services:
+    - traefik
+    - authentik
+    - grafana
+    - prometheus
+    - sonarr
+    - radarr
+    - jellyfin
+    - nextcloud 

@@ -1,0 +1,122 @@
+#!/bin/bash
+# Service Startup Script
+# Manages service startup order based on dependencies
+
+set -e
+
+LOG_FILE="{{ logs_dir }}/orchestration/startup.log"
+DEPENDENCIES_FILE="{{ docker_dir }}/orchestration/dependencies.json"
+
+# Create log directory
+mkdir -p "$(dirname "$LOG_FILE")"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+log "Starting service orchestration..."
+
+# Function to check if service is ready
+check_service_ready() {
+    local service=$1
+    local port=$2
+    local max_attempts=30
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z localhost $port 2>/dev/null; then
+            log "Service $service is ready on port $port"
+            return 0
+        fi
+        log "Waiting for $service to be ready (attempt $attempt/$max_attempts)"
+        sleep 10
+        ((attempt++))
+    done
+    
+    log "ERROR: Service $service failed to start within timeout"
+    return 1
+}
+
+# Start infrastructure services first
+log "Starting infrastructure services..."
+
+# Start Traefik
+if [ -f "{{ docker_dir }}/traefik/docker-compose.yml" ]; then
+    log "Starting Traefik..."
+    cd "{{ docker_dir }}/traefik"
+    docker-compose up -d
+    check_service_ready "Traefik" 80
+fi
+
+# Start Authentik
+if [ -f "{{ docker_dir }}/security/authentik/docker-compose.yml" ]; then
+    log "Starting Authentik..."
+    cd "{{ docker_dir }}/security/authentik"
+    docker-compose up -d
+    check_service_ready "Authentik" 9000
+fi
+
+# Start database services
+log "Starting database services..."
+
+# Start PostgreSQL
+if [ -f "{{ docker_dir }}/databases/postgresql/docker-compose.yml" ]; then
+    log "Starting PostgreSQL..."
+    cd "{{ docker_dir }}/databases/postgresql"
+    docker-compose up -d
+    check_service_ready "PostgreSQL" 5432
+fi
+
+# Start Redis
+if [ -f "{{ docker_dir }}/databases/redis/docker-compose.yml" ]; then
+    log "Starting Redis..."
+    cd "{{ docker_dir }}/databases/redis"
+    docker-compose up -d
+    check_service_ready "Redis" 6379
+fi
+
+# Start monitoring services
+log "Starting monitoring services..."
+
+# Start InfluxDB
+if [ -f "{{ docker_dir }}/monitoring/influxdb/docker-compose.yml" ]; then
+    log "Starting InfluxDB..."
+    cd "{{ docker_dir }}/monitoring/influxdb"
+    docker-compose up -d
+    check_service_ready "InfluxDB" 8086
+fi
+
+# Start Prometheus
+if [ -f "{{ docker_dir }}/monitoring/prometheus/docker-compose.yml" ]; then
+    log "Starting Prometheus..."
+    cd "{{ docker_dir }}/monitoring/prometheus"
+    docker-compose up -d
+    check_service_ready "Prometheus" 9090
+fi
+
+# Start Grafana
+if [ -f "{{ docker_dir }}/monitoring/grafana/docker-compose.yml" ]; then
+    log "Starting Grafana..."
+    cd "{{ docker_dir }}/monitoring/grafana"
+    docker-compose up -d
+    check_service_ready "Grafana" 3000
+fi
+
+# Start application services
+log "Starting application services..."
+
+# Start media services
+if [ -f "{{ docker_dir }}/media/docker-compose.yml" ]; then
+    log "Starting media services..."
+    cd "{{ docker_dir }}/media"
+    docker-compose up -d
+fi
+
+# Start utility services
+if [ -f "{{ docker_dir }}/utilities/docker-compose.yml" ]; then
+    log "Starting utility services..."
+    cd "{{ docker_dir }}/utilities"
+    docker-compose up -d
+fi
+
+log "Service orchestration completed successfully" 

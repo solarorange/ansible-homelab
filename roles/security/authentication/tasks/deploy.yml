@@ -349,4 +349,103 @@ always:
       path: "{{ item }}"
       state: absent
     loop: "{{ temp_dirs | default([]) }}"
-    when: temp_dirs is defined 
+    when: temp_dirs is defined
+
+# Deploy Authentik Identity Provider
+- name: Create Authentik directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_user }}"
+    mode: '0755'
+  loop:
+    - "{{ docker_dir }}/authentik"
+    - "{{ data_dir }}/authentik"
+    - "{{ config_dir }}/authentik"
+    - "{{ backup_dir }}/authentik"
+
+- name: Create Authentik environment file
+  template:
+    src: authentik.env.j2
+    dest: "{{ docker_dir }}/authentik/.env"
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_user }}"
+    mode: '0644'
+  notify: restart authentik
+
+- name: Create Authentik docker-compose file
+  template:
+    src: authentik-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/authentik/docker-compose.yml"
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_user }}"
+    mode: '0644'
+  notify: restart authentik
+
+- name: Start Authentik
+  docker_compose:
+    project_src: "{{ docker_dir }}/authentik"
+    state: present
+  register: authentik_result
+  retries: 3
+  delay: 30
+  until: authentik_result is success
+
+- name: Wait for Authentik to be ready
+  uri:
+    url: "http://localhost:9000/if/user/"
+    method: GET
+    status_code: [200, 302, 401]
+  register: authentik_health
+  retries: 30
+  delay: 10
+  until: authentik_health.status in [200, 302, 401]
+
+- name: Create Authentik configuration script
+  template:
+    src: setup_authentik.py.j2
+    dest: "{{ config_dir }}/authentik/setup_authentik.py"
+    owner: "{{ homelab_user }}"
+    group: "{{ homelab_user }}"
+    mode: '0755'
+  when: authentik_health.status in [200, 302, 401]
+
+- name: Run Authentik configuration script
+  command: "{{ config_dir }}/authentik/setup_authentik.py"
+  environment:
+    AUTHENTIK_URL: "http://localhost:9000"
+    AUTHENTIK_ADMIN_PASSWORD: "{{ vault_authentik_admin_password }}"
+    DOMAIN: "{{ domain }}"
+  register: authentik_setup_result
+  retries: 3
+  delay: 30
+  until: authentik_setup_result.rc == 0
+  when: authentik_health.status in [200, 302, 401]
+
+- name: Create Authentik application summary
+  debug:
+    msg: |
+      Authentik has been configured successfully!
+      
+      Access your services through Authentik:
+      - Authentik Dashboard: https://auth.{{ domain }}
+      - Grafana: https://grafana.{{ domain }}
+      - Sonarr: https://sonarr.{{ domain }}
+      - Radarr: https://radarr.{{ domain }}
+      - Jellyfin: https://jellyfin.{{ domain }}
+      - Overseerr: https://overseerr.{{ domain }}
+      - Portainer: https://portainer.{{ domain }}
+      - Homepage: https://homepage.{{ domain }}
+      - Prowlarr: https://prowlarr.{{ domain }}
+      - Bazarr: https://bazarr.{{ domain }}
+      - Tautulli: https://tautulli.{{ domain }}
+      
+      Default admin user: {{ homelab_user }}
+      Admin password: (from vault)
+      
+      Next steps:
+      1. Access Authentik at https://auth.{{ domain }}
+      2. Login with admin credentials
+      3. Applications are pre-configured and ready to use
+      4. Add additional users and groups as needed 

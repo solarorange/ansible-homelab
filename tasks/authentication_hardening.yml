@@ -1,0 +1,33 @@
+---
+# Authentication Hardening
+# Enforces strong authentication policies and 2FA
+
+- name: Enforce strong password policy
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwquality.conf
+    regexp: '^minlen='
+    line: 'minlen = 12'
+    state: present
+  tags: [security, authentication, password]
+
+- name: Enforce password complexity
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwquality.conf
+    regexp: '^minclass='
+    line: 'minclass = 4'
+    state: present
+  tags: [security, authentication, password]
+
+- name: Enable two-factor authentication (2FA) for SSH
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AuthenticationMethods'
+    line: 'AuthenticationMethods publickey,keyboard-interactive'
+    state: present
+  tags: [security, authentication, 2fa, ssh]
+
+- name: Ensure Google Authenticator is installed
+  ansible.builtin.package:
+    name: libpam-google-authenticator
+    state: present
+  tags: [security, authentication, 2fa] 

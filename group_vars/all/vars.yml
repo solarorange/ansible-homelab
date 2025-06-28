@@ -7,14 +7,14 @@
 #==============================================================================
 
 # User and system settings
-username: "<username>"                    # VM user account
-puid: "<puid>"                           # User ID (get with: id -u username)
-pgid: "<pgid>"                           # Group ID (get with: id -g username)  
-ip_address: "<server_ip>"                # Server's static IP address
-timezone: "<timezone>"                   # System timezone (timedatectl list-timezones)
+username: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+puid: "{{ lookup('env', 'HOMELAB_PUID') | default('1000') }}"
+pgid: "{{ lookup('env', 'HOMELAB_PGID') | default('1000') }}"
+ip_address: "{{ lookup('env', 'HOMELAB_IP_ADDRESS') | default('192.168.1.100') }}"
+timezone: "{{ lookup('env', 'HOMELAB_TIMEZONE') | default('America/New_York') }}"
 
 # Plex server configuration
-plex_server_ip: "192.168.1.41"           # IP address of your existing Plex server
+plex_server_ip: "{{ lookup('env', 'PLEX_SERVER_IP') | default('192.168.1.41') }}"           # IP address of your existing Plex server
 
 # Directory structure
 docker_dir: "/home/{{ username }}/docker"
@@ -27,9 +27,10 @@ logs_dir: "/home/{{ username }}/logs"
 # DOMAIN AND DNS CONFIGURATION
 #==============================================================================
 
-domain: "zorg.media"                  # Your domain name
-cloudflare_email: "endlessoul@gmail.com"   # Cloudflare account email (optional)
-cloudflare_api_key: "TZ5HWYBrL6mtTmJizv3BuvzOEZ4X2zPCUWExj2bv" # Cloudflare Global API key (optional)
+domain: "{{ lookup('env', 'HOMELAB_DOMAIN') | default('yourdomain.com') }}"                  # Your domain name
+cloudflare_enabled: "{{ lookup('env', 'CLOUDFLARE_ENABLED') | default('false') | bool }}"
+cloudflare_email: "{{ lookup('env', 'CLOUDFLARE_EMAIL') | default('') }}"
+cloudflare_api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') | default('') }}"
 
 # Subdomain configuration (customize as needed)
 subdomains:
@@ -89,22 +90,22 @@ subdomains:
 #==============================================================================
 
 # Traefik authentication (generate with: htpasswd -nb user password)
-traefik_basic_auth_hash: "<traefik_basic_auth_hash>"
+traefik_basic_auth_hash: "{{ vault_traefik_basic_auth_hash }}"
 
 # Authentik configuration (replaces Authelia for better features)
-authentik_secret_key: "<authentik_secret_key>"     # 64 character random string
-authentik_postgres_password: "<authentik_db_pass>" # Database password
-authentik_admin_email: "<admin_email>"
-authentik_admin_password: "<admin_password>"
+authentik_secret_key: "{{ vault_authentik_secret_key }}"     # 64 character random string
+authentik_postgres_password: "{{ vault_authentik_postgres_password }}" # Database password
+authentik_admin_email: "{{ vault_authentik_admin_email }}"
+authentik_admin_password: "{{ vault_authentik_admin_password }}"
 
 # Application passwords
-wireguard_password: "<wg_pass>"
-codeserver_password: "<code_pass>"
-gitlab_root_password: "<gitlab_root_pass>"
+wireguard_password: "{{ vault_wireguard_password | default('') }}"
+codeserver_password: "{{ vault_codeserver_password | default('') }}"
+gitlab_root_password: "{{ vault_gitlab_root_password | default('') }}"
 
 # Vault configuration
-vault_root_token: "<vault_root_token>"
-vault_unseal_key: "<vault_unseal_key>"
+vault_root_token: "{{ vault_root_token | default('') }}"
+vault_unseal_key: "{{ vault_unseal_key | default('') }}"
 
 #==============================================================================
 # MONITORING CONFIGURATION
@@ -121,19 +122,22 @@ alertmanager_enabled: true
 
 # InfluxDB configuration
 influxdb_admin_user: "admin"
-influxdb_admin_password: "<influxdb_password>"
+influxdb_admin_password: "{{ vault_influxdb_admin_password }}"
 influxdb_org: "homelab"
 influxdb_bucket: "metrics"
-influxdb_token: "<influxdb_token>"
+influxdb_token: "{{ vault_influxdb_token }}"
+influxdb_username: "{{ lookup('env', 'INFLUXDB_USERNAME') | default('admin') }}"
+influxdb_password: "{{ vault_influxdb_admin_password }}"
+influxdb_retention: "{{ lookup('env', 'INFLUXDB_RETENTION') | default('30d') }}"
 
 # Grafana configuration
 grafana_admin_user: "admin"
-grafana_admin_password: "<grafana_password>"
-grafana_secret_key: "<grafana_secret>"
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+grafana_secret_key: "{{ vault_grafana_secret_key }}"
 
 # Telegram notifications (optional)
-telegram_bot_token: "<telegram_bot_token>"
-telegram_chat_id: "<telegram_chat_id>"
+telegram_bot_token: "{{ vault_telegram_bot_token }}"
+telegram_chat_id: "{{ vault_telegram_chat_id }}"
 
 #==============================================================================
 # SERVICE ENABLEMENT
@@ -285,9 +289,9 @@ media_directories:
   - "{{ data_dir }}/usenet/complete"
 
 # Database configuration
-postgres_password: "<postgres_password>"
-redis_password: "<redis_password>"
-mysql_root_password: "<mysql_root_password>"
+postgres_password: "{{ vault_postgresql_password }}"
+redis_password: "{{ vault_redis_password }}"
+mysql_root_password: "{{ vault_mariadb_root_password }}"
 
 #==============================================================================
 # SYSTEM PACKAGES
@@ -363,7 +367,7 @@ resource_limits:
 # Backup settings
 backup_retention_days: 30
 backup_schedule: "0 2 * * *"  # 2 AM daily (system-wide)
-backup_encryption_key: "<backup_encryption_key>"
+backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
 # Services to include in backups
 backup_include:
@@ -572,14 +576,14 @@ verification_urls:
 
 # Home Assistant configuration
 homeassistant_admin_user: "admin"
-homeassistant_admin_password: "<homeassistant_password>"
+homeassistant_admin_password: "{{ vault_homeassistant_admin_password }}"
 homeassistant_trusted_proxies:
   - "127.0.0.1"
   - "192.168.1.0/24"
 
 # MQTT configuration
 mosquitto_admin_user: "admin"
-mosquitto_admin_password: "<mosquitto_password>"
+mosquitto_admin_password: "{{ vault_mosquitto_admin_password }}"
 mosquitto_allow_anonymous: false
 mosquitto_max_connections: 100
 mosquitto_max_queued_messages: 1000
@@ -587,7 +591,7 @@ mosquitto_max_packet_size: 0
 
 # Zigbee2MQTT configuration
 zigbee2mqtt_mqtt_user: "zigbee2mqtt"
-zigbee2mqtt_mqtt_password: "<zigbee2mqtt_password>"
+zigbee2mqtt_mqtt_password: "{{ vault_zigbee2mqtt_mqtt_password }}"
 zigbee2mqtt_serial_port: "/dev/ttyACM0"
 zigbee2mqtt_pan_id: 6754
 zigbee2mqtt_channel: 11
@@ -598,9 +602,9 @@ zigbee2mqtt_channel: 11
 
 # Nextcloud configuration
 nextcloud_admin_user: "admin"
-nextcloud_admin_password: "<nextcloud_password>"
-nextcloud_db_password: "<nextcloud_db_password>"
-nextcloud_db_root_password: "<nextcloud_db_root_password>"
+nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
+nextcloud_db_password: "{{ vault_nextcloud_db_password }}"
+nextcloud_db_root_password: "{{ vault_nextcloud_db_root_password }}"
 nextcloud_trusted_domains:
   - "{{ domain }}"
   - "nextcloud.{{ domain }}"
@@ -630,8 +634,8 @@ samba_shares:
 
 # Syncthing configuration
 syncthing_gui_user: "admin"
-syncthing_gui_password: "<syncthing_password>"
-syncthing_gui_apikey: "<syncthing_apikey>"
+syncthing_gui_password: "{{ vault_syncthing_gui_password }}"
+syncthing_gui_apikey: "{{ vault_syncthing_apikey }}"
 syncthing_folders:
   - id: "documents"
     path: "/data/documents"
@@ -654,7 +658,7 @@ syncthing_folders:
 backup_retention_days: 30
 backup_compression: true
 backup_encryption: true
-backup_encryption_key: "<backup_encryption_key>"
+backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
 # Backup schedules (in cron format)
 backup_schedules:
@@ -739,8 +743,8 @@ enabled_services:
 # Monitoring Configuration
 monitoring_enabled: true
 monitoring_data_dir: "/opt/monitoring"
-monitoring_email: "{{ lookup('env', 'MONITORING_EMAIL') | default('monitoring@example.com') }}"
-admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@example.com') }}"
+monitoring_email: "{{ lookup('env', 'MONITORING_EMAIL') | default('monitoring@' + domain) }}"
+admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@' + domain) }}"
 
 # SMTP Configuration
 smtp_host: "{{ lookup('env', 'SMTP_HOST') | default('smtp.gmail.com') }}"
@@ -752,15 +756,6 @@ smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') | default('your-app-specific-p
 slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('') }}"
 slack_channel: "{{ lookup('env', 'SLACK_CHANNEL') | default('#alerts') }}"
 
-# InfluxDB Configuration
-influxdb_enabled: true
-influxdb_version: "2.7.1"
-influxdb_username: "{{ lookup('env', 'INFLUXDB_USERNAME') | default('admin') }}"
-influxdb_password: "{{ lookup('env', 'INFLUXDB_PASSWORD') | default('changeme') }}"
-influxdb_org: "{{ lookup('env', 'INFLUXDB_ORG') | default('homelab') }}"
-influxdb_bucket: "{{ lookup('env', 'INFLUXDB_BUCKET') | default('homelab') }}"
-influxdb_retention: "{{ lookup('env', 'INFLUXDB_RETENTION') | default('30d') }}"
-
 # Prometheus Configuration
 prometheus_enabled: true
 prometheus_version: "2.45.0"
@@ -770,8 +765,6 @@ prometheus_storage_path: "{{ monitoring_data_dir }}/prometheus"
 # Grafana Configuration
 grafana_enabled: true
 grafana_version: "10.0.3"
-grafana_admin_user: "{{ lookup('env', 'GRAFANA_ADMIN_USER') | default('admin') }}"
-grafana_admin_password: "{{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') | default('changeme') }}"
 grafana_domain: "{{ lookup('env', 'GRAFANA_DOMAIN') | default('grafana.' + domain) }}"
 
 # AlertManager Configuration
@@ -943,7 +936,7 @@ emergency_contact: ""         # Emergency contact information
 #==============================================================================
 
 # Pi-hole Configuration
-pihole_web_password: "<pihole_web_password>"  # Web interface password
+pihole_web_password: "{{ vault_pihole_admin_password }}"  # Web interface password
 pihole_domain: "pihole.{{ domain }}"          # Pi-hole web interface domain
 pihole_upstream_dns:
   - "1.1.1.1"  # Cloudflare DNS
@@ -952,3 +945,56 @@ pihole_rev_server: false                      # Enable reverse DNS
 pihole_rev_server_domain: ""                  # Your local domain
 pihole_rev_server_target: ""                  # Your DNS server
 pihole_rev_server_cidr: ""                    # Your network CIDR
+
+#==============================================================================
+# VARIABLE DEFINITIONS
+#==============================================================================
+
+# Database configuration
+vault_postgresql_user: "{{ lookup('env', 'POSTGRESQL_USER') | default('homelab') }}"
+vault_postgresql_password: "{{ lookup('env', 'POSTGRESQL_PASSWORD') | default('') }}"
+vault_mariadb_root_password: "{{ lookup('env', 'MARIADB_ROOT_PASSWORD') | default('') }}"
+vault_redis_password: "{{ lookup('env', 'REDIS_PASSWORD') | default('') }}"
+
+# Media service API keys
+vault_sonarr_api_key: "{{ lookup('env', 'SONARR_API_KEY') | default('') }}"
+vault_radarr_api_key: "{{ lookup('env', 'RADARR_API_KEY') | default('') }}"
+vault_prowlarr_api_key: "{{ lookup('env', 'PROWLARR_API_KEY') | default('') }}"
+vault_bazarr_api_key: "{{ lookup('env', 'BAZARR_API_KEY') | default('') }}"
+vault_lidarr_api_key: "{{ lookup('env', 'LIDARR_API_KEY') | default('') }}"
+vault_readarr_api_key: "{{ lookup('env', 'READARR_API_KEY') | default('') }}"
+vault_sabnzbd_api_key: "{{ lookup('env', 'SABNZBD_API_KEY') | default('') }}"
+
+# Notification webhooks
+vault_slack_webhook: "{{ lookup('env', 'SLACK_WEBHOOK') | default('') }}"
+vault_discord_webhook: "{{ lookup('env', 'DISCORD_WEBHOOK') | default('') }}"
+vault_telegram_bot_token: "{{ lookup('env', 'TELEGRAM_BOT_TOKEN') | default('') }}"
+vault_telegram_chat_id: "{{ lookup('env', 'TELEGRAM_CHAT_ID') | default('') }}"
+vault_pagerduty_routing_key: "{{ lookup('env', 'PAGERDUTY_ROUTING_KEY') | default('') }}"
+
+# Service configuration
+media_dir: "{{ data_dir }}/media"
+downloads_dir: "{{ data_dir }}/downloads"
+config_dir: "{{ docker_dir }}/config"
+backup_retention_days: "{{ lookup('env', 'BACKUP_RETENTION_DAYS') | default('7') | int }}"
+backup_compression: "{{ lookup('env', 'BACKUP_COMPRESSION') | default('true') | bool }}"
+backup_encryption: "{{ lookup('env', 'BACKUP_ENCRYPTION') | default('false') | bool }}"
+
+# Network configuration
+traefik_network: "{{ lookup('env', 'TRAEFIK_NETWORK') | default('homelab') }}"
+ssl_enabled: "{{ lookup('env', 'SSL_ENABLED') | default('true') | bool }}"
+ssl_email: "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + domain) }}"
+
+# Monitoring configuration
+monitoring_retention_days: "{{ lookup('env', 'MONITORING_RETENTION_DAYS') | default('30') | int }}"
+alerting_enabled: "{{ lookup('env', 'ALERTING_ENABLED') | default('true') | bool }}"
+
+# Security configuration
+security_enhanced: "{{ lookup('env', 'SECURITY_ENHANCED') | default('true') | bool }}"
+fail2ban_enabled: "{{ lookup('env', 'FAIL2BAN_ENABLED') | default('true') | bool }}"
+crowdsec_enabled: "{{ lookup('env', 'CROWDSEC_ENABLED') | default('true') | bool }}"
+
+# System configuration
+system_updates_enabled: "{{ lookup('env', 'SYSTEM_UPDATES_ENABLED') | default('true') | bool }}"
+docker_restart_needed: "{{ lookup('env', 'DOCKER_RESTART_NEEDED') | default('false') | bool }}"
+log_retention_days: "{{ lookup('env', 'LOG_RETENTION_DAYS') | default('30') | int }}"

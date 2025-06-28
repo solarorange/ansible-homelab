@@ -1,26 +1,37 @@
 version: '3.8'
 
+networks:
+  homelab:
+    name: homelab
+    external: true
+  monitoring:
+    name: monitoring
+    external: true
+
 services:
   overseerr:
     image: linuxserver/overseerr:latest
     container_name: overseerr
+    restart: unless-stopped
     environment:
-      - PUID={{ ansible_user_id }}
-      - PGID={{ ansible_user_gid }}
+      - PUID={{ puid | default(1000) }}
+      - PGID={{ pgid | default(1000) }}
       - TZ={{ timezone | default('UTC') }}
       - NODE_ENV=production
     volumes:
-      - {{ docker_root }}/overseerr/config:/config
-      - {{ docker_root }}/overseerr/data:/data
+      - "{{ config_dir }}/overseerr:/config"
+      - "{{ data_dir }}/overseerr:/data"
+      - "{{ logs_dir }}/overseerr:/var/log/overseerr"
     ports:
       - "5055:5055"
-    restart: unless-stopped
     networks:
-      - traefik_network
+      - homelab
+      - monitoring
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
       - "traefik.http.routers.overseerr.rule=Host(`overseerr.{{ domain }}`)"
-      - "traefik.http.routers.overseerr.entrypoints=websecure"
+      - "traefik.http.routers.overseerr.entrypoints=https"
       - "traefik.http.routers.overseerr.tls=true"
       - "traefik.http.routers.overseerr.tls.certresolver=cloudflare"
       - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
@@ -30,13 +41,30 @@ services:
       - "traefik.http.middlewares.overseerr-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.overseerr-headers.headers.customrequestheaders.X-Forwarded-Host=overseerr.{{ domain }}"
       - "traefik.http.routers.overseerr.middlewares=overseerr-headers"
+      - "prometheus.enable=true"
+      - "prometheus.job=overseerr"
+      - "prometheus.port=5055"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-networks:
-  traefik_network:
-    external: true 
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 26677
+        hard: 46677
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5' 

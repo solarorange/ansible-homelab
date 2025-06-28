@@ -1,0 +1,48 @@
+# Network Security Configuration
+# Comprehensive network security policies
+
+network_security:
+  firewall_rules:
+    default_policy: "DROP"
+    allowed_inbound:
+      - port: 22
+        protocol: "tcp"
+        source: "{{ security_allowed_ssh_networks | default(['10.0.0.0/8']) }}"
+      - port: 80
+        protocol: "tcp"
+        source: "any"
+      - port: 443
+        protocol: "tcp"
+        source: "any"
+      - port: 8080
+        protocol: "tcp"
+        source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+      - port: 3000
+        protocol: "tcp"
+        source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+      - port: 9090
+        protocol: "tcp"
+        source: "{{ security_allowed_admin_networks | default(['10.0.0.0/8']) }}"
+    
+    allowed_outbound:
+      - port: 53
+        protocol: "udp"
+        destination: "any"
+      - port: 80
+        protocol: "tcp"
+        destination: "any"
+      - port: 443
+        protocol: "tcp"
+        destination: "any"
+      - port: 123
+        protocol: "udp"
+        destination: "any"
+  
+  dns_security:
+    use_secure_dns: true
+    dns_servers:
+      - "1.1.1.1"
+      - "8.8.8.8"
+      - "9.9.9.9"
+    block_malicious_domains: true
+    dns_over_https: true 

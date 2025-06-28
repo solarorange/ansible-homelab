@@ -634,3 +634,137 @@
       {{ config_dir }}/ and {{ backup_dir }}/
       
       Happy homelabbing! 🏠🔬
+
+---
+# Post-Deployment Cleanup
+# Performs cleanup tasks after successful deployment
+
+- name: Cleanup temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ docker_dir }}/temp"
+    - "{{ docker_dir }}/cache"
+    - "/tmp/ansible-*"
+    - "/tmp/docker-*"
+  tags: [cleanup, temp]
+
+- name: Cleanup old Docker images
+  ansible.builtin.shell: |
+    docker image prune -f
+    docker system prune -f --volumes
+  changed_when: false
+  tags: [cleanup, docker]
+
+- name: Cleanup old log files
+  ansible.builtin.shell: |
+    find {{ logs_dir }} -name "*.log.*" -mtime +7 -delete
+    find {{ logs_dir }} -name "*.gz" -mtime +30 -delete
+  changed_when: false
+  tags: [cleanup, logs]
+
+- name: Cleanup old backup files
+  ansible.builtin.shell: |
+    find {{ backup_dir }} -name "*.tar.gz" -mtime +{{ backup_retention_days | default(7) }} -delete
+    find {{ backup_dir }} -name "*.sql" -mtime +{{ backup_retention_days | default(7) }} -delete
+  changed_when: false
+  tags: [cleanup, backups]
+
+- name: Cleanup old documentation files
+  ansible.builtin.shell: |
+    cd {{ docker_dir }}/documentation
+    ls -t | tail -n +11 | xargs -r rm -rf
+  changed_when: false
+  tags: [cleanup, docs]
+
+- name: Cleanup old rollback points
+  ansible.builtin.shell: |
+    cd {{ docker_dir }}/rollback
+    ls -t rollback-point-*.json | tail -n +{{ rollback_config.max_rollback_points + 1 }} | xargs -r rm
+  changed_when: false
+  tags: [cleanup, rollback]
+
+- name: Optimize system performance
+  block:
+    - name: Clear system cache
+      ansible.builtin.shell: |
+        sync
+        echo 3 > /proc/sys/vm/drop_caches
+      changed_when: false
+      tags: [cleanup, performance]
+
+    - name: Optimize Docker storage
+      ansible.builtin.shell: |
+        docker system prune -f
+        docker builder prune -f
+      changed_when: false
+      tags: [cleanup, docker]
+
+    - name: Restart Docker daemon if needed
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+      when: docker_restart_needed | default(false)
+      tags: [cleanup, docker]
+
+  tags: [cleanup, optimization]
+
+- name: Update system packages
+  ansible.builtin.apt:
+    update_cache: yes
+    upgrade: safe
+    autoremove: yes
+    autoclean: yes
+  when: system_updates_enabled | default(true)
+  tags: [cleanup, system]
+
+- name: Cleanup SSH known hosts
+  ansible.builtin.shell: |
+    find ~/.ssh -name "known_hosts*" -mtime +30 -delete
+  changed_when: false
+  tags: [cleanup, ssh]
+
+- name: Cleanup Ansible cache
+  ansible.builtin.file:
+    path: "{{ ansible_env.ANSIBLE_CACHE_PLUGIN_CONNECTION | default('/tmp/ansible_cache') }}"
+    state: absent
+  tags: [cleanup, ansible]
+
+- name: Generate cleanup report
+  ansible.builtin.shell: |
+    echo "=== CLEANUP REPORT ===" > {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "Timestamp: {{ ansible_date_time.iso8601 }}" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "Host: {{ inventory_hostname }}" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "Disk Usage Before:" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    df -h >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "Docker Images:" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    docker images | wc -l >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    echo "Docker Containers:" >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+    docker ps -a | wc -l >> {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+  changed_when: false
+  tags: [cleanup, report]
+
+- name: Display cleanup status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      CLEANUP COMPLETED
+      ========================================
+      
+      Temporary Files: CLEANED
+      Docker Images: OPTIMIZED
+      Log Files: CLEANED (older than 7 days)
+      Backup Files: CLEANED (older than {{ backup_retention_days | default(7) }} days)
+      Documentation: CLEANED (kept last 10 versions)
+      Rollback Points: CLEANED (kept last {{ rollback_config.max_rollback_points }} points)
+      System Cache: CLEARED
+      Docker Storage: OPTIMIZED
+      
+      Cleanup Report: {{ docker_dir }}/cleanup-report-{{ ansible_date_time.epoch }}.txt
+      
+      ========================================
+  tags: [cleanup, summary]

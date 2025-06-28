@@ -1,0 +1,300 @@
+---
+# Service Recovery Tasks
+# Automated recovery procedures for failed services
+
+- name: Initialize service recovery
+  block:
+    - name: Log recovery attempt
+      ansible.builtin.lineinfile:
+        path: "{{ logs_dir }}/service_recovery.log"
+        line: "{{ ansible_date_time.iso8601 }} - Starting recovery for {{ service_name }}"
+        create: yes
+      tags: [recovery, logging]
+
+    - name: Create recovery backup
+      ansible.builtin.copy:
+        src: "{{ service_config_path | default('/etc/systemd/system/' + service_name + '.service') }}"
+        dest: "{{ backup_dir }}/{{ service_name }}_config_{{ ansible_date_time.epoch }}.bak"
+        remote_src: yes
+      when: service_config_path is defined
+      tags: [recovery, backup]
+
+  when: service_name is defined
+  tags: [recovery, init]
+
+- name: Attempt service restart
+  block:
+    - name: Stop service gracefully
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: stopped
+        timeout: 30
+      register: stop_result
+      ignore_errors: yes
+      tags: [recovery, restart]
+
+    - name: Wait for service to stop
+      ansible.builtin.wait_for:
+        path: "/proc/$(systemctl show {{ service_name }} -p MainPID | cut -d= -f2)"
+        state: absent
+      when: stop_result is success
+      tags: [recovery, restart]
+
+    - name: Start service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: started
+        enabled: yes
+      register: start_result
+      tags: [recovery, restart]
+
+    - name: Wait for service to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ service_port | default(8080) }}"
+        timeout: 60
+        delay: 10
+      when: 
+        - start_result is success
+        - service_port is defined
+      register: ready_check
+      tags: [recovery, restart]
+
+  when: service_name is defined
+  tags: [recovery, restart]
+
+- name: Docker container recovery
+  block:
+    - name: Stop container
+      community.docker.docker_container:
+        name: "{{ service_name }}"
+        state: stopped
+        timeout: 30
+      register: docker_stop
+      ignore_errors: yes
+      tags: [recovery, docker]
+
+    - name: Remove failed container
+      community.docker.docker_container:
+        name: "{{ service_name }}"
+        state: absent
+      when: docker_stop is success
+      tags: [recovery, docker]
+
+    - name: Start container from compose
+      ansible.builtin.shell: |
+        cd "{{ docker_dir }}/{{ service_name }}"
+        docker-compose up -d
+      register: docker_start
+      tags: [recovery, docker]
+
+    - name: Wait for container to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ service_port | default(8080) }}"
+        timeout: 60
+        delay: 10
+      when: 
+        - docker_start is success
+        - service_port is defined
+      register: docker_ready
+      tags: [recovery, docker]
+
+  when: 
+    - service_name is defined
+    - "'docker' in service_type | default('systemd')"
+  tags: [recovery, docker]
+
+- name: Configuration recovery
+  block:
+    - name: Check configuration syntax
+      ansible.builtin.include_tasks: validate_config.yml
+      vars:
+        config_file: "{{ service_config_path | default('/etc/systemd/system/' + service_name + '.service') }}"
+      tags: [recovery, config]
+
+    - name: Restore from backup if needed
+      ansible.builtin.copy:
+        src: "{{ backup_dir }}/{{ service_name }}_config_{{ ansible_date_time.epoch }}.bak"
+        dest: "{{ service_config_path | default('/etc/systemd/system/' + service_name + '.service') }}"
+        remote_src: yes
+      when: 
+        - config_validation is failed
+        - backup_file_exists | default(false)
+      tags: [recovery, config]
+
+    - name: Reload systemd after config change
+      ansible.builtin.systemd:
+        daemon_reload: yes
+      when: config_restored | default(false)
+      tags: [recovery, config]
+
+  when: service_name is defined
+  tags: [recovery, config]
+
+- name: Dependency recovery
+  block:
+    - name: Check service dependencies
+      ansible.builtin.include_tasks: check_dependencies.yml
+      vars:
+        service: "{{ service_name }}"
+      tags: [recovery, dependencies]
+
+    - name: Start missing dependencies
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop: "{{ missing_dependencies | default([]) }}"
+      when: missing_dependencies is defined
+      tags: [recovery, dependencies]
+
+    - name: Wait for dependencies to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ item.port }}"
+        timeout: 30
+        delay: 5
+      loop: "{{ dependency_ports | default([]) }}"
+      when: dependency_ports is defined
+      tags: [recovery, dependencies]
+
+  when: service_name is defined
+  tags: [recovery, dependencies]
+
+- name: Resource recovery
+  block:
+    - name: Check system resources
+      ansible.builtin.shell: |
+        echo "CPU: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%//')"
+        echo "Memory: $(free | grep Mem | awk '{printf "%.2f", $3/$2 * 100.0}')"
+        echo "Disk: $(df / | tail -1 | awk '{print $5}' | sed 's/%//')"
+      register: resource_check
+      changed_when: false
+      tags: [recovery, resources]
+
+    - name: Free up memory if needed
+      ansible.builtin.shell: |
+        echo 3 > /proc/sys/vm/drop_caches
+        swapoff -a && swapon -a
+      when: resource_check.stdout_lines[1] | float > 90
+      tags: [recovery, resources]
+
+    - name: Clean up Docker resources
+      ansible.builtin.shell: |
+        docker system prune -f
+        docker volume prune -f
+      when: "'docker' in service_type | default('systemd')"
+      tags: [recovery, resources]
+
+  when: service_name is defined
+  tags: [recovery, resources]
+
+- name: Verify recovery success
+  block:
+    - name: Check service status after recovery
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: started
+      register: recovery_status
+      tags: [recovery, verify]
+
+    - name: Test service health after recovery
+      ansible.builtin.uri:
+        url: "{{ service_health_url | default('http://localhost:8080/health') }}"
+        method: GET
+        status_code: [200, 201, 202]
+        timeout: 30
+        validate_certs: false
+      register: recovery_health
+      when: service_health_url is defined
+      tags: [recovery, verify]
+
+    - name: Log recovery result
+      ansible.builtin.lineinfile:
+        path: "{{ logs_dir }}/service_recovery.log"
+        line: "{{ ansible_date_time.iso8601 }} - Recovery {{ 'SUCCESS' if recovery_status is success else 'FAILED' }} for {{ service_name }}"
+        create: yes
+      tags: [recovery, logging]
+
+  when: service_name is defined
+  tags: [recovery, verify]
+
+- name: Handle recovery failure
+  block:
+    - name: Log recovery failure
+      ansible.builtin.lineinfile:
+        path: "{{ logs_dir }}/recovery_failures.log"
+        line: "{{ ansible_date_time.iso8601 }} - {{ service_name }} - Recovery failed after all attempts"
+        create: yes
+      tags: [recovery, failure]
+
+    - name: Send recovery failure notification
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "status": "critical",
+            "service": "{{ service_name }}",
+            "message": "Service recovery failed",
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "action": "Manual intervention required"
+          }
+      when: notification_webhook_url is defined
+      tags: [recovery, failure]
+
+    - name: Create incident ticket
+      ansible.builtin.uri:
+        url: "{{ incident_management_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "title": "Service Recovery Failed - {{ service_name }}",
+            "description": "Automated recovery attempts failed for {{ service_name }}. Manual intervention required.",
+            "priority": "high",
+            "service": "{{ service_name }}",
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+      when: incident_management_url is defined
+      tags: [recovery, failure]
+
+  when: 
+    - service_name is defined
+    - recovery_status is failed or (service_health_url is defined and recovery_health is failed)
+  tags: [recovery, failure]
+
+- name: Recovery summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      SERVICE RECOVERY SUMMARY
+      ========================================
+      
+      Service: {{ service_name }}
+      Recovery Status: {{ 'SUCCESS' if recovery_status is success else 'FAILED' }}
+      Health Check: {{ 'PASSED' if recovery_health is success else 'FAILED' }}
+      
+      Recovery Actions Taken:
+      - Service restart: {{ 'YES' if restart_attempted | default(false) else 'NO' }}
+      - Configuration check: {{ 'YES' if config_checked | default(false) else 'NO' }}
+      - Dependency verification: {{ 'YES' if deps_checked | default(false) else 'NO' }}
+      - Resource cleanup: {{ 'YES' if resources_cleaned | default(false) else 'NO' }}
+      
+      Next Steps:
+      {% if recovery_status is success %}
+      - Monitor service health
+      - Review logs for root cause
+      - Update monitoring thresholds if needed
+      {% else %}
+      - Manual intervention required
+      - Check system resources
+      - Review service configuration
+      - Contact system administrator
+      {% endif %}
+      
+      ========================================
+  when: service_name is defined
+  tags: [recovery, summary] 

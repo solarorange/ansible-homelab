@@ -1,52 +1,251 @@
 ---
-# Service deployment validation tasks
-- name: Check service status
-  ansible.builtin.systemd:
-    name: "{{ service_name }}"
-    state: started
-    enabled: yes
-  register: service_status
-  ignore_errors: yes
-
-- name: Verify service health
-  ansible.builtin.uri:
-    url: "{{ service_health_url | default('http://localhost:8080/health') }}"
-    method: GET
-    status_code: [200, 201, 202]
-    timeout: 30
-  register: health_check
-  when: service_health_url is defined
-  retries: 3
-  delay: 10
-  until: health_check is success
-
-- name: Check service logs
-  ansible.builtin.shell: "journalctl -u {{ service_name }} --no-pager -n 50"
-  register: service_logs
-  changed_when: false
-  when: service_status is success
+# Enhanced Service Validation Tasks
+# Comprehensive validation with error handling and health checks
 
 - name: Validate service configuration
-  ansible.builtin.include_tasks: "validate/{{ service_name }}.yml"
-  when: service_name in enabled_services
-  ignore_errors: yes
+  block:
+    - name: Check if service is enabled
+      ansible.builtin.assert:
+        that:
+          - service_name in enabled_services
+        fail_msg: "Service {{ service_name }} is not enabled in configuration"
+      tags: [validation, config]
 
-- name: Report service status
-  ansible.builtin.debug:
-    msg: |
-      Service: {{ service_name }}
-      Status: {{ 'Running' if service_status is success else 'Failed' }}
-      Health Check: {{ 'Passed' if health_check is success else 'Failed' }}
-      Last Logs: {{ service_logs.stdout_lines[-5:] | default([]) | join('\n') }}
-  when: service_status is defined
+    - name: Validate service dependencies
+      ansible.builtin.include_tasks: validate_dependencies.yml
+      when: service_dependencies is defined
+      tags: [validation, dependencies]
 
-- name: Fail if service validation unsuccessful
-  ansible.builtin.fail:
-    msg: "Service {{ service_name }} validation failed. Check logs for details."
+  when: service_name is defined
+  tags: [validation, config]
+
+- name: Validate service deployment
+  block:
+    - name: Check service status
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: started
+        enabled: yes
+      register: service_status
+      ignore_errors: yes
+      tags: [validation, status]
+
+    - name: Check Docker container status
+      community.docker.docker_container_info:
+        name: "{{ service_name }}"
+      register: container_status
+      when: "'docker' in service_type | default('systemd')"
+      ignore_errors: yes
+      tags: [validation, docker]
+
+    - name: Verify service health endpoint
+      ansible.builtin.uri:
+        url: "{{ service_health_url | default('http://localhost:8080/health') }}"
+        method: GET
+        status_code: [200, 201, 202]
+        timeout: 30
+        validate_certs: false
+      register: health_check
+      when: service_health_url is defined
+      retries: 3
+      delay: 10
+      until: health_check is success
+      tags: [validation, health]
+
+    - name: Check service logs for errors
+      ansible.builtin.shell: "journalctl -u {{ service_name }} --no-pager -n 50 | grep -i error"
+      register: service_errors
+      changed_when: false
+      when: service_status is success
+      tags: [validation, logs]
+
+    - name: Check service resource usage
+      ansible.builtin.shell: |
+        if systemctl is-active --quiet {{ service_name }}; then
+          echo "CPU: $(systemctl show {{ service_name }} -p CPUUsageNS | cut -d= -f2)"
+          echo "Memory: $(systemctl show {{ service_name }} -p MemoryCurrent | cut -d= -f2)"
+        fi
+      register: resource_usage
+      changed_when: false
+      when: service_status is success
+      tags: [validation, resources]
+
+  when: service_name is defined
+  tags: [validation, deployment]
+
+- name: Validate service security
+  block:
+    - name: Check service file permissions
+      ansible.builtin.stat:
+        path: "{{ service_config_path | default('/etc/systemd/system/' + service_name + '.service') }}"
+      register: config_file
+      tags: [validation, security]
+
+    - name: Validate file permissions
+      ansible.builtin.assert:
+        that:
+          - config_file.stat.mode | regex_search('^[0-7]64$')
+        fail_msg: "Service configuration file has insecure permissions: {{ config_file.stat.mode }}"
+      when: config_file.stat.exists
+      tags: [validation, security]
+
+    - name: Check for privileged containers
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "Up.*privileged" | grep {{ service_name }} | wc -l
+      register: privileged_check
+      changed_when: false
+      when: "'docker' in service_type | default('systemd')"
+      tags: [validation, security]
+
+    - name: Fail if privileged container detected
+      ansible.builtin.fail:
+        msg: "Security violation: Service {{ service_name }} is running as privileged container"
+      when: 
+        - "'docker' in service_type | default('systemd')"
+        - privileged_check.stdout | int > 0
+      tags: [validation, security]
+
+  when: service_name is defined
+  tags: [validation, security]
+
+- name: Validate service connectivity
+  block:
+    - name: Check service port accessibility
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ service_port | default(8080) }}"
+        timeout: 30
+        delay: 5
+      register: port_check
+      when: service_port is defined
+      tags: [validation, connectivity]
+
+    - name: Test service API endpoints
+      ansible.builtin.uri:
+        url: "{{ item }}"
+        method: GET
+        status_code: [200, 201, 202, 401, 403]
+        timeout: 10
+        validate_certs: false
+      loop: "{{ service_api_endpoints | default([]) }}"
+      register: api_checks
+      when: service_api_endpoints is defined
+      tags: [validation, connectivity]
+
+  when: service_name is defined
+  tags: [validation, connectivity]
+
+- name: Validate service configuration files
+  block:
+    - name: Include service-specific validation
+      ansible.builtin.include_tasks: "validate/{{ service_name }}.yml"
+      when: service_name in enabled_services
+      ignore_errors: yes
+      tags: [validation, config]
+
+  when: service_name is defined
+  tags: [validation, config]
+
+- name: Generate validation report
+  block:
+    - name: Create validation summary
+      ansible.builtin.set_fact:
+        validation_summary:
+          service: "{{ service_name }}"
+          status: "{{ 'RUNNING' if service_status is success else 'FAILED' }}"
+          health: "{{ 'HEALTHY' if health_check is success else 'UNHEALTHY' }}"
+          docker: "{{ 'RUNNING' if container_status.container.State.Running | default(false) else 'STOPPED' }}"
+          errors: "{{ service_errors.stdout_lines | length }}"
+          resources: "{{ resource_usage.stdout_lines | default([]) }}"
+          security: "{{ 'SECURE' if privileged_check.stdout | int == 0 else 'INSECURE' }}"
+          connectivity: "{{ 'OK' if port_check is success else 'FAILED' }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          SERVICE VALIDATION RESULTS
+          ========================================
+          
+          Service: {{ validation_summary.service }}
+          Status: {{ validation_summary.status }}
+          Health: {{ validation_summary.health }}
+          Docker: {{ validation_summary.docker }}
+          Errors: {{ validation_summary.errors }}
+          Security: {{ validation_summary.security }}
+          Connectivity: {{ validation_summary.connectivity }}
+          
+          {% if validation_summary.resources %}
+          Resource Usage:
+          {% for line in validation_summary.resources %}
+          {{ line }}
+          {% endfor %}
+          {% endif %}
+          
+          {% if service_errors.stdout_lines %}
+          Recent Errors:
+          {% for error in service_errors.stdout_lines[-5:] %}
+          {{ error }}
+          {% endfor %}
+          {% endif %}
+          
+          ========================================
+      tags: [validation, report]
+
+  when: service_name is defined
+  tags: [validation, report]
+
+- name: Handle validation failures
+  block:
+    - name: Log validation failure
+      ansible.builtin.lineinfile:
+        path: "{{ logs_dir }}/validation_failures.log"
+        line: "{{ ansible_date_time.iso8601 }} - {{ service_name }} - {{ validation_failure_reason | default('Unknown failure') }}"
+        create: yes
+      when: validation_failure_reason is defined
+      tags: [validation, failure]
+
+    - name: Send failure notification
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "status": "error",
+            "service": "{{ service_name }}",
+            "message": "Service validation failed",
+            "reason": "{{ validation_failure_reason | default('Unknown') }}",
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+      when: 
+        - notification_webhook_url is defined
+        - validation_failure_reason is defined
+      tags: [validation, failure]
+
+    - name: Attempt service recovery
+      ansible.builtin.include_tasks: service_recovery.yml
+      when: auto_recovery_enabled | default(false)
+      tags: [validation, recovery]
+
   when: 
     - service_status is failed or 
-    - (service_health_url is defined and health_check is failed)
+    - (service_health_url is defined and health_check is failed) or
+    - (service_port is defined and port_check is failed)
+  tags: [validation, failure]
 
-- name: Validate Watchtower security configuration
-  ansible.builtin.include_tasks: tasks/validate/watchtower.yml
-  tags: [validation, security] 
+- name: Fail if critical validation unsuccessful
+  ansible.builtin.fail:
+    msg: |
+      Service {{ service_name }} validation failed:
+      - Status: {{ 'FAILED' if service_status is failed else 'OK' }}
+      - Health: {{ 'FAILED' if service_health_url is defined and health_check is failed else 'OK' }}
+      - Connectivity: {{ 'FAILED' if service_port is defined and port_check is failed else 'OK' }}
+      
+      Check logs for details: {{ logs_dir }}/validation_failures.log
+  when: 
+    - service_status is failed or 
+    - (service_health_url is defined and health_check is failed) or
+    - (service_port is defined and port_check is failed)
+  tags: [validation, critical] 

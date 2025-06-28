@@ -1,0 +1,200 @@
+---
+# Comprehensive Error Handling
+# Provides error handling and recovery mechanisms for all services
+
+- name: Create error handling directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/error_handling"
+    state: directory
+    mode: '0755'
+  tags: [error_handling, setup]
+
+- name: Create service recovery script
+  ansible.builtin.template:
+    src: templates/service_recovery.sh.j2
+    dest: "{{ docker_dir }}/error_handling/service_recovery.sh"
+    mode: '0755'
+  tags: [error_handling, scripts]
+
+- name: Create error notification script
+  ansible.builtin.template:
+    src: templates/error_notification.sh.j2
+    dest: "{{ docker_dir }}/error_handling/error_notification.sh"
+    mode: '0755'
+  tags: [error_handling, scripts]
+
+- name: Create service health monitoring script
+  ansible.builtin.template:
+    src: templates/service_health_check.sh.j2
+    dest: "{{ docker_dir }}/error_handling/service_health_check.sh"
+    mode: '0755'
+  tags: [error_handling, scripts]
+
+- name: Setup error handling for services
+  block:
+    - name: Check service status
+      ansible.builtin.shell: "docker ps -f name={{ item }} --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+      register: service_status
+      loop: "{{ enabled_services }}"
+      changed_when: false
+      tags: [error_handling, status]
+
+    - name: Identify failed services
+      ansible.builtin.set_fact:
+        failed_services: "{{ service_status.results | selectattr('stdout', 'regex', 'Exited|Error|Restarting') | map(attribute='item') | list }}"
+      tags: [error_handling, analysis]
+
+    - name: Attempt service recovery
+      block:
+        - name: Stop failed service
+          ansible.builtin.shell: "docker stop {{ item }}"
+          loop: "{{ failed_services }}"
+          when: failed_services | length > 0
+          tags: [error_handling, recovery]
+
+        - name: Remove failed service
+          ansible.builtin.shell: "docker rm {{ item }}"
+          loop: "{{ failed_services }}"
+          when: failed_services | length > 0
+          tags: [error_handling, recovery]
+
+        - name: Restart failed service
+          ansible.builtin.shell: "docker-compose -f {{ docker_dir }}/{{ item }}/docker-compose.yml up -d"
+          loop: "{{ failed_services }}"
+          when: failed_services | length > 0
+          tags: [error_handling, recovery]
+
+        - name: Wait for service to be healthy
+          ansible.builtin.wait_for:
+            host: "{{ ansible_default_ipv4.address }}"
+            port: "{{ item.port }}"
+            timeout: 60
+            delay: 10
+          loop: "{{ failed_services | map('extract', service_ports) | list }}"
+          when: failed_services | length > 0
+          tags: [error_handling, recovery]
+
+      when: failed_services | length > 0
+      tags: [error_handling, recovery]
+
+    - name: Send error notifications
+      ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh '{{ failed_services | join(', ') }}'"
+      when: 
+        - failed_services | length > 0
+        - notifications.enabled | default(false)
+      tags: [error_handling, notifications]
+
+  when: enabled_services is defined
+  tags: [error_handling, services]
+
+- name: Setup system error handling
+  block:
+    - name: Check system resources
+      ansible.builtin.shell: |
+        echo "CPU Usage: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | sed 's/%//')"
+        echo "Memory Usage: $(free -m | awk 'NR==2{printf "%.2f", $3*100/$2 }')"
+        echo "Disk Usage: $(df -h / | awk 'NR==2{print $5}' | sed 's/%//')"
+      register: system_resources
+      changed_when: false
+      tags: [error_handling, system]
+
+    - name: Check for resource issues
+      ansible.builtin.set_fact:
+        resource_issues: []
+      tags: [error_handling, analysis]
+
+    - name: Detect high CPU usage
+      ansible.builtin.set_fact:
+        resource_issues: "{{ resource_issues + ['High CPU usage detected'] }}"
+      when: 
+        - system_resources.stdout_lines[0] | regex_search('CPU Usage: ([0-9]+)') | int > 90
+      tags: [error_handling, analysis]
+
+    - name: Detect high memory usage
+      ansible.builtin.set_fact:
+        resource_issues: "{{ resource_issues + ['High memory usage detected'] }}"
+      when: 
+        - system_resources.stdout_lines[1] | regex_search('Memory Usage: ([0-9.]+)') | float > 90
+      tags: [error_handling, analysis]
+
+    - name: Detect high disk usage
+      ansible.builtin.set_fact:
+        resource_issues: "{{ resource_issues + ['High disk usage detected'] }}"
+      when: 
+        - system_resources.stdout_lines[2] | regex_search('Disk Usage: ([0-9]+)') | int > 90
+      tags: [error_handling, analysis]
+
+    - name: Send resource warning notifications
+      ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh '{{ resource_issues | join(', ') }}'"
+      when: 
+        - resource_issues | length > 0
+        - notifications.enabled | default(false)
+      tags: [error_handling, notifications]
+
+  tags: [error_handling, system]
+
+- name: Setup Docker error handling
+  block:
+    - name: Check Docker daemon status
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      tags: [error_handling, docker]
+
+    - name: Check Docker disk space
+      ansible.builtin.shell: "docker system df | grep 'Total Space' | awk '{print $3}' | sed 's/GB//'"
+      register: docker_space
+      changed_when: false
+      tags: [error_handling, docker]
+
+    - name: Cleanup Docker if space is low
+      ansible.builtin.shell: |
+        docker system prune -f
+        docker image prune -f
+        docker volume prune -f
+      when: docker_space.stdout | float < 10
+      tags: [error_handling, docker]
+
+    - name: Check for Docker errors
+      ansible.builtin.shell: "docker events --since 1h --filter 'type=container' --filter 'event=die' --format '{{.Actor.Attributes.name}}'"
+      register: docker_errors
+      changed_when: false
+      tags: [error_handling, docker]
+
+    - name: Send Docker error notifications
+      ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh 'Docker errors: {{ docker_errors.stdout_lines | join(', ') }}'"
+      when: 
+        - docker_errors.stdout_lines | length > 0
+        - notifications.enabled | default(false)
+      tags: [error_handling, notifications]
+
+  tags: [error_handling, docker]
+
+- name: Create error handling cron job
+  ansible.builtin.cron:
+    name: "Service Error Handling"
+    minute: "*/5"
+    job: "{{ docker_dir }}/error_handling/service_health_check.sh"
+    user: root
+  tags: [error_handling, cron]
+
+- name: Display error handling status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ERROR HANDLING CONFIGURED
+      ========================================
+      
+      Error Handling Directory: {{ docker_dir }}/error_handling/
+      Service Recovery Script: {{ docker_dir }}/error_handling/service_recovery.sh
+      Error Notification Script: {{ docker_dir }}/error_handling/error_notification.sh
+      Health Check Script: {{ docker_dir }}/error_handling/service_health_check.sh
+      
+      Failed Services: {{ failed_services | default([]) | join(', ') if failed_services | default([]) | length > 0 else 'None' }}
+      Resource Issues: {{ resource_issues | default([]) | join(', ') if resource_issues | default([]) | length > 0 else 'None' }}
+      
+      Monitoring Schedule: Every 5 minutes
+      Notifications: {{ 'ENABLED' if notifications.enabled | default(false) else 'DISABLED' }}
+      
+      ========================================
+  tags: [error_handling, summary] 

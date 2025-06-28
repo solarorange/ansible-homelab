@@ -10,6 +10,45 @@ MAX_LOG_SIZE="{{ media_health_check_max_log_size | default('10M') }}"
 RETENTION_DAYS="{{ media_health_check_retention_days | default(7) }}"
 TIMEOUT="{{ media_health_check_timeout | default(30) }}"
 
+# Service ports
+SABNZBD_PORT="{{ media_sabnzbd_port }}"
+QBITTORRENT_PORT="{{ media_qbittorrent_port }}"
+SONARR_PORT="{{ media_sonarr_port }}"
+RADARR_PORT="{{ media_radarr_port }}"
+LIDARR_PORT="{{ media_lidarr_port }}"
+READARR_PORT="{{ media_readarr_port }}"
+PROWLARR_PORT="{{ media_prowlarr_port }}"
+BAZARR_PORT="{{ media_bazarr_port }}"
+PULSARR_PORT="{{ media_pulsarr_port }}"
+OVERSEERR_PORT="{{ media_overseerr_port }}"
+PLEX_PORT="{{ media_plex_port }}"
+JELLYFIN_PORT="{{ media_jellyfin_port }}"
+IMMICH_PORT="{{ media_immich_port }}"
+
+# Service container names
+SABNZBD_CONTAINER="{{ media_sabnzbd_container_name }}"
+QBITTORRENT_CONTAINER="{{ media_qbittorrent_container_name }}"
+SONARR_CONTAINER="{{ media_sonarr_container_name }}"
+RADARR_CONTAINER="{{ media_radarr_container_name }}"
+LIDARR_CONTAINER="{{ media_lidarr_container_name }}"
+READARR_CONTAINER="{{ media_readarr_container_name }}"
+PROWLARR_CONTAINER="{{ media_prowlarr_container_name }}"
+BAZARR_CONTAINER="{{ media_bazarr_container_name }}"
+PULSARR_CONTAINER="{{ media_pulsarr_container_name }}"
+OVERSEERR_CONTAINER="{{ media_overseerr_container_name }}"
+PLEX_CONTAINER="{{ media_plex_container_name }}"
+JELLYFIN_CONTAINER="{{ media_jellyfin_container_name }}"
+IMMICH_CONTAINER="{{ media_immich_container_name }}"
+
+# Service API keys
+SABNZBD_API_KEY="{{ vault_sabnzbd_api_key | default('') }}"
+SONARR_API_KEY="{{ vault_sonarr_api_key | default('') }}"
+RADARR_API_KEY="{{ vault_radarr_api_key | default('') }}"
+LIDARR_API_KEY="{{ vault_lidarr_api_key | default('') }}"
+READARR_API_KEY="{{ vault_readarr_api_key | default('') }}"
+PROWLARR_API_KEY="{{ vault_prowlarr_api_key | default('') }}"
+BAZARR_API_KEY="{{ vault_bazarr_api_key | default('') }}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -83,23 +122,23 @@ main() {
     # Check downloaders
 {% if media_enable_sabnzbd %}
     ((total_checks++))
-    if check_service "SABnzbd" "http://localhost:{{ media_sabnzbd_port }}/api?mode=version&apikey={{ media_sabnzbd_api_key | default('') }}"; then
+    if check_service "SABnzbd" "http://localhost:$SABNZBD_PORT/api?mode=version&apikey=$SABNZBD_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_sabnzbd_container_name }}" "SABnzbd"; then
+    if ! check_container "$SABNZBD_CONTAINER" "SABnzbd"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_qbittorrent %}
     ((total_checks++))
-    if check_service "qBittorrent" "http://localhost:{{ media_qbittorrent_port }}"; then
+    if check_service "qBittorrent" "http://localhost:$QBITTORRENT_PORT"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_qbittorrent_container_name }}" "qBittorrent"; then
+    if ! check_container "$QBITTORRENT_CONTAINER" "qBittorrent"; then
         ((failed_checks++))
     fi
 {% endif %}
@@ -108,89 +147,89 @@ main() {
     # Check ARR services
 {% if media_enable_sonarr %}
     ((total_checks++))
-    if check_service "Sonarr" "http://localhost:{{ media_sonarr_port }}/api/v3/system/status?apikey={{ media_sonarr_api_key | default('') }}"; then
+    if check_service "Sonarr" "http://localhost:$SONARR_PORT/api/v3/system/status?apikey=$SONARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_sonarr_container_name }}" "Sonarr"; then
+    if ! check_container "$SONARR_CONTAINER" "Sonarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_radarr %}
     ((total_checks++))
-    if check_service "Radarr" "http://localhost:{{ media_radarr_port }}/api/v3/system/status?apikey={{ media_radarr_api_key | default('') }}"; then
+    if check_service "Radarr" "http://localhost:$RADARR_PORT/api/v3/system/status?apikey=$RADARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_radarr_container_name }}" "Radarr"; then
+    if ! check_container "$RADARR_CONTAINER" "Radarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_lidarr %}
     ((total_checks++))
-    if check_service "Lidarr" "http://localhost:{{ media_lidarr_port }}/api/v1/system/status?apikey={{ media_lidarr_api_key | default('') }}"; then
+    if check_service "Lidarr" "http://localhost:$LIDARR_PORT/api/v1/system/status?apikey=$LIDARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_lidarr_container_name }}" "Lidarr"; then
+    if ! check_container "$LIDARR_CONTAINER" "Lidarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_readarr %}
     ((total_checks++))
-    if check_service "Readarr" "http://localhost:{{ media_readarr_port }}/api/v1/system/status?apikey={{ media_readarr_api_key | default('') }}"; then
+    if check_service "Readarr" "http://localhost:$READARR_PORT/api/v1/system/status?apikey=$READARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_readarr_container_name }}" "Readarr"; then
+    if ! check_container "$READARR_CONTAINER" "Readarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_prowlarr %}
     ((total_checks++))
-    if check_service "Prowlarr" "http://localhost:{{ media_prowlarr_port }}/api/v1/system/status?apikey={{ media_prowlarr_api_key | default('') }}"; then
+    if check_service "Prowlarr" "http://localhost:$PROWLARR_PORT/api/v1/system/status?apikey=$PROWLARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_prowlarr_container_name }}" "Prowlarr"; then
+    if ! check_container "$PROWLARR_CONTAINER" "Prowlarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_bazarr %}
     ((total_checks++))
-    if check_service "Bazarr" "http://localhost:{{ media_bazarr_port }}/api/system/status?apikey={{ media_bazarr_api_key | default('') }}"; then
+    if check_service "Bazarr" "http://localhost:$BAZARR_PORT/api/system/status?apikey=$BAZARR_API_KEY"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_bazarr_container_name }}" "Bazarr"; then
+    if ! check_container "$BAZARR_CONTAINER" "Bazarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_pulsarr %}
     ((total_checks++))
-    if check_service "Pulsarr" "http://localhost:{{ media_pulsarr_port }}/health"; then
+    if check_service "Pulsarr" "http://localhost:$PULSARR_PORT/health"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_pulsarr_container_name }}" "Pulsarr"; then
+    if ! check_container "$PULSARR_CONTAINER" "Pulsarr"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_overseerr %}
     ((total_checks++))
-    if check_service "Overseerr" "http://localhost:{{ media_overseerr_port }}/api/v1/status"; then
+    if check_service "Overseerr" "http://localhost:$OVERSEERR_PORT/api/v1/status"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_overseerr_container_name }}" "Overseerr"; then
+    if ! check_container "$OVERSEERR_CONTAINER" "Overseerr"; then
         ((failed_checks++))
     fi
 {% endif %}
@@ -199,34 +238,34 @@ main() {
     # Check media players
 {% if media_enable_plex %}
     ((total_checks++))
-    if check_service "Plex" "http://localhost:{{ media_plex_port }}/web/index.html"; then
+    if check_service "Plex" "http://localhost:$PLEX_PORT/web/index.html"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_plex_container_name }}" "Plex"; then
+    if ! check_container "$PLEX_CONTAINER" "Plex"; then
         ((failed_checks++))
     fi
 {% endif %}
 {% if media_enable_jellyfin %}
     ((total_checks++))
-    if check_service "Jellyfin" "http://localhost:{{ media_jellyfin_port }}/health"; then
+    if check_service "Jellyfin" "http://localhost:$JELLYFIN_PORT/health"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_jellyfin_container_name }}" "Jellyfin"; then
+    if ! check_container "$JELLYFIN_CONTAINER" "Jellyfin"; then
         ((failed_checks++))
     fi
 {% endif %}
-{% if media_enable_emby %}
+{% if media_enable_immich %}
     ((total_checks++))
-    if check_service "Emby" "http://localhost:{{ media_emby_port }}/health"; then
+    if check_service "Immich" "http://localhost:$IMMICH_PORT/api/server-info/version"; then
         ((failed_checks++))
     fi
     
     ((total_checks++))
-    if ! check_container "{{ media_emby_container_name }}" "Emby"; then
+    if ! check_container "$IMMICH_CONTAINER" "Immich"; then
         ((failed_checks++))
     fi
 {% endif %}

@@ -17,6 +17,7 @@
     - "{{ logs_dir }}/system"
     - "{{ logs_dir }}/containers"
     - "{{ logs_dir }}/security"
+  when: logging_enabled | default(true)
 
 - name: Create Promtail configuration for all services
   ansible.builtin.template:
@@ -26,6 +27,7 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   notify: restart promtail
+  when: promtail_enabled | default(true)
 
 - name: Create log rotation configuration
   ansible.builtin.template:
@@ -33,6 +35,7 @@
     dest: /etc/logrotate.d/watchtower-logs
     mode: "0644"
   notify: restart logrotate
+  when: logrotate_enabled | default(true)
 
 - name: Configure Docker logging driver
   ansible.builtin.template:
@@ -40,24 +43,7 @@
     dest: /etc/docker/daemon.json
     mode: "0644"
   notify: restart docker
-
-- name: Create service-specific logging configurations
-  ansible.builtin.template:
-    src: "{{ item }}.yml.j2"
-    dest: "{{ docker_dir }}/monitoring/logging/config/{{ item }}.yml"
-    mode: "0640"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  loop:
-    - web_services
-    - databases
-    - monitoring
-    - containers
-    - system
-    - applications
-    - network
-    - storage
-  notify: restart promtail
+  when: docker_enabled | default(true)
 
 - name: Create logging health check script
   ansible.builtin.template:
@@ -66,6 +52,7 @@
     mode: "0755"
     owner: "{{ username }}"
     group: "{{ username }}"
+  when: logging_enabled | default(true)
 
 - name: Create logging management script
   ansible.builtin.template:
@@ -74,6 +61,7 @@
     mode: "0755"
     owner: "{{ username }}"
     group: "{{ username }}"
+  when: logging_enabled | default(true)
 
 - name: Setup logging monitoring
   ansible.builtin.template:
@@ -83,6 +71,7 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   notify: restart prometheus
+  when: logging_prometheus_enabled | default(true)
 
 - name: Create logging dashboard
   ansible.builtin.template:
@@ -91,4 +80,5 @@
     mode: "0640"
     owner: "{{ username }}"
     group: "{{ username }}"
-  notify: restart grafana 
+  notify: restart grafana
+  when: logging_grafana_enabled | default(true) 

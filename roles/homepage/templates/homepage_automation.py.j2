@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""
+Homepage Configuration Automation Script
+Handles dynamic configuration generation and integration setup
+"""
+
+import os
+import sys
+import json
+import yaml
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('{{ homepage_logs_dir }}/homepage_automation.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class HomepageConfig:
+    """Homepage configuration structure"""
+    theme: str
+    language: str
+    timezone: str
+    title: str
+    description: str
+    widgets: List[str]
+    service_groups: List[Dict[str, Any]]
+    weather_enabled: bool
+    weather_config: Dict[str, Any]
+
+class HomepageAutomation:
+    """Homepage configuration automation"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.homepage_url = "http://localhost:{{ homepage_port }}"
+        self.config_dir = "{{ homepage_config_dir }}"
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def test_homepage_connection(self) -> bool:
+        """Test connection to Homepage API"""
+        try:
+            response = requests.get(f"{self.homepage_url}/api/health", timeout=10)
+            if response.status_code in [200, 302, 401]:
+                logger.info("Homepage API connection successful")
+                return True
+            else:
+                logger.error(f"Homepage API connection failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error connecting to Homepage API: {e}")
+            return False
+    
+    def generate_main_config(self) -> Dict[str, Any]:
+        """Generate main Homepage configuration"""
+        config = {
+            'title': '{{ homepage_title }}',
+            'description': '{{ homepage_description }}',
+            'theme': '{{ homepage_theme }}',
+            'language': '{{ homepage_language }}',
+            'timezone': '{{ homepage_timezone }}',
+            'units': '{{ homepage_units }}',
+            'background': '{{ homepage_background }}',
+            'favicon': '{{ homepage_favicon }}',
+            'icons': '{{ homepage_icons }}'
+        }
+        
+        # Add weather configuration if enabled
+        if {{ homepage_weather_enabled | bool }}:
+            config['weather'] = {
+                'enabled': True,
+                'lat': '{{ homepage_weather_lat }}',
+                'lon': '{{ homepage_weather_lon }}',
+                'api_key': '{{ homepage_weather_api_key | default("") }}'
+            }
+        
+        # Add widgets configuration
+        config['widgets'] = {{ homepage_widgets | to_json }}
+        
+        return config
+    
+    def generate_service_groups(self) -> List[Dict[str, Any]]:
+        """Generate service groups configuration"""
+        return {{ homepage_service_groups | to_json }}
+    
+    def save_configuration(self, config: Dict[str, Any], filename: str):
+        """Save configuration to file"""
+        try:
+            config_path = os.path.join(self.config_dir, filename)
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            logger.info(f"Saved configuration to {config_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving configuration to {filename}: {e}")
+            return False
+    
+    def configure_monitoring_integration(self) -> bool:
+        """Configure monitoring integration"""
+        try:
+            monitoring_config = {
+                'prometheus': {
+                    'enabled': True,
+                    'url': 'http://prometheus:9090'
+                },
+                'grafana': {
+                    'enabled': True,
+                    'url': 'http://grafana:3000'
+                },
+                'loki': {
+                    'enabled': True,
+                    'url': 'http://loki:3100'
+                },
+                'alertmanager': {
+                    'enabled': True,
+                    'url': 'http://alertmanager:9093'
+                }
+            }
+            
+            return self.save_configuration(monitoring_config, 'monitoring.yml')
+            
+        except Exception as e:
+            logger.error(f"Error configuring monitoring integration: {e}")
+            return False
+    
+    def configure_authentication_integration(self) -> bool:
+        """Configure authentication integration"""
+        try:
+            auth_config = {
+                'authentik': {
+                    'enabled': True,
+                    'url': 'https://{{ authentik_subdomain }}.{{ domain }}',
+                    'client_id': '{{ authentik_client_id | default("homepage") }}',
+                    'redirect_uri': 'https://{{ homepage_subdomain }}.{{ domain }}/oauth/callback'
+                }
+            }
+            
+            return self.save_configuration(auth_config, 'auth.yml')
+            
+        except Exception as e:
+            logger.error(f"Error configuring authentication integration: {e}")
+            return False
+    
+    def configure_traefik_integration(self) -> bool:
+        """Configure Traefik integration"""
+        try:
+            traefik_config = {
+                'reverse_proxy': {
+                    'enabled': True,
+                    'domain': '{{ homepage_subdomain }}.{{ domain }}',
+                    'port': '{{ homepage_port }}',
+                    'ssl_enabled': True
+                },
+                'middleware': {
+                    'auth_forward': {
+                        'enabled': True,
+                        'address': 'https://{{ authentik_subdomain }}.{{ domain }}'
+                    }
+                }
+            }
+            
+            return self.save_configuration(traefik_config, 'traefik.yml')
+            
+        except Exception as e:
+            logger.error(f"Error configuring Traefik integration: {e}")
+            return False
+    
+    def validate_configuration(self) -> bool:
+        """Validate generated configuration"""
+        try:
+            # Test main configuration
+            main_config = self.generate_main_config()
+            if not main_config:
+                logger.error("Failed to generate main configuration")
+                return False
+            
+            # Test service groups
+            service_groups = self.generate_service_groups()
+            if not service_groups:
+                logger.error("Failed to generate service groups")
+                return False
+            
+            # Test API connectivity
+            if not self.test_homepage_connection():
+                logger.error("Failed to connect to Homepage API")
+                return False
+            
+            logger.info("Configuration validation successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Configuration validation failed: {e}")
+            return False
+    
+    def run_automation(self) -> bool:
+        """Run the complete automation process"""
+        logger.info("Starting Homepage configuration automation")
+        
+        try:
+            # Test connection
+            if not self.test_homepage_connection():
+                logger.error("Cannot connect to Homepage API")
+                return False
+            
+            # Generate and save main configuration
+            main_config = self.generate_main_config()
+            if not self.save_configuration(main_config, 'config.yml'):
+                return False
+            
+            # Generate and save service groups
+            service_groups = self.generate_service_groups()
+            if not self.save_configuration({'groups': service_groups}, 'groups.yml'):
+                return False
+            
+            # Configure integrations
+            if not self.configure_monitoring_integration():
+                logger.warning("Monitoring integration configuration failed")
+            
+            if not self.configure_authentication_integration():
+                logger.warning("Authentication integration configuration failed")
+            
+            if not self.configure_traefik_integration():
+                logger.warning("Traefik integration configuration failed")
+            
+            # Validate configuration
+            if not self.validate_configuration():
+                logger.warning("Configuration validation failed")
+            
+            logger.info("Homepage configuration automation completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Homepage configuration automation failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Homepage Configuration Automation')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing configuration')
+    
+    args = parser.parse_args()
+    
+    # Initialize automation
+    automation = HomepageAutomation(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        if automation.test_homepage_connection():
+            print("Homepage API connection successful")
+            return 0
+        else:
+            print("Homepage API connection failed")
+            return 1
+    
+    elif args.validate:
+        logger.info("Validating existing configuration")
+        success = automation.validate_configuration()
+        return 0 if success else 1
+    
+    else:
+        # Run full automation
+        success = automation.run_automation()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

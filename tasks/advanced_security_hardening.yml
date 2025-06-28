@@ -478,4 +478,86 @@
       tags: [security, maintenance]
 
   when: security_hardening.enabled | default(true)
-  tags: [security, maintenance] 
+  tags: [security, maintenance]
+
+#==============================================================================
+# ADVANCED SECURITY HARDENING FOR PRODUCTION ENVIRONMENTS
+#==============================================================================
+
+- name: Create security hardening directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/security/hardening"
+    state: directory
+    mode: '0755'
+  tags: [security, hardening, setup]
+
+- name: Configure system security policies
+  ansible.builtin.template:
+    src: templates/security/system-policies.yml.j2
+    dest: "{{ docker_dir }}/security/hardening/system-policies.yml"
+    mode: '0644'
+  tags: [security, hardening, policies]
+
+- name: Setup Docker security hardening
+  ansible.builtin.template:
+    src: templates/security/docker-hardening.yml.j2
+    dest: "{{ docker_dir }}/security/hardening/docker-security.yml"
+    mode: '0644'
+  tags: [security, hardening, docker]
+
+- name: Configure network security
+  ansible.builtin.template:
+    src: templates/security/network-security.yml.j2
+    dest: "{{ docker_dir }}/security/hardening/network-security.yml"
+    mode: '0644'
+  tags: [security, hardening, network]
+
+- name: Setup access controls
+  ansible.builtin.template:
+    src: templates/security/access-controls.yml.j2
+    dest: "{{ docker_dir }}/security/hardening/access-controls.yml"
+    mode: '0644'
+  tags: [security, hardening, access]
+
+- name: Configure audit logging
+  ansible.builtin.template:
+    src: templates/security/audit-config.yml.j2
+    dest: "{{ docker_dir }}/security/hardening/audit-config.yml"
+    mode: '0644'
+  tags: [security, hardening, audit]
+
+- name: Create security monitoring script
+  ansible.builtin.template:
+    src: templates/security/security-monitor.sh.j2
+    dest: "{{ docker_dir }}/security/hardening/security-monitor.sh"
+    mode: '0755'
+  tags: [security, hardening, monitoring]
+
+- name: Setup security monitoring cron job
+  ansible.builtin.cron:
+    name: "Security Monitoring"
+    minute: "*/15"
+    job: "{{ docker_dir }}/security/hardening/security-monitor.sh"
+    user: root
+  tags: [security, hardening, cron]
+
+- name: Display security hardening status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ADVANCED SECURITY HARDENING CONFIGURED
+      ========================================
+      
+      Security Directory: {{ docker_dir }}/security/hardening
+      System Policies: {{ docker_dir }}/security/hardening/system-policies.yml
+      Docker Security: {{ docker_dir }}/security/hardening/docker-security.yml
+      Network Security: {{ docker_dir }}/security/hardening/network-security.yml
+      Access Controls: {{ docker_dir }}/security/hardening/access-controls.yml
+      Audit Configuration: {{ docker_dir }}/security/hardening/audit-config.yml
+      Security Monitor: {{ docker_dir }}/security/hardening/security-monitor.sh
+      
+      Monitoring Schedule: Every 15 minutes
+      Security Level: Production
+      
+      ========================================
+  tags: [security, hardening, summary] 

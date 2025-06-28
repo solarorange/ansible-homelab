@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: {{ grafana_image }}
+    container_name: {{ grafana_container_name }}
+    restart: {{ grafana_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in grafana_environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+      {% if grafana_plugins_enabled | default(true) %}
+      - GF_INSTALL_PLUGINS={{ grafana_plugins | join(',') }}
+      {% endif %}
+    
+    # Volumes
+    volumes:
+      - {{ grafana_data_volume }}:/var/lib/grafana
+      - {{ docker_dir }}/monitoring/grafana/config:/etc/grafana
+      - {{ docker_dir }}/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - {{ docker_dir }}/monitoring/grafana/plugins:/var/lib/grafana/plugins
+      - {{ logs_dir }}/monitoring/grafana:/var/log/grafana
+    
+    # Ports
+    ports:
+      - "{{ grafana_external_port }}:{{ grafana_internal_port }}"
+    
+    # Networks
+    networks:
+      {% for network in grafana_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if grafana_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.grafana.rule=Host(`{{ grafana_domain }}`)"
+      - "traefik.http.routers.grafana.entrypoints=https"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=cloudflare"
+      - "traefik.http.services.grafana.loadbalancer.server.port={{ grafana_internal_port }}"
+      {% if grafana_traefik_middleware is defined %}
+      - "traefik.http.routers.grafana.middlewares={{ grafana_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if grafana_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ grafana_internal_port }}/api/health || exit 1"]
+      interval: {{ grafana_healthcheck_interval }}
+      timeout: {{ grafana_healthcheck_timeout }}
+      retries: {{ grafana_healthcheck_retries }}
+      start_period: {{ grafana_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem
+    read_only: false
+    tmpfs:
+      - /tmp
+    
+    # User
+    user: "472:472"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: {{ grafana_memory_limit }}
+          cpus: '{{ grafana_cpu_limit }}'
+        reservations:
+          memory: {{ grafana_memory_reservation }}
+          cpus: '{{ grafana_cpu_reservation }}'
+    
+    # Dependencies
+    depends_on:
+      {% if grafana_database_type == 'postgres' %}
+      postgresql:
+        condition: service_healthy
+      {% endif %}
+      {% if grafana_database_type == 'mysql' %}
+      mysql:
+        condition: service_healthy
+      {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Volumes
+volumes:
+  {{ grafana_data_volume }}:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ docker_dir }}/monitoring/grafana/data
+
+# Networks
+networks:
+  {% for network in grafana_networks %}
+  {{ network }}:
+    external: true
+  {% endfor %} 

@@ -62,4 +62,170 @@ notifications:
     smtp_username: "{{ smtp_username }}"
     smtp_password: "{{ smtp_password }}"
     from_address: "{{ monitoring_email }}"
-    to_address: "{{ admin_email }}" 
+    to_address: "{{ admin_email }}"
+
+# Health Check Configuration Template
+# This template provides standardized health check configurations for all services
+
+# Standard HTTP health check
+http_health_check:
+  test: ["CMD", "curl", "-f", "http://localhost:{{ service_port }}/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# API health check
+api_health_check:
+  test: ["CMD", "curl", "-f", "http://localhost:{{ service_port }}/api/v3/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# Database health check
+database_health_check:
+  test: ["CMD-SHELL", "pg_isready -U {{ vault_postgresql_user | default('homelab') }} -d {{ database_name | default('homelab') }}"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# Redis health check
+redis_health_check:
+  test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+
+# Prometheus metrics health check
+prometheus_health_check:
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:{{ service_port }}/metrics"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+
+# Docker container health check
+docker_health_check:
+  test: ["CMD", "docker", "ps", "-f", "name={{ container_name }}", "-f", "status=running"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+
+# Service-specific health checks
+service_health_checks:
+  traefik:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+  
+  authentik:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/if/user/"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  grafana:
+    test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+  
+  prometheus:
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+  
+  sonarr:
+    test: ["CMD", "curl", "-f", "http://localhost:8989/api/v3/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  radarr:
+    test: ["CMD", "curl", "-f", "http://localhost:7878/api/v3/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  prowlarr:
+    test: ["CMD", "curl", "-f", "http://localhost:9696/api/v1/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  bazarr:
+    test: ["CMD", "curl", "-f", "http://localhost:6767/api/v1/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  jellyfin:
+    test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  nextcloud:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/status.php"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  
+  portainer:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/api/status"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+
+# Health check script template
+health_check_script: |
+  #!/bin/bash
+  
+  # Service Health Check Script
+  # Usage: ./health_check.sh <service_name> <port> <endpoint>
+  
+  SERVICE_NAME="$1"
+  PORT="$2"
+  ENDPOINT="$3"
+  
+  if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ]; then
+    echo "Usage: $0 <service_name> <port> [endpoint]"
+    exit 1
+  fi
+  
+  # Default endpoint if not provided
+  if [ -z "$ENDPOINT" ]; then
+    ENDPOINT="/health"
+  fi
+  
+  # Check if service is running
+  if ! docker ps -f name="$SERVICE_NAME" -f status=running | grep -q "$SERVICE_NAME"; then
+    echo "Service $SERVICE_NAME is not running"
+    exit 1
+  fi
+  
+  # Check if service is responding
+  if ! curl -f -s "http://localhost:$PORT$ENDPOINT" > /dev/null; then
+    echo "Service $SERVICE_NAME is not responding on port $PORT"
+    exit 1
+  fi
+  
+  echo "Service $SERVICE_NAME is healthy"
+  exit 0 

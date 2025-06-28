@@ -1,223 +1,395 @@
-# Homelab Deployment Guide
+# Deployment Guide
 
 ## Overview
-This guide provides detailed instructions for deploying and managing the homelab infrastructure using Ansible.
+This guide provides step-by-step instructions for deploying the Ansible homelab automation project using the staged deployment approach. The deployment is designed to be turnkey and production-ready.
 
-## Prerequisites
+## Staged Deployment Architecture
 
-### System Requirements
-- Proxmox VE 7.0 or later
-- Minimum 16GB RAM
-- 4+ CPU cores
-- 100GB+ storage
-- Network connectivity
+### Stage 1: Infrastructure
+**Purpose**: Establish the foundational infrastructure and security framework
+**Roles**: Security
+**Dependencies**: None
+**Duration**: ~10-15 minutes
 
-### Required Software
-- Ansible 2.9+
-- Python 3.8+
-- Git
-- SSH client
+**What happens**:
+- System hardening and security configuration
+- Docker installation and configuration
+- Traefik reverse proxy setup
+- SSL/TLS certificate management
+- Firewall and access control configuration
 
-### Network Requirements
-- Static IP assignment
-- DNS resolution
-- Port forwarding (if needed)
-- VLAN support (optional)
+### Stage 2: Core Services
+**Purpose**: Deploy essential services that other applications depend on
+**Roles**: Databases, Storage, Logging, Certificate Management
+**Dependencies**: Stage 1 (Infrastructure)
+**Duration**: ~20-30 minutes
 
-## Installation
+**What happens**:
+- PostgreSQL and Redis database deployment
+- Storage services (Samba, NFS) configuration
+- Logging infrastructure (Loki, Promtail)
+- Certificate monitoring and automation
+- Monitoring stack (Prometheus, Grafana, AlertManager)
 
-### 1. Clone Repository
+### Stage 3: Applications
+**Purpose**: Deploy user-facing applications and services
+**Roles**: Media, Paperless-ngx, Fing, Utilities, Automation
+**Dependencies**: Stage 2 (Core Services)
+**Duration**: ~30-45 minutes
+
+**What happens**:
+- Media stack deployment (Sonarr, Radarr, Jellyfin, etc.)
+- Document management (Paperless-ngx)
+- Network monitoring (Fing)
+- Utility services (Portainer, Tautulli, etc.)
+- Automation and scheduling services
+
+### Stage 4: Validation
+**Purpose**: Verify deployment success and optimize performance
+**Tasks**: Health checks, monitoring, backup orchestration, security hardening
+**Dependencies**: All previous stages
+**Duration**: ~10-15 minutes
+
+**What happens**:
+- Service health validation
+- Performance monitoring setup
+- Backup orchestration configuration
+- Security hardening application
+- Documentation generation
+
+## Pre-Deployment Checklist
+
+Before starting deployment, ensure you have completed the [Pre-Deployment Checklist](PREREQUISITES.md).
+
+## Deployment Commands
+
+### Full Deployment
 ```bash
-git clone https://github.com/solarorange/ansible-homelab.git
-cd ansible-homelab
+# Deploy everything in one command
+ansible-playbook -i inventory.yml site.yml --ask-vault-pass
 ```
 
-### 2. Install Dependencies
+### Staged Deployment
 ```bash
-ansible-galaxy install -r requirements.yml
+# Stage 1: Infrastructure
+ansible-playbook -i inventory.yml site.yml --tags "stage1" --ask-vault-pass
+
+# Stage 2: Core Services
+ansible-playbook -i inventory.yml site.yml --tags "stage2" --ask-vault-pass
+
+# Stage 3: Applications
+ansible-playbook -i inventory.yml site.yml --tags "stage3" --ask-vault-pass
+
+# Stage 4: Validation
+ansible-playbook -i inventory.yml site.yml --tags "stage4" --ask-vault-pass
 ```
 
-### 3. Configure Environment
-1. Copy example inventory:
+### Individual Role Deployment
 ```bash
-cp inventory.example.yml inventory.yml
+# Deploy specific roles
+ansible-playbook -i inventory.yml site.yml --tags "security" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "databases" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "media" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "paperless" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "fing" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "utilities" --ask-vault-pass
 ```
 
-2. Edit inventory.yml with your settings:
-```yaml
-[homelab_core]
-homelab-core ansible_host=192.168.1.100 ansible_user=homelab
-```
-
-3. Configure variables in group_vars/all/vars.yml:
-```yaml
-domain: zorg.media
-username: your_username
-```
-
-## Deployment
-
-### 1. Initial Setup
+### Validation and Testing
 ```bash
-ansible-playbook main.yml --tags setup
+# Validate configuration
+ansible-playbook -i inventory.yml site.yml --tags "validation" --ask-vault-pass
+
+# Test connectivity
+ansible all -m ping -i inventory.yml
+
+# Check syntax
+ansible-playbook --syntax-check site.yml
 ```
 
-### 2. Core Services
+## Deployment Process
+
+### Step 1: Environment Preparation
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd ansible_homelab
+   ```
+
+2. **Configure inventory**:
+   Edit `inventory.yml` with your server details
+
+3. **Set up vault**:
+   ```bash
+   ansible-vault create group_vars/all/vault.yml
+   # Add all required vault variables
+   ```
+
+4. **Configure environment variables**:
+   Edit `group_vars/all/common.yml` with your domain and network settings
+
+### Step 2: Infrastructure Deployment
 ```bash
-ansible-playbook main.yml --tags foundation
+ansible-playbook -i inventory.yml site.yml --tags "stage1" --ask-vault-pass
 ```
 
-### 3. Service Deployment
-```bash
-# Deploy all services
-ansible-playbook main.yml
+**Expected output**:
+- Security hardening completed
+- Docker installed and configured
+- Traefik reverse proxy running
+- SSL certificates obtained
 
-# Deploy specific service groups
-ansible-playbook main.yml --tags monitoring
-ansible-playbook main.yml --tags media
-ansible-playbook main.yml --tags security
+**Verification**:
+- Check Traefik dashboard: `https://traefik.yourdomain.com`
+- Verify Docker is running: `docker ps`
+- Check SSL certificates are valid
+
+### Step 3: Core Services Deployment
+```bash
+ansible-playbook -i inventory.yml site.yml --tags "stage2" --ask-vault-pass
 ```
 
-## Service Management
+**Expected output**:
+- PostgreSQL and Redis databases running
+- Storage services configured
+- Logging infrastructure operational
+- Monitoring stack deployed
 
-### Starting Services
+**Verification**:
+- Check Grafana dashboard: `https://grafana.yourdomain.com`
+- Verify databases are accessible
+- Check logs are being collected
+
+### Step 4: Applications Deployment
 ```bash
-ansible-playbook main.yml --tags start
+ansible-playbook -i inventory.yml site.yml --tags "stage3" --ask-vault-pass
 ```
 
-### Stopping Services
+**Expected output**:
+- Media stack services running
+- Document management operational
+- Network monitoring active
+- Utility services deployed
+
+**Verification**:
+- Check media services: `https://sonarr.yourdomain.com`
+- Verify document management: `https://docs.yourdomain.com`
+- Test network monitoring: `https://fing.yourdomain.com`
+
+### Step 5: Validation and Optimization
 ```bash
-ansible-playbook main.yml --tags stop
+ansible-playbook -i inventory.yml site.yml --tags "stage4" --ask-vault-pass
 ```
 
-### Updating Services
+**Expected output**:
+- All services validated
+- Monitoring configured
+- Backups scheduled
+- Security hardened
+- Documentation generated
+
+**Verification**:
+- Check health dashboard
+- Verify backup procedures
+- Review security configurations
+- Test monitoring alerts
+
+## Post-Deployment Verification
+
+### Service Health Checks
 ```bash
-ansible-playbook main.yml --tags update
+# Check all containers
+docker ps
+
+# Check service logs
+docker logs <container_name>
+
+# Verify network connectivity
+curl -I https://traefik.yourdomain.com
 ```
 
-## Monitoring
+### Monitoring Verification
+1. **Grafana Dashboard**: `https://grafana.yourdomain.com`
+   - Default credentials: admin/admin
+   - Check for monitoring data
+   - Verify dashboards are populated
 
-### Accessing Dashboards
-- Grafana: https://grafana.zorg.media
-- Prometheus: https://prometheus.zorg.media
-- Alertmanager: https://alertmanager.zorg.media
+2. **Prometheus**: `https://prometheus.yourdomain.com`
+   - Check targets are up
+   - Verify metrics are being collected
 
-### Setting Up Alerts
-1. Configure notification channels in Alertmanager
-2. Define alert rules in Prometheus
-3. Set up Grafana dashboards
+3. **AlertManager**: `https://alertmanager.yourdomain.com`
+   - Check alert rules
+   - Verify notification channels
 
-## Backup and Recovery
-
-### Automated Backups
-- Daily incremental backups
-- Weekly full backups
-- Monthly archives
-
-### Manual Backup
+### Security Verification
 ```bash
-ansible-playbook main.yml --tags backup
+# Check Fail2ban status
+sudo fail2ban-client status
+
+# Check CrowdSec status
+sudo crowdsec status
+
+# Verify SSL certificates
+openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 ```
 
-### Restore from Backup
+### Backup Verification
 ```bash
-ansible-playbook main.yml --tags restore --extra-vars "backup_date=YYYY-MM-DD"
-```
+# Check backup scripts
+ls -la /home/username/backups/
 
-## Security
+# Test backup procedures
+sudo /home/username/config/backup-test.sh
 
-### Access Control
-- SSH key authentication
-- VPN access
-- Service authentication
-
-### Security Updates
-```bash
-ansible-playbook main.yml --tags security-update
-```
-
-### Security Scanning
-```bash
-ansible-playbook main.yml --tags security-scan
+# Verify backup retention
+find /home/username/backups/ -name "*.tar.gz" -mtime +7
 ```
 
 ## Troubleshooting
 
 ### Common Issues
-1. Service startup failures
-2. Network connectivity
-3. Resource constraints
-4. Configuration errors
 
-### Debugging
+#### Vault Password Issues
 ```bash
-# Enable verbose output
-ansible-playbook main.yml -vvv
+# Reset vault password
+ansible-vault rekey group_vars/all/vault.yml
 
-# Check service logs
-ansible-playbook main.yml --tags logs
-
-# Validate configuration
-ansible-playbook main.yml --tags validate
+# Test vault access
+ansible-vault view group_vars/all/vault.yml
 ```
 
+#### Network Connectivity Issues
+```bash
+# Check DNS resolution
+nslookup yourdomain.com
+
+# Check port forwarding
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+
+# Test SSL certificates
+openssl s_client -connect yourdomain.com:443
+```
+
+#### Docker Issues
+```bash
+# Check Docker status
+sudo systemctl status docker
+
+# Check Docker logs
+sudo journalctl -u docker
+
+# Restart Docker
+sudo systemctl restart docker
+```
+
+#### Service Dependencies
+```bash
+# Check service dependencies
+docker-compose ps
+
+# Restart specific services
+docker-compose restart <service_name>
+
+# Check service logs
+docker-compose logs <service_name>
+```
+
+### Log Locations
+- **Ansible logs**: `~/.ansible.log`
+- **Service logs**: `/home/username/logs/`
+- **Docker logs**: `docker logs <container_name>`
+- **System logs**: `/var/log/`
+- **Application logs**: `/home/username/docker/*/logs/`
+
 ### Recovery Procedures
-1. Service rollback
-2. Configuration restore
-3. Data recovery
+
+#### Rollback to Previous Stage
+```bash
+# Rollback to specific stage
+ansible-playbook -i inventory.yml rollback.yml --tags "stage2" --ask-vault-pass
+```
+
+#### Service Recovery
+```bash
+# Restart all services
+docker-compose -f /home/username/docker/docker-compose.yml restart
+
+# Restore from backup
+sudo /home/username/config/restore.sh
+```
+
+## Performance Optimization
+
+### Resource Monitoring
+```bash
+# Check system resources
+htop
+df -h
+free -h
+
+# Monitor Docker resources
+docker stats
+```
+
+### Scaling Considerations
+- **CPU**: Monitor usage and scale containers as needed
+- **Memory**: Adjust memory limits for high-usage services
+- **Storage**: Monitor disk usage and implement cleanup procedures
+- **Network**: Optimize bandwidth usage for media services
 
 ## Maintenance
 
-### Regular Tasks
-- Weekly security updates
-- Monthly backup verification
-- Quarterly performance review
-- Annual capacity planning
+### Regular Maintenance Tasks
+```bash
+# Update containers
+docker-compose pull
+docker-compose up -d
 
-### Update Procedures
-1. Backup current state
-2. Update Ansible playbooks
-3. Run deployment
-4. Verify services
+# Clean up old images
+docker image prune -f
 
-## Performance Tuning
+# Rotate logs
+sudo logrotate -f /etc/logrotate.d/homelab
 
-### Resource Allocation
-- CPU limits
-- Memory constraints
-- Storage quotas
-- Network bandwidth
+# Check backups
+sudo /home/username/config/backup-verify.sh
+```
 
-### Optimization
-- Service configuration
-- Cache settings
-- Database tuning
-- Network optimization
+### Security Updates
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade
 
-## Documentation
+# Update Docker
+sudo apt update && sudo apt install docker-ce docker-ce-cli containerd.io
 
-### Additional Resources
-- [Service Documentation](docs/SERVICES.md)
-- [Security Guide](docs/SECURITY.md)
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
-- [API Documentation](docs/API.md)
-
-### Contributing
-1. Fork repository
-2. Create feature branch
-3. Submit pull request
-4. Update documentation
+# Update Ansible
+pip install --upgrade ansible
+```
 
 ## Support
 
-### Getting Help
-- GitHub Issues
-- Documentation
-- Community Forums
-- Email Support
+### Documentation
+- [Pre-Deployment Checklist](PREREQUISITES.md)
+- [Troubleshooting Guide](TROUBLESHOOTING.md)
+- [Role Documentation](roles/)
+- [Advanced Best Practices](docs/ADVANCED_BEST_PRACTICES.md)
 
-### Reporting Issues
-1. Check existing issues
-2. Provide detailed information
-3. Include logs and configuration
-4. Describe expected behavior 
+### Getting Help
+1. Check the troubleshooting guide
+2. Review service logs
+3. Verify configuration files
+4. Test individual components
+5. Check system resources
+
+### Emergency Procedures
+1. **Service Down**: Restart using `docker-compose restart`
+2. **Data Loss**: Restore from backup using restore script
+3. **Security Breach**: Review logs and update security configurations
+4. **Performance Issues**: Scale resources or optimize configurations
+
+---
+
+**Note**: This deployment guide assumes you have completed the pre-deployment checklist. Always test in a staging environment before deploying to production. 

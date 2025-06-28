@@ -1,0 +1,40 @@
+# Security Monitoring Configuration
+# Comprehensive security monitoring and alerting
+
+security_monitoring:
+  intrusion_detection:
+    enabled: true
+    tools:
+      - "fail2ban"
+      - "crowdsec"
+      - "auditd"
+    
+    alerting:
+      email_notifications: {{ security_email_alerts | default(false) }}
+      slack_notifications: {{ security_slack_alerts | default(false) }}
+      telegram_notifications: {{ security_telegram_alerts | default(false) }}
+  
+  log_monitoring:
+    enabled: true
+    log_sources:
+      - "/var/log/auth.log"
+      - "/var/log/syslog"
+      - "/var/log/docker/*.log"
+      - "{{ logs_dir }}/*.log"
+    
+    patterns:
+      failed_login: "Failed password"
+      successful_login: "Accepted password"
+      sudo_usage: "sudo:"
+      docker_events: "docker"
+      security_events: "security"
+  
+  threat_intelligence:
+    enabled: true
+    sources:
+      - "abuseipdb"
+      - "virustotal"
+      - "alienvault"
+    
+    automatic_blocking: true
+    block_duration_hours: 24 

@@ -7,11 +7,14 @@ set -e
 # Configuration
 SERVICE_NAME="paperless-ngx"
 CONTAINER_NAME="{{ paperless_ngx_container_name }}"
-BACKUP_DIR="{{ backup_dir }}/paperless-ngx"
+BACKUP_DIR="{{ paperless_ngx_backup_dir }}"
 DATA_DIR="{{ data_dir }}/paperless-ngx"
 DOCKER_DIR="{{ docker_dir }}/paperless-ngx"
 CONFIG_DIR="{{ config_dir }}/paperless-ngx"
 LOGS_DIR="{{ logs_dir }}/paperless-ngx"
+LOG_FILE="{{ paperless_ngx_backup_log_file }}"
+MAX_LOG_SIZE="{{ paperless_ngx_backup_max_log_size | default('10M') }}"
+NOTIFICATION_ENABLED="{{ paperless_ngx_backup_notifications_enabled | default(true) | lower }}"
 
 # Database configuration
 DB_TYPE="{{ paperless_ngx_database_type }}"
@@ -19,13 +22,13 @@ DB_HOST="{{ paperless_ngx_database_host }}"
 DB_PORT="{{ paperless_ngx_database_port }}"
 DB_NAME="{{ paperless_ngx_database_name }}"
 DB_USER="{{ paperless_ngx_database_user }}"
-DB_PASS="{{ paperless_ngx_database_password }}"
+DB_PASS="{{ vault_paperless_database_password | default('') }}"
 
 # Backup settings
-BACKUP_RETENTION="{{ paperless_ngx_backup_retention }}"
-BACKUP_COMPRESSION="{{ paperless_ngup_compression | default(true) }}"
-BACKUP_INCLUDE_MEDIA="{{ paperless_ngx_backup_include_media | default(true) }}"
-BACKUP_INCLUDE_DATABASE="{{ paperless_ngx_backup_include_database | default(true) }}"
+BACKUP_RETENTION="{{ paperless_ngx_backup_retention_days | default(7) }}"
+BACKUP_COMPRESSION="{{ paperless_ngx_backup_compression | default(true) | lower }}"
+BACKUP_INCLUDE_MEDIA="{{ paperless_ngx_backup_include_media | default(true) | lower }}"
+BACKUP_INCLUDE_DATABASE="{{ paperless_ngx_backup_include_database | default(true) | lower }}"
 
 # Colors for output
 RED='\033[0;31m'

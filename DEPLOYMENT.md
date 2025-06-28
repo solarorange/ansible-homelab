@@ -1,436 +1,374 @@
-# Watchtower Deployment Guide
+# Deployment Summary
 
-This guide provides detailed steps for deploying and validating the Watchtower environment.
+## Overview
+This document provides a comprehensive overview of the staged deployment process for the Ansible homelab automation project. The deployment is designed to be **turnkey** and **production-ready** with proper validation and error handling.
 
-## Pre-deployment Checklist
+## Quick Start
 
-### System Verification
-1. Verify system requirements:
-   ```bash
-   # Check CPU cores and frequency
-   nproc
-   lscpu | grep "CPU MHz"
-   
-   # Check available memory
-   free -h
-   
-   # Check disk space and type
-   df -h
-   lsblk -d -o name,rota
-   
-   # Check network speed and configuration
-   speedtest-cli
-   ip a
-   ```
+### 1. Pre-Deployment Checklist
+**Complete the [Pre-Deployment Checklist](PREREQUISITES.md) before proceeding.**
 
-2. Verify software prerequisites:
-   ```bash
-   # Check Ansible version and configuration
-   ansible --version
-   ansible-config dump | grep -v "^#"
-   
-   # Check Python version and packages
-   python3 --version
-   pip list
-   
-   # Check Docker installation and configuration
-   docker --version
-   docker-compose --version
-   docker info
-   ```
-
-3. Verify network connectivity:
-   ```bash
-   # Test SSH connection to all hosts
-   ansible all -m ping
-   
-   # Verify DNS resolution
-   dig +short your-domain.com
-   
-   # Check port availability
-   nc -zv your-domain.com 80
-   nc -zv your-domain.com 443
-   ```
-
-### Configuration Verification
-1. Verify inventory configuration:
-   ```bash
-   # Validate inventory syntax
-   ansible-inventory --list
-   
-   # Check host connectivity
-   ansible all -m ping
-   ```
-
-2. Verify variable files:
-   ```bash
-   # Check variable syntax
-   ansible-playbook main.yml --syntax-check
-   
-   # Validate vault files
-   ansible-vault view group_vars/all/proxmox_vault.yml
-   ```
-
-## Deployment Steps
-
-### 1. Initial Setup
-
-1. Clone and run setup script:
-   ```bash
-   git clone https://github.com/yourusername/ansible_watchtower.git
-   cd ansible_watchtower
-   ./scripts/setup.sh
-   ```
-
-2. Review generated configuration:
-   - `inventory/hosts.yml`: Verify host information
-   - `group_vars/all/proxmox_vault.yml`: Check Proxmox settings
-   - `group_vars/all/vars.yml`: Review service configuration
-   - `group_vars/all/network.yml`: Verify network settings
-   - `group_vars/all/security.yml`: Review security settings
-
-3. Validate configuration:
-   ```bash
-   # Run syntax check
-   ansible-playbook main.yml --syntax-check
-   
-   # Run in check mode
-   ansible-playbook main.yml --check
-   ```
-
-### 2. Proxmox VM Deployment
-
-1. Verify Proxmox access:
-   ```bash
-   # Test Proxmox connection
-   ansible-playbook main.yml --tags setup --check
-   
-   # Verify API token
-   curl -k -s https://proxmox:8006/api2/json/cluster/status \
-     -H "Authorization: PVEAPIToken=root@pam!tokenid=tokensecret"
-   ```
-
-2. Deploy VM:
-   ```bash
-   # Deploy VM with default settings
-   ansible-playbook main.yml --tags proxmox
-   
-   # Or deploy with custom settings
-   ansible-playbook main.yml --tags proxmox \
-     -e "vm_memory=4096 vm_cores=4 vm_disk=50"
-   ```
-
-3. Verify VM deployment:
-   ```bash
-   # Check VM status
-   ansible-playbook main.yml --tags proxmox -e "vm_state=info"
-   
-   # Check resource usage
-   ansible-playbook main.yml --tags proxmox -e "vm_state=resources"
-   
-   # Verify network connectivity
-   ansible-playbook main.yml --tags proxmox -e "vm_state=network"
-   ```
-
-### 3. Foundation Deployment
-
-1. Deploy system essentials:
-   ```bash
-   ansible-playbook main.yml --tags foundation
-   ```
-
-2. Validate foundation deployment:
-   ```bash
-   # Check system updates
-   ansible all -m shell -a "apt list --upgradable"
-   
-   # Check Docker installation
-   ansible all -m shell -a "docker info"
-   
-   # Check network configuration
-   ansible all -m shell -a "ip a"
-   
-   # Verify system time
-   ansible all -m shell -a "timedatectl status"
-   ```
-
-### 4. Core Services Deployment
-
-1. Deploy core services:
-   ```bash
-   ansible-playbook main.yml --tags infrastructure
-   ```
-
-2. Validate core services:
-   ```bash
-   # Check Traefik
-   curl -I https://traefik.your-domain.com
-   curl -k https://traefik.your-domain.com/api/rawdata
-   
-   # Check Authentik
-   curl -I https://auth.your-domain.com
-   curl -k https://auth.your-domain.com/api/v3/core/applications/
-   
-   # Check monitoring infrastructure
-   curl -I https://grafana.your-domain.com
-   curl -k https://prometheus.your-domain.com/api/v1/status/config
-   ```
-
-### 5. Monitoring Stack Deployment
-
-1. Deploy monitoring services:
-   ```bash
-   ansible-playbook main.yml --tags monitoring
-   ```
-
-2. Validate monitoring stack:
-   ```bash
-   # Check InfluxDB
-   curl -I https://influxdb.your-domain.com
-   curl -k https://influxdb.your-domain.com/health
-   
-   # Check Prometheus
-   curl -I https://prometheus.your-domain.com
-   curl -k https://prometheus.your-domain.com/api/v1/query?query=up
-   
-   # Check Grafana
-   curl -I https://grafana.your-domain.com
-   curl -k https://grafana.your-domain.com/api/health
-   
-   # Verify metrics collection
-   curl -k https://prometheus.your-domain.com/api/v1/query?query=up
-   curl -k https://prometheus.your-domain.com/api/v1/query?query=node_memory_MemTotal_bytes
-   ```
-
-### 6. Security Services Deployment
-
-1. Deploy security services:
-   ```bash
-   ansible-playbook main.yml --tags security
-   ```
-
-2. Validate security services:
-   ```bash
-   # Check CrowdSec
-   curl -I https://crowdsec.your-domain.com
-   curl -k https://crowdsec.your-domain.com/v1/decisions
-   
-   # Check Vault
-   curl -I https://vault.your-domain.com
-   curl -k https://vault.your-domain.com/v1/sys/health
-   
-   # Verify WireGuard
-   wg show
-   wg show all
-   
-   # Check fail2ban
-   fail2ban-client status
-   fail2ban-client status sshd
-   ```
-
-### 7. Media Stack Deployment
-
-1. Deploy media services:
-   ```bash
-   ansible-playbook main.yml --tags media
-   ```
-
-2. Validate media services:
-   ```bash
-   # Check Jellyfin
-   curl -I https://jellyfin.your-domain.com
-   curl -k https://jellyfin.your-domain.com/System/Info
-   
-   # Check Sonarr
-   curl -I https://sonarr.your-domain.com
-   curl -k https://sonarr.your-domain.com/api/v3/system/status
-   
-   # Check Radarr
-   curl -I https://radarr.your-domain.com
-   curl -k https://radarr.your-domain.com/api/v3/system/status
-   ```
-
-### 8. File Services Deployment
-
-1. Deploy file services:
-   ```bash
-   ansible-playbook main.yml --tags storage
-   ```
-
-2. Validate file services:
-   ```bash
-   # Check Nextcloud
-   curl -I https://nextcloud.your-domain.com
-   curl -k https://nextcloud.your-domain.com/status.php
-   
-   # Check Samba
-   smbclient -L //your-server-ip
-   smbclient -L //your-server-ip -U your-username
-   
-   # Check Syncthing
-   curl -I https://syncthing.your-domain.com
-   curl -k https://syncthing.your-domain.com/rest/system/status
-   ```
-
-### 9. Automation Services Deployment
-
-1. Deploy automation services:
-   ```bash
-   ansible-playbook main.yml --tags automation
-   ```
-
-2. Validate automation services:
-   ```bash
-   # Check Home Assistant
-   curl -I https://homeassistant.your-domain.com
-   curl -k https://homeassistant.your-domain.com/api/
-   
-   # Check Node-RED
-   curl -I https://nodered.your-domain.com
-   curl -k https://nodered.your-domain.com/flows
-   
-   # Check MQTT broker
-   mosquitto_sub -h your-server-ip -t '#' -v
-   mosquitto_pub -h your-server-ip -t 'test' -m 'test'
-   ```
-
-### 10. Utility Services Deployment
-
-1. Deploy utility services:
-   ```bash
-   ansible-playbook main.yml --tags utilities
-   ```
-
-2. Validate utility services:
-   ```bash
-   # Check Portainer
-   curl -I https://portainer.your-domain.com
-   curl -k https://portainer.your-domain.com/api/status
-   
-   # Check Uptime Kuma
-   curl -I https://uptime.your-domain.com
-   curl -k https://uptime.your-domain.com/api/status-page
-   
-   # Check Guacamole
-   curl -I https://guacamole.your-domain.com
-   curl -k https://guacamole.your-domain.com/api/session/data/mysql/activeConnections
-   ```
-
-### 11. Certificate Management Deployment
-
-1. Deploy certificate management:
-   ```bash
-   ansible-playbook main.yml --tags certificate_management
-   ```
-
-2. Validate certificate management:
-   ```bash
-   # Check certificate status
-   ansible-playbook main.yml --tags certificate_management -e "check_status=true"
-   
-   # Verify certificate renewal
-   ansible-playbook main.yml --tags certificate_management -e "check_renewal=true"
-   
-   # Test certificate deployment
-   ansible-playbook main.yml --tags certificate_management -e "test_deployment=true"
-   ```
-
-### 12. Logging Stack Deployment
-
-1. Deploy logging services:
-   ```bash
-   ansible-playbook main.yml --tags logging
-   ```
-
-2. Validate logging services:
-   ```bash
-   # Check log aggregation
-   curl -k https://logging.your-domain.com/api/status
-   
-   # Verify log retention
-   curl -k https://logging.your-domain.com/api/retention
-   
-   # Test log shipping
-   ansible-playbook main.yml --tags logging -e "test_shipping=true"
-   ```
-
-## Post-deployment Validation
-
-### 1. Run Validation Script
+### 2. Automated Deployment (Recommended)
 ```bash
-./scripts/validate.sh
+# Clone repository
+git clone <repository-url>
+cd ansible_homelab
+
+# Create vault file
+cp group_vars/all/vault.yml.template group_vars/all/vault.yml
+ansible-vault edit group_vars/all/vault.yml
+
+# Configure environment
+nano inventory.yml
+nano group_vars/all/common.yml
+
+# Deploy
+./scripts/deploy.sh
 ```
 
-### 2. Check Service Health
+### 3. Manual Deployment
 ```bash
-# Check all services
-ansible-playbook main.yml --tags validate
+# Validate configuration
+ansible-playbook -i inventory.yml site.yml --tags "validation" --ask-vault-pass
 
-# Check specific service
-ansible-playbook main.yml --tags "{{ service_name }}" -e "check_status=true"
+# Staged deployment
+ansible-playbook -i inventory.yml site.yml --tags "stage1" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage2" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage3" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage4" --ask-vault-pass
 ```
 
-### 3. Verify Monitoring
+## Staged Deployment Architecture
+
+### Stage 1: Infrastructure (10-15 minutes)
+**Purpose**: Establish foundational infrastructure and security framework
+**Roles**: Security
+**Dependencies**: None
+
+**Services Deployed**:
+- System hardening and security configuration
+- Docker installation and configuration
+- Traefik reverse proxy setup
+- SSL/TLS certificate management
+- Firewall and access control configuration
+
+**Verification**:
+- Traefik dashboard accessible
+- Docker running
+- SSL certificates valid
+
+### Stage 2: Core Services (20-30 minutes)
+**Purpose**: Deploy essential services that other applications depend on
+**Roles**: Databases, Storage, Logging, Certificate Management
+**Dependencies**: Stage 1 (Infrastructure)
+
+**Services Deployed**:
+- PostgreSQL and Redis database deployment
+- Storage services (Samba, NFS) configuration
+- Logging infrastructure (Loki, Promtail)
+- Certificate monitoring and automation
+- Monitoring stack (Prometheus, Grafana, AlertManager)
+
+**Verification**:
+- Grafana dashboard accessible
+- Databases running
+- Logs being collected
+
+### Stage 3: Applications (30-45 minutes)
+**Purpose**: Deploy user-facing applications and services
+**Roles**: Media, Paperless-ngx, Fing, Utilities, Automation
+**Dependencies**: Stage 2 (Core Services)
+
+**Services Deployed**:
+- Media stack deployment (Sonarr, Radarr, Jellyfin, etc.)
+- Document management (Paperless-ngx)
+- Network monitoring (Fing)
+- Utility services (Portainer, Tautulli, etc.)
+- Automation and scheduling services
+
+**Verification**:
+- Media services accessible
+- Document management operational
+- Network monitoring active
+
+### Stage 4: Validation (10-15 minutes)
+**Purpose**: Verify deployment success and optimize performance
+**Tasks**: Health checks, monitoring, backup orchestration, security hardening
+**Dependencies**: All previous stages
+
+**Tasks Completed**:
+- Service health validation
+- Performance monitoring setup
+- Backup orchestration configuration
+- Security hardening application
+- Documentation generation
+
+**Verification**:
+- All services healthy
+- Monitoring configured
+- Backups scheduled
+- Security hardened
+
+## Deployment Methods
+
+### 1. Automated Deployment Script
+The `scripts/deploy.sh` script provides a turnkey deployment experience:
+
 ```bash
-# Check Prometheus targets
-curl -k https://prometheus.your-domain.com/api/v1/targets
+# Full deployment
+./scripts/deploy.sh
 
-# Check Grafana dashboards
-curl -k https://grafana.your-domain.com/api/dashboards
+# Staged deployment
+./scripts/deploy.sh stage 1
+./scripts/deploy.sh stage 2
+./scripts/deploy.sh stage 3
+./scripts/deploy.sh stage 4
 
-# Check alert rules
-curl -k https://prometheus.your-domain.com/api/v1/rules
+# Individual role deployment
+./scripts/deploy.sh role security
+./scripts/deploy.sh role media
+
+# Validation only
+./scripts/deploy.sh validate
 ```
 
-### 4. Verify Security
+**Script Features**:
+- Automatic prerequisite checking
+- Configuration validation
+- Connectivity testing
+- Staged deployment with validation
+- Comprehensive logging
+- Error handling and rollback support
+- Backup creation (optional)
+
+### 2. Manual Ansible Commands
+For advanced users who prefer manual control:
+
 ```bash
-# Check SSL certificates
-curl -vI https://your-domain.com
+# Full deployment
+ansible-playbook -i inventory.yml site.yml --ask-vault-pass
 
-# Check firewall rules
-iptables -L -n -v
+# Staged deployment
+ansible-playbook -i inventory.yml site.yml --tags "stage1" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage2" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage3" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "stage4" --ask-vault-pass
 
-# Check fail2ban status
-fail2ban-client status
+# Individual role deployment
+ansible-playbook -i inventory.yml site.yml --tags "security" --ask-vault-pass
+ansible-playbook -i inventory.yml site.yml --tags "media" --ask-vault-pass
 ```
 
-### 5. Verify Backups
-```bash
-# Check backup status
-ansible-playbook main.yml --tags backup -e "check_status=true"
+## Configuration Requirements
 
-# Verify backup integrity
-ansible-playbook main.yml --tags backup -e "verify=true"
+### Required Vault Variables
+All sensitive information is stored in `group_vars/all/vault.yml`:
+
+**Database Passwords**:
+- `vault_postgresql_password`
+- `vault_media_database_password`
+- `vault_paperless_database_password`
+- `vault_fing_database_password`
+- `vault_redis_password`
+
+**Service Authentication**:
+- `vault_paperless_admin_password`
+- `vault_paperless_secret_key`
+- `vault_fing_admin_password`
+- `vault_paperless_admin_token`
+- `vault_fing_api_key`
+
+**Media Service API Keys**:
+- `vault_sabnzbd_api_key`
+- `vault_sonarr_api_key`
+- `vault_radarr_api_key`
+- `vault_lidarr_api_key`
+- `vault_readarr_api_key`
+- `vault_prowlarr_api_key`
+- `vault_bazarr_api_key`
+
+**Email and Notifications**:
+- `vault_smtp_username`
+- `vault_smtp_password`
+- `vault_slack_webhook`
+- `vault_discord_webhook`
+
+**Container Updates**:
+- `vault_watchtower_token`
+
+### Environment Configuration
+Configure in `group_vars/all/common.yml`:
+
+**Domain and Network**:
+- `domain`: Your domain name
+- `admin_email`: Admin email address
+- `network_range`: Network range (e.g., 192.168.1.0/24)
+- `gateway_ip`: Gateway IP address
+- `dns_servers`: DNS server list
+
+**User Configuration**:
+- `username`: System username
+- `user_id`: User ID (default: 1000)
+- `group_id`: Group ID (default: 1000)
+
+**Service Configuration**:
+- `security_enabled`: Enable security services
+- `databases_enabled`: Enable database services
+- `storage_enabled`: Enable storage services
+- `logging_enabled`: Enable logging services
+- `media_enabled`: Enable media services
+- `paperless_ngx_enabled`: Enable document management
+- `fing_enabled`: Enable network monitoring
+- `utilities_enabled`: Enable utility services
+
+## Post-Deployment Verification
+
+### Service Health Checks
+```bash
+# Check all containers
+docker ps
+
+# Check service logs
+docker logs <container_name>
+
+# Verify network connectivity
+curl -I https://traefik.yourdomain.com
 ```
 
-### 6. Verify Certificate Management
+### Monitoring Verification
+1. **Grafana Dashboard**: `https://grafana.yourdomain.com`
+   - Default credentials: admin/admin
+   - Check for monitoring data
+   - Verify dashboards are populated
+
+2. **Prometheus**: `https://prometheus.yourdomain.com`
+   - Check targets are up
+   - Verify metrics are being collected
+
+3. **AlertManager**: `https://alertmanager.yourdomain.com`
+   - Check alert rules
+   - Verify notification channels
+
+### Security Verification
 ```bash
-# Check certificate status
-ansible-playbook main.yml --tags certificate_management -e "check_status=true"
+# Check Fail2ban status
+sudo fail2ban-client status
 
-# Verify certificate renewal
-ansible-playbook main.yml --tags certificate_management -e "check_renewal=true"
+# Check CrowdSec status
+sudo crowdsec status
 
-# Test certificate deployment
-ansible-playbook main.yml --tags certificate_management -e "test_deployment=true"
+# Verify SSL certificates
+openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 ```
 
-### 7. Verify Logging System
+### Backup Verification
 ```bash
-# Check log aggregation status
-curl -k https://logging.your-domain.com/api/status
+# Check backup scripts
+ls -la /home/username/backups/
 
-# Verify log retention policies
-curl -k https://logging.your-domain.com/api/retention
+# Test backup procedures
+sudo /home/username/config/backup-test.sh
 
-# Test log shipping
-ansible-playbook main.yml --tags logging -e "test_shipping=true"
+# Verify backup retention
+find /home/username/backups/ -name "*.tar.gz" -mtime +7
 ```
 
 ## Troubleshooting
 
-If you encounter any issues during deployment, please refer to [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common problems and solutions.
+### Common Issues
 
-## Rollback Procedures
+#### Vault Password Issues
+```bash
+# Reset vault password
+ansible-vault rekey group_vars/all/vault.yml
 
-If you need to rollback any changes, please refer to the [Rollback Procedures](#rollback-procedures) section in the README.md file. 
+# Test vault access
+ansible-vault view group_vars/all/vault.yml
+```
+
+#### Network Connectivity Issues
+```bash
+# Check DNS resolution
+nslookup yourdomain.com
+
+# Check port forwarding
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+
+# Test SSL certificates
+openssl s_client -connect yourdomain.com:443
+```
+
+#### Docker Issues
+```bash
+# Check Docker status
+sudo systemctl status docker
+
+# Check Docker logs
+sudo journalctl -u docker
+
+# Restart Docker
+sudo systemctl restart docker
+```
+
+### Log Locations
+- **Ansible logs**: `~/.ansible.log`
+- **Service logs**: `/home/username/logs/`
+- **Docker logs**: `docker logs <container_name>`
+- **System logs**: `/var/log/`
+- **Application logs**: `/home/username/docker/*/logs/`
+
+### Recovery Procedures
+
+#### Rollback to Previous Stage
+```bash
+# Rollback to specific stage
+ansible-playbook -i inventory.yml rollback.yml --tags "stage2" --ask-vault-pass
+```
+
+#### Service Recovery
+```bash
+# Restart all services
+docker-compose -f /home/username/docker/docker-compose.yml restart
+
+# Restore from backup
+sudo /home/username/config/restore.sh
+```
+
+## Documentation
+
+### Essential Documentation
+- **[Pre-Deployment Checklist](PREREQUISITES.md)**: Complete setup guide
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)**: Detailed deployment instructions
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)**: Common issues and solutions
+- **[Role Documentation](roles/)**: Individual role documentation
+
+### Advanced Documentation
+- **[Advanced Best Practices](docs/ADVANCED_BEST_PRACTICES.md)**: Advanced configuration
+- **[Security Guide](docs/SECURITY.md)**: Security hardening
+- **[Monitoring Guide](docs/MONITORING.md)**: Monitoring configuration
+- **[Backup Guide](docs/BACKUP_ORCHESTRATION.md)**: Backup procedures
+
+### Maintenance Documentation
+- **[Maintenance Guide](docs/MAINTENANCE.md)**: Regular maintenance tasks
+- **[Performance Tuning](docs/PERFORMANCE_TUNING.md)**: Performance optimization
+- **[Scaling Strategies](docs/SCALING_STRATEGIES.md)**: Scaling considerations
+
+## Support
+
+### Getting Help
+1. Check the troubleshooting guide
+2. Review service logs
+3. Verify configuration files
+4. Test individual components
+5. Check system resources
+
+### Emergency Procedures
+1. **Service Down**: Restart using `docker-compose restart`
+2. **Data Loss**: Restore from backup using restore script
+3. **Security Breach**: Review logs and update security configurations
+4. **Performance Issues**: Scale resources or optimize configurations
+
+---
+
+**Note**: This deployment is designed to be turnkey and production-ready. Always test in a staging environment before deploying to production. Follow the pre-deployment checklist to ensure successful deployment. 

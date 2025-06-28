@@ -1,0 +1,205 @@
+---
+# Logging Stack Configuration
+# Production-ready defaults for centralized logging infrastructure
+
+#==============================================================================
+# GENERAL LOGGING STACK CONFIGURATION
+#==============================================================================
+
+# Service Configuration
+logging_enabled: true
+logging_version: "latest"
+logging_network: "monitoring"
+
+# Container Configuration
+logging_container_restart_policy: "unless-stopped"
+logging_container_network_mode: "bridge"
+
+# Resource Limits
+logging_memory_limit: "2g"
+logging_cpu_limit: "1.0"
+logging_storage_limit: "50g"
+
+#==============================================================================
+# LOKI CONFIGURATION
+#==============================================================================
+
+# Loki Configuration
+loki_enabled: true
+loki_version: "2.9.0"
+loki_image: "grafana/loki:2.9.0"
+loki_container_name: "loki"
+loki_restart_policy: "unless-stopped"
+loki_network_mode: "bridge"
+loki_web_port: 3100
+loki_data_dir: "{{ docker_dir }}/monitoring/loki/data"
+loki_config_dir: "{{ docker_dir }}/monitoring/loki/config"
+loki_backup_dir: "{{ docker_dir }}/monitoring/loki/backup"
+loki_logs_dir: "{{ logs_dir }}/monitoring/loki"
+
+# Loki Performance Tuning
+loki_retention_period: "744h"  # 31 days
+loki_max_cache_fresh_period: "1m"
+loki_chunk_store_cache_lookups: 1000
+loki_table_manager_retention_deletes_enabled: true
+loki_table_manager_retention_period: "744h"
+
+# Loki Security
+loki_auth_enabled: false
+loki_auth_token: "{{ vault_loki_auth_token | default('') }}"
+
+#==============================================================================
+# PROMTAIL CONFIGURATION
+#==============================================================================
+
+# Promtail Configuration
+promtail_enabled: true
+promtail_version: "2.9.0"
+promtail_image: "grafana/promtail:2.9.0"
+promtail_container_name: "promtail"
+promtail_restart_policy: "unless-stopped"
+promtail_network_mode: "bridge"
+promtail_config_dir: "{{ docker_dir }}/monitoring/promtail/config"
+promtail_logs_dir: "{{ logs_dir }}/monitoring/promtail"
+
+# Promtail Scraping Configuration
+promtail_scrape_interval: "15s"
+promtail_batch_wait: "1s"
+promtail_batch_size: 1024
+promtail_max_retries: 5
+
+# Promtail Targets
+promtail_targets:
+  - name: "system_logs"
+    path: "/var/log/*.log"
+    labels:
+      job: "system"
+      __path__: "/var/log/*.log"
+  
+  - name: "docker_logs"
+    path: "/var/lib/docker/containers/*/*.log"
+    labels:
+      job: "docker"
+      __path__: "/var/lib/docker/containers/*/*.log"
+  
+  - name: "application_logs"
+    path: "{{ logs_dir }}/applications/*.log"
+    labels:
+      job: "applications"
+      __path__: "{{ logs_dir }}/applications/*.log"
+
+#==============================================================================
+# LOG ROTATION CONFIGURATION
+#==============================================================================
+
+# Log Rotation Settings
+logrotate_enabled: true
+logrotate_compress: true
+logrotate_delaycompress: true
+logrotate_missingok: true
+logrotate_notifempty: true
+logrotate_rotate: 7
+logrotate_size: "100M"
+logrotate_frequency: "daily"
+
+# Log Rotation Paths
+logrotate_paths:
+  - "{{ logs_dir }}/applications/*.log"
+  - "{{ logs_dir }}/system/*.log"
+  - "{{ logs_dir }}/containers/*.log"
+  - "{{ logs_dir }}/security/*.log"
+  - "{{ logs_dir }}/monitoring/*.log"
+
+#==============================================================================
+# DOCKER LOGGING CONFIGURATION
+#==============================================================================
+
+# Docker Logging Driver
+docker_logging_driver: "json-file"
+docker_logging_max_size: "10m"
+docker_logging_max_files: 3
+docker_logging_compress: true
+
+#==============================================================================
+# MONITORING CONFIGURATION
+#==============================================================================
+
+logging_monitoring_enabled: true
+logging_metrics_enabled: true
+logging_health_check_enabled: true
+logging_health_check_interval: 30
+
+# Prometheus Integration
+logging_prometheus_enabled: true
+logging_prometheus_metrics: true
+logging_prometheus_scrape_interval: 30
+
+# Grafana Integration
+logging_grafana_enabled: true
+logging_grafana_dashboard: true
+logging_grafana_datasource: "loki"
+
+# Alerting Configuration
+logging_alerting_enabled: true
+logging_alerting_rules:
+  - alert: "LoggingServiceDown"
+    expr: "up{job=\"loki\"} == 0"
+    for: "1m"
+    labels:
+      severity: "critical"
+    annotations:
+      summary: "Loki logging service is down"
+      description: "Loki has been down for more than 1 minute"
+
+  - alert: "HighLogVolume"
+    expr: "rate(loki_log_entries_total[5m]) > 1000"
+    for: "5m"
+    labels:
+      severity: "warning"
+    annotations:
+      summary: "High log volume detected"
+      description: "Log volume is above 1000 entries per second"
+
+#==============================================================================
+# SECURITY CONFIGURATION
+#==============================================================================
+
+logging_security_enabled: true
+logging_encryption_enabled: true
+logging_network_isolation: true
+
+# Access Control
+logging_access_control_enabled: true
+logging_admin_users: []
+logging_readonly_users: []
+
+#==============================================================================
+# BACKUP CONFIGURATION
+#==============================================================================
+
+logging_backup_enabled: true
+logging_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+logging_backup_retention: 7
+logging_backup_compression: true
+logging_backup_encryption: false
+
+#==============================================================================
+# HOMEPAGE INTEGRATION
+#==============================================================================
+
+logging_homepage_enabled: true
+logging_homepage_category: "Monitoring"
+logging_homepage_description: "Centralized Logging Infrastructure"
+logging_homepage_icon: "logging.png"
+
+# Homepage Services
+logging_homepage_services:
+  - name: "Loki"
+    url: "http://loki.{{ domain | default('localhost') }}:3100"
+    icon: "loki"
+    description: "Log aggregation and querying"
+  
+  - name: "Grafana Logs"
+    url: "http://grafana.{{ domain | default('localhost') }}:3000/explore"
+    icon: "grafana"
+    description: "Log visualization and dashboards" 

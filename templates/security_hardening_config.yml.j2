@@ -1,0 +1,342 @@
+# Security Hardening Configuration
+# Comprehensive security settings for homelab deployment
+
+security_hardening:
+  enabled: true
+  
+  # System hardening
+  system:
+    # SSH hardening
+    ssh:
+      port: 22
+      permit_root_login: false
+      password_authentication: false
+      pubkey_authentication: true
+      max_auth_tries: 3
+      client_alive_interval: 300
+      client_alive_count_max: 2
+      allow_users: "{{ username }}"
+      deny_users: root
+    
+    # Firewall configuration
+    firewall:
+      default_policy: deny
+      allowed_ports:
+        - 22   # SSH
+        - 80   # HTTP
+        - 443  # HTTPS
+        - 8080 # Alternative HTTP
+      allowed_networks:
+        - "192.168.40.0/24"
+        - "127.0.0.1/32"
+    
+    # System services
+    services:
+      disable:
+        - bluetooth
+        - cups
+        - avahi-daemon
+        - rpcbind
+        - nfs-common
+        - nfs-kernel-server
+        - telnet
+        - rsh
+        - rlogin
+    
+    # Kernel hardening
+    kernel:
+      sysctl_settings:
+        net.ipv4.ip_forward: 0
+        net.ipv4.conf.all.accept_redirects: 0
+        net.ipv4.conf.default.accept_redirects: 0
+        net.ipv4.conf.all.secure_redirects: 0
+        net.ipv4.conf.default.secure_redirects: 0
+        net.ipv4.conf.all.send_redirects: 0
+        net.ipv4.conf.default.send_redirects: 0
+        net.ipv4.conf.all.rp_filter: 1
+        net.ipv4.conf.default.rp_filter: 1
+        net.ipv4.conf.all.log_martians: 1
+        net.ipv4.conf.default.log_martians: 1
+        net.ipv4.icmp_echo_ignore_broadcasts: 1
+        net.ipv4.icmp_ignore_bogus_error_responses: 1
+        net.ipv4.conf.all.accept_source_route: 0
+        net.ipv4.conf.default.accept_source_route: 0
+        net.ipv4.tcp_syncookies: 1
+        net.ipv4.tcp_max_syn_backlog: 2048
+        net.ipv4.tcp_synack_retries: 2
+        net.ipv4.tcp_syn_retries: 5
+        net.ipv4.tcp_timestamps: 0
+        net.ipv4.tcp_rmem: "4096 87380 16777216"
+        net.ipv4.tcp_wmem: "4096 65536 16777216"
+        net.core.rmem_max: 16777216
+        net.core.wmem_max: 16777216
+        net.core.rmem_default: 262144
+        net.core.wmem_default: 262144
+        net.core.netdev_max_backlog: 5000
+        net.core.somaxconn: 65535
+        net.ipv6.conf.all.accept_ra: 0
+        net.ipv6.conf.default.accept_ra: 0
+        net.ipv6.conf.all.accept_redirects: 0
+        net.ipv6.conf.default.accept_redirects: 0
+        net.ipv6.conf.all.disable_ipv6: 1
+        net.ipv6.conf.default.disable_ipv6: 1
+        net.ipv6.conf.lo.disable_ipv6: 1
+        kernel.sysrq: 0
+        kernel.core_uses_pid: 1
+        kernel.msgmnb: 65536
+        kernel.msgmax: 65536
+        kernel.shmmax: 68719476736
+        kernel.shmall: 4294967296
+        kernel.panic: 10
+        kernel.panic_on_oops: 1
+        kernel.dmesg_restrict: 1
+        kernel.kptr_restrict: 2
+        kernel.yama.ptrace_scope: 1
+        fs.suid_dumpable: 0
+        vm.swappiness: 10
+        vm.dirty_ratio: 15
+        vm.dirty_background_ratio: 5
+
+  # Docker hardening
+  docker:
+    daemon_config:
+      userland-proxy: false
+      live-restore: true
+      no-new-privileges: true
+      seccomp-profile: unconfined
+      apparmor-profile: docker-default
+      userns-remap: "{{ username }}:{{ username }}"
+      default-ulimits:
+        nofile:
+          soft: 65536
+          hard: 65536
+        nproc:
+          soft: 32768
+          hard: 32768
+      log-driver: json-file
+      log-opts:
+        max-size: "10m"
+        max-file: "3"
+      storage-driver: overlay2
+      storage-opts:
+        - overlay2.override_kernel_check=true
+      experimental: false
+      metrics-addr: "127.0.0.1:9323"
+      default-address-pools:
+        - base: 172.17.0.0/12
+          size: 24
+    
+    # Container security policies
+    container_policies:
+      no_new_privileges: true
+      read_only_root_filesystem: true
+      security_opt:
+        - no-new-privileges
+        - seccomp=unconfined
+      cap_drop:
+        - ALL
+      cap_add:
+        - CHOWN
+        - SETGID
+        - SETUID
+        - DAC_OVERRIDE
+        - FOWNER
+        - MKNOD
+        - NET_RAW
+        - SETFCAP
+      ulimits:
+        nofile:
+          soft: 65536
+          hard: 65536
+        nproc:
+          soft: 32768
+          hard: 32768
+
+  # Application hardening
+  applications:
+    # Web application security
+    web:
+      headers:
+        X-Frame-Options: DENY
+        X-Content-Type-Options: nosniff
+        X-XSS-Protection: "1; mode=block"
+        Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+        Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';"
+        Referrer-Policy: strict-origin-when-cross-origin
+        Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+    
+    # Database security
+    database:
+      postgresql:
+        ssl: true
+        ssl_cert_file: "/etc/ssl/certs/postgresql.crt"
+        ssl_key_file: "/etc/ssl/private/postgresql.key"
+        ssl_ca_file: "/etc/ssl/certs/ca.crt"
+        max_connections: 100
+        shared_preload_libraries: "pg_stat_statements"
+      
+      redis:
+        requirepass: "{{ vault_redis_password }}"
+        maxmemory: "256mb"
+        maxmemory_policy: allkeys-lru
+        protected_mode: yes
+        tcp_keepalive: 300
+        timeout: 0
+        tcp_backlog: 511
+    
+    # Authentication security
+    authentication:
+      rate_limiting:
+        enabled: true
+        requests_per_minute: 60
+        burst_size: 10
+      
+      password_policy:
+        min_length: 12
+        require_uppercase: true
+        require_lowercase: true
+        require_numbers: true
+        require_special: true
+        max_age_days: 90
+        history_count: 5
+      
+      session_management:
+        session_timeout: 3600
+        max_sessions: 5
+        session_fixation_protection: true
+        secure_cookies: true
+        http_only_cookies: true
+
+  # Monitoring and alerting
+  monitoring:
+    # Security monitoring
+    security_events:
+      enabled: true
+      log_sources:
+        - "/var/log/auth.log"
+        - "/var/log/syslog"
+        - "/var/log/docker.log"
+        - "{{ logs_dir }}/**/*.log"
+      
+      alert_rules:
+        failed_login_attempts:
+          threshold: 5
+          time_window: "5m"
+          action: "block_ip"
+        
+        privilege_escalation:
+          threshold: 1
+          time_window: "1m"
+          action: "alert_admin"
+        
+        suspicious_activity:
+          threshold: 3
+          time_window: "10m"
+          action: "investigate"
+    
+    # Performance monitoring
+    performance:
+      enabled: true
+      metrics:
+        - cpu_usage
+        - memory_usage
+        - disk_usage
+        - network_usage
+        - container_health
+      
+      thresholds:
+        cpu_warning: 80
+        cpu_critical: 90
+        memory_warning: 85
+        memory_critical: 95
+        disk_warning: 80
+        disk_critical: 90
+
+  # Backup and recovery
+  backup:
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      key_rotation_days: 90
+    
+    integrity:
+      checksum_verification: true
+      backup_verification: true
+      retention_policy:
+        daily: 7
+        weekly: 4
+        monthly: 12
+        yearly: 5
+    
+    testing:
+      restore_test_frequency: "weekly"
+      automated_testing: true
+      test_environment: "isolated"
+
+  # Compliance and auditing
+  compliance:
+    # Audit logging
+    audit:
+      enabled: true
+      audit_rules:
+        - "-w /etc/passwd -p wa -k identity"
+        - "-w /etc/group -p wa -k identity"
+        - "-w /etc/shadow -p wa -k identity"
+        - "-w /etc/gshadow -p wa -k identity"
+        - "-w /etc/ssh/sshd_config -p wa -k sshd"
+        - "-w /etc/sudoers -p wa -k sudo"
+        - "-w /etc/docker/daemon.json -p wa -k docker"
+        - "-w /var/log/auth.log -p wa -k auth"
+        - "-w /var/log/syslog -p wa -k system"
+        - "-w {{ docker_dir }} -p wa -k docker_data"
+        - "-w {{ data_dir }} -p wa -k homelab_data"
+        - "-w {{ config_dir }} -p wa -k homelab_config"
+      
+      auditd_config:
+        log_file: "/var/log/audit/audit.log"
+        max_log_file: 8
+        num_logs: 5
+        log_format: RAW
+        flush: INCREMENTAL_ASYNC
+        freq: 50
+        max_log_file_action: ROTATE
+        space_left: 100
+        space_left_action: EMAIL
+        action_mail_acct: "{{ admin_email }}"
+        admin_space_left: 50
+        admin_space_left_action: SUSPEND
+        disk_full_action: SUSPEND
+        disk_error_action: SUSPEND
+        tcp_listen_port: 60
+        tcp_listen_queue: 5
+        tcp_max_per_addr: 1
+        use_libwrap: yes
+        tcp_client_ports: 1024-65535
+        tcp_client_max_idle: 0
+        enable_krb5: no
+        krb5_principal: auditd
+        krb5_key_file: /etc/audit/audit.key
+    
+    # Log management
+    logging:
+      centralized_logging: true
+      log_retention_days: 90
+      log_compression: true
+      log_encryption: true
+      
+      log_sources:
+        system:
+          - "/var/log/syslog"
+          - "/var/log/auth.log"
+          - "/var/log/kern.log"
+          - "/var/log/dmesg"
+        
+        applications:
+          - "{{ logs_dir }}/**/*.log"
+          - "/var/log/docker.log"
+          - "/var/log/containers/*.log"
+        
+        security:
+          - "/var/log/audit/audit.log"
+          - "/var/log/fail2ban.log"
+          - "/var/log/crowdsec.log" 

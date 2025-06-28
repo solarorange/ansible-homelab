@@ -1,7 +1,72 @@
 ---
-# This task includes the authentication sub-role.
+# Authentication Services Deployment
+# Deploy Authentik for centralized authentication
 
-- name: Deploy security authentication stack
-  ansible.builtin.include_role:
-    name: security/authentication
+- name: Create Authentik Docker Compose configuration
+  ansible.builtin.template:
+    src: authentik-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/security/authentik/docker-compose.yml"
+    mode: '0644'
+  tags: [security, authentication, config]
+
+- name: Create Authentik environment file
+  ansible.builtin.template:
+    src: authentik-env.j2
+    dest: "{{ docker_dir }}/security/authentik/.env"
+    mode: '0600'
+  tags: [security, authentication, config]
+
+- name: Create Authentik data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_dir }}/security/authentik/data"
+    - "{{ docker_dir }}/security/authentik/media"
+    - "{{ docker_dir }}/security/authentik/custom-templates"
+    - "{{ docker_dir }}/security/authentik/redis"
+  tags: [security, authentication, directories]
+
+- name: Start Authentik services
+  community.docker.docker_compose:
+    project_src: "{{ docker_dir }}/security/authentik"
+    state: present
   tags: [security, authentication, deploy]
+
+- name: Wait for Authentik to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: 9000
+    timeout: 120
+    delay: 10
+  tags: [security, authentication, wait]
+
+- name: Verify Authentik deployment
+  ansible.builtin.uri:
+    url: "https://{{ subdomains.authentik }}.{{ domain }}/if/user/"
+    method: GET
+    status_code: [200, 302]
+    timeout: 30
+  register: authentik_check
+  tags: [security, authentication, verify]
+
+- name: Display Authentik deployment status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      AUTHENTIK DEPLOYMENT STATUS
+      ========================================
+      
+      Status: {{ 'SUCCESS' if authentik_check.status == 200 or authentik_check.status == 302 else 'FAILED' }}
+      URL: https://{{ subdomains.authentik }}.{{ domain }}
+      Admin Email: {{ vault_authentik_admin_email }}
+      Admin Password: [REDACTED]
+      
+      Configuration:
+      - Secret Key: [REDACTED]
+      - Postgres Password: [REDACTED]
+      - Redis Password: {{ vault_redis_password }}
+      
+      ========================================
+  tags: [security, authentication, summary]

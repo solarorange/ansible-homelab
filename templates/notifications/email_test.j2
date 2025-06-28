@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ alert.labels.service }} Alert</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-critical {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 {{ alert.labels.service }} Alert</h1>
+        <p><strong>Instance:</strong> {{ alert.labels.instance }}</p>
+        <p><strong>Severity:</strong> {{ alert.labels.severity | upper }}</p>
+        <p><strong>Time:</strong> {{ alert.startsAt }}</p>
+    </div>
+
+    {% if alert.labels.severity == 'critical' %}
+    <div class="alert-critical">
+        <h2>🚨 Critical Alert</h2>
+        <p>{{ alert.annotations.description }}</p>
+    </div>
+    {% elif alert.labels.severity == 'warning' %}
+    <div class="alert-warning">
+        <h2>⚠️ Warning Alert</h2>
+        <p>{{ alert.annotations.description }}</p>
+    </div>
+    {% else %}
+    <div class="alert-info">
+        <h2>ℹ️ Information Alert</h2>
+        <p>{{ alert.annotations.description }}</p>
+    </div>
+    {% endif %}
+
+    <div class="details">
+        <h3>Alert Details</h3>
+        <p><strong>Service:</strong> {{ alert.labels.service }}</p>
+        <p><strong>Instance:</strong> {{ alert.labels.instance }}</p>
+        <p><strong>Severity:</strong> {{ alert.labels.severity | upper }}</p>
+        <p><strong>Description:</strong> {{ alert.annotations.description }}</p>
+        {% if alert.annotations.dashboard %}
+        <p><strong>Dashboard:</strong> <a href="{{ alert.annotations.dashboard }}">{{ alert.annotations.dashboard }}</a></p>
+        {% endif %}
+        {% if alert.annotations.runbook %}
+        <p><strong>Runbook:</strong> <a href="{{ alert.annotations.runbook }}">{{ alert.annotations.runbook }}</a></p>
+        {% endif %}
+    </div>
+
+    <div style="text-align: center;">
+        {% if alert.annotations.dashboard %}
+        <a href="{{ alert.annotations.dashboard }}" class="button">View Dashboard</a>
+        {% endif %}
+        {% if alert.annotations.runbook %}
+        <a href="{{ alert.annotations.runbook }}" class="button">View Runbook</a>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>This is a test notification from your Homelab monitoring system.</p>
+        <p>Generated at: {{ alert.startsAt }}</p>
+    </div>
+</body>
+</html> 

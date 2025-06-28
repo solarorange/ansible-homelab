@@ -4,7 +4,7 @@
 
 - name: Create media stack backup directory
   ansible.builtin.file:
-    path: "{{ backup_dir }}/media"
+    path: "{{ media_backup_dir }}"
     state: directory
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -19,6 +19,7 @@
     group: "{{ username }}"
     mode: "0755"
   when: media_backup_enabled | default(true)
+  notify: restart media backup
 
 - name: Schedule media stack backup
   ansible.builtin.cron:

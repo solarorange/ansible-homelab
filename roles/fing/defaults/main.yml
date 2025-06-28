@@ -24,7 +24,7 @@ fing_domain: "{{ fing_subdomain }}.{{ domain }}"
 fing_auth_enabled: true
 fing_auth_method: "authentik"  # Options: authentik, basic, none
 fing_admin_email: "{{ admin_email | default('admin@' + domain) }}"
-fing_admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+fing_admin_password: "{{ vault_fing_admin_password | default('') }}"
 
 # Database Configuration
 fing_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
@@ -32,7 +32,7 @@ fing_database_host: "{{ postgresql_host | default('localhost') }}"
 fing_database_port: "{{ postgresql_port | default(5432) }}"
 fing_database_name: "fing"
 fing_database_user: "fing"
-fing_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+fing_database_password: "{{ vault_fing_database_password | default('') }}"
 
 # Network Discovery Configuration
 fing_scan_interval: 300  # 5 minutes
@@ -64,6 +64,11 @@ fing_backup_enabled: true
 fing_backup_schedule: "0 2 * * *"  # Daily at 2 AM
 fing_backup_retention: 7  # Keep backups for 7 days
 fing_backup_compression: true
+fing_backup_dir: "{{ backup_dir }}/fing"
+fing_backup_retention_days: 7
+fing_backup_log_file: "{{ logs_dir }}/fing/backup/backup.log"
+fing_backup_max_log_size: "10M"
+fing_backup_notifications_enabled: true
 
 # Logging Configuration
 fing_log_level: "info"  # Options: debug, info, warn, error
@@ -78,11 +83,11 @@ fing_storage_limit: "10g"
 
 # Traefik Configuration
 fing_traefik_enabled: true
-fing_traefik_network: "traefik"
+fing_traefik_network: "{{ traefik_network | default('homelab') }}"
 fing_traefik_middleware: "secure-headers,compress"
 fing_traefik_auth_middleware: "authentik-forward-auth"
 fing_traefik_ssl_enabled: true
-fing_traefik_ssl_resolver: "cloudflare"
+fing_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
 
 # Homepage Integration
 fing_homepage_enabled: true
@@ -145,12 +150,16 @@ fing_dependencies:
 fing_health_check_url: "/health"
 fing_health_check_timeout: 10
 fing_health_check_retries: 3
+fing_health_check_log_file: "{{ logs_dir }}/fing/health/health.log"
+fing_health_check_max_log_size: "10M"
+fing_health_check_retention_days: 7
 
 # API Configuration
 fing_api_enabled: true
 fing_api_version: "v1"
 fing_api_rate_limit: 1000
 fing_api_rate_limit_window: 3600
+fing_api_key: "{{ vault_fing_api_key | default('') }}"
 
 # Webhook Configuration
 fing_webhooks_enabled: true
@@ -173,18 +182,18 @@ fing_notification_channels:
 fing_email_enabled: false
 fing_smtp_host: "{{ smtp_host | default('localhost') }}"
 fing_smtp_port: "{{ smtp_port | default(587) }}"
-fing_smtp_username: "{{ smtp_username | default('') }}"
-fing_smtp_password: "{{ smtp_password | default('') }}"
+fing_smtp_username: "{{ vault_smtp_username | default('') }}"
+fing_smtp_password: "{{ vault_smtp_password | default('') }}"
 fing_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
 
 # Slack Configuration
 fing_slack_enabled: false
-fing_slack_webhook: "{{ slack_webhook | default('') }}"
+fing_slack_webhook: "{{ vault_slack_webhook | default('') }}"
 fing_slack_channel: "{{ slack_channel | default('#alerts') }}"
 
 # Discord Configuration
 fing_discord_enabled: false
-fing_discord_webhook: "{{ discord_webhook | default('') }}"
+fing_discord_webhook: "{{ vault_discord_webhook | default('') }}"
 fing_discord_channel: "{{ discord_channel | default('alerts') }}"
 
 # Custom Configuration

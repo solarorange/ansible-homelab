@@ -1,0 +1,250 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '{{ notifications.email.smtp_host }}:{{ notifications.email.smtp_port }}'
+  smtp_from: '{{ notifications.email.from_address }}'
+  smtp_auth_username: '{{ notifications.email.smtp_username }}'
+  smtp_auth_password: '{{ notifications.email.smtp_password }}'
+  smtp_require_tls: {{ notifications.email.smtp_use_tls | lower }}
+  
+  slack_api_url: '{{ notifications.slack.webhook_url }}'
+  
+  # PagerDuty configuration
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # Telegram configuration
+  telegram_api_url: 'https://api.telegram.org/bot{{ notifications.telegram.bot_token }}/sendMessage'
+
+route:
+  group_by: {{ notifications.throttling.group_by | to_json }}
+  group_wait: {{ notifications.throttling.group_wait }}
+  group_interval: {{ notifications.throttling.group_interval }}
+  repeat_interval: {{ notifications.throttling.repeat_interval }}
+  receiver: 'default-receiver'
+  
+  # Route critical alerts to all channels
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      continue: true
+    
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      continue: true
+    
+    - match:
+        severity: info
+      receiver: 'info-receiver'
+      continue: true
+
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: {{ notifications.email.to_addresses | to_json }}
+        send_resolved: true
+        headers:
+          subject: 'Homelab Alert: {{ $labels.service }}'
+        html: |
+          <h2>Alert: {{ $labels.alertname }}</h2>
+          <p><strong>Service:</strong> {{ $labels.service }}</p>
+          <p><strong>Instance:</strong> {{ $labels.instance }}</p>
+          <p><strong>Description:</strong> {{ $annotations.description }}</p>
+          <p><strong>Time:</strong> {{ $startsAt }}</p>
+          {% if $annotations.dashboard %}
+          <p><a href="{{ $annotations.dashboard }}">View Dashboard</a></p>
+          {% endif %}
+          {% if $annotations.runbook %}
+          <p><a href="{{ $annotations.runbook }}">View Runbook</a></p>
+          {% endif %}
+
+  - name: 'critical-receiver'
+    email_configs:
+      - to: {{ notifications.email.to_addresses | to_json }}
+        send_resolved: true
+        headers:
+          subject: '🚨 CRITICAL: {{ $labels.service }} Alert'
+        html: |
+          <h2 style="color: red;">🚨 Critical Alert: {{ $labels.alertname }}</h2>
+          <p><strong>Service:</strong> {{ $labels.service }}</p>
+          <p><strong>Instance:</strong> {{ $labels.instance }}</p>
+          <p><strong>Description:</strong> {{ $annotations.description }}</p>
+          <p><strong>Time:</strong> {{ $startsAt }}</p>
+          {% if $annotations.dashboard %}
+          <p><a href="{{ $annotations.dashboard }}">View Dashboard</a></p>
+          {% endif %}
+          {% if $annotations.runbook %}
+          <p><a href="{{ $annotations.runbook }}">View Runbook</a></p>
+          {% endif %}
+    
+    {% if notifications.slack.enabled %}
+    slack_configs:
+      - channel: '{{ notifications.slack.channel }}'
+        username: '{{ notifications.slack.username }}'
+        icon_emoji: '{{ notifications.slack.icon_emoji }}'
+        send_resolved: true
+        title: '🚨 Critical Alert: {{ $labels.service }}'
+        text: '{{ $annotations.description }}'
+        actions:
+          - type: button
+            text: 'View Dashboard'
+            url: '{{ $annotations.dashboard }}'
+          {% if $annotations.runbook %}
+          - type: button
+            text: 'View Runbook'
+            url: '{{ $annotations.runbook }}'
+          {% endif %}
+    {% endif %}
+    
+    {% if notifications.discord.enabled %}
+    webhook_configs:
+      - url: '{{ notifications.discord.webhook_url }}'
+        send_resolved: true
+        http_config:
+          headers:
+            Content-Type: application/json
+        max_alerts: 0
+    {% endif %}
+    
+    {% if notifications.telegram.enabled %}
+    webhook_configs:
+      - url: '{{ notifications.telegram.bot_token }}'
+        send_resolved: true
+        http_config:
+          headers:
+            Content-Type: application/json
+        max_alerts: 0
+    {% endif %}
+    
+    {% if notifications.pagerduty.enabled %}
+    pagerduty_configs:
+      - routing_key: '{{ notifications.pagerduty.integration_key }}'
+        send_resolved: true
+        description: 'Critical Alert: {{ $labels.service }}'
+        severity: 'critical'
+        client: 'Homelab Monitor'
+        client_url: '{{ $annotations.dashboard }}'
+    {% endif %}
+
+  - name: 'warning-receiver'
+    email_configs:
+      - to: {{ notifications.email.to_addresses | to_json }}
+        send_resolved: true
+        headers:
+          subject: '⚠️ WARNING: {{ $labels.service }} Alert'
+        html: |
+          <h2 style="color: orange;">⚠️ Warning Alert: {{ $labels.alertname }}</h2>
+          <p><strong>Service:</strong> {{ $labels.service }}</p>
+          <p><strong>Instance:</strong> {{ $labels.instance }}</p>
+          <p><strong>Description:</strong> {{ $annotations.description }}</p>
+          <p><strong>Time:</strong> {{ $startsAt }}</p>
+          {% if $annotations.dashboard %}
+          <p><a href="{{ $annotations.dashboard }}">View Dashboard</a></p>
+          {% endif %}
+    
+    {% if notifications.slack.enabled %}
+    slack_configs:
+      - channel: '{{ notifications.slack.channel }}'
+        username: '{{ notifications.slack.username }}'
+        icon_emoji: '{{ notifications.slack.icon_emoji }}'
+        send_resolved: true
+        title: '⚠️ Warning Alert: {{ $labels.service }}'
+        text: '{{ $annotations.description }}'
+        actions:
+          - type: button
+            text: 'View Dashboard'
+            url: '{{ $annotations.dashboard }}'
+    {% endif %}
+    
+    {% if notifications.discord.enabled %}
+    webhook_configs:
+      - url: '{{ notifications.discord.webhook_url }}'
+        send_resolved: true
+        http_config:
+          headers:
+            Content-Type: application/json
+        max_alerts: 0
+    {% endif %}
+
+  - name: 'info-receiver'
+    email_configs:
+      - to: {{ notifications.email.to_addresses | to_json }}
+        send_resolved: true
+        headers:
+          subject: 'ℹ️ INFO: {{ $labels.service }} Notification'
+        html: |
+          <h2 style="color: blue;">ℹ️ Info: {{ $labels.alertname }}</h2>
+          <p><strong>Service:</strong> {{ $labels.service }}</p>
+          <p><strong>Instance:</strong> {{ $labels.instance }}</p>
+          <p><strong>Description:</strong> {{ $annotations.description }}</p>
+          <p><strong>Time:</strong> {{ $startsAt }}</p>
+          {% if $annotations.dashboard %}
+          <p><a href="{{ $annotations.dashboard }}">View Dashboard</a></p>
+          {% endif %}
+    
+    {% if notifications.slack.enabled %}
+    slack_configs:
+      - channel: '{{ notifications.slack.channel }}'
+        username: '{{ notifications.slack.username }}'
+        icon_emoji: '{{ notifications.slack.icon_emoji }}'
+        send_resolved: true
+        title: 'ℹ️ Info: {{ $labels.service }}'
+        text: '{{ $annotations.description }}'
+    {% endif %}
+
+# Time-based routing
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 09:00
+            end_time: 17:00
+  
+  - name: off_hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 17:00
+            end_time: 09:00
+      - weekdays: ['saturday', 'sunday']
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit critical alerts when system is down
+  - source_match:
+      alertname: 'SystemDown'
+    target_match:
+      severity: critical
+    equal: ['instance']
+  
+  # Inhibit container alerts when Docker is down
+  - source_match:
+      alertname: 'DockerDaemonDown'
+    target_match:
+      service: 'container'
+    equal: ['instance']
+  
+  # Inhibit service alerts when network is down
+  - source_match:
+      alertname: 'NetworkConnectivityLost'
+    target_match:
+      service: 'web'
+    equal: ['instance']
+
+# Rate limiting
+rate_limit:
+  enabled: {{ notifications.throttling.rate_limit.enabled | lower }}
+  max_alerts_per_minute: {{ notifications.throttling.rate_limit.max_alerts_per_minute }}
+  max_alerts_per_hour: {{ notifications.throttling.rate_limit.max_alerts_per_hour }}
+
+# Templates
+templates:
+  - '/etc/alertmanager/template/*.tmpl'
+
+# Notification testing
+testing:
+  enabled: {{ notifications.testing.enabled | lower }}
+  test_interval: {{ notifications.testing.test_interval }}
+  test_time: {{ notifications.testing.test_time }}
+  test_channels: {{ notifications.testing.test_channels | to_json }} 

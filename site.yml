@@ -1,17 +1,19 @@
 ---
 # Main Ansible playbook for homelab setup
-# Advanced role-based architecture with comprehensive optimizations
+# Staged deployment with comprehensive infrastructure management
 
-- name: Configure homelab infrastructure with advanced optimizations
+- name: Configure homelab infrastructure with staged deployment
   hosts: all
   become: true
   gather_facts: true
   
-  # Advanced configuration loading
+  # Configuration loading
   vars_files:
     - group_vars/all/common.yml
     - group_vars/all/roles.yml
     - group_vars/all/advanced_config.yml
+    - group_vars/all/notifications.yml
+    - group_vars/all/monitoring_thresholds.yml
   
   # Pre-flight checks and system preparation
   pre_tasks:
@@ -19,11 +21,19 @@
       ansible.builtin.include_vars: group_vars/all/advanced_config.yml
       tags: [always, config]
 
-    - name: Validate system prerequisites with advanced checks
+    - name: Load notification configuration
+      ansible.builtin.include_vars: group_vars/all/notifications.yml
+      tags: [always, config, notifications]
+
+    - name: Load monitoring thresholds
+      ansible.builtin.include_vars: group_vars/all/monitoring_thresholds.yml
+      tags: [always, config, monitoring]
+
+    - name: Validate system prerequisites
       ansible.builtin.include_tasks: tasks/advanced_validation.yml
       tags: [always, validation]
 
-    - name: Setup advanced pre-flight tasks
+    - name: Setup pre-flight tasks
       ansible.builtin.include_tasks: tasks/pre_tasks.yml
       tags: [always, validation]
 
@@ -31,96 +41,110 @@
       ansible.builtin.include_tasks: tasks/advanced_rollback.yml
       tags: [rollback, point]
 
-  # All roles in optimized execution order with dependencies
+  # Staged deployment with clear dependencies
   roles:
-    # Core infrastructure roles (must run first)
+    # Stage 1: Infrastructure (must run first)
     - name: security
-      tags: [security, infrastructure]
+      tags: [security, infrastructure, stage1]
       when: security_enabled | default(true)
       
+    # Stage 2: Core Services (depends on infrastructure)
     - name: databases
-      tags: [databases, infrastructure]
+      tags: [databases, core_services, stage2]
       when: databases_enabled | default(true)
       
     - name: storage
-      tags: [storage, infrastructure]
+      tags: [storage, core_services, stage2]
       when: storage_enabled | default(true)
       
-    # Monitoring and logging (depends on infrastructure)
     - name: logging
-      tags: [logging, monitoring]
+      tags: [logging, core_services, stage2]
       when: logging_enabled | default(true)
       
     - name: certificate_management
-      tags: [certificates, monitoring]
+      tags: [certificates, core_services, stage2]
       when: certificate_management_enabled | default(true)
       
-    # Media stack (depends on databases and storage)
+    # Stage 3: Applications (depends on core services)
     - name: media
-      tags: [media, services]
+      tags: [media, applications, stage3]
       when: media_enabled | default(true)
       
-    # Automation and utilities (can run in parallel)
-    - name: automation
-      tags: [automation, services]
-      when: automation_enabled | default(true)
-      
-    - name: utilities
-      tags: [utilities, services]
-      when: utilities_enabled | default(true)
-      
-    # Specialized services
     - name: paperless_ngx
-      tags: [paperless, services]
+      tags: [paperless, applications, stage3]
       when: paperless_ngx_enabled | default(true)
       
     - name: fing
-      tags: [fing, services]
+      tags: [fing, applications, stage3]
       when: fing_enabled | default(true)
+      
+    - name: utilities
+      tags: [utilities, applications, stage3]
+      when: utilities_enabled | default(true)
+      
+    - name: automation
+      tags: [automation, applications, stage3]
+      when: automation_enabled | default(true)
+      
+    # Stage 3.5: Dashboard and Management (depends on applications)
+    - name: homepage
+      tags: [homepage, dashboard, stage3.5]
+      when: homepage_enabled | default(true)
 
-  # Post-deployment advanced tasks
+  # Post-deployment validation and optimization
   post_tasks:
-    - name: Validate all services with advanced checks
+    - name: Validate all services
       ansible.builtin.include_tasks: tasks/validate.yml
-      tags: [always, validation]
+      tags: [always, validation, stage4]
 
-    - name: Configure advanced service orchestration
+    - name: Configure service orchestration
       ansible.builtin.include_tasks: tasks/service_orchestration.yml
-      tags: [orchestration, services]
+      tags: [orchestration, services, stage4]
 
-    - name: Setup advanced monitoring and alerting
+    - name: Setup monitoring and alerting
       ansible.builtin.include_tasks: tasks/monitor_performance.yml
-      tags: [monitoring, alerts]
+      tags: [monitoring, alerts, stage4]
 
-    - name: Configure advanced health monitoring
+    - name: Configure notification channels
+      ansible.builtin.include_tasks: tasks/configure_notifications.yml
+      tags: [notifications, alerts, stage4]
+      when: notifications.enabled | default(true)
+
+    - name: Configure monitoring thresholds
+      ansible.builtin.include_tasks: tasks/configure_monitoring_thresholds.yml
+      tags: [monitoring, thresholds, stage4]
+      when: monitoring_thresholds.enabled | default(true)
+
+    - name: Configure health monitoring
       ansible.builtin.include_tasks: tasks/advanced_health_monitoring.yml
-      tags: [health, monitoring]
+      tags: [health, monitoring, stage4]
 
-    - name: Configure advanced backup orchestration
+    - name: Configure backup orchestration
       ansible.builtin.include_tasks: tasks/backup_orchestration.yml
-      tags: [backup, orchestration]
+      tags: [backup, orchestration, stage4]
 
-    - name: Update backup schedules with advanced strategies
-      ansible.builtin.include_tasks: tasks/update_backup_schedules.yml
-      tags: [backup, schedules]
-
-    - name: Apply advanced security hardening
+    - name: Apply security hardening
       ansible.builtin.include_tasks: tasks/advanced_security_hardening.yml
-      tags: [security, hardening]
+      tags: [security, hardening, stage4]
 
-    - name: Generate advanced documentation
+    - name: Generate documentation
       ansible.builtin.include_tasks: tasks/generate_documentation.yml
-      tags: [documentation, reporting]
+      tags: [documentation, reporting, stage4]
+
+    - name: Test notification channels
+      ansible.builtin.include_tasks: tasks/test_notifications.yml
+      tags: [notifications, testing, stage4]
+      when: notifications.enabled | default(true)
 
     - name: Final cleanup and optimization
       ansible.builtin.include_tasks: tasks/cleanup.yml
-      tags: [cleanup, optimization]
+      tags: [cleanup, optimization, stage4]
 
-    - name: Display deployment summary with advanced metrics
+    - name: Display deployment summary
       ansible.builtin.debug:
         msg: |
           ========================================
-          ADVANCED HOMELAB DEPLOYMENT SUMMARY
+          HOMELAB DEPLOYMENT SUMMARY
           ========================================
           
           Deployment Information:
@@ -129,65 +153,78 @@
           - Ansible Version: {{ ansible_version.full }}
           - Execution Time: {{ ansible_date_time.iso8601 }}
           
+          Stage Deployment Status:
+          - Stage 1 (Infrastructure): {{ 'COMPLETED' if security_enabled | default(false) else 'SKIPPED' }}
+          - Stage 2 (Core Services): {{ 'COMPLETED' if databases_enabled | default(false) else 'SKIPPED' }}
+          - Stage 3 (Applications): {{ 'COMPLETED' if media_enabled | default(false) else 'SKIPPED' }}
+          - Stage 3.5 (Dashboard): {{ 'COMPLETED' if homepage_enabled | default(false) else 'SKIPPED' }}
+          - Stage 4 (Validation): COMPLETED
+          
           Role Deployment Status:
           - Security: {{ 'ENABLED' if security_enabled | default(false) else 'DISABLED' }}
           - Databases: {{ 'ENABLED' if databases_enabled | default(false) else 'DISABLED' }}
           - Storage: {{ 'ENABLED' if storage_enabled | default(false) else 'DISABLED' }}
           - Logging: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
           - Media: {{ 'ENABLED' if media_enabled | default(false) else 'DISABLED' }}
-          - Automation: {{ 'ENABLED' if automation_enabled | default(false) else 'DISABLED' }}
+          - Paperless-ngx: {{ 'ENABLED' if paperless_ngx_enabled | default(false) else 'DISABLED' }}
+          - Fing: {{ 'ENABLED' if fing_enabled | default(false) else 'DISABLED' }}
           - Utilities: {{ 'ENABLED' if utilities_enabled | default(false) else 'DISABLED' }}
-          
-          Advanced Features:
-          - Health Monitoring: {{ 'ENABLED' if health_monitoring.enabled | default(false) else 'DISABLED' }}
-          - Self-Healing: {{ 'ENABLED' if health_monitoring.self_healing.enabled | default(false) else 'DISABLED' }}
-          - Rollback Protection: {{ 'ENABLED' if rollback.enabled | default(false) else 'DISABLED' }}
-          - Security Hardening: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
-          - Backup Orchestration: {{ 'ENABLED' if backup_strategies.incremental.enabled | default(false) else 'DISABLED' }}
-          
-          Performance Configuration:
-          - Max Concurrent Containers: {{ resource_limits.max_concurrent_containers | default(20) }}
-          - Max Concurrent Backups: {{ resource_limits.max_concurrent_backups | default(3) }}
-          - CPU Threshold: {{ resource_limits.cpu_threshold | default(80) }}%
-          - Memory Threshold: {{ resource_limits.memory_threshold | default(85) }}%
+          - Automation: {{ 'ENABLED' if automation_enabled | default(false) else 'DISABLED' }}
+          - Homepage: {{ 'ENABLED' if homepage_enabled | default(false) else 'DISABLED' }}
           
           Security Status:
-          - Compliance Frameworks: {{ compliance.frameworks | length }} enabled
-          - Security Scanning: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
-          - Audit Logging: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
+          - Fail2ban: {{ 'ENABLED' if fail2ban_enabled | default(false) else 'DISABLED' }}
+          - CrowdSec: {{ 'ENABLED' if crowdsec_enabled | default(false) else 'DISABLED' }}
+          - SSL/TLS: {{ 'ENABLED' if ssl_enabled | default(false) else 'DISABLED' }}
           
           Monitoring Integration:
-          - Prometheus: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
-          - Grafana: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
-          - Loki: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
-          - AlertManager: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          - Prometheus: {{ 'ENABLED' if prometheus_enabled | default(false) else 'DISABLED' }}
+          - Grafana: {{ 'ENABLED' if grafana_enabled | default(false) else 'DISABLED' }}
+          - Loki: {{ 'ENABLED' if loki_enabled | default(false) else 'DISABLED' }}
+          - AlertManager: {{ 'ENABLED' if alertmanager_enabled | default(false) else 'DISABLED' }}
           
-          Backup Strategy:
-          - Incremental Backups: {{ 'ENABLED' if backup_strategies.incremental.enabled | default(false) else 'DISABLED' }}
-          - Backup Testing: {{ 'ENABLED' if backup_testing.enabled | default(false) else 'DISABLED' }}
-          - Encryption: {{ 'ENABLED' if backup_strategies.incremental.encryption | default(false) else 'DISABLED' }}
+          Notification Channels:
+          - Email: {{ 'ENABLED' if notifications.email.enabled | default(false) else 'DISABLED' }}
+          - Slack: {{ 'ENABLED' if notifications.slack.enabled | default(false) else 'DISABLED' }}
+          - Discord: {{ 'ENABLED' if notifications.discord.enabled | default(false) else 'DISABLED' }}
+          - Telegram: {{ 'ENABLED' if notifications.telegram.enabled | default(false) else 'DISABLED' }}
+          - PagerDuty: {{ 'ENABLED' if notifications.pagerduty.enabled | default(false) else 'DISABLED' }}
+          - Webhook: {{ 'ENABLED' if notifications.webhook.enabled | default(false) else 'DISABLED' }}
           
-          Documentation:
-          - Auto-Generation: {{ 'ENABLED' if documentation.enabled | default(false) else 'DISABLED' }}
-          - Diagram Generation: {{ 'ENABLED' if diagrams.enabled | default(false) else 'DISABLED' }}
-          - Output Formats: {{ documentation.output_formats | default(['markdown']) | join(', ') }}
+          Monitoring Thresholds:
+          - System CPU: {{ monitoring_thresholds.system.cpu.warning | default(80) }}% / {{ monitoring_thresholds.system.cpu.critical | default(90) }}%
+          - System Memory: {{ monitoring_thresholds.system.memory.warning | default(85) }}% / {{ monitoring_thresholds.system.memory.critical | default(95) }}%
+          - System Disk: {{ monitoring_thresholds.system.disk.warning | default(80) }}% / {{ monitoring_thresholds.system.disk.critical | default(90) }}%
+          - Web Response: {{ monitoring_thresholds.services.web.response_time.warning | default(1000) }}ms / {{ monitoring_thresholds.services.web.response_time.critical | default(3000) }}ms
+          
+          Backup Configuration:
+          - Backup Enabled: {{ 'YES' if backup_enabled | default(false) else 'NO' }}
+          - Retention Days: {{ backup_retention_days | default(7) }}
+          - Compression: {{ 'ENABLED' if backup_compression | default(false) else 'DISABLED' }}
+          
+          Access Information:
+          - Homepage Dashboard: https://homepage.{{ domain }}
+          - Traefik Dashboard: https://traefik.{{ domain }}
+          - Grafana Dashboard: https://grafana.{{ domain }}
+          - Authentik: https://auth.{{ domain }}
+          - Portainer: https://portainer.{{ domain }}
+          
+          ========================================
+          DEPLOYMENT COMPLETED SUCCESSFULLY
+          ========================================
           
           Next Steps:
-          1. Monitor the health dashboard: http://localhost:3000
-          2. Check service status: docker ps
-          3. Review security scan results: /etc/security/hardening/
-          4. Verify backup completion: {{ backup_dir }}/logs/
-          5. Test rollback procedures if needed
-          6. Review generated documentation: {{ backup_dir }}/documentation/
+          1. Access Homepage at: https://homepage.{{ domain }}
+          2. Configure service API keys in Homepage settings
+          3. Set up weather widget with your location
+          4. Customize bookmarks and service groups
+          5. Test all service integrations
+          6. Review monitoring dashboards
+          7. Configure backup schedules
           
-          Support and Maintenance:
-          - Health Monitoring: {{ backup_dir }}/health/
-          - Security Reports: /etc/security/hardening/
-          - Backup Logs: {{ backup_dir }}/logs/
-          - Documentation: {{ backup_dir }}/documentation/
-          - Troubleshooting Guide: docs/ADVANCED_BEST_PRACTICES.md
+          For support and documentation:
+          - GitHub: https://github.com/your-repo/ansible-homelab
+          - Documentation: https://docs.your-domain.com
+          - Community: https://discord.gg/homelab
           
-          ========================================
-          DEPLOYMENT COMPLETED SUCCESSFULLY!
-          ========================================
-      tags: [summary, reporting] 
+          ======================================== 

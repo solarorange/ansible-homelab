@@ -1,0 +1,497 @@
+# Monitoring Thresholds Configuration
+# Comprehensive monitoring thresholds for homelab services
+
+monitoring_thresholds:
+  enabled: true
+  
+  # System resource thresholds
+  system:
+    # CPU thresholds
+    cpu:
+      warning: 80
+      critical: 90
+      load_average:
+        warning: 2.0
+        critical: 5.0
+    
+    # Memory thresholds
+    memory:
+      warning: 85
+      critical: 95
+      swap:
+        warning: 50
+        critical: 80
+    
+    # Disk thresholds
+    disk:
+      warning: 80
+      critical: 90
+      inode:
+        warning: 85
+        critical: 95
+    
+    # Network thresholds
+    network:
+      bandwidth:
+        warning: 80
+        critical: 90
+      errors:
+        warning: 10
+        critical: 50
+      latency:
+        warning: 100
+        critical: 500
+
+  # Container thresholds
+  containers:
+    # CPU usage per container
+    cpu:
+      warning: 70
+      critical: 85
+    
+    # Memory usage per container
+    memory:
+      warning: 80
+      critical: 90
+    
+    # Disk usage per container
+    disk:
+      warning: 75
+      critical: 85
+    
+    # Container restart rate
+    restarts:
+      warning: 3
+      critical: 10
+      time_window: "1h"
+    
+    # Container health status
+    health:
+      unhealthy_threshold: 1
+      time_window: "5m"
+
+  # Service-specific thresholds
+  services:
+    # Web services (nginx, apache, traefik)
+    web:
+      response_time:
+        warning: 1000
+        critical: 3000
+      error_rate:
+        warning: 5
+        critical: 10
+      availability:
+        warning: 99.5
+        critical: 99.0
+    
+    # Database services (postgresql, mysql, redis)
+    database:
+      connection_pool:
+        warning: 80
+        critical: 90
+      query_time:
+        warning: 1000
+        critical: 5000
+      slow_queries:
+        warning: 10
+        critical: 50
+        time_window: "5m"
+      replication_lag:
+        warning: 30
+        critical: 60
+    
+    # Media services (plex, jellyfin, emby)
+    media:
+      transcoding_queue:
+        warning: 5
+        critical: 10
+      stream_count:
+        warning: 10
+        critical: 20
+      library_scan:
+        warning: 300
+        critical: 600
+    
+    # Download services (sonarr, radarr, sabnzbd)
+    download:
+      queue_size:
+        warning: 50
+        critical: 100
+      download_speed:
+        warning: 10
+        critical: 5
+      failed_downloads:
+        warning: 5
+        critical: 15
+        time_window: "1h"
+    
+    # Storage services (nextcloud, samba)
+    storage:
+      sync_status:
+        warning: 5
+        critical: 10
+      file_operations:
+        warning: 100
+        critical: 500
+        time_window: "1m"
+      quota_usage:
+        warning: 80
+        critical: 90
+    
+    # Monitoring services (prometheus, grafana)
+    monitoring:
+      scrape_interval:
+        warning: 30
+        critical: 60
+      storage_usage:
+        warning: 80
+        critical: 90
+      query_time:
+        warning: 5
+        critical: 15
+    
+    # Security services (authentik, fail2ban)
+    security:
+      failed_logins:
+        warning: 10
+        critical: 50
+        time_window: "5m"
+      blocked_ips:
+        warning: 5
+        critical: 20
+        time_window: "1h"
+      security_events:
+        warning: 5
+        critical: 15
+        time_window: "10m"
+
+  # Application-specific thresholds
+  applications:
+    # Traefik
+    traefik:
+      request_rate:
+        warning: 1000
+        critical: 5000
+      error_rate:
+        warning: 5
+        critical: 15
+      response_time:
+        warning: 500
+        critical: 2000
+    
+    # Grafana
+    grafana:
+      dashboard_load_time:
+        warning: 3
+        critical: 10
+      user_sessions:
+        warning: 50
+        critical: 100
+      datasource_queries:
+        warning: 100
+        critical: 500
+        time_window: "1m"
+    
+    # Prometheus
+    prometheus:
+      scrape_duration:
+        warning: 10
+        critical: 30
+      storage_retention:
+        warning: 7
+        critical: 3
+      rule_evaluation:
+        warning: 5
+        critical: 15
+    
+    # Loki
+    loki:
+      query_time:
+        warning: 5
+        critical: 15
+      ingestion_rate:
+        warning: 1000
+        critical: 5000
+      storage_usage:
+        warning: 80
+        critical: 90
+    
+    # AlertManager
+    alertmanager:
+      notification_queue:
+        warning: 10
+        critical: 50
+      notification_time:
+        warning: 30
+        critical: 60
+    
+    # Jellyfin/Plex
+    media_server:
+      active_streams:
+        warning: 5
+        critical: 10
+      transcoding_sessions:
+        warning: 2
+        critical: 5
+      library_scan_time:
+        warning: 300
+        critical: 600
+    
+    # Sonarr/Radarr
+    arr_services:
+      queue_size:
+        warning: 20
+        critical: 50
+      api_response_time:
+        warning: 2
+        critical: 10
+      failed_grabs:
+        warning: 3
+        critical: 10
+        time_window: "1h"
+    
+    # SABnzbd
+    sabnzbd:
+      download_queue:
+        warning: 10
+        critical: 25
+      download_speed:
+        warning: 10
+        critical: 5
+      failed_downloads:
+        warning: 2
+        critical: 8
+        time_window: "1h"
+    
+    # Nextcloud
+    nextcloud:
+      sync_conflicts:
+        warning: 5
+        critical: 15
+      file_operations:
+        warning: 50
+        critical: 200
+        time_window: "1m"
+      storage_quota:
+        warning: 80
+        critical: 90
+    
+    # Authentik
+    authentik:
+      failed_logins:
+        warning: 5
+        critical: 20
+        time_window: "5m"
+      user_sessions:
+        warning: 20
+        critical: 50
+      api_response_time:
+        warning: 1
+        critical: 5
+
+  # Network thresholds
+  network:
+    # Internet connectivity
+    internet:
+      latency:
+        warning: 50
+        critical: 200
+      packet_loss:
+        warning: 1
+        critical: 5
+      bandwidth:
+        warning: 80
+        critical: 90
+    
+    # Local network
+    local:
+      latency:
+        warning: 10
+        critical: 50
+      packet_loss:
+        warning: 0.1
+        critical: 1.0
+    
+    # DNS resolution
+    dns:
+      response_time:
+        warning: 100
+        critical: 500
+      failure_rate:
+        warning: 5
+        critical: 15
+
+  # Security thresholds
+  security:
+    # Authentication
+    authentication:
+      failed_logins:
+        warning: 5
+        critical: 20
+        time_window: "5m"
+      brute_force_attempts:
+        warning: 10
+        critical: 50
+        time_window: "10m"
+    
+    # Network security
+    network_security:
+      blocked_ips:
+        warning: 5
+        critical: 20
+        time_window: "1h"
+      suspicious_connections:
+        warning: 10
+        critical: 50
+        time_window: "5m"
+    
+    # Container security
+    container_security:
+      privileged_containers:
+        warning: 0
+        critical: 1
+      root_containers:
+        warning: 0
+        critical: 1
+      security_vulnerabilities:
+        warning: 5
+        critical: 15
+
+  # Backup thresholds
+  backup:
+    # Backup status
+    status:
+      failed_backups:
+        warning: 1
+        critical: 3
+        time_window: "24h"
+      backup_age:
+        warning: 24
+        critical: 48
+        unit: "hours"
+    
+    # Backup performance
+    performance:
+      backup_duration:
+        warning: 3600
+        critical: 7200
+        unit: "seconds"
+      backup_size:
+        warning: 100
+        critical: 500
+        unit: "GB"
+    
+    # Backup verification
+    verification:
+      restore_test_failures:
+        warning: 1
+        critical: 3
+        time_window: "7d"
+      backup_integrity:
+        warning: 0
+        critical: 1
+
+  # SSL/TLS thresholds
+  ssl:
+    # Certificate expiration
+    expiration:
+      warning: 30
+      critical: 7
+      unit: "days"
+    
+    # Certificate validation
+    validation:
+      invalid_certificates:
+        warning: 0
+        critical: 1
+      certificate_errors:
+        warning: 1
+        critical: 5
+        time_window: "1h"
+
+  # Performance thresholds
+  performance:
+    # Response times
+    response_time:
+      web_services:
+        warning: 1000
+        critical: 3000
+      api_services:
+        warning: 500
+        critical: 2000
+      database_queries:
+        warning: 100
+        critical: 1000
+    
+    # Throughput
+    throughput:
+      requests_per_second:
+        warning: 100
+        critical: 500
+      transactions_per_second:
+        warning: 50
+        critical: 200
+    
+    # Error rates
+    error_rate:
+      http_errors:
+        warning: 5
+        critical: 15
+      application_errors:
+        warning: 2
+        critical: 10
+      database_errors:
+        warning: 1
+        critical: 5
+
+  # Alert timing
+  alert_timing:
+    # How long to wait before alerting
+    evaluation_interval: "30s"
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+    
+    # Alert grouping
+    group_by:
+      - alertname
+      - service
+      - instance
+    
+    # Rate limiting
+    rate_limit:
+      max_alerts_per_minute: 10
+      max_alerts_per_hour: 100
+
+  # Threshold overrides
+  overrides:
+    # Environment-specific overrides
+    production:
+      system:
+        cpu:
+          warning: 70
+          critical: 85
+        memory:
+          warning: 80
+          critical: 90
+    
+    development:
+      system:
+        cpu:
+          warning: 90
+          critical: 95
+        memory:
+          warning: 90
+          critical: 95
+    
+    # Service-specific overrides
+    high_priority_services:
+      - traefik
+      - authentik
+      - prometheus
+      - grafana
+      
+    low_priority_services:
+      - media_processing
+      - backup_services
+      - maintenance_tasks 

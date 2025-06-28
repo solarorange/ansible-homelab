@@ -10,4 +10,14 @@
     group: "{{ username }}"
     mode: "0644"
   when: media_alerting_enabled | default(true)
-  notify: restart prometheus 
+  notify: restart prometheus
+
+- name: Configure media stack alerting notifications
+  ansible.builtin.template:
+    src: media-alerts.yml.j2
+    dest: "{{ alertmanager_config_dir }}/media-stack.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: media_alerting_enabled | default(true)
+  notify: restart alertmanager 

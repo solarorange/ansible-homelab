@@ -27,11 +27,59 @@ security_authentik:
   container_name: "authentik"
   subdomain: "auth"
   # Authentik requires a unique secret key
-  secret_key: "{{ vault_authentik_secret_key | default('authentik_secret_key_placeholder') }}"
+  secret_key: "{{ vault_authentik_secret_key }}"
   # Postgres password for Authentik
-  postgres_password: "{{ vault_authentik_postgres_password | default('authentik_postgres_password_placeholder') }}"
+  postgres_password: "{{ vault_authentik_postgres_password }}"
   # Authentik admin password
-  admin_password: "{{ vault_authentik_admin_password | default('admin_password_placeholder') }}"
+  admin_password: "{{ vault_authentik_admin_password }}"
+  # Authentik automation configuration
+  automation_enabled: true
+  automation_admin_user: "admin"
+  automation_admin_email: "{{ admin_email }}"
+  automation_admin_password: "{{ vault_authentik_admin_password }}"
+  automation_bootstrap_token: "{{ vault_authentik_bootstrap_token | default('') }}"
+  automation_api_timeout: 30
+  automation_retry_attempts: 3
+  automation_retry_delay: 30
+  # Authentik service configuration
+  port: 9000
+  postgres_port: 5432
+  redis_port: 6379
+  # Authentik application provisioning
+  applications:
+    - name: "Homepage"
+      client_id: "homepage"
+      client_secret: "{{ vault_homepage_oauth_secret }}"
+      redirect_uris: ["https://homepage.{{ domain }}/oauth/callback"]
+      provider_type: "oauth2"
+    - name: "Grafana"
+      client_id: "grafana"
+      client_secret: "{{ vault_grafana_oauth_secret }}"
+      redirect_uris: ["https://grafana.{{ domain }}/login/generic_oauth"]
+      provider_type: "oauth2"
+  # Authentik user management
+  users:
+    - username: "admin"
+      email: "{{ admin_email }}"
+      password: "{{ vault_authentik_admin_password }}"
+      is_superuser: true
+      is_active: true
+  # Authentik groups
+  groups:
+    - name: "Administrators"
+      description: "System administrators"
+      users: ["admin"]
+    - name: "Users"
+      description: "Regular users"
+      users: []
+  # Authentik policies
+  policies:
+    - name: "Admin Access"
+      type: "policy_admin"
+      group: "Administrators"
+    - name: "User Access"
+      type: "policy_user"
+      group: "Users"
 
 # Traefik (Reverse Proxy)
 security_traefik:
@@ -40,7 +88,7 @@ security_traefik:
   container_name: "traefik"
   # Traefik should not have a subdomain, it is the entrypoint
   # Cloudflare API Token for DNS challenge
-  cloudflare_api_token: "{{ vault_cloudflare_api_token | default('cloudflare_api_token_placeholder') }}"
+  cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
 
 # Pi-hole (DNS)
 security_pihole:
@@ -49,7 +97,7 @@ security_pihole:
   container_name: "pihole"
   subdomain: "pihole"
   # Pi-hole admin password
-  admin_password: "{{ vault_pihole_admin_password | default('pihole_admin_password_placeholder') }}"
+  admin_password: "{{ vault_pihole_admin_password }}"
 
 # Fail2ban (Firewall)
 security_fail2ban:
@@ -87,7 +135,7 @@ security_homepage_icon: "security.png"
 security_backup_schedule: "0 3 * * *" # Daily at 3 AM
 security_backup_retention: 14
 security_backup_include_config: true
-security_backup_encryption_passphrase: "{{ vault_backup_encryption_passphrase | default('backup_passphrase_placeholder') }}"
+security_backup_encryption_passphrase: "{{ vault_backup_encryption_passphrase }}"
 
 # Monitoring Configuration
 security_prometheus_scrape_interval: 60
