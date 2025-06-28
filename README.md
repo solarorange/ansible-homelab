@@ -1,19 +1,83 @@
-# Enhanced Ansible Watchtower Playbook
+# Ansible Homelab - Role-Based Infrastructure
 
-A production-ready Ansible playbook for deploying and managing a comprehensive Watchtower environment with monitoring, automation, security, and media services.
+A production-ready Ansible playbook for deploying and managing a comprehensive homelab environment with monitoring, automation, security, media, and storage services using a modern role-based architecture.
 
 ## Table of Contents
-- [Prerequisites](#prerequisites)
-- [System Requirements](#system-requirements)
-- [Quick Start](#quick-start)
-- [Installation Guide](#installation-guide)
-- [Configuration](#configuration)
-- [Deployment Guide](#deployment-guide)
-- [Troubleshooting](#troubleshooting)
-- [Rollback Procedures](#rollback-procedures)
+- [Overview](#overview)
 - [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Role Structure](#role-structure)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Validation and Testing](#validation-and-testing)
+- [Rollback Procedures](#rollback-procedures)
+- [Troubleshooting](#troubleshooting)
+- [Migration Guide](#migration-guide)
 - [Contributing](#contributing)
-- [Monitoring Setup and Deployment](#monitoring-setup-and-deployment)
+
+## Overview
+
+This Ansible homelab project provides a complete infrastructure-as-code solution for deploying and managing a production-ready homelab environment. The project uses a modern role-based architecture that provides:
+
+- **Modular Design**: Each service category is organized into focused roles
+- **Dependency Management**: Clear execution order and role dependencies
+- **Centralized Configuration**: Master configuration file for all role variables
+- **Comprehensive Validation**: Built-in testing and validation procedures
+- **Rollback Capabilities**: Role-level and system-wide rollback procedures
+- **Documentation**: Complete documentation for each role and component
+
+## Architecture
+
+### Role-Based Structure
+
+```
+ansible_homelab/
+├── site.yml                    # Main playbook using roles
+├── validation.yml              # Comprehensive validation playbook
+├── rollback.yml                # Rollback procedures
+├── roles/                      # All service roles
+│   ├── security/               # Security infrastructure
+│   ├── databases/              # Database services
+│   ├── storage/                # Storage infrastructure
+│   ├── logging/                # Centralized logging
+│   ├── certificate_management/ # SSL/TLS certificates
+│   ├── media/                  # Media stack
+│   ├── automation/             # Automation services
+│   ├── utilities/              # Utility services
+│   ├── paperless_ngx/          # Document management
+│   └── fing/                   # Network monitoring
+├── group_vars/                 # Centralized variables
+│   └── all/
+│       ├── roles.yml           # Master role configuration
+│       ├── vars.yml            # System-wide variables
+│       ├── common.yml          # Common settings
+│       └── proxmox.yml         # Proxmox-specific settings
+├── inventory/                  # Host definitions
+├── tasks/                      # Post-deployment tasks
+├── docs/                       # Comprehensive documentation
+└── scripts/                    # Utility scripts
+```
+
+### Role Dependencies
+
+```yaml
+# Infrastructure (no dependencies)
+security: []
+databases: []
+storage: []
+
+# Monitoring (depends on infrastructure)
+logging: [security, databases]
+certificate_management: [security]
+
+# Services (depend on infrastructure and monitoring)
+media: [databases, storage, security]
+automation: [databases, security]
+utilities: [databases, security]
+paperless_ngx: [databases, storage, security]
+fing: [security]
+```
 
 ## Prerequisites
 
@@ -22,386 +86,319 @@ A production-ready Ansible playbook for deploying and managing a comprehensive W
 - Python 3.8 or higher
 - Docker Engine 20.10 or higher
 - Docker Compose 2.0 or higher
-- Proxmox VE 7.0 or higher
 - Git 2.25 or higher
 - SSH client and server
 - OpenSSL 1.1.1 or higher
 
 ### Required Accounts and Services
-- Proxmox VE host with API access
-- Cloudflare account (for DNS management)
 - Domain name with DNS control
+- Cloudflare account (for DNS management)
 - SMTP server for notifications (optional)
 - Backup storage solution
 
-### Required Knowledge
-- Linux system administration
-- Docker containers and orchestration
-- Network configuration and routing
-- DNS management and SSL/TLS
-- Proxmox VE administration
-- Basic Ansible concepts
+### System Requirements
 
-## System Requirements
-
-### Minimum Requirements (Single VM Deployment)
+#### Minimum Requirements (Single Server)
 - CPU: 4 cores (2.0 GHz or higher)
 - RAM: 8GB DDR4
 - Storage: 100GB SSD (NVMe preferred)
 - Network: 1Gbps Ethernet
 - OS: Ubuntu 20.04 LTS or Debian 11
 
-### Recommended Requirements (Multi-VM Deployment)
-- Core Server:
-  - CPU: 4 cores (2.5 GHz or higher)
-  - RAM: 8GB DDR4
-  - Storage: 100GB NVMe SSD
-  - Network: 2.5Gbps Ethernet
-  - OS: Ubuntu 22.04 LTS
-
-- Monitoring Server:
-  - CPU: 2 cores (2.0 GHz or higher)
-  - RAM: 4GB DDR4
-  - Storage: 50GB NVMe SSD
-  - Network: 1Gbps Ethernet
-  - OS: Ubuntu 22.04 LTS
-
-- Automation Server:
-  - CPU: 2 cores (2.0 GHz or higher)
-  - RAM: 4GB DDR4
-  - Storage: 50GB NVMe SSD
-  - Network: 1Gbps Ethernet
-  - OS: Ubuntu 22.04 LTS
-
-- Security Server:
-  - CPU: 2 cores (2.0 GHz or higher)
-  - RAM: 4GB DDR4
-  - Storage: 50GB NVMe SSD
-  - Network: 1Gbps Ethernet
-  - OS: Ubuntu 22.04 LTS
-
-### Network Requirements
-- Static IP addresses for all servers
-- Port forwarding configured on router
-- DNS records properly configured
-- SSL/TLS certificates available
-- Firewall rules configured
+#### Recommended Requirements (Multi-Server)
+- Core Server: 4 cores, 8GB RAM, 100GB NVMe SSD
+- Monitoring Server: 2 cores, 4GB RAM, 50GB NVMe SSD
+- Storage Server: 2 cores, 4GB RAM, 500GB+ storage
+- Security Server: 2 cores, 4GB RAM, 50GB NVMe SSD
 
 ## Quick Start
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
-   git clone https://github.com/solarorange/ansible-watchtower.git
+   git clone https://github.com/solarorange/ansible_homelab.git
    cd ansible_homelab
    ```
 
-2. Run the setup script:
+2. **Run the setup script**:
    ```bash
    ./scripts/setup.sh
    ```
-   This will:
-   - Install required collections and roles
-   - Create necessary directory structure
-   - Set up Proxmox vault file
-   - Generate SSH keys
-   - Create initial configuration files
-   - Validate system requirements
-   - Configure network settings
 
-3. Review and edit configuration:
-   - `inventory/hosts.yml`: Update host information
-   - `group_vars/all/proxmox_vault.yml`: Review Proxmox settings
-   - `group_vars/all/vars.yml`: Configure your services
-   - `group_vars/all/network.yml`: Configure network settings
-   - `group_vars/all/security.yml`: Configure security settings
-
-4. Run the playbook:
+3. **Configure your environment**:
    ```bash
-   ansible-playbook main.yml
+   # Edit master configuration
+   nano group_vars/all/roles.yml
+   
+   # Edit system variables
+   nano group_vars/all/vars.yml
+   
+   # Update inventory
+   nano inventory.yml
    ```
+
+4. **Deploy the infrastructure**:
+   ```bash
+   # Deploy all services
+   ansible-playbook site.yml
+   
+   # Deploy specific roles
+   ansible-playbook site.yml --tags security,databases
+   
+   # Validate deployment
+   ansible-playbook validation.yml
+   ```
+
+## Role Structure
+
+### Core Infrastructure Roles
+
+#### Security Role (`roles/security/`)
+- **Authentication**: Authentik for SSO
+- **Reverse Proxy**: Traefik with automatic SSL
+- **DNS**: Pi-hole for ad blocking and DNS
+- **Firewall**: UFW configuration
+- **VPN**: WireGuard setup
+- **Security Monitoring**: CrowdSec, Fail2ban
+
+#### Databases Role (`roles/databases/`)
+- **Cache**: Redis for session and cache storage
+- **Relational**: PostgreSQL and MariaDB
+- **Search**: Elasticsearch and Kibana
+- **Monitoring**: Database health checks and backup
+
+#### Storage Role (`roles/storage/`)
+- **File Systems**: Samba for network shares
+- **Sync Services**: Syncthing for file synchronization
+- **Cloud Storage**: Nextcloud for personal cloud
+- **Backup**: Automated backup procedures
+
+### Monitoring and Logging Roles
+
+#### Logging Role (`roles/logging/`)
+- **Log Aggregation**: Loki for centralized logging
+- **Log Collection**: Promtail for log shipping
+- **Metrics**: Prometheus for time-series data
+- **Alerting**: Alertmanager for notifications
+- **System Metrics**: Telegraf and InfluxDB
+
+#### Certificate Management Role (`roles/certificate_management/`)
+- **SSL/TLS**: Automated certificate renewal
+- **mTLS**: Mutual TLS certificate generation
+- **Monitoring**: Certificate expiration alerts
+
+### Service Roles
+
+#### Media Role (`roles/media/`)
+- **ARR Services**: Sonarr, Radarr, Prowlarr, Bazarr, Lidarr, Readarr
+- **Downloaders**: qBittorrent, SABnzbd
+- **Media Players**: Plex, Jellyfin, Emby
+- **Media Management**: Tautulli, Overseerr
+- **Media Processing**: Tdarr
+
+#### Automation Role (`roles/automation/`)
+- **Container Management**: Portainer, Watchtower
+- **Home Automation**: Home Assistant, Node-RED
+- **Scheduling**: Cron job management
+- **MQTT**: Mosquitto broker
+
+#### Utilities Role (`roles/utilities/`)
+- **Dashboards**: Homepage, Grafana
+- **Media Processing**: Tdarr
+- **System Utilities**: Various helper services
+
+### Specialized Roles
+
+#### Paperless-ngx Role (`roles/paperless_ngx/`)
+- Document management and OCR
+- Automated document processing
+- Search and organization
+
+#### Fing Role (`roles/fing/`)
+- Network device discovery
+- Network monitoring
+- Device tracking
 
 ## Configuration
 
-### Proxmox Configuration
-The playbook supports two authentication methods:
+### Master Configuration (`group_vars/all/roles.yml`)
 
-1. Password Authentication:
-   ```yaml
-   proxmox_host: "proxmox.local"
-   proxmox_user: "root@pam"
-   proxmox_password: "your-password"
-   ```
-
-2. API Token Authentication (Recommended):
-   ```yaml
-   proxmox_host: "proxmox.local"
-   proxmox_user: "root@pam"
-   proxmox_token_id: "your-token-id"
-   proxmox_token_secret: "your-token-secret"
-   ```
-
-### Resource Management
-Configure VM resources in `group_vars/all/proxmox.yml`:
+The master configuration file centralizes all role variables:
 
 ```yaml
-resource_limits:
-  memory:
-    min: 1024  # Minimum memory in MB
-    max: 8192  # Maximum memory in MB
-  cpu:
-    min: 1     # Minimum CPU cores
-    max: 8     # Maximum CPU cores
-  disk:
-    min: 10    # Minimum disk space in GB
-    max: 100   # Maximum disk space in GB
-  backup:
-    enabled: true
-    schedule: "0 2 * * *"  # Daily at 2 AM
-    retention: 7  # Days to keep backups
+# Role enablement
+security_enabled: true
+databases_enabled: true
+storage_enabled: true
+media_enabled: true
+automation_enabled: true
+utilities_enabled: true
+
+# Role-specific configuration
+security_authentication_enabled: true
+security_proxy_enabled: true
+databases_cache_enabled: true
+media_arr_services_enabled: true
 ```
 
-### Network Configuration
-Configure networking in `group_vars/all/network.yml`:
+### System Variables (`group_vars/all/vars.yml`)
+
+System-wide configuration variables:
 
 ```yaml
-network_config:
-  bridge: "vmbr0"
-  vlan: "optional-vlan-id"
-  ip_config: "static"  # or dhcp
-  gateway: "192.168.40.1"
-  dns_servers:
-    - "8.8.8.8"
-    - "8.8.4.4"
-  firewall:
-    enabled: true
-    rules:
-      - port: 80
-        protocol: tcp
-        action: allow
-      - port: 443
-        protocol: tcp
-        action: allow
+# Basic system configuration
+username: "your_username"
+domain: "your-domain.com"
+timezone: "UTC"
+
+# Directory structure
+docker_dir: "/home/{{ username }}/docker"
+data_dir: "/home/{{ username }}/data"
+config_dir: "/home/{{ username }}/config"
+backup_dir: "/home/{{ username }}/backups"
 ```
 
-### Security Configuration
-Configure security settings in `group_vars/all/security.yml`:
+## Deployment
 
-```yaml
-security_config:
-  ssl:
-    provider: "letsencrypt"
-    email: "your-email@domain.com"
-    staging: false
-  firewall:
-    enabled: true
-    default_policy: "drop"
-  fail2ban:
-    enabled: true
-    max_retries: 3
-    ban_time: 3600
-  wireguard:
-    enabled: true
-    port: 51820
+### Full Deployment
+```bash
+# Deploy all services
+ansible-playbook site.yml
 ```
 
-### Certificate Management Configuration
-Configure certificate management in `group_vars/all/certificate_management.yml`:
+### Selective Deployment
+```bash
+# Deploy infrastructure only
+ansible-playbook site.yml --tags infrastructure
 
-```yaml
-certificate_management:
-  provider: "letsencrypt"  # or "self-signed"
-  staging: false  # Set to true for testing
-  email: "your-email@domain.com"
-  domains:
-    - domain: "your-domain.com"
-      subdomains:
-        - "www"
-        - "api"
-        - "auth"
-    - domain: "another-domain.com"
-      subdomains:
-        - "app"
-  renewal:
-    enabled: true
-    schedule: "0 0 1 * *"  # Monthly at midnight
-    days_before_expiry: 30
-  storage:
-    type: "file"  # or "vault"
-    path: "/etc/ssl/certs"
-    backup: true
-  validation:
-    method: "dns"  # or "http"
-    dns_provider: "cloudflare"
-    http_port: 80
+# Deploy specific roles
+ansible-playbook site.yml --tags security,databases
+
+# Deploy services only
+ansible-playbook site.yml --tags services
+
+# Skip specific roles
+ansible-playbook site.yml --skip-tags paperless,fing
 ```
 
-### Logging Configuration
-Configure logging in `group_vars/all/logging.yml`:
+### Pre-Deployment Validation
+```bash
+# Check mode (dry run)
+ansible-playbook site.yml --check --diff
 
-```yaml
-logging:
-  aggregation:
-    enabled: true
-    type: "filebeat"  # or "fluentd"
-    hosts:
-      - "log-server.your-domain.com:5044"
-    ssl:
-      enabled: true
-      ca_cert: "/etc/ssl/certs/ca.pem"
-      client_cert: "/etc/ssl/certs/client.pem"
-      client_key: "/etc/ssl/private/client.key"
-  
-  storage:
-    type: "elasticsearch"  # or "loki"
-    hosts:
-      - "elasticsearch.your-domain.com:9200"
-    indices:
-      prefix: "logs-"
-      retention: "30d"
-    backup:
-      enabled: true
-      schedule: "0 1 * * *"  # Daily at 1 AM
-      retention: "90d"
-  
-  analysis:
-    enabled: true
-    type: "kibana"  # or "grafana"
-    dashboards:
-      - name: "system-logs"
-        refresh: "5m"
-      - name: "application-logs"
-        refresh: "1m"
-    alerts:
-      enabled: true
-      channels:
-        - type: "email"
-          recipients:
-            - "admin@your-domain.com"
-        - type: "slack"
-          webhook: "https://hooks.slack.com/services/xxx"
-  
-  retention:
-    enabled: true
-    policies:
-      - name: "system-logs"
-        pattern: "system-*"
-        max_age: "30d"
-        max_size: "10GB"
-      - name: "application-logs"
-        pattern: "app-*"
-        max_age: "90d"
-        max_size: "50GB"
-  
-  shipping:
-    enabled: true
-    batch_size: 2048
-    compression: true
-    timeout: "30s"
-    retry:
-      max_attempts: 3
-      initial_interval: "1s"
-      max_interval: "10s"
+# Validate specific roles
+ansible-playbook site.yml --tags security --check
 ```
 
-## Deployment Guide
+## Validation and Testing
 
-For detailed deployment instructions, please refer to [DEPLOYMENT.md](DEPLOYMENT.md).
+### Comprehensive Validation
+```bash
+# Run full validation
+ansible-playbook validation.yml
 
-## Troubleshooting
+# Validate specific components
+ansible-playbook validation.yml --tags security,databases
+```
 
-For common issues and solutions, please refer to [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+### Service Health Checks
+```bash
+# Check service status
+ansible-playbook validation.yml --tags validation
+
+# Generate health report
+ansible-playbook validation.yml --tags report
+```
 
 ## Rollback Procedures
 
-### VM Rollback
-1. Stop the VM:
-   ```bash
-   ansible-playbook main.yml --tags proxmox -e "vm_state=stopped"
-   ```
+### Role-Level Rollback
+```bash
+# Rollback specific role
+ansible-playbook rollback.yml --tags security -e "rollback_confirm=true"
 
-2. Restore from backup:
-   ```bash
-   ansible-playbook main.yml --tags proxmox -e "vm_restore=true"
-   ```
+# Rollback all services
+ansible-playbook rollback.yml --tags services -e "rollback_confirm=true"
+```
 
-### Service Rollback
-1. Restore service configuration:
-   ```bash
-   ansible-playbook main.yml --tags "{{ service_name }}" -e "restore=true"
-   ```
+### Full System Rollback
+```bash
+# Rollback entire system
+ansible-playbook rollback.yml -e "rollback_confirm=true"
+```
 
-2. Verify service status:
-   ```bash
-   ansible-playbook main.yml --tags "{{ service_name }}" -e "check_status=true"
-   ```
+## Troubleshooting
 
-## Architecture
+### Common Issues
 
-The Watchtower architecture consists of several key components:
+1. **Role Dependencies**: Ensure roles are deployed in the correct order
+2. **Configuration Errors**: Check variable syntax in `group_vars/all/roles.yml`
+3. **Service Failures**: Use validation playbook to identify issues
+4. **Network Issues**: Verify DNS and firewall configuration
 
-1. Core Infrastructure:
-   - Proxmox VE for virtualization
-   - Docker for containerization
-   - Traefik for reverse proxy
-   - Authentik for authentication
+### Debug Commands
+```bash
+# Verbose output
+ansible-playbook site.yml -vvv
 
-2. Monitoring Stack:
-   - Prometheus for metrics collection
-   - Grafana for visualization
-   - InfluxDB for time-series data
-   - Alertmanager for notifications
+# Check specific role
+ansible-playbook site.yml --tags security --check --diff
 
-3. Security Services:
-   - CrowdSec for intrusion detection
-   - Vault for secrets management
-   - WireGuard for VPN
-   - Fail2ban for brute force protection
-   - Certificate Management for SSL/TLS
+# Validate configuration
+ansible-playbook validation.yml --tags validation
+```
 
-4. Media Services:
-   - Jellyfin for media streaming
-   - Sonarr for TV shows
-   - Radarr for movies
-   - Plex for media management
+### Logs and Reports
+- Service logs: `/home/{{ username }}/logs/`
+- Validation reports: `/home/{{ username }}/logs/validation_report_*.txt`
+- Rollback reports: `/home/{{ username }}/logs/rollback_report_*.txt`
 
-5. File Services:
-   - Nextcloud for file sharing
-   - Samba for network shares
-   - Syncthing for file synchronization
-   - Backup solutions
+## Migration Guide
 
-6. Automation Services:
-   - Home Assistant for home automation
-   - Node-RED for automation flows
-   - MQTT broker for IoT communication
-   - Task scheduling
+If you're migrating from the old task-based structure, see the comprehensive migration guide:
 
-7. Logging Services:
-   - Centralized logging system
-   - Log aggregation and analysis
-   - Log retention management
-   - Log-based alerting
+- [Role Migration Summary](docs/ROLE_MIGRATION_SUMMARY.md)
+- [Migration Best Practices](docs/MIGRATION_BEST_PRACTICES.md)
+
+### Migration Scripts
+```bash
+# Clean up obsolete task files
+./scripts/cleanup_obsolete_tasks.sh
+
+# Dry run first
+./scripts/cleanup_obsolete_tasks.sh true
+```
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+### Development Guidelines
+1. Follow the role-based architecture
+2. Use centralized configuration
+3. Implement proper validation
+4. Add comprehensive documentation
+5. Test thoroughly before submitting
+
+### Adding New Roles
+1. Create role structure in `roles/`
+2. Add role configuration to `group_vars/all/roles.yml`
+3. Update dependencies in `site.yml`
+4. Add validation tasks
+5. Update documentation
+
+### Testing
+```bash
+# Test new role
+ansible-playbook site.yml --tags your_new_role --check
+
+# Validate role
+ansible-playbook validation.yml --tags your_new_role
+```
+
+## Support
+
+- **Documentation**: See `docs/` directory for detailed guides
+- **Issues**: Report bugs and feature requests via GitHub issues
+- **Discussions**: Use GitHub discussions for questions and help
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Monitoring Setup and Deployment
-
-### Prometheus & Grafana
-1. Configure monitoring in `group_vars/all/vars.yml`
-2. Deploy monitoring stack:
-   ```bash
-   ansible-playbook main.yml --tags monitoring
-   ```
-
-### Node Exporter
-1. Enable node exporter in Proxmox configuration
-2. Deploy node exporter:
-   ```bash
-   ansible-playbook main.yml --tags monitoring
-   ``` 
+This project is licensed under the MIT License - see the LICENSE file for details. 

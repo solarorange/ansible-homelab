@@ -1,89 +1,97 @@
-# Databases Role
+# Ansible Role: Databases
 
-This role manages all database infrastructure for the homelab, including relational (PostgreSQL, MariaDB), cache (Redis), and search (Elasticsearch, Kibana) services. It provides modular tasks for deployment, validation, monitoring, backup/restore (with PITR), security, and homepage integration.
+This role deploys and manages the database stack for the homelab, including relational, cache, and search databases. It is designed to be modular, secure, and resilient, with integrated monitoring, backup, and validation.
 
-## Directory Structure
+## Role Structure
 
-```
-defaults/main.yml         # Default variables for all services
-handlers/main.yml         # Handlers for service restarts, notifications
-vars/main.yml             # Sensitive or environment-specific variables
+The role is organized into the following components:
 
-tasks/main.yml            # Main entry point, includes all modular tasks
-tasks/prerequisites.yml   # Pre-flight checks and setup
-tasks/relational.yml      # PostgreSQL & MariaDB deployment/config/backup
-tasks/cache.yml           # Redis deployment/config/backup
-tasks/search.yml          # Elasticsearch & Kibana deployment/config/backup
-tasks/monitoring.yml      # Monitoring integration (Prometheus, Grafana)
-tasks/backup.yml          # Backup & PITR scripts, scheduling, restore
-tasks/security.yml        # Security hardening, SSL, auth
-tasks/homepage.yml        # Homepage integration
-tasks/alerts.yml          # Alerting integration
-tasks/validate.yml        # Validation tasks (connectivity, config)
-tasks/validate_deployment.yml # End-to-end health checks
+-   **`defaults/main.yml`**: Contains all default variables for the database stack. Passwords and secrets should be managed via Ansible Vault.
+-   **`tasks/`**: The main entry point is `main.yml`, which includes other task files based on enabled services.
+    -   `main.yml`: Orchestrates the entire role.
+    -   `validate.yml`: Performs pre-flight checks and configuration validation.
+    -   `prerequisites.yml`: Installs necessary packages and dependencies.
+    -   `relational.yml`: Deploys and configures relational databases (PostgreSQL, MariaDB).
+    -   `cache.yml`: Deploys and configures cache databases (Redis).
+    -   `search.yml`: Deploys and configures search databases (Elasticsearch, Kibana).
+    -   `monitoring.yml`: Integrates with the monitoring stack (Prometheus, Grafana, Telegraf, Loki).
+    -   `security.yml`: Applies security hardening, firewall rules, and encryption.
+    -   `backup.yml`: Configures automated backups with point-in-time recovery.
+    -   `homepage.yml`: Integrates with the homepage dashboard.
+    -   `alerts.yml`: Configures alerting rules.
+    -   `validate_deployment.yml`: Performs post-deployment health checks and validation.
+-   **`templates/`**: Contains Jinja2 templates for configuration files, scripts, and dashboards.
+    -   `postgresql.conf.j2`: PostgreSQL configuration.
+    -   `mariadb.conf.j2`: MariaDB configuration.
+    -   `redis.conf.j2`: Redis configuration.
+    -   `elasticsearch.yml.j2`: Elasticsearch configuration.
+    -   `kibana.yml.j2`: Kibana configuration.
+    -   `backup.sh.j2`: Backup script for each database.
+    -   `restore.sh.j2`: Restore script for each database.
+    -   `grafana-dashboard.json.j2`: Grafana dashboard for database monitoring.
+-   **`handlers/`**: Contains handlers for restarting services.
+-   **`vars/`**: Contains variables for the role.
 
-templates/                # All config, script, and dashboard templates
-```
+## Requirements
 
-## Variables & Vault Integration
-
-- All tunable variables are in `defaults/main.yml`.
-- Sensitive variables (passwords, keys) are referenced in `vars/main.yml` and can be overridden in `group_vars/` or `host_vars/` (vault-encrypted recommended).
-- Example:
-  ```yaml
-  postgresql_admin_password: "{{ vault_postgresql_admin_password | default(lookup('password', '/dev/null length=32 chars=ascii_letters,digits')) }}"
-  ```
-- To override, create `group_vars/all/vault.yml` (encrypted with `ansible-vault`).
+-   Ansible 2.9 or higher.
+-   Docker and Docker Compose installed on the target host.
+-   Ansible Vault configured for secret management.
+-   A running monitoring stack (Prometheus, Grafana, Loki).
 
 ## Usage
 
-1. Include the role in your playbook:
-   ```yaml
-   - hosts: databases
-     roles:
-       - databases
-   ```
-2. Set/override variables as needed in inventory or group_vars.
-3. Ensure vault files are available for sensitive data.
+To use this role, include it in your playbook and configure the variables in `group_vars` or `host_vars`.
 
-## Backup & Restore
+```yaml
+- hosts: database_servers
+  roles:
+    - role: databases
+```
 
-- Automated full and PITR backups for PostgreSQL and MariaDB.
-- Backup scripts and cron jobs are deployed to each service.
-- Restore scripts provided for manual or automated recovery.
-- Validation tasks check backup integrity and test restores.
+### Variable Reference
 
-## Validation & Health Checks
+A comprehensive list of variables can be found in `defaults/main.yml`. Key variables to configure include:
 
-- Connectivity checks for all services (e.g., `pg_isready`, `mysqladmin ping`, `redis-cli ping`, HTTP checks for Elasticsearch/Kibana).
-- Backup file age and integrity checks.
-- Security configuration validation.
+-   `databases_enabled`: Enable or disable the entire database stack.
+-   `postgresql_enabled`, `mariadb_enabled`, `redis_enabled`, `elasticsearch_enabled`, `kibana_enabled`: Enable or disable individual database services.
+-   `databases_backup_enabled`: Enable or disable automated backups.
+-   `databases_monitoring_enabled`: Enable or disable monitoring integration.
+-   `databases_security_enabled`: Enable or disable security features.
+-   `databases_homepage_enabled`: Enable or disable homepage integration.
 
-## Monitoring Integration
+### Backup and Restore
 
-- Prometheus exporters for all services.
-- Grafana dashboards provisioned for database metrics.
-- Alertmanager rules for backup failures, service downtime, and performance issues.
+This role configures automated backups with retention policies. To perform a manual backup or restore, you can use the generated scripts in the respective container's script directory (e.g., `{{ docker_dir }}/postgresql/scripts/`).
 
-## Security Hardening
+**Backup:**
+```bash
+/path/to/scripts/backup.sh
+```
 
-- SSL/TLS enforced for all services.
-- Strong, rotated passwords.
-- Hardened config files (e.g., `pg_hba.conf`, `my.cnf`, `redis.conf`).
-- Authentication enabled and access restricted.
-- Optional integration with CrowdSec/Fail2Ban.
+**Restore:**
+To restore from a specific backup file:
+```bash
+/path/to/scripts/restore.sh /path/to/backup/file
+```
 
-## Homepage Integration
+### Monitoring
 
-- All database services are added to the homepage with icons, categories, and descriptions.
-- See `tasks/homepage.yml` for configuration details.
+The role integrates with Prometheus for metrics collection and Grafana for visualization. A pre-configured Grafana dashboard is included. Logs are forwarded to Loki via Promtail.
 
-## Extending & Customizing
+### Security
 
-- Add new services by extending the relevant task files and templates.
-- Override any variable in your inventory or group_vars.
-- Use vault for all sensitive data.
+Security is managed through several layers:
 
----
+-   **Ansible Vault**: All secrets are encrypted.
+-   **SSL/TLS**: Communication is encrypted.
+-   **Firewall**: Network access is restricted.
+-   **CrowdSec/Fail2ban**: Intrusion detection and prevention.
 
-For detailed variable documentation, see `defaults/main.yml`. 
+## Local Development and Testing
+
+For local testing, you can use Molecule.
+
+```bash
+molecule test
+``` 

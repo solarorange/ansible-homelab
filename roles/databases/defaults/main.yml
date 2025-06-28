@@ -36,7 +36,7 @@ postgresql_restart_policy: "unless-stopped"
 postgresql_network_mode: "bridge"
 postgresql_web_port: 5432
 postgresql_admin_user: "postgres"
-postgresql_admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+postgresql_admin_password: "{{ lookup('vault', 'postgresql_admin_password') }}"
 postgresql_data_dir: "{{ docker_dir }}/postgresql/data"
 postgresql_config_dir: "{{ docker_dir }}/postgresql/config"
 postgresql_backup_dir: "{{ docker_dir }}/postgresql/backup"
@@ -54,9 +54,9 @@ postgresql_min_wal_size: "80MB"
 
 # PostgreSQL Security
 postgresql_ssl_enabled: true
-postgresql_ssl_cert_file: "/etc/ssl/certs/postgresql.crt"
-postgresql_ssl_key_file: "/etc/ssl/private/postgresql.key"
-postgresql_ssl_ca_file: "/etc/ssl/certs/ca.crt"
+postgresql_ssl_cert_file: "{{ ssl_certificate_path }}/postgresql.crt"
+postgresql_ssl_key_file: "{{ ssl_certificate_key_path }}/postgresql.key"
+postgresql_ssl_ca_file: "{{ ssl_ca_certificate_path }}/ca.crt"
 
 # MariaDB Configuration
 mariadb_enabled: true
@@ -66,7 +66,7 @@ mariadb_container_name: "mariadb"
 mariadb_restart_policy: "unless-stopped"
 mariadb_network_mode: "bridge"
 mariadb_web_port: 3306
-mariadb_root_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+mariadb_root_password: "{{ lookup('vault', 'mariadb_root_password') }}"
 mariadb_data_dir: "{{ docker_dir }}/mariadb/data"
 mariadb_config_dir: "{{ docker_dir }}/mariadb/config"
 mariadb_backup_dir: "{{ docker_dir }}/mariadb/backup"
@@ -83,9 +83,9 @@ mariadb_thread_cache_size: 128
 
 # MariaDB Security
 mariadb_ssl_enabled: true
-mariadb_ssl_cert_file: "/etc/ssl/certs/mariadb.crt"
-mariadb_ssl_key_file: "/etc/ssl/private/mariadb.key"
-mariadb_ssl_ca_file: "/etc/ssl/certs/ca.crt"
+mariadb_ssl_cert_file: "{{ ssl_certificate_path }}/mariadb.crt"
+mariadb_ssl_key_file: "{{ ssl_certificate_key_path }}/mariadb.key"
+mariadb_ssl_ca_file: "{{ ssl_ca_certificate_path }}/ca.crt"
 
 #==============================================================================
 # CACHE DATABASES CONFIGURATION
@@ -99,7 +99,7 @@ redis_container_name: "redis"
 redis_restart_policy: "unless-stopped"
 redis_network_mode: "bridge"
 redis_web_port: 6379
-redis_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+redis_password: "{{ lookup('vault', 'redis_password') }}"
 redis_data_dir: "{{ docker_dir }}/redis/data"
 redis_config_dir: "{{ docker_dir }}/redis/config"
 redis_backup_dir: "{{ docker_dir }}/redis/backup"
@@ -153,7 +153,7 @@ elasticsearch_number_of_replicas: 0
 elasticsearch_xpack_security_enabled: true
 elasticsearch_xpack_security_transport_ssl_enabled: true
 elasticsearch_xpack_security_http_ssl_enabled: true
-elasticsearch_elastic_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+elasticsearch_elastic_password: "{{ lookup('vault', 'elasticsearch_elastic_password') }}"
 
 #==============================================================================
 # MONITORING CONFIGURATION
@@ -297,7 +297,7 @@ kibana_logs_dir: "{{ logs_dir }}/kibana"
 kibana_xpack_security_enabled: true
 kibana_server_ssl_enabled: true
 kibana_elasticsearch_ssl_enabled: true
-kibana_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+kibana_encryption_key: "{{ lookup('vault', 'kibana_encryption_key') }}"
 
 #==============================================================================
 # ALERTING CONFIGURATION
@@ -305,7 +305,7 @@ kibana_encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_l
 
 databases_alerting_enabled: true
 databases_alerting_provider: "alertmanager"
-databases_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+databases_alerting_webhook: "http://{{ alertmanager_host | default('alertmanager') }}:{{ alertmanager_port | default(9093) }}/api/v1/alerts"
 
 # Alert Rules
 databases_alert_rules:
@@ -337,6 +337,10 @@ databases_vault_secrets:
   - "redis_password"
   - "elasticsearch_elastic_password"
   - "kibana_encryption_key"
+  - "postgresql_secret_key"
+  - "mariadb_secret_key"
+  - "postgresql_database_password"
+  - "mariadb_database_password"
 
 #==============================================================================
 # SERVICE DEPENDENCIES
@@ -351,7 +355,6 @@ databases_dependencies:
 # Health Check Configuration
 databases_health_check_timeout: 10
 databases_health_check_retries: 3
-databases_health_check_interval: 30
 
 #==============================================================================
 # LOGGING CONFIGURATION
@@ -467,14 +470,14 @@ postgresql_domain: "{{ postgresql_subdomain }}.{{ domain }}"
 
 # PostgreSQL Authentication Configuration
 postgresql_auth_enabled: true
-postgresql_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+postgresql_secret_key: "{{ lookup('vault', 'postgresql_secret_key') }}"
 
 # PostgreSQL Database Configuration
 postgresql_database_host: "{{ postgresql_host | default('postgresql') }}"
 postgresql_database_port: "{{ postgresql_port | default(5432) }}"
 postgresql_database_name: "postgres"
 postgresql_database_user: "postgres"
-postgresql_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+postgresql_database_password: "{{ lookup('vault', 'postgresql_database_password') }}"
 
 # MariaDB Port Configuration
 mariadb_port: 3306
@@ -486,14 +489,14 @@ mariadb_domain: "{{ mariadb_subdomain }}.{{ domain }}"
 # MariaDB Authentication Configuration
 mariadb_auth_enabled: true
 mariadb_root_user: "root"
-mariadb_secret_key: "{{ lookup('password', '/dev/null length=50 chars=ascii_letters,digits') }}"
+mariadb_secret_key: "{{ lookup('vault', 'mariadb_secret_key') }}"
 
 # MariaDB Database Configuration
 mariadb_database_host: "{{ mariadb_host | default('mariadb') }}"
 mariadb_database_port: "{{ mariadb_port | default(3306) }}"
 mariadb_database_name: "mysql"
 mariadb_database_user: "root"
-mariadb_database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+mariadb_database_password: "{{ lookup('vault', 'mariadb_database_password') }}"
 
 # Redis Port Configuration
 redis_port: 6379
@@ -528,56 +531,5 @@ kibana_domain: "{{ kibana_subdomain }}.{{ domain }}"
 
 # Kibana Authentication Configuration
 kibana_auth_enabled: true
-kibana_user: "kibana"
-kibana_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-
-# Health Check Configuration
-databases_health_check_url: "/health"
-
-# Access Control Configuration
-databases_access_control_enabled: true
-databases_allowed_networks:
-  - "10.0.0.0/8"
-  - "172.16.0.0/12"
-  - "192.168.0.0/16"
-databases_allowed_users: []
-databases_allowed_groups: []
-
-# Encryption Configuration
-databases_encryption_at_rest_enabled: true
-databases_encryption_in_transit_enabled: true
-databases_encryption_algorithm: "AES-256-GCM"
-databases_encryption_key_rotation: 90  # Days
-
-# Audit Configuration
-databases_audit_enabled: true
-databases_audit_log_path: "/var/log/databases/audit.log"
-databases_audit_retention: 365  # Days
-databases_audit_events:
-  - "authentication"
-  - "authorization"
-  - "data_access"
-  - "data_modification"
-  - "configuration_change"
-  - "backup_restore"
-
-# Maintenance Configuration
-databases_maintenance_tasks:
-  - "vacuum"
-  - "analyze"
-  - "reindex"
-  - "optimize"
-  - "cleanup"
-
-# Replication Configuration
-databases_replication_delay: 0  # Seconds
-
-# Clustering Configuration
-databases_cluster_quorum: 2
-
-# Disaster Recovery Configuration
-databases_dr_enabled: true
-databases_dr_type: "backup-restore"  # Options: backup-restore, replication, clustering
-databases_dr_rto: 3600  # Recovery Time Objective in seconds
-databases_dr_rpo: 300   # Recovery Point Objective in seconds
-databases_dr_test_schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM 
+kibana_user: "elastic"
+kibana_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}" 

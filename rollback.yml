@@ -1,0 +1,334 @@
+---
+# Comprehensive Rollback Playbook
+# Provides role-level and system-wide rollback capabilities
+
+- name: Rollback homelab deployment
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    rollback_backup_dir: "/home/{{ username }}/backups/rollback"
+    rollback_confirm: "{{ rollback_confirm | default(false) }}"
+
+  pre_tasks:
+    - name: Validate rollback prerequisites
+      block:
+        - name: Check if backup directory exists
+          ansible.builtin.stat:
+            path: "{{ rollback_backup_dir }}"
+          register: backup_dir_check
+
+        - name: Display available backups
+          ansible.builtin.shell: |
+            echo "=== Available Rollback Backups ==="
+            ls -la {{ rollback_backup_dir }} 2>/dev/null || echo "No backup directory found"
+          register: available_backups
+          changed_when: false
+
+        - name: Show available backups
+          ansible.builtin.debug:
+            var: available_backups.stdout_lines
+
+  tasks:
+    - name: Confirm rollback operation
+      ansible.builtin.fail:
+        msg: |
+          ROLLBACK OPERATION REQUIRES CONFIRMATION
+          
+          This will rollback the following roles:
+          {% if 'security' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Security services (Traefik, Authentik, Pi-hole, etc.)
+          {% endif %}
+          {% if 'databases' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Database services (Redis, PostgreSQL, MariaDB, etc.)
+          {% endif %}
+          {% if 'storage' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Storage services (Samba, Syncthing, Nextcloud)
+          {% endif %}
+          {% if 'media' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Media services (Plex, Sonarr, Radarr, etc.)
+          {% endif %}
+          {% if 'automation' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Automation services (Portainer, Watchtower, etc.)
+          {% endif %}
+          {% if 'utilities' in ansible_run_tags or 'all' in ansible_run_tags %}
+          - Utility services (Homepage, Grafana, etc.)
+          {% endif %}
+          
+          Set rollback_confirm=true to proceed
+      when: not rollback_confirm
+
+    - name: Rollback security services
+      block:
+        - name: Stop security containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - traefik
+            - authentik
+            - pihole
+            - crowdsec
+            - fail2ban
+          ignore_errors: true
+
+        - name: Restore security configuration
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/security/"
+            dest: "/home/{{ username }}/config/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart security services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - traefik
+            - authentik
+            - pihole
+          ignore_errors: true
+
+      when: 'security' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, security]
+
+    - name: Rollback database services
+      block:
+        - name: Stop database containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - redis
+            - postgresql
+            - mariadb
+            - elasticsearch
+            - kibana
+          ignore_errors: true
+
+        - name: Restore database data
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/databases/"
+            dest: "/home/{{ username }}/data/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart database services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - redis
+            - postgresql
+            - mariadb
+            - elasticsearch
+            - kibana
+          ignore_errors: true
+
+      when: 'databases' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, databases]
+
+    - name: Rollback storage services
+      block:
+        - name: Stop storage containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - samba
+            - syncthing
+            - nextcloud
+          ignore_errors: true
+
+        - name: Restore storage configuration
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/storage/"
+            dest: "/home/{{ username }}/config/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart storage services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - samba
+            - syncthing
+            - nextcloud
+          ignore_errors: true
+
+      when: 'storage' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, storage]
+
+    - name: Rollback media services
+      block:
+        - name: Stop media containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - plex
+            - sonarr
+            - radarr
+            - prowlarr
+            - bazarr
+            - lidarr
+            - readarr
+            - qbittorrent
+            - sabnzbd
+            - jellyfin
+            - tautulli
+            - overseerr
+            - komga
+            - audiobookshelf
+            - calibre-web
+            - immich
+            - tdarr
+          ignore_errors: true
+
+        - name: Restore media configuration
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/media/"
+            dest: "/home/{{ username }}/config/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart media services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - plex
+            - sonarr
+            - radarr
+            - prowlarr
+            - bazarr
+            - lidarr
+            - readarr
+            - qbittorrent
+            - sabnzbd
+            - jellyfin
+            - tautulli
+            - overseerr
+            - komga
+            - audiobookshelf
+            - calibre-web
+            - immich
+            - tdarr
+          ignore_errors: true
+
+      when: 'media' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, media]
+
+    - name: Rollback automation services
+      block:
+        - name: Stop automation containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - portainer
+            - watchtower
+            - mosquitto
+            - homeassistant
+            - nodered
+          ignore_errors: true
+
+        - name: Restore automation configuration
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/automation/"
+            dest: "/home/{{ username }}/config/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart automation services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - portainer
+            - watchtower
+            - mosquitto
+            - homeassistant
+            - nodered
+          ignore_errors: true
+
+      when: 'automation' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, automation]
+
+    - name: Rollback utility services
+      block:
+        - name: Stop utility containers
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - homepage
+            - grafana
+            - prometheus
+            - loki
+            - promtail
+            - alertmanager
+            - telegraf
+            - influxdb
+          ignore_errors: true
+
+        - name: Restore utility configuration
+          ansible.builtin.copy:
+            src: "{{ rollback_backup_dir }}/utilities/"
+            dest: "/home/{{ username }}/config/"
+            remote_src: true
+          when: backup_dir_check.stat.exists
+          ignore_errors: true
+
+        - name: Restart utility services
+          ansible.builtin.docker_container:
+            name: "{{ item }}"
+            state: started
+          loop:
+            - homepage
+            - grafana
+            - prometheus
+            - loki
+            - promtail
+            - alertmanager
+            - telegraf
+            - influxdb
+          ignore_errors: true
+
+      when: 'utilities' in ansible_run_tags or 'all' in ansible_run_tags
+      tags: [rollback, utilities]
+
+  post_tasks:
+    - name: Validate rollback
+      block:
+        - name: Check service status after rollback
+          ansible.builtin.shell: |
+            echo "=== Service Status After Rollback ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          register: rollback_status
+          changed_when: false
+
+        - name: Display rollback status
+          ansible.builtin.debug:
+            var: rollback_status.stdout_lines
+
+        - name: Save rollback report
+          ansible.builtin.copy:
+            content: |
+              Rollback Report
+              ===============
+              Date: {{ ansible_date_time.iso8601 }}
+              Host: {{ inventory_hostname }}
+              
+              {{ rollback_status.stdout }}
+            dest: "/home/{{ username }}/logs/rollback_report_$(date +%Y%m%d_%H%M%S).txt"
+            mode: '0644'
+
+      tags: [rollback, validation] 

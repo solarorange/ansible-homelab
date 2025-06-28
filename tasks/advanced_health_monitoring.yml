@@ -1,0 +1,367 @@
+---
+# Advanced Health Monitoring and Self-Healing
+# Comprehensive monitoring with automated recovery procedures
+
+- name: Setup health monitoring infrastructure
+  block:
+    - name: Create health monitoring directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ backup_dir }}/health"
+        - "{{ backup_dir }}/health/checks"
+        - "{{ backup_dir }}/health/logs"
+        - "{{ backup_dir }}/health/scripts"
+        - "{{ backup_dir }}/health/alerts"
+      tags: [health, setup]
+
+    - name: Create health monitoring configuration
+      ansible.builtin.template:
+        src: templates/health_monitoring_config.yml.j2
+        dest: "{{ backup_dir }}/health/config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [health, setup]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, setup]
+
+#==============================================================================
+# SYSTEM HEALTH CHECKS
+#==============================================================================
+
+- name: Perform system health checks
+  block:
+    - name: Check system resource usage
+      ansible.builtin.shell: |
+        echo "CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)"
+        echo "Memory: $(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')"
+        echo "Disk: $(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')"
+      register: system_resources
+      changed_when: false
+      tags: [health, system]
+
+    - name: Parse system resource values
+      ansible.builtin.set_fact:
+        cpu_usage: "{{ system_resources.stdout_lines[0].split(': ')[1] | float }}"
+        memory_usage: "{{ system_resources.stdout_lines[1].split(': ')[1] | float }}"
+        disk_usage: "{{ system_resources.stdout_lines[2].split(': ')[1] | int }}"
+      tags: [health, system]
+
+    - name: Check for resource warnings
+      ansible.builtin.debug:
+        msg: "WARNING: {{ item.resource }} usage is {{ item.usage }}% (threshold: {{ item.threshold }}%)"
+      loop:
+        - { resource: "CPU", usage: "{{ cpu_usage }}", threshold: "{{ validation_thresholds.cpu_usage_warning }}" }
+        - { resource: "Memory", usage: "{{ memory_usage }}", threshold: "{{ validation_thresholds.memory_usage_warning }}" }
+        - { resource: "Disk", usage: "{{ disk_usage }}", threshold: "{{ validation_thresholds.disk_usage_warning }}" }
+      when: item.usage > item.threshold
+      tags: [health, system]
+
+    - name: Check for critical resource usage
+      ansible.builtin.fail:
+        msg: "CRITICAL: {{ item.resource }} usage is {{ item.usage }}% (threshold: {{ item.threshold }}%)"
+      loop:
+        - { resource: "CPU", usage: "{{ cpu_usage }}", threshold: "{{ validation_thresholds.cpu_usage_critical }}" }
+        - { resource: "Memory", usage: "{{ memory_usage }}", threshold: "{{ validation_thresholds.memory_usage_critical }}" }
+        - { resource: "Disk", usage: "{{ disk_usage }}", threshold: "{{ validation_thresholds.disk_usage_critical }}" }
+      when: item.usage > item.threshold
+      tags: [health, system]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, system]
+
+#==============================================================================
+# SERVICE HEALTH CHECKS
+#==============================================================================
+
+- name: Perform service health checks
+  block:
+    - name: Check Docker service status
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      tags: [health, services]
+
+    - name: Check running containers
+      ansible.builtin.shell: "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+      register: running_containers
+      changed_when: false
+      tags: [health, services]
+
+    - name: Check for failed containers
+      ansible.builtin.shell: "docker ps -a --filter 'status=exited' --format 'table {{.Names}}\t{{.Status}}\t{{.ExitCode}}'"
+      register: failed_containers
+      changed_when: false
+      tags: [health, services]
+
+    - name: Alert on failed containers
+      ansible.builtin.debug:
+        msg: "ALERT: Failed containers detected: {{ failed_containers.stdout_lines }}"
+      when: failed_containers.stdout_lines | length > 1
+      tags: [health, services]
+
+    - name: Check service endpoints
+      ansible.builtin.uri:
+        url: "{{ item.url }}"
+        method: GET
+        status_code: "{{ item.expected_status | default(200) }}"
+        timeout: "{{ item.timeout | default(10) }}"
+      register: endpoint_checks
+      loop: "{{ health_monitoring.services }}"
+      tags: [health, services]
+
+    - name: Alert on failed endpoint checks
+      ansible.builtin.debug:
+        msg: "ALERT: Service endpoint {{ item.item.name }} is not responding"
+      loop: "{{ endpoint_checks.results }}"
+      when: item.failed
+      tags: [health, services]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, services]
+
+#==============================================================================
+# NETWORK HEALTH CHECKS
+#==============================================================================
+
+- name: Perform network health checks
+  block:
+    - name: Check network connectivity
+      ansible.builtin.shell: "ping -c 3 8.8.8.8"
+      register: network_ping
+      changed_when: false
+      tags: [health, network]
+
+    - name: Check DNS resolution
+      ansible.builtin.shell: "nslookup google.com"
+      register: dns_check
+      changed_when: false
+      tags: [health, network]
+
+    - name: Check network latency
+      ansible.builtin.shell: "ping -c 5 8.8.8.8 | tail -1 | awk '{print $4}' | cut -d'/' -f2"
+      register: network_latency
+      changed_when: false
+      tags: [health, network]
+
+    - name: Parse network latency
+      ansible.builtin.set_fact:
+        latency_ms: "{{ network_latency.stdout | float }}"
+      tags: [health, network]
+
+    - name: Check for network issues
+      ansible.builtin.debug:
+        msg: "WARNING: Network latency is {{ latency_ms }}ms (threshold: {{ validation_thresholds.network_latency_warning }}ms)"
+      when: latency_ms > validation_thresholds.network_latency_warning
+      tags: [health, network]
+
+    - name: Fail on critical network issues
+      ansible.builtin.fail:
+        msg: "CRITICAL: Network latency is {{ latency_ms }}ms (threshold: {{ validation_thresholds.network_latency_critical }}ms)"
+      when: latency_ms > validation_thresholds.network_latency_critical
+      tags: [health, network]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, network]
+
+#==============================================================================
+# SELF-HEALING PROCEDURES
+#==============================================================================
+
+- name: Execute self-healing procedures
+  block:
+    - name: Restart failed services
+      ansible.builtin.include_tasks: tasks/self_healing_service_restart.yml
+      when: failed_containers.stdout_lines | length > 1
+      tags: [health, healing]
+
+    - name: Cleanup resources
+      ansible.builtin.include_tasks: tasks/self_healing_resource_cleanup.yml
+      when: 
+        - cpu_usage > validation_thresholds.cpu_usage_warning or
+          memory_usage > validation_thresholds.memory_usage_warning or
+          disk_usage > validation_thresholds.disk_usage_warning
+      tags: [health, healing]
+
+    - name: Recover network connectivity
+      ansible.builtin.include_tasks: tasks/self_healing_network_recovery.yml
+      when: network_ping.rc != 0
+      tags: [health, healing]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, healing]
+
+#==============================================================================
+# HEALTH MONITORING SCHEDULING
+#==============================================================================
+
+- name: Setup health monitoring cron jobs
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    day: "{{ item.day }}"
+    job: "{{ item.job }}"
+    user: "{{ username }}"
+    state: present
+  loop:
+    - name: "System Health Check"
+      minute: "*/5"
+      hour: "*"
+      day: "*"
+      job: "cd {{ backup_dir }}/health && ./system_health_check.sh >> logs/system_health.log 2>&1"
+    
+    - name: "Service Health Check"
+      minute: "*/2"
+      hour: "*"
+      day: "*"
+      job: "cd {{ backup_dir }}/health && ./service_health_check.sh >> logs/service_health.log 2>&1"
+    
+    - name: "Network Health Check"
+      minute: "*/1"
+      hour: "*"
+      day: "*"
+      job: "cd {{ backup_dir }}/health && ./network_health_check.sh >> logs/network_health.log 2>&1"
+    
+    - name: "Self-Healing Check"
+      minute: "*/10"
+      hour: "*"
+      day: "*"
+      job: "cd {{ backup_dir }}/health && ./self_healing_check.sh >> logs/self_healing.log 2>&1"
+  tags: [health, scheduling]
+
+#==============================================================================
+# HEALTH MONITORING SCRIPTS
+#==============================================================================
+
+- name: Create health monitoring scripts
+  block:
+    - name: Create system health check script
+      ansible.builtin.template:
+        src: templates/system_health_check.sh.j2
+        dest: "{{ backup_dir }}/health/system_health_check.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      tags: [health, scripts]
+
+    - name: Create service health check script
+      ansible.builtin.template:
+        src: templates/service_health_check.sh.j2
+        dest: "{{ backup_dir }}/health/service_health_check.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      tags: [health, scripts]
+
+    - name: Create network health check script
+      ansible.builtin.template:
+        src: templates/network_health_check.sh.j2
+        dest: "{{ backup_dir }}/health/network_health_check.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      tags: [health, scripts]
+
+    - name: Create self-healing check script
+      ansible.builtin.template:
+        src: templates/self_healing_check.sh.j2
+        dest: "{{ backup_dir }}/health/self_healing_check.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      tags: [health, scripts]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, scripts]
+
+#==============================================================================
+# HEALTH ALERTING
+#==============================================================================
+
+- name: Setup health alerting
+  block:
+    - name: Create alerting configuration
+      ansible.builtin.template:
+        src: templates/health_alerting.yml.j2
+        dest: "{{ backup_dir }}/health/alerting.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [health, alerting]
+
+    - name: Send health status to monitoring systems
+      ansible.builtin.uri:
+        url: "{{ monitoring_webhook | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "cpu_usage": {{ cpu_usage }},
+            "memory_usage": {{ memory_usage }},
+            "disk_usage": {{ disk_usage }},
+            "network_latency": {{ latency_ms }},
+            "failed_containers": {{ failed_containers.stdout_lines | length }},
+            "status": "{{ 'healthy' if (cpu_usage < validation_thresholds.cpu_usage_warning and memory_usage < validation_thresholds.memory_usage_warning and disk_usage < validation_thresholds.disk_usage_warning) else 'warning' }}"
+          }
+      when: monitoring_webhook is defined
+      tags: [health, alerting]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, alerting]
+
+#==============================================================================
+# HEALTH REPORTING
+#==============================================================================
+
+- name: Generate health reports
+  block:
+    - name: Create health status report
+      ansible.builtin.template:
+        src: templates/health_report.yml.j2
+        dest: "{{ backup_dir }}/health/status_report.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [health, reporting]
+
+    - name: Display health monitoring summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          HEALTH MONITORING SUMMARY
+          ========================================
+          
+          System Resources:
+          - CPU Usage: {{ cpu_usage }}%
+          - Memory Usage: {{ memory_usage }}%
+          - Disk Usage: {{ disk_usage }}%
+          - Network Latency: {{ latency_ms }}ms
+          
+          Services:
+          - Running Containers: {{ running_containers.stdout_lines | length - 1 }}
+          - Failed Containers: {{ failed_containers.stdout_lines | length - 1 }}
+          - Endpoint Checks: {{ endpoint_checks.results | selectattr('failed', 'equalto', false) | list | length }}/{{ endpoint_checks.results | length }}
+          
+          Self-Healing:
+          - Enabled: {{ health_monitoring.self_healing.enabled | default(false) }}
+          - Max Attempts: {{ health_monitoring.self_healing.max_attempts | default(3) }}
+          
+          Monitoring:
+          - Check Interval: {{ health_monitoring.check_interval | default(60) }}s
+          - Timeout: {{ health_monitoring.timeout | default(30) }}s
+          - Retries: {{ health_monitoring.retries | default(3) }}
+          
+          Overall Status: {{ 'HEALTHY' if (cpu_usage < validation_thresholds.cpu_usage_warning and memory_usage < validation_thresholds.memory_usage_warning and disk_usage < validation_thresholds.disk_usage_warning and failed_containers.stdout_lines | length <= 1) else 'WARNING' }}
+          ========================================
+      tags: [health, reporting]
+
+  when: health_monitoring.enabled | default(true)
+  tags: [health, reporting] 

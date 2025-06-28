@@ -1,0 +1,290 @@
+---
+# Advanced Rollback Procedures
+# Automated rollback with multiple strategies and safety checks
+
+- name: Create rollback directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ backup_dir }}/rollback"
+    - "{{ backup_dir }}/rollback/points"
+    - "{{ backup_dir }}/rollback/logs"
+    - "{{ backup_dir }}/rollback/scripts"
+    - "{{ backup_dir }}/rollback/configs"
+  tags: [rollback, setup]
+
+#==============================================================================
+# ROLLBACK POINT CREATION
+#==============================================================================
+
+- name: Create deployment rollback point
+  block:
+    - name: Generate rollback point ID
+      ansible.builtin.set_fact:
+        rollback_point_id: "{{ ansible_date_time.epoch }}"
+      tags: [rollback, point]
+
+    - name: Create rollback point directory
+      ansible.builtin.file:
+        path: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      tags: [rollback, point]
+
+    - name: Backup current Docker Compose configurations
+      ansible.builtin.copy:
+        src: "{{ docker_config_root }}/"
+        dest: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/docker-compose/"
+        remote_src: yes
+        owner: "{{ username }}"
+        group: "{{ username }}"
+      tags: [rollback, point]
+
+    - name: Backup current environment variables
+      ansible.builtin.copy:
+        src: "{{ docker_config_root }}/.env"
+        dest: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/env_backup"
+        remote_src: yes
+        owner: "{{ username }}"
+        group: "{{ username }}"
+      ignore_errors: yes
+      tags: [rollback, point]
+
+    - name: Backup current Ansible configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/group_vars/"
+        dest: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/ansible_config/"
+        remote_src: yes
+        owner: "{{ username }}"
+        group: "{{ username }}"
+      tags: [rollback, point]
+
+    - name: Create system snapshot
+      ansible.builtin.shell: |
+        tar -czf "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/system_snapshot.tar.gz" \
+          /etc/docker \
+          /etc/systemd/system \
+          /var/lib/docker/volumes \
+          --exclude='*.log' \
+          --exclude='*.tmp'
+      args:
+        creates: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/system_snapshot.tar.gz"
+      tags: [rollback, point]
+
+    - name: Create rollback metadata
+      ansible.builtin.template:
+        src: templates/rollback_metadata.yml.j2
+        dest: "{{ backup_dir }}/rollback/points/{{ rollback_point_id }}/metadata.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [rollback, point]
+
+    - name: Update rollback points index
+      ansible.builtin.template:
+        src: templates/rollback_index.yml.j2
+        dest: "{{ backup_dir }}/rollback/points/index.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [rollback, point]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, point]
+
+#==============================================================================
+# ROLLBACK TRIGGER MONITORING
+#==============================================================================
+
+- name: Monitor for rollback triggers
+  block:
+    - name: Check service failure count
+      ansible.builtin.shell: |
+        find "{{ backup_dir }}/logs" -name "*.log" -mtime -1 | xargs grep -l "ERROR\|FAILED" | wc -l
+      register: service_failures
+      changed_when: false
+      tags: [rollback, monitoring]
+
+    - name: Check health check failures
+      ansible.builtin.shell: |
+        systemctl is-failed --quiet && echo "1" || echo "0"
+      register: health_check_failures
+      changed_when: false
+      tags: [rollback, monitoring]
+
+    - name: Check backup failures
+      ansible.builtin.shell: |
+        find "{{ backup_dir }}/logs" -name "*backup*" -mtime -1 | xargs grep -l "FAILED" | wc -l
+      register: backup_failures
+      changed_when: false
+      tags: [rollback, monitoring]
+
+    - name: Evaluate rollback triggers
+      ansible.builtin.set_fact:
+        rollback_triggered: "{{ 
+          (service_failures.stdout | int >= rollback.triggers[0].service_failure_count) or
+          (health_check_failures.stdout | int > 0) or
+          (backup_failures.stdout | int > 0)
+        }}"
+      tags: [rollback, monitoring]
+
+    - name: Trigger automatic rollback if conditions met
+      ansible.builtin.include_tasks: tasks/execute_rollback.yml
+      when: 
+        - rollback_triggered | default(false)
+        - rollback.auto_rollback_on_failure | default(true)
+      tags: [rollback, auto]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, monitoring]
+
+#==============================================================================
+# ROLLBACK EXECUTION PROCEDURES
+#==============================================================================
+
+- name: Execute rollback procedures
+  block:
+    - name: Determine rollback strategy
+      ansible.builtin.set_fact:
+        rollback_strategy: "{{ rollback_strategy | default('configuration') }}"
+      tags: [rollback, execute]
+
+    - name: Execute configuration rollback
+      ansible.builtin.include_tasks: tasks/rollback_configuration.yml
+      when: rollback_strategy == 'configuration'
+      tags: [rollback, execute, config]
+
+    - name: Execute database rollback
+      ansible.builtin.include_tasks: tasks/rollback_database.yml
+      when: rollback_strategy == 'database'
+      tags: [rollback, execute, database]
+
+    - name: Execute full system rollback
+      ansible.builtin.include_tasks: tasks/rollback_full_system.yml
+      when: rollback_strategy == 'full_system'
+      tags: [rollback, execute, full]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, execute]
+
+#==============================================================================
+# ROLLBACK VALIDATION
+#==============================================================================
+
+- name: Validate rollback success
+  block:
+    - name: Wait for services to stabilize
+      ansible.builtin.wait_for:
+        timeout: 60
+      tags: [rollback, validation]
+
+    - name: Check service health after rollback
+      ansible.builtin.include_tasks: tasks/validate.yml
+      tags: [rollback, validation]
+
+    - name: Verify data integrity
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v "Up"
+      register: failed_containers
+      changed_when: false
+      tags: [rollback, validation]
+
+    - name: Validate rollback success
+      ansible.builtin.assert:
+        that:
+          - failed_containers.stdout_lines | length == 0
+        fail_msg: "Rollback validation failed. Failed containers: {{ failed_containers.stdout }}"
+      tags: [rollback, validation]
+
+    - name: Log rollback success
+      ansible.builtin.lineinfile:
+        path: "{{ backup_dir }}/rollback/logs/rollback_history.log"
+        line: "{{ ansible_date_time.iso8601 }} - Rollback {{ rollback_point_id }} completed successfully"
+        create: yes
+        owner: "{{ username }}"
+        group: "{{ username }}"
+      tags: [rollback, validation]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, validation]
+
+#==============================================================================
+# ROLLBACK CLEANUP
+#==============================================================================
+
+- name: Cleanup old rollback points
+  block:
+    - name: List rollback points
+      ansible.builtin.find:
+        paths: "{{ backup_dir }}/rollback/points"
+        file_type: directory
+        age: "{{ rollback.max_rollback_points | default(10) }}d"
+      register: old_rollback_points
+      tags: [rollback, cleanup]
+
+    - name: Remove old rollback points
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_rollback_points.files }}"
+      tags: [rollback, cleanup]
+
+    - name: Update rollback index after cleanup
+      ansible.builtin.template:
+        src: templates/rollback_index.yml.j2
+        dest: "{{ backup_dir }}/rollback/points/index.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      tags: [rollback, cleanup]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, cleanup]
+
+#==============================================================================
+# ROLLBACK NOTIFICATIONS
+#==============================================================================
+
+- name: Send rollback notifications
+  block:
+    - name: Notify rollback completion
+      ansible.builtin.uri:
+        url: "{{ notification_webhook | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "Rollback {{ rollback_point_id }} completed successfully",
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "strategy": "{{ rollback_strategy }}"
+          }
+      when: notification_webhook is defined
+      tags: [rollback, notifications]
+
+    - name: Send email notification
+      ansible.builtin.mail:
+        host: "{{ smtp_host | default('localhost') }}"
+        port: "{{ smtp_port | default(25) }}"
+        username: "{{ smtp_username | default('') }}"
+        password: "{{ smtp_password | default('') }}"
+        to: "{{ admin_email | default('admin@localhost') }}"
+        subject: "Homelab Rollback Completed"
+        body: |
+          Rollback {{ rollback_point_id }} completed successfully
+          
+          Strategy: {{ rollback_strategy }}
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Point ID: {{ rollback_point_id }}
+          
+          Check logs for details: {{ backup_dir }}/rollback/logs/
+      when: admin_email is defined
+      tags: [rollback, notifications]
+
+  when: rollback.enabled | default(true)
+  tags: [rollback, notifications] 

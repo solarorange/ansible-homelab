@@ -1,0 +1,65 @@
+---
+# Security Services Validation
+
+- name: Validate Docker installation
+  ansible.builtin.shell: docker --version
+  register: docker_version
+  failed_when: false
+  changed_when: false
+
+- name: Display Docker version
+  ansible.builtin.debug:
+    msg: "Docker version: {{ docker_version.stdout }}"
+
+- name: Validate Traefik container
+  ansible.builtin.docker_container_info:
+    name: traefik
+  register: traefik_status
+  failed_when: false
+
+- name: Check Traefik status
+  ansible.builtin.debug:
+    msg: "Traefik status: {{ 'Running' if traefik_status.exists and traefik_status.container.State.Running else 'Not running' }}"
+
+- name: Validate Authentik container
+  ansible.builtin.docker_container_info:
+    name: authentik
+  register: authentik_status
+  failed_when: false
+
+- name: Check Authentik status
+  ansible.builtin.debug:
+    msg: "Authentik status: {{ 'Running' if authentik_status.exists and authentik_status.container.State.Running else 'Not running' }}"
+
+- name: Validate Pi-hole container
+  ansible.builtin.docker_container_info:
+    name: pihole
+  register: pihole_status
+  failed_when: false
+
+- name: Check Pi-hole status
+  ansible.builtin.debug:
+    msg: "Pi-hole status: {{ 'Running' if pihole_status.exists and pihole_status.container.State.Running else 'Not running' }}"
+
+- name: Test Traefik API
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api/http/routers"
+    method: GET
+    status_code: [200, 401, 403]
+  register: traefik_api_test
+  failed_when: false
+  changed_when: false
+
+- name: Check Traefik API response
+  ansible.builtin.debug:
+    msg: "Traefik API status: {{ traefik_api_test.status }}"
+
+- name: Validate firewall rules
+  ansible.builtin.shell: ufw status
+  register: firewall_status
+  failed_when: false
+  changed_when: false
+
+- name: Display firewall status
+  ansible.builtin.debug:
+    var: firewall_status.stdout_lines 

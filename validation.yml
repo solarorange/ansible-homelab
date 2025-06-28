@@ -1,0 +1,129 @@
+---
+# Comprehensive Validation Playbook
+# Validates all roles and services after deployment
+
+- name: Validate homelab deployment
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    validation_timeout: 30
+    health_check_retries: 3
+    health_check_delay: 10
+
+  pre_tasks:
+    - name: Validate system prerequisites
+      block:
+        - name: Check system resources
+          ansible.builtin.shell: |
+            echo "=== System Resources ==="
+            free -h
+            df -h
+            echo "=== Docker Status ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          register: system_status
+          changed_when: false
+
+        - name: Display system status
+          ansible.builtin.debug:
+            var: system_status.stdout_lines
+
+  tasks:
+    - name: Validate infrastructure roles
+      block:
+        - name: Validate security services
+          ansible.builtin.include_tasks: tasks/validate/security.yml
+          when: security_enabled | default(true)
+          tags: [validation, security]
+
+        - name: Validate database services
+          ansible.builtin.include_tasks: tasks/validate/databases.yml
+          when: databases_enabled | default(true)
+          tags: [validation, databases]
+
+        - name: Validate storage services
+          ansible.builtin.include_tasks: tasks/validate/storage.yml
+          when: storage_enabled | default(true)
+          tags: [validation, storage]
+
+      tags: [validation, infrastructure]
+
+    - name: Validate monitoring roles
+      block:
+        - name: Validate logging services
+          ansible.builtin.include_tasks: tasks/validate/logging.yml
+          when: logging_enabled | default(true)
+          tags: [validation, logging]
+
+        - name: Validate certificate management
+          ansible.builtin.include_tasks: tasks/validate/certificates.yml
+          when: certificate_management_enabled | default(true)
+          tags: [validation, certificates]
+
+      tags: [validation, monitoring]
+
+    - name: Validate service roles
+      block:
+        - name: Validate media services
+          ansible.builtin.include_tasks: tasks/validate/media.yml
+          when: media_enabled | default(true)
+          tags: [validation, media]
+
+        - name: Validate automation services
+          ansible.builtin.include_tasks: tasks/validate/automation.yml
+          when: automation_enabled | default(true)
+          tags: [validation, automation]
+
+        - name: Validate utility services
+          ansible.builtin.include_tasks: tasks/validate/utilities.yml
+          when: utilities_enabled | default(true)
+          tags: [validation, utilities]
+
+      tags: [validation, services]
+
+    - name: Validate specialized roles
+      block:
+        - name: Validate paperless-ngx
+          ansible.builtin.include_tasks: tasks/validate/paperless.yml
+          when: paperless_ngx_enabled | default(true)
+          tags: [validation, paperless]
+
+        - name: Validate fing
+          ansible.builtin.include_tasks: tasks/validate/fing.yml
+          when: fing_enabled | default(true)
+          tags: [validation, fing]
+
+      tags: [validation, specialized]
+
+  post_tasks:
+    - name: Generate validation report
+      block:
+        - name: Collect service status
+          ansible.builtin.shell: |
+            echo "=== Service Validation Report ==="
+            echo "Generated: $(date)"
+            echo "Host: $(hostname)"
+            echo
+            echo "=== Docker Services ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | head -20
+            echo
+            echo "=== System Resources ==="
+            echo "Memory: $(free -h | grep Mem | awk '{print $3 "/" $2}')"
+            echo "Disk: $(df -h / | tail -1 | awk '{print $3 "/" $2}')"
+            echo "CPU Load: $(uptime | awk -F'load average:' '{print $2}')"
+          register: validation_report
+          changed_when: false
+
+        - name: Display validation report
+          ansible.builtin.debug:
+            var: validation_report.stdout_lines
+
+        - name: Save validation report
+          ansible.builtin.copy:
+            content: "{{ validation_report.stdout }}"
+            dest: "/home/{{ username }}/logs/validation_report_$(date +%Y%m%d_%H%M%S).txt"
+            mode: '0644'
+          when: validation_report.stdout is defined
+
+      tags: [validation, report] 

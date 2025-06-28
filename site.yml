@@ -1,50 +1,193 @@
 ---
-# Main playbook for homelab setup
+# Main Ansible playbook for homelab setup
+# Advanced role-based architecture with comprehensive optimizations
 
-- name: Configure homelab
+- name: Configure homelab infrastructure with advanced optimizations
   hosts: all
   become: true
-  tasks:
-    - name: Include common tasks
-      ansible.builtin.include_tasks: tasks/common.yml
+  gather_facts: true
+  
+  # Advanced configuration loading
+  vars_files:
+    - group_vars/all/common.yml
+    - group_vars/all/roles.yml
+    - group_vars/all/advanced_config.yml
+  
+  # Pre-flight checks and system preparation
+  pre_tasks:
+    - name: Load advanced configuration
+      ansible.builtin.include_vars: group_vars/all/advanced_config.yml
+      tags: [always, config]
 
-    - name: Include Docker tasks
-      ansible.builtin.include_tasks: tasks/docker.yml
+    - name: Validate system prerequisites with advanced checks
+      ansible.builtin.include_tasks: tasks/advanced_validation.yml
+      tags: [always, validation]
 
-    - name: Include Traefik tasks
-      ansible.builtin.include_tasks: tasks/traefik.yml
+    - name: Setup advanced pre-flight tasks
+      ansible.builtin.include_tasks: tasks/pre_tasks.yml
+      tags: [always, validation]
 
-    - name: Include Authentik tasks
-      ansible.builtin.include_tasks: tasks/authentik.yml
+    - name: Create rollback point before deployment
+      ansible.builtin.include_tasks: tasks/advanced_rollback.yml
+      tags: [rollback, point]
 
-    - name: Include Plex tasks
-      ansible.builtin.include_tasks: tasks/plex.yml
+  # All roles in optimized execution order with dependencies
+  roles:
+    # Core infrastructure roles (must run first)
+    - name: security
+      tags: [security, infrastructure]
+      when: security_enabled | default(true)
+      
+    - name: databases
+      tags: [databases, infrastructure]
+      when: databases_enabled | default(true)
+      
+    - name: storage
+      tags: [storage, infrastructure]
+      when: storage_enabled | default(true)
+      
+    # Monitoring and logging (depends on infrastructure)
+    - name: logging
+      tags: [logging, monitoring]
+      when: logging_enabled | default(true)
+      
+    - name: certificate_management
+      tags: [certificates, monitoring]
+      when: certificate_management_enabled | default(true)
+      
+    # Media stack (depends on databases and storage)
+    - name: media
+      tags: [media, services]
+      when: media_enabled | default(true)
+      
+    # Automation and utilities (can run in parallel)
+    - name: automation
+      tags: [automation, services]
+      when: automation_enabled | default(true)
+      
+    - name: utilities
+      tags: [utilities, services]
+      when: utilities_enabled | default(true)
+      
+    # Specialized services
+    - name: paperless_ngx
+      tags: [paperless, services]
+      when: paperless_ngx_enabled | default(true)
+      
+    - name: fing
+      tags: [fing, services]
+      when: fing_enabled | default(true)
 
-    - name: Include media stack tasks
-      ansible.builtin.include_tasks: tasks/media_stack.yml
+  # Post-deployment advanced tasks
+  post_tasks:
+    - name: Validate all services with advanced checks
+      ansible.builtin.include_tasks: tasks/validate.yml
+      tags: [always, validation]
 
-    - name: Include monitoring tasks
-      ansible.builtin.include_tasks: tasks/monitoring.yml
+    - name: Configure advanced service orchestration
+      ansible.builtin.include_tasks: tasks/service_orchestration.yml
+      tags: [orchestration, services]
 
-    - name: Include backup tasks
-      ansible.builtin.include_tasks: tasks/backup.yml
+    - name: Setup advanced monitoring and alerting
+      ansible.builtin.include_tasks: tasks/monitor_performance.yml
+      tags: [monitoring, alerts]
 
-    - name: Include backup orchestration tasks
+    - name: Configure advanced health monitoring
+      ansible.builtin.include_tasks: tasks/advanced_health_monitoring.yml
+      tags: [health, monitoring]
+
+    - name: Configure advanced backup orchestration
       ansible.builtin.include_tasks: tasks/backup_orchestration.yml
       tags: [backup, orchestration]
 
-    - name: Update backup schedules to staggered timing
+    - name: Update backup schedules with advanced strategies
       ansible.builtin.include_tasks: tasks/update_backup_schedules.yml
       tags: [backup, schedules]
 
-    - name: Include Paperless-ngx role
-      ansible.builtin.include_role:
-        name: paperless_ngx
-      when: paperless_ngx_enabled | default(true)
+    - name: Apply advanced security hardening
+      ansible.builtin.include_tasks: tasks/advanced_security_hardening.yml
+      tags: [security, hardening]
 
-    - name: Include Automation role
-      ansible.builtin.include_role:
-        name: automation
-      when: automation_enabled | default(true)
+    - name: Generate advanced documentation
+      ansible.builtin.include_tasks: tasks/generate_documentation.yml
+      tags: [documentation, reporting]
 
-    # ... existing code ... 
+    - name: Final cleanup and optimization
+      ansible.builtin.include_tasks: tasks/cleanup.yml
+      tags: [cleanup, optimization]
+
+    - name: Display deployment summary with advanced metrics
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          ADVANCED HOMELAB DEPLOYMENT SUMMARY
+          ========================================
+          
+          Deployment Information:
+          - Environment: {{ environment | default('production') }}
+          - Deployment ID: {{ ansible_date_time.epoch }}
+          - Ansible Version: {{ ansible_version.full }}
+          - Execution Time: {{ ansible_date_time.iso8601 }}
+          
+          Role Deployment Status:
+          - Security: {{ 'ENABLED' if security_enabled | default(false) else 'DISABLED' }}
+          - Databases: {{ 'ENABLED' if databases_enabled | default(false) else 'DISABLED' }}
+          - Storage: {{ 'ENABLED' if storage_enabled | default(false) else 'DISABLED' }}
+          - Logging: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          - Media: {{ 'ENABLED' if media_enabled | default(false) else 'DISABLED' }}
+          - Automation: {{ 'ENABLED' if automation_enabled | default(false) else 'DISABLED' }}
+          - Utilities: {{ 'ENABLED' if utilities_enabled | default(false) else 'DISABLED' }}
+          
+          Advanced Features:
+          - Health Monitoring: {{ 'ENABLED' if health_monitoring.enabled | default(false) else 'DISABLED' }}
+          - Self-Healing: {{ 'ENABLED' if health_monitoring.self_healing.enabled | default(false) else 'DISABLED' }}
+          - Rollback Protection: {{ 'ENABLED' if rollback.enabled | default(false) else 'DISABLED' }}
+          - Security Hardening: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
+          - Backup Orchestration: {{ 'ENABLED' if backup_strategies.incremental.enabled | default(false) else 'DISABLED' }}
+          
+          Performance Configuration:
+          - Max Concurrent Containers: {{ resource_limits.max_concurrent_containers | default(20) }}
+          - Max Concurrent Backups: {{ resource_limits.max_concurrent_backups | default(3) }}
+          - CPU Threshold: {{ resource_limits.cpu_threshold | default(80) }}%
+          - Memory Threshold: {{ resource_limits.memory_threshold | default(85) }}%
+          
+          Security Status:
+          - Compliance Frameworks: {{ compliance.frameworks | length }} enabled
+          - Security Scanning: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
+          - Audit Logging: {{ 'ENABLED' if security_hardening.enabled | default(false) else 'DISABLED' }}
+          
+          Monitoring Integration:
+          - Prometheus: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          - Grafana: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          - Loki: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          - AlertManager: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
+          
+          Backup Strategy:
+          - Incremental Backups: {{ 'ENABLED' if backup_strategies.incremental.enabled | default(false) else 'DISABLED' }}
+          - Backup Testing: {{ 'ENABLED' if backup_testing.enabled | default(false) else 'DISABLED' }}
+          - Encryption: {{ 'ENABLED' if backup_strategies.incremental.encryption | default(false) else 'DISABLED' }}
+          
+          Documentation:
+          - Auto-Generation: {{ 'ENABLED' if documentation.enabled | default(false) else 'DISABLED' }}
+          - Diagram Generation: {{ 'ENABLED' if diagrams.enabled | default(false) else 'DISABLED' }}
+          - Output Formats: {{ documentation.output_formats | default(['markdown']) | join(', ') }}
+          
+          Next Steps:
+          1. Monitor the health dashboard: http://localhost:3000
+          2. Check service status: docker ps
+          3. Review security scan results: /etc/security/hardening/
+          4. Verify backup completion: {{ backup_dir }}/logs/
+          5. Test rollback procedures if needed
+          6. Review generated documentation: {{ backup_dir }}/documentation/
+          
+          Support and Maintenance:
+          - Health Monitoring: {{ backup_dir }}/health/
+          - Security Reports: /etc/security/hardening/
+          - Backup Logs: {{ backup_dir }}/logs/
+          - Documentation: {{ backup_dir }}/documentation/
+          - Troubleshooting Guide: docs/ADVANCED_BEST_PRACTICES.md
+          
+          ========================================
+          DEPLOYMENT COMPLETED SUCCESSFULLY!
+          ========================================
+      tags: [summary, reporting] 

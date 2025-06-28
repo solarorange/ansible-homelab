@@ -1,0 +1,554 @@
+---
+# Advanced Documentation Configuration
+# Auto-generated documentation with multiple formats and diagrams
+
+documentation:
+  # Documentation metadata
+  metadata:
+    title: "Homelab Infrastructure Documentation"
+    version: "{{ ansible_date_time.iso8601 }}"
+    environment: "{{ environment | default('production') }}"
+    generated_by: "Ansible {{ ansible_version.full }}"
+    last_updated: "{{ ansible_date_time.iso8601 }}"
+    
+  # Architecture overview
+  architecture:
+    overview:
+      title: "Homelab Architecture Overview"
+      description: |
+        This homelab infrastructure is built using a role-based Ansible architecture
+        with Docker containerization, comprehensive monitoring, and security hardening.
+        
+        The system is designed for high availability, security, and maintainability
+        with automated deployment, monitoring, and backup procedures.
+      
+      components:
+        - name: "Security Layer"
+          description: "Authentication, firewall, VPN, and security monitoring"
+          services: ["Authentik", "CrowdSec", "Fail2Ban", "OpenVPN"]
+          
+        - name: "Infrastructure Layer"
+          description: "Core infrastructure services and databases"
+          services: ["PostgreSQL", "MariaDB", "Redis", "Elasticsearch"]
+          
+        - name: "Storage Layer"
+          description: "File systems, sync, and cloud storage"
+          services: ["Samba", "Syncthing", "Nextcloud"]
+          
+        - name: "Media Layer"
+          description: "Media management and streaming services"
+          services: ["Plex", "Sonarr", "Radarr", "Jellyfin"]
+          
+        - name: "Monitoring Layer"
+          description: "Logging, metrics, and alerting"
+          services: ["Prometheus", "Grafana", "Loki", "AlertManager"]
+          
+        - name: "Automation Layer"
+          description: "Container management and automation"
+          services: ["Portainer", "Watchtower", "Home Assistant"]
+    
+    network_topology:
+      title: "Network Topology"
+      description: |
+        The homelab uses a segmented network architecture with proper isolation
+        between different service tiers and security zones.
+      
+      zones:
+        - name: "DMZ"
+          description: "Public-facing services"
+          services: ["Reverse Proxy", "DNS", "VPN Gateway"]
+          network: "192.168.1.0/24"
+          
+        - name: "Internal Services"
+          description: "Internal application services"
+          services: ["Media Services", "Databases", "Storage"]
+          network: "192.168.40.0/24"
+          
+        - name: "Management"
+          description: "Administrative and monitoring services"
+          services: ["Ansible", "Monitoring", "Backup"]
+          network: "192.168.50.0/24"
+    
+    data_flow:
+      title: "Data Flow Architecture"
+      description: |
+        Data flows through the system with proper security controls, monitoring,
+        and backup procedures at each stage.
+      
+      flows:
+        - name: "User Access Flow"
+          description: "How users access services"
+          steps:
+            - "User authenticates via Authentik"
+            - "Request routed through reverse proxy"
+            - "Service accessed with proper authorization"
+            - "Activity logged and monitored"
+            
+        - name: "Media Processing Flow"
+          description: "How media is processed and served"
+          steps:
+            - "Media downloaded via downloaders"
+            - "Processed by ARR services"
+            - "Stored in organized structure"
+            - "Served via media players"
+            
+        - name: "Backup Flow"
+          description: "How data is backed up"
+          steps:
+            - "Scheduled backup triggers"
+            - "Data encrypted and compressed"
+            - "Transferred to backup storage"
+            - "Integrity verified and logged"
+  
+  # Deployment guide
+  deployment:
+    title: "Deployment Guide"
+    prerequisites:
+      - "Ubuntu 20.04+ or Debian 11+"
+      - "Minimum 4GB RAM, 50GB disk space"
+      - "Docker and Docker Compose installed"
+      - "Ansible 2.9+ installed"
+      - "Network connectivity and DNS resolution"
+    
+    quick_start:
+      title: "Quick Start Deployment"
+      steps:
+        - "Clone the repository: `git clone <repo-url>`"
+        - "Configure environment variables"
+        - "Run pre-flight validation: `ansible-playbook -i inventory.yml site.yml --tags validation`"
+        - "Deploy infrastructure: `ansible-playbook -i inventory.yml site.yml`"
+        - "Verify deployment: `ansible-playbook -i inventory.yml site.yml --tags validation`"
+    
+    detailed_deployment:
+      title: "Detailed Deployment Process"
+      phases:
+        - name: "Phase 1: Prerequisites"
+          description: "System preparation and validation"
+          tasks:
+            - "Validate system requirements"
+            - "Install required packages"
+            - "Configure network settings"
+            - "Setup Docker environment"
+            
+        - name: "Phase 2: Security Foundation"
+          description: "Deploy security infrastructure"
+          tasks:
+            - "Deploy authentication services"
+            - "Configure firewall rules"
+            - "Setup VPN access"
+            - "Enable security monitoring"
+            
+        - name: "Phase 3: Core Infrastructure"
+          description: "Deploy core services"
+          tasks:
+            - "Deploy database services"
+            - "Setup storage systems"
+            - "Configure monitoring stack"
+            - "Deploy backup systems"
+            
+        - name: "Phase 4: Application Services"
+          description: "Deploy application services"
+          tasks:
+            - "Deploy media services"
+            - "Setup automation tools"
+            - "Configure utilities"
+            - "Deploy specialized services"
+            
+        - name: "Phase 5: Validation and Optimization"
+          description: "Verify and optimize deployment"
+          tasks:
+            - "Run comprehensive validation"
+            - "Configure performance optimization"
+            - "Setup alerting and notifications"
+            - "Generate documentation"
+    
+    configuration:
+      title: "Configuration Reference"
+      environment_variables:
+        - name: "ANSIBLE_ENVIRONMENT"
+          description: "Deployment environment"
+          values: ["development", "staging", "production"]
+          default: "production"
+          
+        - name: "DOCKER_ROOT"
+          description: "Docker root directory"
+          default: "/opt/docker"
+          
+        - name: "BACKUP_DIR"
+          description: "Backup directory"
+          default: "/opt/backups"
+      
+      role_configuration:
+        security:
+          enabled: true
+          components: ["authentication", "firewall", "vpn", "monitoring"]
+          
+        databases:
+          enabled: true
+          components: ["postgresql", "mariadb", "redis", "elasticsearch"]
+          
+        storage:
+          enabled: true
+          components: ["samba", "syncthing", "nextcloud"]
+          
+        media:
+          enabled: true
+          components: ["plex", "sonarr", "radarr", "jellyfin"]
+          
+        monitoring:
+          enabled: true
+          components: ["prometheus", "grafana", "loki", "alertmanager"]
+  
+  # Troubleshooting guide
+  troubleshooting:
+    title: "Troubleshooting Guide"
+    common_issues:
+      - name: "Service Startup Failures"
+        description: "Services failing to start"
+        symptoms:
+          - "Container exits with error code"
+          - "Service shows as failed in systemd"
+          - "Port conflicts or binding errors"
+        solutions:
+          - "Check container logs: `docker logs <container-name>`"
+          - "Verify port availability: `netstat -tulpn`"
+          - "Check resource constraints: `docker stats`"
+          - "Validate configuration files"
+          
+      - name: "Network Connectivity Issues"
+        description: "Services not accessible over network"
+        symptoms:
+          - "Cannot access web interfaces"
+          - "DNS resolution failures"
+          - "Port forwarding not working"
+        solutions:
+          - "Check firewall rules: `ufw status`"
+          - "Verify reverse proxy configuration"
+          - "Test DNS resolution: `nslookup <domain>`"
+          - "Check network connectivity: `ping <target>`"
+          
+      - name: "Performance Issues"
+        description: "Slow system performance"
+        symptoms:
+          - "High CPU or memory usage"
+          - "Slow response times"
+          - "Container resource exhaustion"
+        solutions:
+          - "Monitor resource usage: `htop` or `docker stats`"
+          - "Check for resource leaks"
+          - "Optimize container configurations"
+          - "Scale services if needed"
+          
+      - name: "Backup Failures"
+        description: "Backup processes failing"
+        symptoms:
+          - "Backup jobs failing"
+          - "Insufficient storage space"
+          - "Permission errors"
+        solutions:
+          - "Check backup logs: `tail -f /var/log/backup.log`"
+          - "Verify storage space: `df -h`"
+          - "Check permissions on backup directories"
+          - "Validate backup configuration"
+    
+    diagnostic_commands:
+      - name: "System Health Check"
+        command: "ansible-playbook -i inventory.yml site.yml --tags health"
+        description: "Run comprehensive health checks"
+        
+      - name: "Service Status Check"
+        command: "docker ps -a"
+        description: "Check all container statuses"
+        
+      - name: "Resource Usage Check"
+        command: "docker stats --no-stream"
+        description: "Check container resource usage"
+        
+      - name: "Network Connectivity Test"
+        command: "ping -c 3 8.8.8.8"
+        description: "Test basic network connectivity"
+        
+      - name: "Log Analysis"
+        command: "journalctl -u docker --since '1 hour ago'"
+        description: "Check recent Docker logs"
+    
+    recovery_procedures:
+      - name: "Service Recovery"
+        description: "Recover failed services"
+        steps:
+          - "Identify failed service: `docker ps -a`"
+          - "Check service logs: `docker logs <container>`"
+          - "Restart service: `docker restart <container>`"
+          - "Verify recovery: `docker ps`"
+          
+      - name: "Configuration Recovery"
+        description: "Recover from configuration issues"
+        steps:
+          - "Backup current configuration"
+          - "Restore from last known good configuration"
+          - "Validate configuration syntax"
+          - "Restart affected services"
+          
+      - name: "Data Recovery"
+        description: "Recover from data loss"
+        steps:
+          - "Stop affected services"
+          - "Restore from backup"
+          - "Verify data integrity"
+          - "Restart services"
+  
+  # API documentation
+  api:
+    title: "API Documentation"
+    services:
+      - name: "Authentication API"
+        description: "Authentik authentication service"
+        base_url: "https://auth.{{ domain }}"
+        endpoints:
+          - path: "/api/v3/"
+            method: "GET"
+            description: "API root endpoint"
+            
+      - name: "Media API"
+        description: "Media service APIs"
+        services:
+          - name: "Plex"
+            base_url: "http://localhost:32400"
+            endpoints:
+              - path: "/library/sections"
+                method: "GET"
+                description: "Get library sections"
+                
+          - name: "Sonarr"
+            base_url: "http://localhost:8989"
+            endpoints:
+              - path: "/api/v3/series"
+                method: "GET"
+                description: "Get series list"
+                
+          - name: "Radarr"
+            base_url: "http://localhost:7878"
+            endpoints:
+              - path: "/api/v3/movie"
+                method: "GET"
+                description: "Get movie list"
+      
+      - name: "Monitoring API"
+        description: "Monitoring service APIs"
+        services:
+          - name: "Prometheus"
+            base_url: "http://localhost:9090"
+            endpoints:
+              - path: "/api/v1/query"
+                method: "GET"
+                description: "Query metrics"
+                
+          - name: "Grafana"
+            base_url: "http://localhost:3000"
+            endpoints:
+              - path: "/api/dashboards"
+                method: "GET"
+                description: "Get dashboards"
+  
+  # Security guide
+  security:
+    title: "Security Guide"
+    overview:
+      description: |
+        This homelab implements comprehensive security measures following
+        industry best practices and compliance frameworks.
+      
+      principles:
+        - "Defense in depth"
+        - "Principle of least privilege"
+        - "Zero trust architecture"
+        - "Continuous monitoring"
+        - "Regular security updates"
+    
+    security_measures:
+      - name: "Network Security"
+        description: "Network-level security controls"
+        measures:
+          - "Firewall configuration (UFW)"
+          - "Network segmentation"
+          - "VPN access control"
+          - "DNS filtering"
+          
+      - name: "Application Security"
+        description: "Application-level security controls"
+        measures:
+          - "SSL/TLS encryption"
+          - "Authentication and authorization"
+          - "Rate limiting"
+          - "Input validation"
+          
+      - name: "Container Security"
+        description: "Docker container security"
+        measures:
+          - "Content trust enabled"
+          - "Seccomp profiles"
+          - "Capability restrictions"
+          - "Network policies"
+          
+      - name: "Monitoring and Detection"
+        description: "Security monitoring and detection"
+        measures:
+          - "Fail2ban intrusion prevention"
+          - "Security scanning (Lynis, Rkhunter)"
+          - "Audit logging"
+          - "Alert monitoring"
+    
+    compliance:
+      title: "Compliance Frameworks"
+      frameworks:
+        - name: "CIS Docker Benchmark"
+          description: "Center for Internet Security Docker Benchmark"
+          status: "{{ 'Compliant' if 'cis_docker_benchmark' in compliance.frameworks else 'Not Implemented' }}"
+          
+        - name: "NIST Cybersecurity Framework"
+          description: "National Institute of Standards and Technology framework"
+          status: "{{ 'Compliant' if 'nist_cybersecurity_framework' in compliance.frameworks else 'Not Implemented' }}"
+          
+        - name: "ISO 27001"
+          description: "Information security management standard"
+          status: "{{ 'Compliant' if 'iso_27001' in compliance.frameworks else 'Not Implemented' }}"
+          
+        - name: "GDPR"
+          description: "General Data Protection Regulation"
+          status: "{{ 'Compliant' if 'gdpr_compliance' in compliance.frameworks else 'Not Implemented' }}"
+    
+    incident_response:
+      title: "Incident Response Procedures"
+      procedures:
+        - name: "Security Incident Detection"
+          description: "How security incidents are detected"
+          steps:
+            - "Automated monitoring alerts"
+            - "Manual investigation"
+            - "Threat intelligence correlation"
+            - "Incident classification"
+            
+        - name: "Incident Response Process"
+          description: "Steps to respond to security incidents"
+          steps:
+            - "Immediate containment"
+            - "Evidence preservation"
+            - "Root cause analysis"
+            - "Remediation and recovery"
+            - "Post-incident review"
+            
+        - name: "Communication Plan"
+          description: "Communication during security incidents"
+          contacts:
+            - "Primary admin: {{ admin_email | default('admin@localhost') }}"
+            - "Backup admin: {{ backup_admin_email | default('') }}"
+            - "Emergency contact: {{ emergency_contact | default('') }}"
+  
+  # Maintenance guide
+  maintenance:
+    title: "Maintenance Guide"
+    routine_maintenance:
+      title: "Routine Maintenance Tasks"
+      daily:
+        - "Check system health and resource usage"
+        - "Review security alerts and logs"
+        - "Verify backup completion"
+        - "Monitor service status"
+        
+      weekly:
+        - "Update system packages"
+        - "Review and rotate logs"
+        - "Run security scans"
+        - "Test backup restoration"
+        
+      monthly:
+        - "Comprehensive security audit"
+        - "Performance optimization review"
+        - "Capacity planning assessment"
+        - "Documentation updates"
+        
+      quarterly:
+        - "Full system backup verification"
+        - "Disaster recovery testing"
+        - "Security policy review"
+        - "Compliance assessment"
+    
+    backup_maintenance:
+      title: "Backup Maintenance"
+      tasks:
+        - "Verify backup integrity"
+        - "Test restore procedures"
+        - "Clean up old backups"
+        - "Update backup schedules"
+        - "Monitor backup storage usage"
+    
+    security_maintenance:
+      title: "Security Maintenance"
+      tasks:
+        - "Update security patches"
+        - "Review access logs"
+        - "Update virus definitions"
+        - "Run security scans"
+        - "Review firewall rules"
+    
+    performance_maintenance:
+      title: "Performance Maintenance"
+      tasks:
+        - "Monitor resource usage"
+        - "Optimize container configurations"
+        - "Clean up unused resources"
+        - "Review and adjust limits"
+        - "Performance testing"
+  
+  # Diagrams
+  diagrams:
+    title: "System Diagrams"
+    types:
+      - name: "Architecture Diagram"
+        description: "High-level system architecture"
+        format: "PlantUML"
+        file: "architecture.puml"
+        
+      - name: "Network Topology"
+        description: "Network layout and connectivity"
+        format: "Draw.io"
+        file: "network-topology.drawio"
+        
+      - name: "Data Flow Diagram"
+        description: "Data flow through the system"
+        format: "Mermaid"
+        file: "data-flow.mmd"
+        
+      - name: "Deployment Pipeline"
+        description: "Deployment and CI/CD pipeline"
+        format: "PlantUML"
+        file: "deployment-pipeline.puml"
+    
+    generation:
+      enabled: true
+      tools:
+        - name: "PlantUML"
+          command: "plantuml"
+          output_format: "png"
+          
+        - name: "Draw.io"
+          command: "draw.io"
+          output_format: "png"
+          
+        - name: "Mermaid"
+          command: "mmdc"
+          output_format: "png"
+    
+    auto_generation:
+      triggers:
+        - "on_deployment"
+        - "on_configuration_change"
+        - "on_schedule"
+        - "on_demand"
+      
+      schedule:
+        frequency: "weekly"
+        day: "sunday"
+        time: "02:00"
+      
+      output_directory: "{{ backup_dir }}/documentation/diagrams" 
