@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Correlation ID Generator Script
+# Generates unique correlation IDs for request tracing across services
+
+# Configuration
+CORRELATION_FILE="{{ docker_dir }}/monitoring/logging/correlation-ids.txt"
+MAX_IDS=10000
+
+# Function to generate correlation ID
+generate_correlation_id() {
+    # Generate a unique correlation ID using timestamp and random string
+    local timestamp=$(date +%s%N | cut -b1-13)
+    local random_str=$(cat /dev/urandom | tr -dc 'a-f0-9' | fold -w 8 | head -n1)
+    echo "${timestamp}-${random_str}"
+}
+
+# Function to store correlation ID
+store_correlation_id() {
+    local correlation_id="$1"
+    local service="$2"
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    
+    echo "${timestamp}|${correlation_id}|${service}" >> "$CORRELATION_FILE"
+    
+    # Clean up old entries if file gets too large
+    local line_count=$(wc -l < "$CORRELATION_FILE" 2>/dev/null || echo "0")
+    if [[ $line_count -gt $MAX_IDS ]]; then
+        tail -n $((MAX_IDS / 2)) "$CORRELATION_FILE" > "${CORRELATION_FILE}.tmp"
+        mv "${CORRELATION_FILE}.tmp" "$CORRELATION_FILE"
+    fi
+}
+
+# Function to get correlation ID for a service
+get_correlation_id() {
+    local service="$1"
+    local correlation_id=$(generate_correlation_id)
+    store_correlation_id "$correlation_id" "$service"
+    echo "$correlation_id"
+}
+
+# Function to show help
+show_help() {
+    echo "Correlation ID Generator"
+    echo "Usage: $0 [command] [service]"
+    echo ""
+    echo "Commands:"
+    echo "  generate [service]  - Generate a new correlation ID for a service"
+    echo "  list [service]      - List correlation IDs for a service"
+    echo "  search [id]         - Search for a specific correlation ID"
+    echo "  cleanup            - Clean up old correlation IDs"
+    echo "  help               - Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 generate paperless_ngx"
+    echo "  $0 list grafana"
+    echo "  $0 search abc123-def456"
+}
+
+# Function to list correlation IDs for a service
+list_correlation_ids() {
+    local service="$1"
+    
+    if [[ -f "$CORRELATION_FILE" ]]; then
+        if [[ -n "$service" ]]; then
+            grep "|${service}$" "$CORRELATION_FILE" | tail -20
+        else
+            tail -20 "$CORRELATION_FILE"
+        fi
+    else
+        echo "No correlation IDs found."
+    fi
+}
+
+# Function to search for a specific correlation ID
+search_correlation_id() {
+    local correlation_id="$1"
+    
+    if [[ -f "$CORRELATION_FILE" ]]; then
+        grep "$correlation_id" "$CORRELATION_FILE"
+    else
+        echo "No correlation IDs found."
+    fi
+}
+
+# Function to cleanup old correlation IDs
+cleanup_correlation_ids() {
+    local days="${1:-7}"
+    local cutoff_date=$(date -d "$days days ago" +%Y-%m-%d)
+    
+    if [[ -f "$CORRELATION_FILE" ]]; then
+        # Remove entries older than specified days
+        awk -F'|' -v cutoff="$cutoff_date" '$1 >= cutoff' "$CORRELATION_FILE" > "${CORRELATION_FILE}.tmp"
+        mv "${CORRELATION_FILE}.tmp" "$CORRELATION_FILE"
+        echo "Cleaned up correlation IDs older than $days days."
+    else
+        echo "No correlation IDs file found."
+    fi
+}
+
+# Main script logic
+case "${1:-help}" in
+    "generate")
+        if [[ -n "$2" ]]; then
+            correlation_id=$(get_correlation_id "$2")
+            echo "Generated correlation ID for $2: $correlation_id"
+        else
+            echo "Error: Service name required for generate command."
+            exit 1
+        fi
+        ;;
+    "list")
+        list_correlation_ids "$2"
+        ;;
+    "search")
+        if [[ -n "$2" ]]; then
+            search_correlation_id "$2"
+        else
+            echo "Error: Correlation ID required for search command."
+            exit 1
+        fi
+        ;;
+    "cleanup")
+        cleanup_correlation_ids "$2"
+        ;;
+    "help"|*)
+        show_help
+        ;;
+esac 

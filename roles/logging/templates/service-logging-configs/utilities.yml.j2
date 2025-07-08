@@ -1,0 +1,273 @@
+# Utilities Services Logging Configuration
+# Comprehensive logging setup for utility and dashboard services
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-utilities.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # Homepage logs
+  - job_name: homepage
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: homepage
+          component: dashboard
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/homepage/logs/*.log
+          - {{ logs_dir }}/utilities/homepage/*.log
+
+  # Tdarr logs
+  - job_name: tdarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: tdarr
+          component: media_processing
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/tdarr/logs/*.log
+          - {{ logs_dir }}/utilities/tdarr/*.log
+
+  # Grafana logs
+  - job_name: grafana
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: grafana
+          component: monitoring_dashboard
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/grafana/logs/*.log
+          - {{ logs_dir }}/utilities/grafana/*.log
+
+  # Prometheus logs
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: prometheus
+          component: metrics_collection
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/prometheus/logs/*.log
+          - {{ logs_dir }}/utilities/prometheus/*.log
+
+  # Alertmanager logs
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: alertmanager
+          component: alert_routing
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/alertmanager/logs/*.log
+          - {{ logs_dir }}/utilities/alertmanager/*.log
+
+  # Telegraf logs
+  - job_name: telegraf
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: telegraf
+          component: metrics_agent
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/telegraf/logs/*.log
+          - {{ logs_dir }}/utilities/telegraf/*.log
+
+  # InfluxDB logs
+  - job_name: influxdb
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: influxdb
+          component: time_series_database
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/influxdb/logs/*.log
+          - {{ logs_dir }}/utilities/influxdb/*.log
+
+  # Node Exporter logs
+  - job_name: node_exporter
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: node_exporter
+          component: system_metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/node-exporter/logs/*.log
+          - {{ logs_dir }}/utilities/node-exporter/*.log
+
+  # cAdvisor logs
+  - job_name: cadvisor
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: cadvisor
+          component: container_metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/monitoring/cadvisor/logs/*.log
+          - {{ logs_dir }}/utilities/cadvisor/*.log
+
+  # Utilities API logs
+  - job_name: utilities_api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_api
+          component: api
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/api/*.log
+          - {{ docker_dir }}/utilities-api/logs/*.log
+
+  # Utilities webhook logs
+  - job_name: utilities_webhooks
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_webhooks
+          component: webhooks
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/webhooks/*.log
+          - {{ docker_dir }}/utilities-webhooks/logs/*.log
+
+  # Utilities notification logs
+  - job_name: utilities_notifications
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_notifications
+          component: notifications
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/notifications/*.log
+          - {{ docker_dir }}/utilities-notifications/logs/*.log
+
+  # Utilities backup logs
+  - job_name: utilities_backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_backup
+          component: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/backup/*.log
+          - {{ docker_dir }}/utilities-backup/logs/*.log
+
+  # Utilities security logs
+  - job_name: utilities_security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_security
+          component: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/security/*.log
+          - {{ docker_dir }}/utilities-security/logs/*.log
+
+  # Utilities performance logs
+  - job_name: utilities_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_performance
+          component: performance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/performance/*.log
+          - {{ docker_dir }}/utilities-performance/logs/*.log
+
+  # Utilities error logs
+  - job_name: utilities_errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_errors
+          component: errors
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/errors/*.log
+          - {{ docker_dir }}/utilities-errors/logs/*.log
+
+  # Utilities maintenance logs
+  - job_name: utilities_maintenance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: utilities
+          service: utilities_maintenance
+          component: maintenance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/utilities/maintenance/*.log
+          - {{ docker_dir }}/utilities-maintenance/logs/*.log 

@@ -1,0 +1,199 @@
+# Certificate Management Logging Configuration
+# Comprehensive logging setup for SSL/TLS certificate management
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-certificate-management.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # Certbot logs
+  - job_name: certbot
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certbot
+          component: certificate_renewal
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/certbot/logs/*.log
+          - /var/log/letsencrypt/*.log
+          - {{ logs_dir }}/certificate_management/certbot/*.log
+
+  # Certificate monitoring logs
+  - job_name: certificate_monitor
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_monitor
+          component: monitoring
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/certificate-monitor/logs/*.log
+          - {{ logs_dir }}/certificate_management/monitor/*.log
+
+  # Certificate automation logs
+  - job_name: certificate_automation
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_automation
+          component: automation
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/automation/*.log
+          - {{ docker_dir }}/certificate-automation/logs/*.log
+
+  # Certificate validation logs
+  - job_name: certificate_validation
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_validation
+          component: validation
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/validation/*.log
+          - {{ docker_dir }}/certificate-validator/logs/*.log
+
+  # Certificate backup logs
+  - job_name: certificate_backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_backup
+          component: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/backup/*.log
+          - {{ docker_dir }}/certificate-backup/logs/*.log
+
+  # Certificate security logs
+  - job_name: certificate_security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_security
+          component: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/security/*.log
+          - {{ docker_dir }}/certificate-security/logs/*.log
+
+  # Certificate API logs
+  - job_name: certificate_api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_api
+          component: api
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/api/*.log
+          - {{ docker_dir }}/certificate-api/logs/*.log
+
+  # Certificate webhook logs
+  - job_name: certificate_webhooks
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_webhooks
+          component: webhooks
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/webhooks/*.log
+          - {{ docker_dir }}/certificate-webhooks/logs/*.log
+
+  # Certificate notification logs
+  - job_name: certificate_notifications
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_notifications
+          component: notifications
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/notifications/*.log
+          - {{ docker_dir }}/certificate-notifications/logs/*.log
+
+  # Certificate error logs
+  - job_name: certificate_errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_errors
+          component: errors
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/errors/*.log
+          - {{ docker_dir }}/certificate-errors/logs/*.log
+
+  # Certificate performance logs
+  - job_name: certificate_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_performance
+          component: performance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/performance/*.log
+          - {{ docker_dir }}/certificate-performance/logs/*.log
+
+  # Certificate maintenance logs
+  - job_name: certificate_maintenance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: certificate_management
+          service: certificate_maintenance
+          component: maintenance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/certificate_management/maintenance/*.log
+          - {{ docker_dir }}/certificate-maintenance/logs/*.log 

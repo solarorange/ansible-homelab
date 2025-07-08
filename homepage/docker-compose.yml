@@ -13,19 +13,20 @@ services:
     container_name: homepage
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${HOMEPAGE_PORT:-3000}:3000"
     volumes:
-      - ./config:/app/config
+      - ./config:/app/config:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
-      - TZ=${TZ:-America/New_York}
+      - TZ=${TIMEZONE:-UTC}
+      - NODE_ENV=production
     networks:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.homepage.rule=Host(`homepage.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.${DOMAIN:-homelab.local}`)"
       - "traefik.http.routers.homepage.entrypoints=websecure"
       - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
       - "traefik.http.services.homepage.loadbalancer.server.port=3000"
@@ -39,14 +40,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: ${MEMORY_LIMIT:-512M}
-          cpus: ${CPU_LIMIT:-0.5}
-        reservations:
-          memory: 256M
-          cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
 
   # =============================================================================
   # WEATHER API SERVICE (OPTIONAL)
@@ -56,14 +55,20 @@ services:
     container_name: homepage-weather
     restart: unless-stopped
     environment:
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
       - WEATHER_LAT=${WEATHER_LAT:-40.7128}
       - WEATHER_LON=${WEATHER_LON:--74.0060}
       - WEATHER_UNITS=${WEATHER_UNITS:-metric}
     networks:
       - traefik
-    profiles:
-      - weather
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
 
   # =============================================================================
   # SYSTEM MONITORING SERVICE (OPTIONAL)
@@ -81,8 +86,14 @@ services:
       - HOST_ETC=/host/etc
     networks:
       - traefik
-    profiles:
-      - monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
 
   # =============================================================================
   # BACKUP SERVICE (OPTIONAL)

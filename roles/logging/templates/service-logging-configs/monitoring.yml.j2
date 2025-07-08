@@ -1,0 +1,427 @@
+# Monitoring Services Logging Configuration
+# Comprehensive logging setup for all monitoring-related services
+# This file should be included in the main Promtail configuration
+
+scrape_configs:
+  # =============================================================================
+  # METRICS COLLECTION
+  # =============================================================================
+  
+  # Prometheus - Metrics Collection
+  - job_name: monitoring_prometheus
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: prometheus
+          component: metrics_collection
+          category: metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/prometheus/logs/*.log
+          - {{ logs_dir }}/monitoring/prometheus/application/*.log
+          - {{ logs_dir }}/monitoring/prometheus/scrape/*.log
+          - {{ logs_dir }}/monitoring/prometheus/error/*.log
+          - {{ logs_dir }}/monitoring/prometheus/performance/*.log
+          - {{ logs_dir }}/monitoring/prometheus/backup/*.log
+          - {{ logs_dir }}/monitoring/prometheus/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_prometheus"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Node Exporter - System Metrics
+  - job_name: monitoring_node_exporter
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: node_exporter
+          component: system_metrics
+          category: metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/node-exporter/logs/*.log
+          - {{ logs_dir }}/monitoring/node-exporter/application/*.log
+          - {{ logs_dir }}/monitoring/node-exporter/collection/*.log
+          - {{ logs_dir }}/monitoring/node-exporter/error/*.log
+          - {{ logs_dir }}/monitoring/node-exporter/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_node_exporter"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # cAdvisor - Container Metrics
+  - job_name: monitoring_cadvisor
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: cadvisor
+          component: container_metrics
+          category: metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/cadvisor/logs/*.log
+          - {{ logs_dir }}/monitoring/cadvisor/application/*.log
+          - {{ logs_dir }}/monitoring/cadvisor/collection/*.log
+          - {{ logs_dir }}/monitoring/cadvisor/error/*.log
+          - {{ logs_dir }}/monitoring/cadvisor/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_cadvisor"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Telegraf - Metrics Agent
+  - job_name: monitoring_telegraf
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: telegraf
+          component: metrics_agent
+          category: metrics
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/telegraf/logs/*.log
+          - {{ logs_dir }}/monitoring/telegraf/application/*.log
+          - {{ logs_dir }}/monitoring/telegraf/collection/*.log
+          - {{ logs_dir }}/monitoring/telegraf/error/*.log
+          - {{ logs_dir }}/monitoring/telegraf/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_telegraf"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # VISUALIZATION & DASHBOARDS
+  # =============================================================================
+  
+  # Grafana - Visualization Platform
+  - job_name: monitoring_grafana
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: grafana
+          component: visualization_platform
+          category: visualization
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/grafana/logs/*.log
+          - {{ logs_dir }}/monitoring/grafana/application/*.log
+          - {{ logs_dir }}/monitoring/grafana/api/*.log
+          - {{ logs_dir }}/monitoring/grafana/query/*.log
+          - {{ logs_dir }}/monitoring/grafana/error/*.log
+          - {{ logs_dir }}/monitoring/grafana/performance/*.log
+          - {{ logs_dir }}/monitoring/grafana/backup/*.log
+          - {{ logs_dir }}/monitoring/grafana/plugins/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_grafana"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # LOG AGGREGATION
+  # =============================================================================
+  
+  # Loki - Log Aggregation
+  - job_name: monitoring_loki
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: loki
+          component: log_aggregation
+          category: logging
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/loki/logs/*.log
+          - {{ logs_dir }}/monitoring/loki/application/*.log
+          - {{ logs_dir }}/monitoring/loki/ingestion/*.log
+          - {{ logs_dir }}/monitoring/loki/query/*.log
+          - {{ logs_dir }}/monitoring/loki/error/*.log
+          - {{ logs_dir }}/monitoring/loki/performance/*.log
+          - {{ logs_dir }}/monitoring/loki/backup/*.log
+          - {{ logs_dir }}/monitoring/loki/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_loki"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Promtail - Log Collection
+  - job_name: monitoring_promtail
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: promtail
+          component: log_collection
+          category: logging
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/promtail/logs/*.log
+          - {{ logs_dir }}/monitoring/promtail/application/*.log
+          - {{ logs_dir }}/monitoring/promtail/collection/*.log
+          - {{ logs_dir }}/monitoring/promtail/error/*.log
+          - {{ logs_dir }}/monitoring/promtail/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_promtail"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # ALERTING
+  # =============================================================================
+  
+  # Alertmanager - Alert Management
+  - job_name: monitoring_alertmanager
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: alertmanager
+          component: alert_management
+          category: alerting
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/alertmanager/logs/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/application/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/alerts/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/notifications/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/error/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/performance/*.log
+          - {{ logs_dir }}/monitoring/alertmanager/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_alertmanager"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # SERVICE DISCOVERY
+  # =============================================================================
+  
+  # Consul - Service Discovery
+  - job_name: monitoring_consul
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: consul
+          component: service_discovery
+          category: discovery
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/consul/logs/*.log
+          - {{ logs_dir }}/monitoring/consul/application/*.log
+          - {{ logs_dir }}/monitoring/consul/discovery/*.log
+          - {{ logs_dir }}/monitoring/consul/health/*.log
+          - {{ logs_dir }}/monitoring/consul/error/*.log
+          - {{ logs_dir }}/monitoring/consul/performance/*.log
+          - {{ logs_dir }}/monitoring/consul/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_consul"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # MONITORING UTILITIES
+  # =============================================================================
+  
+  # Uptime Kuma - Uptime Monitoring
+  - job_name: monitoring_uptime_kuma
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: uptime_kuma
+          component: uptime_monitoring
+          category: utilities
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/uptime-kuma/logs/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/application/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/checks/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/notifications/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/error/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/performance/*.log
+          - {{ logs_dir }}/monitoring/uptime-kuma/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_uptime_kuma"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Netdata - Real-time Monitoring
+  - job_name: monitoring_netdata
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: monitoring_services
+          service: netdata
+          component: real_time_monitoring
+          category: utilities
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/netdata/logs/*.log
+          - {{ logs_dir }}/monitoring/netdata/application/*.log
+          - {{ logs_dir }}/monitoring/netdata/collection/*.log
+          - {{ logs_dir }}/monitoring/netdata/error/*.log
+          - {{ logs_dir }}/monitoring/netdata/performance/*.log
+          - {{ logs_dir }}/monitoring/netdata/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="monitoring_netdata"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category: 

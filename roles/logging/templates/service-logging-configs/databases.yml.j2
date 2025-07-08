@@ -1,0 +1,420 @@
+# Database Services Logging Configuration
+# Comprehensive logging setup for all database-related services
+# This file should be included in the main Promtail configuration
+
+scrape_configs:
+  # =============================================================================
+  # RELATIONAL DATABASES
+  # =============================================================================
+  
+  # PostgreSQL - Relational Database
+  - job_name: database_postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: postgresql
+          component: relational_database
+          category: relational
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/postgresql/logs/*.log
+          - {{ logs_dir }}/databases/postgresql/application/*.log
+          - {{ logs_dir }}/databases/postgresql/query/*.log
+          - {{ logs_dir }}/databases/postgresql/error/*.log
+          - {{ logs_dir }}/databases/postgresql/slow/*.log
+          - {{ logs_dir }}/databases/postgresql/backup/*.log
+          - {{ logs_dir }}/databases/postgresql/replication/*.log
+          - {{ logs_dir }}/databases/postgresql/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_postgresql"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+) (?P<level>\w+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05 MST"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # MySQL/MariaDB - Relational Database
+  - job_name: database_mysql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: mysql
+          component: relational_database
+          category: relational
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/mysql/logs/*.log
+          - {{ logs_dir }}/databases/mysql/application/*.log
+          - {{ logs_dir }}/databases/mysql/query/*.log
+          - {{ logs_dir }}/databases/mysql/error/*.log
+          - {{ logs_dir }}/databases/mysql/slow/*.log
+          - {{ logs_dir }}/databases/mysql/backup/*.log
+          - {{ logs_dir }}/databases/mysql/replication/*.log
+          - {{ logs_dir }}/databases/mysql/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_mysql"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # CACHE DATABASES
+  # =============================================================================
+  
+  # Redis - In-Memory Cache
+  - job_name: database_redis
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: redis
+          component: in_memory_cache
+          category: cache
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/redis/logs/*.log
+          - {{ logs_dir }}/databases/redis/application/*.log
+          - {{ logs_dir }}/databases/redis/command/*.log
+          - {{ logs_dir }}/databases/redis/error/*.log
+          - {{ logs_dir }}/databases/redis/performance/*.log
+          - {{ logs_dir }}/databases/redis/backup/*.log
+          - {{ logs_dir }}/databases/redis/replication/*.log
+          - {{ logs_dir }}/databases/redis/memory/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_redis"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{1,2} \w+ \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "_2 Jan 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Memcached - Distributed Cache
+  - job_name: database_memcached
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: memcached
+          component: distributed_cache
+          category: cache
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/memcached/logs/*.log
+          - {{ logs_dir }}/databases/memcached/application/*.log
+          - {{ logs_dir }}/databases/memcached/command/*.log
+          - {{ logs_dir }}/databases/memcached/error/*.log
+          - {{ logs_dir }}/databases/memcached/performance/*.log
+          - {{ logs_dir }}/databases/memcached/memory/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_memcached"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{1,2} \w+ \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "_2 Jan 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # SEARCH DATABASES
+  # =============================================================================
+  
+  # Elasticsearch - Search Engine
+  - job_name: database_elasticsearch
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: elasticsearch
+          component: search_engine
+          category: search
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/elasticsearch/logs/*.log
+          - {{ logs_dir }}/databases/elasticsearch/application/*.log
+          - {{ logs_dir }}/databases/elasticsearch/query/*.log
+          - {{ logs_dir }}/databases/elasticsearch/error/*.log
+          - {{ logs_dir }}/databases/elasticsearch/performance/*.log
+          - {{ logs_dir }}/databases/elasticsearch/cluster/*.log
+          - {{ logs_dir }}/databases/elasticsearch/backup/*.log
+          - {{ logs_dir }}/databases/elasticsearch/indexing/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_elasticsearch"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: "@timestamp"
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Solr - Search Platform
+  - job_name: database_solr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: solr
+          component: search_platform
+          category: search
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/solr/logs/*.log
+          - {{ logs_dir }}/databases/solr/application/*.log
+          - {{ logs_dir }}/databases/solr/query/*.log
+          - {{ logs_dir }}/databases/solr/error/*.log
+          - {{ logs_dir }}/databases/solr/performance/*.log
+          - {{ logs_dir }}/databases/solr/indexing/*.log
+          - {{ logs_dir }}/databases/solr/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_solr"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05,000"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # TIME-SERIES DATABASES
+  # =============================================================================
+  
+  # InfluxDB - Time Series Database
+  - job_name: database_influxdb
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: influxdb
+          component: time_series_database
+          category: time_series
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/influxdb/logs/*.log
+          - {{ logs_dir }}/databases/influxdb/application/*.log
+          - {{ logs_dir }}/databases/influxdb/query/*.log
+          - {{ logs_dir }}/databases/influxdb/write/*.log
+          - {{ logs_dir }}/databases/influxdb/error/*.log
+          - {{ logs_dir }}/databases/influxdb/performance/*.log
+          - {{ logs_dir }}/databases/influxdb/backup/*.log
+          - {{ logs_dir }}/databases/influxdb/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_influxdb"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: ts
+                  level: level
+                  message: msg
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Prometheus - Time Series Database
+  - job_name: database_prometheus
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: prometheus
+          component: time_series_database
+          category: time_series
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/prometheus/logs/*.log
+          - {{ logs_dir }}/databases/prometheus/application/*.log
+          - {{ logs_dir }}/databases/prometheus/scrape/*.log
+          - {{ logs_dir }}/databases/prometheus/error/*.log
+          - {{ logs_dir }}/databases/prometheus/performance/*.log
+          - {{ logs_dir }}/databases/prometheus/backup/*.log
+          - {{ logs_dir }}/databases/prometheus/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_prometheus"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # DOCUMENT DATABASES
+  # =============================================================================
+  
+  # MongoDB - Document Database
+  - job_name: database_mongodb
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: mongodb
+          component: document_database
+          category: document
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/mongodb/logs/*.log
+          - {{ logs_dir }}/databases/mongodb/application/*.log
+          - {{ logs_dir }}/databases/mongodb/query/*.log
+          - {{ logs_dir }}/databases/mongodb/error/*.log
+          - {{ logs_dir }}/databases/mongodb/performance/*.log
+          - {{ logs_dir }}/databases/mongodb/replication/*.log
+          - {{ logs_dir }}/databases/mongodb/backup/*.log
+          - {{ logs_dir }}/databases/mongodb/indexing/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_mongodb"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}\+\d{4}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # DATABASE MANAGEMENT
+  # =============================================================================
+  
+  # phpMyAdmin - MySQL Management
+  - job_name: database_phpmyadmin
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: phpmyadmin
+          component: database_management
+          category: management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/phpmyadmin/logs/*.log
+          - {{ logs_dir }}/databases/phpmyadmin/application/*.log
+          - {{ logs_dir }}/databases/phpmyadmin/access/*.log
+          - {{ logs_dir }}/databases/phpmyadmin/error/*.log
+          - {{ logs_dir }}/databases/phpmyadmin/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_phpmyadmin"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Adminer - Database Management
+  - job_name: database_adminer
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: database_services
+          service: adminer
+          component: database_management
+          category: management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/adminer/logs/*.log
+          - {{ logs_dir }}/databases/adminer/application/*.log
+          - {{ logs_dir }}/databases/adminer/access/*.log
+          - {{ logs_dir }}/databases/adminer/error/*.log
+          - {{ logs_dir }}/databases/adminer/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="database_adminer"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category: 

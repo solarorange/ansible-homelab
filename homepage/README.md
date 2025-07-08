@@ -1,360 +1,450 @@
-# Homelab Dashboard - Homepage Configuration
+# Homelab Homepage Dashboard
 
-A comprehensive, production-ready Homepage configuration for homelab environments with advanced features, monitoring integration, and modern UI design.
+A comprehensive, enhanced homepage dashboard for homelab infrastructure with complete service integration, monitoring, and automation capabilities.
 
 ## 🚀 Features
 
-### 📊 **Service Management**
-- **Organized Service Groups**: Media Stack, Monitoring & Observability, Management & Control, Security & Network, External Resources
-- **Health Monitoring**: Real-time service status with configurable health checks
-- **Authentication Integration**: Support for API keys, session-based auth, and OAuth
-- **Custom Styling**: Themed service groups with gradient backgrounds and hover effects
+### Complete Service Coverage
+- **Infrastructure Services**: Traefik, Authentik, Portainer, Watchtower
+- **Monitoring Stack**: Grafana, Prometheus, Loki, AlertManager, Uptime Kuma, Dashdot
+- **Security Services**: CrowdSec, Fail2ban, Pi-hole, UFW, WireGuard
+- **Database Services**: PostgreSQL, MariaDB, Redis, Elasticsearch, Kibana
+- **Media Stack**: All ARR services (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, Bazarr), Jellyfin, Overseerr, Tautulli
+- **Storage Services**: Nextcloud, Vaultwarden, Paperless, MinIO, Filebrowser
+- **Automation Services**: Home Assistant, Node-RED, n8n, Zigbee2MQTT
+- **Backup Services**: Kopia, Duplicati, Restic
+- **Utility Services**: Tdarr, Unmanic, Requestrr, Pulsarr
 
-### 🎨 **Modern UI/UX**
-- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
-- **Dark Mode**: Beautiful dark theme with custom CSS variables
-- **Custom CSS**: Advanced styling with animations, gradients, and modern design elements
-- **Accessibility**: WCAG compliant with focus indicators and reduced motion support
+### Enhanced Visual Design
+- Modern, responsive UI with gradient backgrounds
+- Service-specific color themes and styling
+- Hover effects and animations
+- Status indicators and health monitoring
+- Mobile-friendly design
 
-### 📈 **Advanced Widgets**
-- **Weather Widget**: OpenWeatherMap integration with forecast and detailed metrics
-- **System Monitoring**: CPU, RAM, disk, network, and temperature monitoring
-- **Docker Integration**: Container status and resource usage
-- **Search Widget**: Configurable search providers (DuckDuckGo, Google, Bing)
+### Advanced Functionality
+- Real-time service health monitoring
+- API key management with encryption
+- Automated backup and recovery
+- System resource monitoring
+- Weather integration
+- Search functionality
+- Calendar integration
 
-### 🔧 **Configuration Management**
-- **Modular Structure**: Separate config files for services, bookmarks, and settings
-- **Environment Variables**: Support for dynamic configuration
-- **Health Check Integration**: Automatic service discovery and monitoring
-- **Backup & Recovery**: Automated backup configuration
+## 📋 Prerequisites
 
-## 📁 File Structure
-
-```
-homepage/
-├── config/
-│   ├── config.yml          # Main configuration
-│   ├── services.yml        # Service definitions
-│   ├── bookmarks.yml       # Bookmark categories
-│   ├── docker.yml          # Docker compose configuration
-│   ├── settings.yml        # Advanced settings
-│   └── custom.css          # Custom styling
-├── docker-compose.yml      # Main docker compose file
-└── README.md              # This file
-```
-
-## 🛠️ Installation & Setup
-
-### Prerequisites
-
+### System Requirements
 - Docker and Docker Compose
-- Domain name with DNS configured
-- Traefik reverse proxy (recommended)
-- API keys for external services
+- Python 3.8+
+- curl, jq, yq utilities
+- Traefik network (for reverse proxy)
 
-### Quick Start
+### Required Dependencies
+```bash
+# Install system dependencies
+sudo apt update
+sudo apt install -y docker.io docker-compose python3 python3-pip curl jq
 
-1. **Clone or download the configuration files**
-   ```bash
-   cd homepage/
-   ```
+# Install Python dependencies
+pip3 install pyyaml requests cryptography
+```
 
-2. **Configure environment variables**
-   ```bash
-   # Copy and edit the environment file
-   cp .env.example .env
-   nano .env
-   ```
+## 🛠️ Installation
 
-3. **Update configuration files**
-   - Replace `{{ domain }}` with your actual domain
-   - Add your API keys in `config.yml` and `services.yml`
-   - Customize service URLs and endpoints
+### Quick Deployment
+```bash
+# Clone the repository (if not already done)
+cd /path/to/your/homelab
 
-4. **Deploy with Docker Compose**
-   ```bash
-   docker-compose up -d
-   ```
+# Deploy the complete homepage
+./homepage/deploy_enhanced.sh deploy
+```
 
-5. **Access the dashboard**
-   ```
-   https://homepage.yourdomain.com
-   ```
+### Manual Installation
+```bash
+# 1. Navigate to homepage directory
+cd homepage
+
+# 2. Create necessary directories
+mkdir -p config backups logs scripts
+
+# 3. Set your domain (optional)
+export DOMAIN=yourdomain.com
+
+# 4. Deploy
+./deploy_enhanced.sh deploy
+```
 
 ## ⚙️ Configuration
 
-### Main Configuration (`config.yml`)
+### Environment Variables
+```bash
+# Domain for services
+export DOMAIN=homelab.local
 
-The main configuration file includes:
-- Dashboard title and description
-- Theme and layout settings
-- Widget configuration
-- Custom CSS integration
-- Weather and system monitoring settings
+# Homepage port
+export HOMEPAGE_PORT=3000
+```
 
-### Service Configuration (`services.yml`)
+### API Key Management
+The homepage includes a comprehensive API key management system:
 
-Organized into service groups:
+```bash
+# Add API key for a service
+python3 scripts/api_key_manager.py add sonarr your_sonarr_api_key
 
-#### 🎬 Media Stack (Blue/Purple Theme)
-- **Sonarr**: TV show management
-- **Radarr**: Movie management  
-- **Jellyfin**: Media server
-- **Overseerr**: Media requests
-- **Prowlarr**: Indexer management
-- **Bazarr**: Subtitle management
-- **Tautulli**: Media statistics
+# Test all API keys
+python3 scripts/api_key_manager.py test --all
 
-#### 📊 Monitoring & Observability (Green/Teal Theme)
-- **Grafana**: Metrics dashboard
-- **Prometheus**: Metrics collection
-- **AlertManager**: Alert management
-- **Loki**: Log aggregation
-- **Node Exporter**: System metrics
+# Generate configuration files
+python3 scripts/api_key_manager.py generate
+```
 
-#### ⚙️ Management & Control (Orange/Amber Theme)
-- **Portainer**: Container management
-- **Authentik**: Identity management
-- **Traefik**: Reverse proxy
-- **Homepage**: Dashboard itself
+### Service Configuration
+Edit the service configurations in `config/services.yml`:
 
-#### 🛡️ Security & Network (Red/Security Theme)
-- **CrowdSec**: Intrusion detection
-- **Fail2ban**: Intrusion prevention
-- **UFW**: Firewall status
-
-#### 🌐 External Resources (Gray/Neutral Theme)
-- **GitHub**: Code repository
-- **Documentation**: System docs
-- **Support**: Help resources
-- **Status Pages**: External monitoring
-
-### Bookmarks Configuration (`bookmarks.yml`)
-
-Organized bookmark categories:
-- **Documentation & Guides**: System and service documentation
-- **Support & Community**: Forums and technical support
-- **Development Resources**: Code repositories and tools
-- **Monitoring & Status**: System monitoring and external status
-- **External Services**: Cloud services and utilities
-- **Media & Entertainment**: Streaming and media services
-- **Utilities & Tools**: Network and development tools
-- **Learning & Reference**: Educational resources
+```yaml
+- group: Media Stack
+  icon: tv.png
+  className: media-stack
+  items:
+    - Sonarr:
+        icon: sonarr.png
+        href: https://sonarr.{{ domain }}
+        description: TV Show Management & Automation
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: your_sonarr_api_key
+        health:
+          url: http://sonarr:8989/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+```
 
 ## 🎨 Customization
 
-### Custom CSS (`custom.css`)
+### Custom CSS
+The homepage includes extensive CSS customization options in `config/custom.css`:
 
-The custom CSS file provides:
-- **CSS Variables**: Consistent color scheme and spacing
-- **Service Group Themes**: Gradient backgrounds for each service category
-- **Responsive Design**: Mobile-first approach with breakpoints
-- **Animations**: Smooth transitions and hover effects
-- **Accessibility**: Focus indicators and reduced motion support
+```css
+/* Custom service group themes */
+.infrastructure-stack {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
 
-### Theme Customization
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+```
 
-You can customize the appearance by modifying:
-- Color variables in `:root`
-- Service group themes
-- Widget styling
-- Animation effects
+### Widget Configuration
+Configure widgets in `config/widgets.yml`:
 
-### Adding New Services
+```yaml
+# System monitoring widget
+system_resources:
+  label: System Resources
+  type: resources
+  url: http://localhost:3001
+  config:
+    cpu: true
+    memory: true
+    disk: true
+    network: true
+    temperature: true
+    interval: 30
+```
 
-1. **Add to services.yml**:
-   ```yaml
-   - Your Service:
-       icon: your-service.png
-       href: https://your-service.{{ domain }}
-       description: Service description
-       widget:
-         type: your-service
-         url: http://your-service:port
-         key: your_api_key
-       health:
-         url: http://your-service:port/health
-         interval: 30
-       auth:
-         type: api_key
-         header: X-API-Key
-   ```
+## 🔧 Management
 
-2. **Add icon**: Place service icon in the icons directory
-3. **Configure health checks**: Set appropriate health check endpoints
-4. **Test the configuration**: Restart Homepage to apply changes
+### Deployment Script Commands
+```bash
+# Deploy complete homepage
+./deploy_enhanced.sh deploy
 
-## 🔧 Advanced Features
+# Show status
+./deploy_enhanced.sh status
+
+# View logs
+./deploy_enhanced.sh logs
+
+# Stop services
+./deploy_enhanced.sh stop
+
+# Start services
+./deploy_enhanced.sh start
+
+# Restart services
+./deploy_enhanced.sh restart
+
+# Update to latest version
+./deploy_enhanced.sh update
+
+# Create backup
+./deploy_enhanced.sh backup
+
+# Restore from backup
+./deploy_enhanced.sh restore backup_file.tar.gz
+```
 
 ### Health Monitoring
+The homepage includes automated health monitoring:
 
-Each service includes configurable health checks:
-- **URL-based checks**: HTTP/HTTPS endpoint monitoring
-- **Interval configuration**: Customizable check frequency
-- **Authentication support**: API key and session-based auth
-- **Status indicators**: Visual status with color coding
+```bash
+# Run health check once
+python3 scripts/health_monitor.py --once
 
-### Widget Integration
+# Start continuous monitoring
+python3 scripts/health_monitor.py --interval 60
 
-Advanced widget configuration includes:
-- **Weather data**: Real-time weather with forecast
-- **System metrics**: CPU, memory, disk, and network monitoring
-- **Docker stats**: Container resource usage
-- **Search functionality**: Multiple search providers
+# Check specific service
+python3 scripts/health_monitor.py --service sonarr
+```
 
-### Security Features
+### Backup Management
+```bash
+# Create backup
+python3 scripts/backup_manager.py create --name my_backup
 
-- **Authentication**: Basic auth and OAuth support
-- **Access control**: IP whitelisting and HTTPS enforcement
-- **API security**: Rate limiting and CORS configuration
-- **Session management**: Configurable session timeouts
+# List backups
+python3 scripts/backup_manager.py list
 
-## 📊 Monitoring & Alerts
+# Restore backup
+python3 scripts/backup_manager.py restore backup_file.tar.gz
+
+# Clean up old backups
+python3 scripts/backup_manager.py cleanup --days 30
+```
+
+## 📊 Service Integration
+
+### Infrastructure Services
+- **Traefik**: Reverse proxy and load balancer monitoring
+- **Authentik**: Identity provider and SSO integration
+- **Portainer**: Container management and orchestration
+- **Watchtower**: Automated container updates
+
+### Monitoring Stack
+- **Grafana**: Metrics dashboard and visualization
+- **Prometheus**: Metrics collection and storage
+- **AlertManager**: Alert management and routing
+- **Loki**: Log aggregation and query
+- **Uptime Kuma**: Uptime monitoring and status pages
+- **Dashdot**: System dashboard and hardware monitoring
+
+### Security Services
+- **CrowdSec**: Intrusion detection and prevention
+- **Fail2ban**: Intrusion prevention system
+- **Pi-hole**: DNS ad blocker and network protection
+- **UFW**: Uncomplicated firewall
+- **WireGuard**: VPN server
+
+### Media Stack
+- **Jellyfin**: Media server and streaming
+- **Sonarr**: TV show management and automation
+- **Radarr**: Movie management and automation
+- **Lidarr**: Music management and automation
+- **Readarr**: Book management and automation
+- **Prowlarr**: Indexer management
+- **Bazarr**: Subtitle management
+- **Tautulli**: Media statistics and analytics
+- **Overseerr**: Media requests and discovery
+- **SABnzbd**: Usenet downloader
+- **qBittorrent**: Torrent client
+- **Immich**: Photo management
+
+### Automation Services
+- **Home Assistant**: Home automation platform
+- **Node-RED**: Flow-based programming
+- **n8n**: Workflow automation
+- **Zigbee2MQTT**: Zigbee bridge
+- **Code Server**: Web-based VS Code
+- **GitLab**: Git repository management
+- **Harbor**: Container registry
+
+### Storage Services
+- **Nextcloud**: File storage and collaboration
+- **Vaultwarden**: Password manager
+- **Paperless**: Document management
+- **MinIO**: Object storage
+- **Filebrowser**: Web file manager
+- **Bookstack**: Wiki and documentation
+
+### Backup Services
+- **Kopia**: Fast and secure backup
+- **Duplicati**: Backup with encryption
+- **Restic**: Fast and secure backups
+
+### Utility Services
+- **Tdarr**: Distributed media transcoding
+- **Unmanic**: Media library optimizer
+- **Requestrr**: Discord bot for media requests
+- **Pulsarr**: ARR service status dashboard
+
+## 🔐 Security
+
+### API Key Encryption
+All API keys are stored with AES-256 encryption:
+
+```bash
+# Keys are automatically encrypted when stored
+python3 scripts/api_key_manager.py add service_name api_key
+
+# Keys are decrypted when needed for service communication
+```
+
+### Access Control
+- HTTPS enforcement with Let's Encrypt certificates
+- API rate limiting
+- Session timeout configuration
+- IP whitelisting support
+
+## 📈 Monitoring and Alerts
 
 ### Health Checks
+- Automatic service health monitoring
+- Response time tracking
+- Status reporting to dashboard
+- Alert integration with monitoring stack
 
-Services are automatically monitored with:
-- **Status indicators**: Green (online), red (offline), yellow (warning)
-- **Response time tracking**: Performance monitoring
-- **Last check timestamps**: Audit trail
-- **Configurable thresholds**: Custom alert conditions
-
-### Integration with Monitoring Stack
-
-Homepage integrates with:
-- **Grafana**: Dashboard metrics and alerts
-- **Prometheus**: System and service metrics
-- **AlertManager**: Alert routing and notification
-- **Loki**: Log aggregation and querying
-
-## 🔄 Backup & Recovery
-
-### Automatic Backups
-
-Configured backup features:
-- **Daily backups**: Automated backup scheduling
-- **Multiple locations**: Local, S3, and FTP backup
-- **Compression**: Space-efficient backup storage
-- **Retention policies**: Configurable backup retention
-
-### Recovery Procedures
-
-1. **Stop Homepage**: `docker-compose down`
-2. **Restore configuration**: Copy backup files to config directory
-3. **Restart services**: `docker-compose up -d`
-4. **Verify functionality**: Check service status and widgets
+### Metrics Collection
+- System resource monitoring (CPU, memory, disk, network)
+- Container health metrics
+- Service response times
+- Error rate tracking
 
 ## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Services not showing up**
-   - Check service URLs and ports
-   - Verify API keys and authentication
-   - Review health check endpoints
-
-2. **Widgets not working**
-   - Verify API keys for external services
-   - Check network connectivity
-   - Review widget configuration
-
-3. **Styling issues**
-   - Clear browser cache
-   - Check CSS syntax in custom.css
-   - Verify CSS file path in config
-
-### Debug Mode
-
-Enable debug logging:
-```yaml
-logging:
-  level: debug
-  output: stdout
-```
-
-### Health Check Testing
-
-Test individual service health:
+#### Homepage not accessible
 ```bash
-curl -f http://service:port/health
+# Check if containers are running
+docker-compose ps
+
+# Check logs
+docker-compose logs homepage
+
+# Check port binding
+netstat -tlnp | grep 3000
 ```
 
-## 🔗 Integration Examples
+#### API keys not working
+```bash
+# Test specific service
+python3 scripts/api_key_manager.py test --service sonarr
 
-### Traefik Integration
-
-```yaml
-labels:
-  - "traefik.enable=true"
-  - "traefik.http.routers.homepage.rule=Host(`homepage.yourdomain.com`)"
-  - "traefik.http.routers.homepage.entrypoints=websecure"
-  - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+# Regenerate configuration
+python3 scripts/api_key_manager.py generate
 ```
 
-### Authentik SSO
+#### Health monitoring not working
+```bash
+# Check systemd service status
+sudo systemctl status homepage-health-monitor
 
-```yaml
-auth:
-  type: oauth
-  provider: authentik
-  clientId: your_client_id
-  clientSecret: your_client_secret
-  redirectUri: https://homepage.yourdomain.com/auth/callback
+# Check service logs
+sudo journalctl -u homepage-health-monitor -f
+
+# Test health check manually
+python3 scripts/health_monitor.py --once
 ```
 
-## 📈 Performance Optimization
+### Log Locations
+- **Container logs**: `docker-compose logs`
+- **Systemd logs**: `journalctl -u homepage-health-monitor`
+- **Application logs**: `logs/` directory
+- **Health status**: `config/health_status.json`
 
-### Resource Limits
+## 🔄 Updates and Maintenance
 
-Configured resource limits:
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 512M
-      cpus: '0.5'
-    reservations:
-      memory: 256M
-      cpus: '0.25'
+### Regular Maintenance
+```bash
+# Weekly backup
+python3 scripts/backup_manager.py create --name weekly_backup
+
+# Monthly cleanup
+python3 scripts/backup_manager.py cleanup --days 30
+
+# Update services
+./deploy_enhanced.sh update
 ```
 
-### Caching
+### Version Updates
+```bash
+# Pull latest images
+docker-compose pull
 
-Enable caching for better performance:
-```yaml
-cache:
-  enabled: true
-  type: memory
-  ttl: 300
-  maxSize: 100
+# Restart with new images
+docker-compose up -d
+
+# Verify deployment
+./deploy_enhanced.sh status
 ```
+
+## 📚 Documentation
+
+### Additional Resources
+- [Homepage Documentation](https://gethomepage.dev)
+- [Docker Documentation](https://docs.docker.com)
+- [Traefik Documentation](https://doc.traefik.io)
+- [Ansible Documentation](https://docs.ansible.com)
+
+### Configuration Examples
+- [Service Configuration Examples](docs/service-configuration-examples.md)
+- [Widget Configuration Guide](docs/widget-configuration-guide.md)
+- [Customization Guide](docs/customization-guide.md)
+- [Security Hardening](docs/security-hardening.md)
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Development Setup
+```bash
+# Clone repository
+git clone <repository-url>
+cd ansible_homelab/homepage
+
+# Install development dependencies
+pip3 install -r requirements-dev.txt
+
+# Run tests
+python3 -m pytest tests/
+
+# Format code
+black scripts/
+isort scripts/
+```
+
+### Adding New Services
+1. Add service definition to `config/services.yml`
+2. Add widget configuration to `config/widgets.yml`
+3. Update API key manager with service details
+4. Test service integration
+5. Update documentation
 
 ## 📄 License
 
-This configuration is provided under the MIT License. See LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- [Homepage](https://gethomepage.dev) - The amazing dashboard application
-- [Traefik](https://traefik.io) - Reverse proxy and load balancer
-- [Docker](https://docker.com) - Container platform
-- The homelab community for inspiration and feedback
-
-## 📞 Support
-
-For support and questions:
-- Create an issue in the repository
-- Join the [Homepage Discord](https://discord.gg/homelab)
-- Check the [Homepage documentation](https://gethomepage.dev)
+- [Homepage](https://github.com/benphelps/homepage) - The base homepage application
+- [Traefik](https://traefik.io/) - Reverse proxy and load balancer
+- [Docker](https://www.docker.com/) - Container platform
+- [Ansible](https://www.ansible.com/) - Automation platform
 
 ---
 
-**Happy Homelabbing! 🏠** 
+**Note**: This homepage dashboard is designed for homelab environments. Ensure proper security measures are in place when exposing services to the internet. 

@@ -1,0 +1,361 @@
+# Enhanced Log Rotation Configuration for Homelab Services
+# Comprehensive log rotation for all services with proper retention and compression
+
+# Global settings
+compress
+delaycompress
+missingok
+notifempty
+create 644 {{ username }} {{ username }}
+
+# System logs
+/var/log/syslog {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 syslog adm
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+
+/var/log/auth.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 syslog adm
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+
+/var/log/kern.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 syslog adm
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+
+/var/log/daemon.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 syslog adm
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+
+# Security logs
+/var/log/fail2ban.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload fail2ban
+    endscript
+}
+
+/var/log/crowdsec.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload crowdsec
+    endscript
+}
+
+/var/log/audit/audit.log {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 root root
+    postrotate
+        systemctl reload auditd
+    endscript
+}
+
+# Network logs
+/var/log/dnsmasq.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload dnsmasq
+    endscript
+}
+
+/var/log/dhcpd.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload isc-dhcp-server
+    endscript
+}
+
+# Storage logs
+/var/log/samba/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload smbd
+        systemctl reload nmbd
+    endscript
+}
+
+/var/log/nfs/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        systemctl reload nfs-kernel-server
+    endscript
+}
+
+# Docker logs
+{{ docker_dir }}/**/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+    postrotate
+        # Restart affected containers if needed
+        docker ps --format "{{.Names}}" | grep -E "(loki|promtail|grafana|prometheus)" | xargs -r docker restart
+    endscript
+}
+
+# Service-specific logs
+{{ logs_dir }}/paperless-ngx/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+{{ logs_dir }}/fing/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+{{ logs_dir }}/certificate_management/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+{{ logs_dir }}/automation/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+{{ logs_dir }}/utilities/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Monitoring logs
+{{ logs_dir }}/monitoring/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Media service logs
+{{ logs_dir }}/media/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Database logs
+{{ logs_dir }}/databases/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Security service logs
+{{ logs_dir }}/security/**/*.log {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Backup logs
+{{ logs_dir }}/backup/**/*.log {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Performance logs
+{{ logs_dir }}/performance/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Error logs
+{{ logs_dir }}/errors/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Ansible logs
+{{ logs_dir }}/ansible/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Web server logs
+/var/log/nginx/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 www-data www-data
+    postrotate
+        systemctl reload nginx
+    endscript
+}
+
+/var/log/apache2/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 www-data www-data
+    postrotate
+        systemctl reload apache2
+    endscript
+}
+
+# Custom application logs
+{{ logs_dir }}/**/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+# Clean up old log files (older than 90 days)
+{{ logs_dir }}/**/*.log.* {
+    daily
+    rotate 0
+    missingok
+    notifempty
+    olddir {{ logs_dir }}/archive
+    postrotate
+        find {{ logs_dir }}/archive -name "*.log.*" -mtime +90 -delete
+    endscript
+} 

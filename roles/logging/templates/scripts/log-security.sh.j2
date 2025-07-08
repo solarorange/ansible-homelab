@@ -1,0 +1,306 @@
+#!/bin/bash
+
+# Log Security Monitoring Script
+# Monitors and analyzes security-related logs and events
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Configuration
+LOKI_URL="http://loki:3100"
+PROMETHEUS_URL="http://prometheus:9090"
+LOG_DIR="{{ logs_dir }}"
+DOCKER_DIR="{{ docker_dir }}"
+SECURITY_LOG="{{ docker_dir }}/monitoring/logging/security.log"
+
+# Function to show help
+show_help() {
+    echo -e "${CYAN}Log Security Monitoring Script${NC}"
+    echo "Usage: $0 [command] [options]"
+    echo ""
+    echo "Commands:"
+    echo "  monitor [duration]  - Monitor security logs for specified duration (default: 1h)"
+    echo "  threats [period]    - Analyze security threats for specified period (default: 24h)"
+    echo "  auth-failures       - Show authentication failures"
+    echo "  suspicious-ips      - Show suspicious IP addresses"
+    echo "  failed-logins       - Show failed login attempts"
+    echo "  security-events     - Show security events"
+    echo "  audit-logs          - Show audit logs"
+    echo "  report [period]     - Generate security report"
+    echo "  help                - Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 monitor 30m"
+    echo "  $0 threats 7d"
+    echo "  $0 auth-failures"
+    echo "  $0 suspicious-ips"
+    echo "  $0 report 24h"
+}
+
+# Function to query Loki
+query_loki() {
+    local query="$1"
+    local start_time="${2:-1h}"
+    
+    curl -s -G "$LOKI_URL/loki/api/v1/query_range" \
+        --data-urlencode "query=$query" \
+        --data-urlencode "start=$(date -d "$start_time ago" -u +%s)000000000" \
+        --data-urlencode "end=$(date -u +%s)000000000" \
+        --data-urlencode "step=1s" | jq -r '.data.result[0].values[]? | "\(.[0]) \(.[1])"' 2>/dev/null
+}
+
+# Function to monitor security logs
+monitor_security() {
+    local duration="${1:-1h}"
+    local interval=30
+    local iterations=$(( $(echo "$duration" | sed 's/[^0-9]//g') * 60 / interval ))
+    
+    echo -e "${BLUE}Monitoring security logs for $duration${NC}"
+    echo "Interval: ${interval}s, Iterations: $iterations"
+    echo "----------------------------------------"
+    
+    # Create security log file
+    mkdir -p "$(dirname "$SECURITY_LOG")"
+    echo "# Security Log Monitoring - Started at $(date)" > "$SECURITY_LOG"
+    echo "# Duration: $duration, Interval: ${interval}s" >> "$SECURITY_LOG"
+    echo "# Timestamp,AuthFailures,SuspiciousIPs,FailedLogins,SecurityEvents,ThreatLevel" >> "$SECURITY_LOG"
+    
+    for ((i=1; i<=iterations; i++)); do
+        local timestamp=$(date +%s)
+        local auth_failures=$(query_loki '{service=~"authentik|security", level="error"}' "5m" | wc -l)
+        local suspicious_ips=$(query_loki '{service="security", component="threats"}' "5m" | wc -l)
+        local failed_logins=$(query_loki '{service=~"authentik|security", level="warn"}' "5m" | wc -l)
+        local security_events=$(query_loki '{component="security"}' "5m" | wc -l)
+        
+        # Calculate threat level
+        local threat_level=0
+        if [[ $auth_failures -gt 10 ]]; then threat_level=$((threat_level + 3)); fi
+        if [[ $suspicious_ips -gt 5 ]]; then threat_level=$((threat_level + 2)); fi
+        if [[ $failed_logins -gt 20 ]]; then threat_level=$((threat_level + 2)); fi
+        if [[ $security_events -gt 10 ]]; then threat_level=$((threat_level + 1)); fi
+        
+        echo "$timestamp,$auth_failures,$suspicious_ips,$failed_logins,$security_events,$threat_level" >> "$SECURITY_LOG"
+        
+        # Display current status with color coding
+        local status_color="$GREEN"
+        if [[ $threat_level -gt 5 ]]; then status_color="$RED"; elif [[ $threat_level -gt 2 ]]; then status_color="$YELLOW"; fi
+        
+        echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC} Auth Failures: ${RED}${auth_failures}${NC}, Suspicious IPs: ${YELLOW}${suspicious_ips}${NC}, Threat Level: ${status_color}${threat_level}${NC}"
+        
+        sleep $interval
+    done
+    
+    echo -e "${GREEN}Security monitoring completed. Results saved to: $SECURITY_LOG${NC}"
+}
+
+# Function to analyze security threats
+analyze_threats() {
+    local period="${1:-24h}"
+    
+    echo -e "${BLUE}Analyzing security threats for $period${NC}"
+    echo "----------------------------------------"
+    
+    # Get security metrics
+    local total_auth_failures=$(query_loki '{service=~"authentik|security", level="error"}' "$period" | wc -l)
+    local total_suspicious_ips=$(query_loki '{service="security", component="threats"}' "$period" | wc -l)
+    local total_failed_logins=$(query_loki '{service=~"authentik|security", level="warn"}' "$period" | wc -l)
+    local total_security_events=$(query_loki '{component="security"}' "$period" | wc -l)
+    
+    echo -e "${CYAN}Security Summary for $period:${NC}"
+    echo -e "  Authentication Failures: ${RED}${total_auth_failures}${NC}"
+    echo -e "  Suspicious IP Addresses: ${YELLOW}${total_suspicious_ips}${NC}"
+    echo -e "  Failed Login Attempts: ${RED}${total_failed_logins}${NC}"
+    echo -e "  Security Events: ${BLUE}${total_security_events}${NC}"
+    
+    # Threat assessment
+    echo ""
+    echo -e "${CYAN}Threat Assessment:${NC}"
+    
+    if [[ $total_auth_failures -gt 100 ]]; then
+        echo -e "  ${RED}✗ High number of authentication failures detected${NC}"
+    elif [[ $total_auth_failures -gt 50 ]]; then
+        echo -e "  ${YELLOW}⚠ Elevated authentication failures${NC}"
+    else
+        echo -e "  ${GREEN}✓ Authentication failures are within normal range${NC}"
+    fi
+    
+    if [[ $total_suspicious_ips -gt 20 ]]; then
+        echo -e "  ${RED}✗ High number of suspicious IP addresses detected${NC}"
+    elif [[ $total_suspicious_ips -gt 10 ]]; then
+        echo -e "  ${YELLOW}⚠ Elevated suspicious IP activity${NC}"
+    else
+        echo -e "  ${GREEN}✓ Suspicious IP activity is within normal range${NC}"
+    fi
+    
+    if [[ $total_failed_logins -gt 200 ]]; then
+        echo -e "  ${RED}✗ High number of failed login attempts detected${NC}"
+    elif [[ $total_failed_logins -gt 100 ]]; then
+        echo -e "  ${YELLOW}⚠ Elevated failed login attempts${NC}"
+    else
+        echo -e "  ${GREEN}✓ Failed login attempts are within normal range${NC}"
+    fi
+}
+
+# Function to show authentication failures
+show_auth_failures() {
+    echo -e "${RED}Authentication Failures${NC}"
+    echo "----------------------------------------"
+    
+    query_loki '{service=~"authentik|security", level="error"}' "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${RED}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show suspicious IP addresses
+show_suspicious_ips() {
+    echo -e "${YELLOW}Suspicious IP Addresses${NC}"
+    echo "----------------------------------------"
+    
+    query_loki '{service="security", component="threats"}' "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${YELLOW}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show failed login attempts
+show_failed_logins() {
+    echo -e "${RED}Failed Login Attempts${NC}"
+    echo "----------------------------------------"
+    
+    query_loki '{service=~"authentik|security", level="warn"}' "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${RED}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show security events
+show_security_events() {
+    echo -e "${PURPLE}Security Events${NC}"
+    echo "----------------------------------------"
+    
+    query_loki '{component="security"}' "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${PURPLE}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show audit logs
+show_audit_logs() {
+    echo -e "${CYAN}Audit Logs${NC}"
+    echo "----------------------------------------"
+    
+    query_loki '{service="system", component="audit"}' "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${CYAN}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to generate security report
+generate_security_report() {
+    local period="${1:-24h}"
+    local report_file="{{ docker_dir }}/monitoring/logging/security-report-$(date +%Y%m%d-%H%M%S).txt"
+    
+    echo -e "${BLUE}Generating Security Report${NC}"
+    echo "Report will be saved to: $report_file"
+    
+    {
+        echo "Security Log Report"
+        echo "Generated: $(date)"
+        echo "Period: $period"
+        echo "========================================"
+        echo ""
+        
+        # Security metrics
+        echo "SECURITY METRICS"
+        echo "----------------"
+        local total_auth_failures=$(query_loki '{service=~"authentik|security", level="error"}' "$period" | wc -l)
+        local total_suspicious_ips=$(query_loki '{service="security", component="threats"}' "$period" | wc -l)
+        local total_failed_logins=$(query_loki '{service=~"authentik|security", level="warn"}' "$period" | wc -l)
+        local total_security_events=$(query_loki '{component="security"}' "$period" | wc -l)
+        
+        echo "Authentication Failures: $total_auth_failures"
+        echo "Suspicious IP Addresses: $total_suspicious_ips"
+        echo "Failed Login Attempts: $total_failed_logins"
+        echo "Security Events: $total_security_events"
+        echo ""
+        
+        # Threat assessment
+        echo "THREAT ASSESSMENT"
+        echo "-----------------"
+        if [[ $total_auth_failures -gt 100 ]]; then
+            echo "- HIGH: Authentication failures exceed threshold"
+        fi
+        if [[ $total_suspicious_ips -gt 20 ]]; then
+            echo "- HIGH: Suspicious IP activity exceeds threshold"
+        fi
+        if [[ $total_failed_logins -gt 200 ]]; then
+            echo "- HIGH: Failed login attempts exceed threshold"
+        fi
+        echo ""
+        
+        # Recommendations
+        echo "RECOMMENDATIONS"
+        echo "---------------"
+        if [[ $total_auth_failures -gt 100 ]]; then
+            echo "- Review authentication configuration"
+            echo "- Implement rate limiting"
+            echo "- Enable two-factor authentication"
+        fi
+        if [[ $total_suspicious_ips -gt 20 ]]; then
+            echo "- Review firewall rules"
+            echo "- Implement IP blocking"
+            echo "- Monitor network traffic"
+        fi
+        if [[ $total_failed_logins -gt 200 ]]; then
+            echo "- Implement account lockout policies"
+            echo "- Review password policies"
+            echo "- Enable intrusion detection"
+        fi
+        
+    } > "$report_file"
+    
+    echo -e "${GREEN}Security report generated: $report_file${NC}"
+}
+
+# Main script logic
+case "${1:-help}" in
+    "monitor")
+        monitor_security "$2"
+        ;;
+    "threats")
+        analyze_threats "$2"
+        ;;
+    "auth-failures")
+        show_auth_failures
+        ;;
+    "suspicious-ips")
+        show_suspicious_ips
+        ;;
+    "failed-logins")
+        show_failed_logins
+        ;;
+    "security-events")
+        show_security_events
+        ;;
+    "audit-logs")
+        show_audit_logs
+        ;;
+    "report")
+        generate_security_report "$2"
+        ;;
+    "help"|*)
+        show_help
+        ;;
+esac 

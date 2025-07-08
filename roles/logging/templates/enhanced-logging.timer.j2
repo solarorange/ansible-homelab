@@ -1,0 +1,21 @@
+[Unit]
+Description=Enhanced Logging Maintenance Timer
+Documentation=https://github.com/your-repo/ansible_homelab
+Requires=enhanced-logging.service
+
+[Timer]
+# Run daily at 2 AM
+OnCalendar=*-*-* 02:00:00
+# Run every 6 hours for health checks
+OnCalendar=*-*-* */6:00:00
+# Run weekly on Sunday at 3 AM for maintenance
+OnCalendar=Sun *-*-* 03:00:00
+
+# Persistent timer (survives reboots)
+Persistent=true
+
+# Random delay to avoid thundering herd
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target 

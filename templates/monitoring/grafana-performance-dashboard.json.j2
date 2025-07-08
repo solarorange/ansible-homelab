@@ -110,7 +110,122 @@
           }
         ],
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 9,
+        "title": "Performance Log Stream (Real-time)",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{level=~\"error|warn|info\", service=~\"$service\", host=~\"$host\"}",
+            "queryType": "range"
+          }
+        ],
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 28},
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": true,
+          "showLabels": true,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": true,
+          "syntaxHighlight": true
+        }
+      },
+      {
+        "id": 10,
+        "title": "Performance Log Activity Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum by (service, level) (rate(loki_log_entries_total{category=\"performance\"}[1m]))",
+            "legendFormat": "{{service}} - {{level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "options": {"color": {"mode": "palette-classic"}, "heatmap": true}
+      },
+      {
+        "id": 11,
+        "title": "Performance Error/Warning Trends",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum by (service) (rate(loki_log_entries_total{level=~\"error|warn\",category=\"performance\"}[5m]))",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38}
+      },
+      {
+        "id": 12,
+        "title": "Slow Queries & Errors Table",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "{category=\"performance\", level=~\"error|warn\", service=~\"$service\", host=~\"$host\"}",
+            "queryType": "range"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 46},
+        "options": {"showHeader": true, "sortable": true, "filterable": true}
+      },
+      {
+        "id": 13,
+        "title": "Performance Log Level Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (level) (rate(loki_log_entries_total{category=\"performance\"}[5m]))",
+            "legendFormat": "{{level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 54},
+        "options": {"pieType": "pie", "legend": {"displayMode": "table", "placement": "right"}}
       }
-    ]
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, service)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Service"
+        },
+        {
+          "name": "host",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, host)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Host"
+        },
+        {
+          "name": "level",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, level)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Log Level"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    }
   }
 } 

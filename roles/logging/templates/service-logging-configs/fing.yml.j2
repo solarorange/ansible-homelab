@@ -1,0 +1,199 @@
+# Fing Logging Configuration
+# Comprehensive logging setup for network device discovery service
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-fing.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # Fing application logs
+  - job_name: fing_app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: application
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          version: "{{ fing_version | default('latest') }}"
+        __path__:
+          - {{ docker_dir }}/fing/logs/fing.log
+          - {{ logs_dir }}/fing/application/*.log
+
+  # Fing network discovery logs
+  - job_name: fing_network
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: network
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/network/*.log
+          - {{ docker_dir }}/fing/logs/network.log
+
+  # Fing device monitoring logs
+  - job_name: fing_devices
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: devices
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/devices/*.log
+          - {{ docker_dir }}/fing/logs/devices.log
+
+  # Fing API logs
+  - job_name: fing_api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: api
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/api/*.log
+          - {{ docker_dir }}/fing/logs/api.log
+
+  # Fing database logs
+  - job_name: fing_database
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: database
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/database/*.log
+          - {{ docker_dir }}/fing/logs/database.log
+
+  # Fing backup logs
+  - job_name: fing_backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/backup/*.log
+          - {{ docker_dir }}/fing/logs/backup.log
+
+  # Fing health check logs
+  - job_name: fing_health
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: health
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/health/*.log
+          - {{ docker_dir }}/fing/logs/health.log
+
+  # Fing security logs
+  - job_name: fing_security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/security/*.log
+          - {{ docker_dir }}/fing/logs/security.log
+
+  # Fing performance logs
+  - job_name: fing_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: performance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/performance/*.log
+          - {{ docker_dir }}/fing/logs/performance.log
+
+  # Fing alerting logs
+  - job_name: fing_alerts
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: alerts
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/alerts/*.log
+          - {{ docker_dir }}/fing/logs/alerts.log
+
+  # Fing error logs
+  - job_name: fing_errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: errors
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/errors/*.log
+          - {{ docker_dir }}/fing/logs/errors.log
+
+  # Fing maintenance logs
+  - job_name: fing_maintenance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fing
+          service: fing
+          component: maintenance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/fing/maintenance/*.log
+          - {{ docker_dir }}/fing/logs/maintenance.log 

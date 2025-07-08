@@ -1,0 +1,313 @@
+# Storage Services Logging Configuration
+# Comprehensive logging setup for all storage-related services
+# This file should be included in the main Promtail configuration
+
+scrape_configs:
+  # =============================================================================
+  # FILE SYSTEMS
+  # =============================================================================
+  
+  # Samba - File Sharing
+  - job_name: storage_samba
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: samba
+          component: file_sharing
+          category: file_systems
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/samba/*.log
+          - {{ logs_dir }}/storage/samba/application/*.log
+          - {{ logs_dir }}/storage/samba/access/*.log
+          - {{ logs_dir }}/storage/samba/error/*.log
+          - {{ logs_dir }}/storage/samba/performance/*.log
+          - {{ logs_dir }}/storage/samba/backup/*.log
+          - {{ logs_dir }}/storage/samba/security/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_samba"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006/01/02 15:04:05,000"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # NFS - Network File System
+  - job_name: storage_nfs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: nfs
+          component: network_file_system
+          category: file_systems
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/nfs/*.log
+          - {{ logs_dir }}/storage/nfs/application/*.log
+          - {{ logs_dir }}/storage/nfs/access/*.log
+          - {{ logs_dir }}/storage/nfs/error/*.log
+          - {{ logs_dir }}/storage/nfs/performance/*.log
+          - {{ logs_dir }}/storage/nfs/backup/*.log
+          - {{ logs_dir }}/storage/nfs/security/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_nfs"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # CLOUD STORAGE
+  # =============================================================================
+  
+  # Nextcloud - Cloud Storage
+  - job_name: storage_nextcloud
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: nextcloud
+          component: cloud_storage
+          category: cloud_storage
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/nextcloud/logs/*.log
+          - {{ logs_dir }}/storage/nextcloud/application/*.log
+          - {{ logs_dir }}/storage/nextcloud/api/*.log
+          - {{ logs_dir }}/storage/nextcloud/access/*.log
+          - {{ logs_dir }}/storage/nextcloud/error/*.log
+          - {{ logs_dir }}/storage/nextcloud/performance/*.log
+          - {{ logs_dir }}/storage/nextcloud/backup/*.log
+          - {{ logs_dir }}/storage/nextcloud/sync/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_nextcloud"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Syncthing - File Synchronization
+  - job_name: storage_syncthing
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: syncthing
+          component: file_synchronization
+          category: cloud_storage
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/syncthing/logs/*.log
+          - {{ logs_dir }}/storage/syncthing/application/*.log
+          - {{ logs_dir }}/storage/syncthing/api/*.log
+          - {{ logs_dir }}/storage/syncthing/sync/*.log
+          - {{ logs_dir }}/storage/syncthing/error/*.log
+          - {{ logs_dir }}/storage/syncthing/performance/*.log
+          - {{ logs_dir }}/storage/syncthing/backup/*.log
+          - {{ logs_dir }}/storage/syncthing/devices/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_syncthing"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # BACKUP SERVICES
+  # =============================================================================
+  
+  # Restic - Backup Tool
+  - job_name: storage_restic
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: restic
+          component: backup_tool
+          category: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/storage/restic/application/*.log
+          - {{ logs_dir }}/storage/restic/backup/*.log
+          - {{ logs_dir }}/storage/restic/restore/*.log
+          - {{ logs_dir }}/storage/restic/verify/*.log
+          - {{ logs_dir }}/storage/restic/error/*.log
+          - {{ logs_dir }}/storage/restic/performance/*.log
+          - {{ logs_dir }}/storage/restic/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_restic"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Duplicati - Backup Tool
+  - job_name: storage_duplicati
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: duplicati
+          component: backup_tool
+          category: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/duplicati/logs/*.log
+          - {{ logs_dir }}/storage/duplicati/application/*.log
+          - {{ logs_dir }}/storage/duplicati/backup/*.log
+          - {{ logs_dir }}/storage/duplicati/restore/*.log
+          - {{ logs_dir }}/storage/duplicati/error/*.log
+          - {{ logs_dir }}/storage/duplicati/performance/*.log
+          - {{ logs_dir }}/storage/duplicati/retention/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_duplicati"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # STORAGE MONITORING
+  # =============================================================================
+  
+  # Storage Performance Monitoring
+  - job_name: storage_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: storage_performance
+          component: performance_monitoring
+          category: monitoring
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/storage/performance/io/*.log
+          - {{ logs_dir }}/storage/performance/throughput/*.log
+          - {{ logs_dir }}/storage/performance/latency/*.log
+          - {{ logs_dir }}/storage/performance/errors/*.log
+          - {{ logs_dir }}/storage/performance/alerts/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_performance"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # STORAGE UTILITIES
+  # =============================================================================
+  
+  # Rsync - File Transfer
+  - job_name: storage_rsync
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: storage_services
+          service: rsync
+          component: file_transfer
+          category: utilities
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/rsync.log
+          - {{ logs_dir }}/storage/rsync/application/*.log
+          - {{ logs_dir }}/storage/rsync/transfers/*.log
+          - {{ logs_dir }}/storage/rsync/error/*.log
+          - {{ logs_dir }}/storage/rsync/performance/*.log
+          - {{ logs_dir }}/storage/rsync/backup/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="storage_rsync"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category: 

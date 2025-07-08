@@ -1,0 +1,332 @@
+# Enhanced Logging Infrastructure
+
+## Overview
+
+This directory contains the enhanced logging infrastructure for the Ansible homelab project. The system provides comprehensive log collection, analysis, monitoring, and alerting capabilities for all services.
+
+## Architecture
+
+### Components
+
+- **Loki**: Centralized log aggregation and storage
+- **Promtail**: Log collection agent with service-specific configurations
+- **Grafana**: Log visualization and dashboards
+- **Prometheus**: Metrics collection for log-based monitoring
+- **Alertmanager**: Alert routing and notification
+
+### Directory Structure
+
+```
+{{ docker_dir }}/monitoring/logging/
+├── scripts/                    # Analysis and monitoring scripts
+│   ├── log-analysis.sh        # Comprehensive log analysis
+│   ├── log-performance.sh     # Performance monitoring
+│   ├── log-security.sh        # Security monitoring
+│   ├── correlation-id.sh      # Correlation ID generator
+│   ├── healthcheck.sh         # Health check script
+│   └── manage.sh              # Management script
+├── service-configs/           # Service-specific configurations
+│   ├── paperless-ngx.yml
+│   ├── fing.yml
+│   ├── certificate-management.yml
+│   ├── automation.yml
+│   └── utilities.yml
+├── dashboards/                # Grafana dashboard configurations
+├── alerting-rules/            # Prometheus alerting rules
+├── correlation-ids.txt        # Correlation ID tracking
+└── README.md                  # This file
+```
+
+## Quick Start
+
+### 1. Check System Status
+
+```bash
+# Check overall health
+{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh
+
+# Check service health
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh service-health
+```
+
+### 2. Analyze Logs
+
+```bash
+# Show recent errors
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh errors
+
+# Show errors for specific service
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh errors paperless_ngx
+
+# Show warnings
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh warnings
+
+# Search for specific patterns
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh search "authentication failure"
+```
+
+### 3. Monitor Performance
+
+```bash
+# Monitor performance for 1 hour
+{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh monitor 1h
+
+# Analyze performance for 24 hours
+{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh analyze 24h
+
+# Identify bottlenecks
+{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh bottlenecks
+```
+
+### 4. Monitor Security
+
+```bash
+# Monitor security logs
+{{ docker_dir }}/monitoring/logging/scripts/log-security.sh monitor 1h
+
+# Show authentication failures
+{{ docker_dir }/monitoring/logging/scripts/log-security.sh auth-failures
+
+# Show suspicious IP addresses
+{{ docker_dir }}/monitoring/logging/scripts/log-security.sh suspicious-ips
+
+# Generate security report
+{{ docker_dir }}/monitoring/logging/scripts/log-security.sh report 24h
+```
+
+## Service Coverage
+
+The enhanced logging infrastructure covers all services in the homelab:
+
+### Core Infrastructure
+- System logs (syslog, auth, kernel, daemon)
+- Docker container logs
+- Network services (DNS, DHCP, firewall)
+- Storage services (Samba, NFS, backup)
+
+### Security Services
+- Authentik authentication
+- Vault secrets management
+- CrowdSec threat detection
+- Fail2ban intrusion prevention
+- Audit logs
+
+### Database Services
+- PostgreSQL
+- MariaDB/MySQL
+- Redis
+- Elasticsearch
+- InfluxDB
+
+### Media Services
+- Sonarr, Radarr, Lidarr, Readarr
+- Bazarr, Prowlarr
+- Jellyfin, Emby
+- Download clients (SABnzbd, qBittorrent)
+- Overseerr, Tautulli
+
+### Monitoring Services
+- Prometheus
+- Grafana
+- Alertmanager
+- Telegraf
+- Node Exporter
+
+### Specialized Services
+- Paperless-ngx document management
+- Fing network discovery
+- Certificate management
+- Automation services (Portainer, Watchtower, Home Assistant)
+
+## Log Levels
+
+- **ERROR**: Critical issues requiring immediate attention
+- **WARN**: Warning conditions that may need investigation
+- **INFO**: General operational information
+- **DEBUG**: Detailed debugging information
+
+## Log Retention
+
+- **Hot Storage**: 7 days in Loki
+- **Warm Storage**: 30 days in compressed format
+- **Cold Storage**: 90 days in archival storage
+- **Backup**: Daily backups with 7-day retention
+
+## Alerting
+
+The system includes comprehensive alerting rules for:
+
+- Logging infrastructure health
+- Error rate thresholds
+- Security events
+- Service-specific issues
+- Performance problems
+- Backup failures
+
+## Correlation IDs
+
+The system generates unique correlation IDs for request tracing across services:
+
+```bash
+# Generate correlation ID for a service
+{{ docker_dir }}/monitoring/logging/scripts/correlation-id.sh generate paperless_ngx
+
+# Search for logs with correlation ID
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh correlation abc123-def456
+```
+
+## Grafana Dashboards
+
+Access the following dashboards in Grafana:
+
+- **Logs Overview**: General log visualization and filtering
+- **Service Health**: Service-specific health indicators
+- **Security Monitoring**: Security event tracking
+- **Performance Analysis**: Log processing performance
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Promtail not collecting logs**
+   - Check Promtail service status: `docker ps | grep promtail`
+   - Verify configuration: `docker exec promtail promtail --config.file=/etc/promtail/config.yml --check-config`
+   - Check log paths exist and are readable
+
+2. **Loki not receiving logs**
+   - Check Loki service status: `docker ps | grep loki`
+   - Verify connectivity: `curl http://loki:3100/ready`
+   - Check Promtail can reach Loki
+
+3. **High log volume**
+   - Use performance monitoring: `{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh bottlenecks`
+   - Consider log sampling for high-volume services
+   - Review log retention policies
+
+4. **Missing service logs**
+   - Verify service-specific configuration exists
+   - Check log file paths in Promtail config
+   - Ensure service is generating logs
+
+### Health Checks
+
+```bash
+# Run comprehensive health check
+{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh
+
+# Check specific components
+docker exec promtail wget -qO- http://localhost:9080/ready
+curl http://loki:3100/ready
+curl http://prometheus:9090/-/healthy
+```
+
+## Maintenance
+
+### Automated Maintenance
+
+The system includes automated maintenance tasks:
+
+- Daily log rotation and compression
+- Weekly correlation ID cleanup
+- Monthly performance analysis
+- Quarterly security review
+
+### Manual Maintenance
+
+```bash
+# Clean up old logs
+{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh cleanup
+
+# Clean up old correlation IDs
+{{ docker_dir }}/monitoring/logging/scripts/correlation-id.sh cleanup 7
+
+# Generate performance report
+{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh report 7d
+```
+
+## Configuration
+
+### Adding New Services
+
+1. Create service-specific configuration in `service-configs/`
+2. Add log paths to main Promtail configuration
+3. Create service-specific dashboard if needed
+4. Add alerting rules for the service
+5. Update this documentation
+
+### Customizing Alert Thresholds
+
+Edit alerting rules in `alerting-rules/log-based-alerts.yml`:
+
+```yaml
+- alert: ServiceErrorRate
+  expr: rate(loki_log_entries_total{service="your-service", level="error"}[5m]) > 10
+  for: 5m
+  labels:
+    severity: warning
+    service: your-service
+```
+
+## Support
+
+For issues and questions:
+
+1. Check the troubleshooting section above
+2. Review the main documentation: `docs/ENHANCED_LOGGING_INFRASTRUCTURE.md`
+3. Check service logs for errors
+4. Use the analysis tools to investigate issues
+
+## Version Information
+
+- **Enhanced Logging Version**: 2.0.0
+- **Last Updated**: {{ ansible_date_time.iso8601 }}
+- **Compatible with**: Ansible Homelab v1.0+
+
+# Enhanced Grafana Log Dashboards for Homelab
+
+## Overview
+This documentation describes the advanced Grafana dashboards for log analysis and visualization in your homelab. These dashboards provide enterprise-grade, real-time insights into logs from 30+ services, leveraging Loki and Prometheus for data collection and analysis.
+
+## Dashboard Categories
+- **Logs Overview:** System-wide log health, trends, and real-time streaming
+- **System Overview:** Host and component log breakdowns, error/warning rates
+- **Media Services:** ARR, downloaders, players, and processing logs
+- **Security Services:** Authentication, network, DNS, and system security logs
+- **Performance Dashboard:** System metrics, performance logs, slow queries, and error analysis
+
+## Panel Types & Features
+- **Real-time Log Stream:** Live log viewing with syntax highlighting, advanced filtering, and drill-down
+- **Heatmap:** Log activity patterns by service, level, or category
+- **Pie Chart:** Log level distribution for quick status assessment
+- **Table:** Structured log data, slow queries, and error tracking
+- **Timeseries:** Log volume, error/warning trends, and performance metrics
+- **Stat & Gauge:** Key status indicators (e.g., container count, service health)
+
+## Advanced Features
+- **Modern Design:** Dark theme, gradients, and visually appealing layouts
+- **Interactive Filtering:** Dashboard variables for service, host, component, category, and log level
+- **Drill-down & Links:** Clickable panels for detailed investigation
+- **Annotation & Alert Integration:** Visual event markers and alert overlays
+- **Custom Query Builder:** Use dashboard variables to build complex log queries
+- **Export & Sharing:** Dashboards can be exported and shared via Grafana
+
+## Customization & Usage
+1. **Import Dashboards:** Use the provided Jinja2 templates to deploy dashboards via Ansible or manually import JSON into Grafana.
+2. **Configure Data Sources:** Ensure Loki and Prometheus are set up and connected in Grafana.
+3. **Set Variables:** Use the dashboard variable dropdowns to filter by service, host, log level, etc.
+4. **Real-time Streaming:** Use the log stream panels for live log analysis and troubleshooting.
+5. **Alerting:** Configure alert rules in Grafana for log-based events and integrate with notification channels.
+6. **Drill-down:** Click on panels or table rows to investigate specific log events or trends.
+
+## Tips for Effective Log Analysis
+- Use the heatmap to spot spikes or anomalies in log activity
+- Filter by error/warning level to quickly identify issues
+- Leverage the structured log table for root cause analysis
+- Use annotation overlays to correlate logs with deployments or incidents
+
+## Maintenance
+- Periodically review and update dashboard templates as new services or log fields are added
+- Tune alert thresholds and queries to match evolving operational needs
+
+---
+For further customization or troubleshooting, refer to the [Grafana documentation](https://grafana.com/docs/) and your homelab's deployment guides. 

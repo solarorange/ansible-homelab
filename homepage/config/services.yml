@@ -3,116 +3,86 @@
 # =============================================================================
 
 # =============================================================================
-# MEDIA STACK - Blue/Purple Theme
+# INFRASTRUCTURE & MANAGEMENT - Blue/Purple Theme
 # =============================================================================
-- group: Media Stack
-  icon: tv.png
-  className: media-stack
+- group: Infrastructure & Management
+  icon: settings.png
+  className: infrastructure-stack
   items:
-    - Sonarr:
-        icon: sonarr.png
-        href: https://sonarr.{{ domain }}
-        description: TV Show Management & Automation
+    - Traefik:
+        icon: traefik.png
+        href: https://traefik.{{ domain }}
+        description: Reverse Proxy & Load Balancer
         widget:
-          type: sonarr
-          url: http://sonarr:8989
-          key: your_sonarr_api_key
+          type: traefik
+          url: http://traefik:8080
+          key: "{{ traefik_api_key | default('') }}"
         health:
-          url: http://sonarr:8989/health
+          url: http://traefik:8080/ping
           interval: 30
         auth:
           type: api_key
-          header: X-API-Key
         css: |
-          .sonarr-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          .traefik-card {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
             border-radius: 12px;
           }
 
-    - Radarr:
-        icon: radarr.png
-        href: https://radarr.{{ domain }}
-        description: Movie Management & Automation
+    - Authentik:
+        icon: authentik.png
+        href: https://auth.{{ domain }}
+        description: Identity & Access Management
         widget:
-          type: radarr
-          url: http://radarr:7878
-          key: your_radarr_api_key
+          type: authentik
+          url: http://authentik:9000
+          key: "{{ authentik_api_key | default('') }}"
         health:
-          url: http://radarr:7878/health
+          url: http://authentik:9000/api/v3/core/health/
+          interval: 30
+        auth:
+          type: api_key
+          header: Authorization
+
+    - Portainer:
+        icon: portainer.png
+        href: https://portainer.{{ domain }}
+        description: Container Management & Orchestration
+        widget:
+          type: portainer
+          url: http://portainer:9000
+          key: "{{ portainer_api_key | default('') }}"
+        health:
+          url: http://portainer:9000/api/status
           interval: 30
         auth:
           type: api_key
           header: X-API-Key
 
-    - Jellyfin:
-        icon: jellyfin.png
-        href: https://jellyfin.{{ domain }}
-        description: Media Server & Streaming
+    - Watchtower:
+        icon: watchtower.png
+        href: https://watchtower.{{ domain }}
+        description: Automated Container Updates
         widget:
-          type: jellyfin
-          url: http://jellyfin:8096
-          key: your_jellyfin_api_key
+          type: watchtower
+          url: http://watchtower:8080
         health:
-          url: http://jellyfin:8096/health
+          url: http://watchtower:8080/v1/update
+          interval: 300
+        auth:
+          type: none
+
+    - Homepage:
+        icon: homepage.png
+        href: https://homepage.{{ domain }}
+        description: Dashboard & Service Discovery
+        widget:
+          type: homepage
+          url: http://homepage:3000
+        health:
+          url: http://homepage:3000/health
           interval: 60
         auth:
-          type: session
-
-    - Overseerr:
-        icon: overseerr.png
-        href: https://overseerr.{{ domain }}
-        description: Media Requests & Discovery
-        widget:
-          type: overseerr
-          url: http://overseerr:5055
-          key: your_overseerr_api_key
-        health:
-          url: http://overseerr:5055/health
-          interval: 30
-        auth:
-          type: api_key
-
-    - Prowlarr:
-        icon: prowlarr.png
-        href: https://prowlarr.{{ domain }}
-        description: Indexer Management
-        widget:
-          type: prowlarr
-          url: http://prowlarr:9696
-          key: your_prowlarr_api_key
-        health:
-          url: http://prowlarr:9696/health
-          interval: 30
-        auth:
-          type: api_key
-
-    - Bazarr:
-        icon: bazarr.png
-        href: https://bazarr.{{ domain }}
-        description: Subtitle Management
-        widget:
-          type: bazarr
-          url: http://bazarr:6767
-          key: your_bazarr_api_key
-        health:
-          url: http://bazarr:6767/health
-          interval: 30
-        auth:
-          type: api_key
-
-    - Tautulli:
-        icon: tautulli.png
-        href: https://tautulli.{{ domain }}
-        description: Media Statistics & Analytics
-        widget:
-          type: tautulli
-          url: http://tautulli:8181
-          key: your_tautulli_api_key
-        health:
-          url: http://tautulli:8181/status
-          interval: 60
-        auth:
-          type: api_key
+          type: none
 
 # =============================================================================
 # MONITORING & OBSERVABILITY - Green/Teal Theme
@@ -128,18 +98,13 @@
         widget:
           type: grafana
           url: http://grafana:3000
-          key: your_grafana_api_key
+          key: "{{ grafana_api_key | default('') }}"
         health:
           url: http://grafana:3000/api/health
           interval: 30
         auth:
           type: api_key
           header: Authorization
-        css: |
-          .grafana-card {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            border-radius: 12px;
-          }
 
     - Prometheus:
         icon: prometheus.png
@@ -180,6 +145,33 @@
         auth:
           type: none
 
+    - Uptime Kuma:
+        icon: uptimekuma.png
+        href: https://uptime.{{ domain }}
+        description: Uptime Monitoring & Status Pages
+        widget:
+          type: uptime_kuma
+          url: http://uptime-kuma:3001
+          key: "{{ uptimekuma_api_key | default('') }}"
+        health:
+          url: http://uptime-kuma:3001/api/status
+          interval: 60
+        auth:
+          type: api_key
+
+    - Dashdot:
+        icon: dashdot.png
+        href: https://dashdot.{{ domain }}
+        description: System Dashboard & Hardware Monitoring
+        widget:
+          type: dashdot
+          url: http://dashdot:3001
+        health:
+          url: http://dashdot:3001/api/health
+          interval: 60
+        auth:
+          type: none
+
     - Node Exporter:
         icon: prometheus.png
         href: https://node-exporter.{{ domain }}
@@ -193,79 +185,23 @@
         auth:
           type: none
 
-# =============================================================================
-# MANAGEMENT & CONTROL - Orange/Amber Theme
-# =============================================================================
-- group: Management & Control
-  icon: settings.png
-  className: management-stack
-  items:
-    - Portainer:
-        icon: portainer.png
-        href: https://portainer.{{ domain }}
-        description: Container Management & Orchestration
+    - cAdvisor:
+        icon: cadvisor.png
+        href: https://cadvisor.{{ domain }}
+        description: Container Metrics Collection
         widget:
-          type: portainer
-          url: http://portainer:9000
-          key: your_portainer_api_key
+          type: cadvisor
+          url: http://cadvisor:8080
         health:
-          url: http://portainer:9000/api/status
+          url: http://cadvisor:8080/healthz
           interval: 30
-        auth:
-          type: api_key
-          header: X-API-Key
-        css: |
-          .portainer-card {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 12px;
-          }
-
-    - Authentik:
-        icon: authentik.png
-        href: https://auth.{{ domain }}
-        description: Identity & Access Management
-        widget:
-          type: authentik
-          url: http://authentik:9000
-          key: your_authentik_api_key
-        health:
-          url: http://authentik:9000/api/v3/core/health/
-          interval: 30
-        auth:
-          type: api_key
-          header: Authorization
-
-    - Traefik:
-        icon: traefik.png
-        href: https://traefik.{{ domain }}
-        description: Reverse Proxy & Load Balancer
-        widget:
-          type: traefik
-          url: http://traefik:8080
-          key: your_traefik_api_key
-        health:
-          url: http://traefik:8080/ping
-          interval: 30
-        auth:
-          type: api_key
-
-    - Homepage:
-        icon: homepage.png
-        href: https://homepage.{{ domain }}
-        description: Dashboard & Service Discovery
-        widget:
-          type: homepage
-          url: http://homepage:3000
-        health:
-          url: http://homepage:3000/health
-          interval: 60
         auth:
           type: none
 
 # =============================================================================
-# SECURITY & NETWORK - Red/Security Theme
+# SECURITY & NETWORKING - Red/Orange Theme
 # =============================================================================
-- group: Security & Network
+- group: Security & Networking
   icon: shield.png
   className: security-stack
   items:
@@ -276,18 +212,11 @@
         widget:
           type: crowdsec
           url: http://crowdsec:8080
-          key: your_crowdsec_api_key
         health:
-          url: http://crowdsec:8080/v1/decisions
+          url: http://crowdsec:8080/health
           interval: 60
         auth:
-          type: api_key
-          header: X-Api-Key
-        css: |
-          .crowdsec-card {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            border-radius: 12px;
-          }
+          type: none
 
     - Fail2ban:
         icon: fail2ban.png
@@ -302,10 +231,23 @@
         auth:
           type: none
 
-    - UFW Status:
+    - Pi-hole:
+        icon: pihole.png
+        href: https://pihole.{{ domain }}
+        description: DNS Ad Blocker & Network Protection
+        widget:
+          type: pihole
+          url: http://pihole:80
+        health:
+          url: http://pihole:80/admin/api.php?status
+          interval: 60
+        auth:
+          type: none
+
+    - UFW:
         icon: ufw.png
         href: https://ufw.{{ domain }}
-        description: Uncomplicated Firewall Status
+        description: Uncomplicated Firewall
         widget:
           type: ufw
           url: http://ufw:8080
@@ -315,74 +257,91 @@
         auth:
           type: none
 
-# =============================================================================
-# EXTERNAL RESOURCES - Gray/Neutral Theme
-# =============================================================================
-- group: External Resources
-  icon: external.png
-  className: external-stack
-  items:
-    - GitHub:
-        icon: github.png
-        href: https://github.com
-        description: Code Repository & Collaboration
+    - WireGuard:
+        icon: wireguard.png
+        href: https://wireguard.{{ domain }}
+        description: VPN Server
         widget:
-          type: github
-          url: https://api.github.com
-          key: your_github_api_key
+          type: wireguard
+          url: http://wireguard:51820
         health:
-          url: https://www.githubstatus.com/api/v2/status.json
-          interval: 300
-        auth:
-          type: api_key
-          header: Authorization
-
-    - Documentation:
-        icon: docs.png
-        href: https://docs.{{ domain }}
-        description: System Documentation & Guides
-        widget:
-          type: docs
-          url: http://docs:8080
-        health:
-          url: http://docs:8080/health
-          interval: 300
-        auth:
-          type: none
-
-    - Support:
-        icon: support.png
-        href: https://support.{{ domain }}
-        description: Support Portal & Help Desk
-        widget:
-          type: support
-          url: http://support:8080
-        health:
-          url: http://support:8080/health
-          interval: 300
-        auth:
-          type: none
-
-    - Status Page:
-        icon: status.png
-        href: https://status.{{ domain }}
-        description: System Status & Uptime
-        widget:
-          type: status
-          url: http://status:8080
-        health:
-          url: http://status:8080/health
+          url: http://wireguard:51820/health
           interval: 60
         auth:
           type: none
 
 # =============================================================================
-# STORAGE & FILE SERVICES
+# DATABASES & STORAGE - Orange/Amber Theme
 # =============================================================================
-- group: Storage & Files
-  icon: storage.png
-  className: storage-stack
+- group: Databases & Storage
+  icon: database.png
+  className: database-stack
   items:
+    - PostgreSQL:
+        icon: postgresql.png
+        href: https://postgresql.{{ domain }}
+        description: Primary Database
+        widget:
+          type: postgresql
+          url: http://postgresql:5432
+        health:
+          url: http://postgresql:5432/health
+          interval: 60
+        auth:
+          type: none
+
+    - MariaDB:
+        icon: mariadb.png
+        href: https://mariadb.{{ domain }}
+        description: Alternative Database
+        widget:
+          type: mariadb
+          url: http://mariadb:3306
+        health:
+          url: http://mariadb:3306/health
+          interval: 60
+        auth:
+          type: none
+
+    - Redis:
+        icon: redis.png
+        href: https://redis.{{ domain }}
+        description: Cache & Session Store
+        widget:
+          type: redis
+          url: http://redis:6379
+        health:
+          url: http://redis:6379/health
+          interval: 60
+        auth:
+          type: none
+
+    - Elasticsearch:
+        icon: elasticsearch.png
+        href: https://elasticsearch.{{ domain }}
+        description: Search Engine
+        widget:
+          type: elasticsearch
+          url: http://elasticsearch:9200
+        health:
+          url: http://elasticsearch:9200/_cluster/health
+          interval: 60
+        auth:
+          type: none
+
+    - Kibana:
+        icon: kibana.png
+        href: https://kibana.{{ domain }}
+        description: Elasticsearch UI
+        widget:
+          type: kibana
+          url: http://kibana:5601
+        health:
+          url: http://kibana:5601/api/status
+          interval: 60
+        auth:
+          type: none
+
     - Nextcloud:
         icon: nextcloud.png
         href: https://nextcloud.{{ domain }}
@@ -390,7 +349,7 @@
         widget:
           type: nextcloud
           url: http://nextcloud:8080
-          key: your_nextcloud_api_key
+          key: "{{ nextcloud_api_key | default('') }}"
         health:
           url: http://nextcloud:8080/status.php
           interval: 60
@@ -417,12 +376,178 @@
         widget:
           type: paperless
           url: http://paperless:8000
-          key: your_paperless_api_key
+          key: "{{ paperless_api_key | default('') }}"
         health:
           url: http://paperless:8000/api/health
           interval: 60
         auth:
           type: api_key
+
+# =============================================================================
+# MEDIA STACK - Blue/Purple Theme
+# =============================================================================
+- group: Media Stack
+  icon: tv.png
+  className: media-stack
+  items:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: https://jellyfin.{{ domain }}
+        description: Media Server & Streaming
+        widget:
+          type: jellyfin
+          url: http://jellyfin:8096
+          key: "{{ jellyfin_api_key | default('') }}"
+        health:
+          url: http://jellyfin:8096/health
+          interval: 60
+        auth:
+          type: session
+
+    - Sonarr:
+        icon: sonarr.png
+        href: https://sonarr.{{ domain }}
+        description: TV Show Management & Automation
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: "{{ sonarr_api_key | default('') }}"
+        health:
+          url: http://sonarr:8989/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Radarr:
+        icon: radarr.png
+        href: https://radarr.{{ domain }}
+        description: Movie Management & Automation
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: "{{ radarr_api_key | default('') }}"
+        health:
+          url: http://radarr:7878/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Lidarr:
+        icon: lidarr.png
+        href: https://lidarr.{{ domain }}
+        description: Music Management & Automation
+        widget:
+          type: lidarr
+          url: http://lidarr:8686
+          key: "{{ lidarr_api_key | default('') }}"
+        health:
+          url: http://lidarr:8686/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Readarr:
+        icon: readarr.png
+        href: https://readarr.{{ domain }}
+        description: Book Management & Automation
+        widget:
+          type: readarr
+          url: http://readarr:8787
+          key: "{{ readarr_api_key | default('') }}"
+        health:
+          url: http://readarr:8787/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: https://prowlarr.{{ domain }}
+        description: Indexer Management
+        widget:
+          type: prowlarr
+          url: http://prowlarr:9696
+          key: "{{ prowlarr_api_key | default('') }}"
+        health:
+          url: http://prowlarr:9696/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Bazarr:
+        icon: bazarr.png
+        href: https://bazarr.{{ domain }}
+        description: Subtitle Management
+        widget:
+          type: bazarr
+          url: http://bazarr:6767
+          key: "{{ bazarr_api_key | default('') }}"
+        health:
+          url: http://bazarr:6767/health
+          interval: 30
+        auth:
+          type: api_key
+          header: X-API-Key
+
+    - Tautulli:
+        icon: tautulli.png
+        href: https://tautulli.{{ domain }}
+        description: Media Statistics & Analytics
+        widget:
+          type: tautulli
+          url: http://tautulli:8181
+          key: "{{ tautulli_api_key | default('') }}"
+        health:
+          url: http://tautulli:8181/api/v2?apikey={{ tautulli_api_key | default('') }}&cmd=status
+          interval: 60
+        auth:
+          type: api_key
+
+    - Overseerr:
+        icon: overseerr.png
+        href: https://overseerr.{{ domain }}
+        description: Media Requests & Discovery
+        widget:
+          type: overseerr
+          url: http://overseerr:5055
+          key: "{{ overseerr_api_key | default('') }}"
+        health:
+          url: http://overseerr:5055/api/v1/status
+          interval: 60
+        auth:
+          type: api_key
+
+    - SABnzbd:
+        icon: sabnzbd.png
+        href: https://sabnzbd.{{ domain }}
+        description: Usenet Downloader
+        widget:
+          type: sabnzbd
+          url: http://sabnzbd:8080
+          key: "{{ sabnzbd_api_key | default('') }}"
+        health:
+          url: http://sabnzbd:8080/api?mode=version&apikey={{ sabnzbd_api_key | default('') }}
+          interval: 60
+        auth:
+          type: api_key
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://qbittorrent.{{ domain }}
+        description: Torrent Client
+        widget:
+          type: qbittorrent
+          url: http://qbittorrent:8080
+        health:
+          url: http://qbittorrent:8080/api/v2/app/version
+          interval: 60
+        auth:
+          type: session
 
     - Immich:
         icon: immich.png
@@ -431,7 +556,7 @@
         widget:
           type: immich
           url: http://immich:3001
-          key: your_immich_api_key
+          key: "{{ immich_api_key | default('') }}"
         health:
           url: http://immich:3001/api/health
           interval: 60
@@ -439,7 +564,7 @@
           type: api_key
 
 # =============================================================================
-# AUTOMATION & DEVELOPMENT
+# AUTOMATION & DEVELOPMENT - Purple/Pink Theme
 # =============================================================================
 - group: Automation & Development
   icon: automation.png
@@ -452,7 +577,7 @@
         widget:
           type: homeassistant
           url: http://homeassistant:8123
-          key: your_homeassistant_api_key
+          key: "{{ homeassistant_api_key | default('') }}"
         health:
           url: http://homeassistant:8123/api/
           interval: 60
@@ -473,6 +598,32 @@
         auth:
           type: none
 
+    - n8n:
+        icon: n8n.png
+        href: https://n8n.{{ domain }}
+        description: Workflow Automation
+        widget:
+          type: n8n
+          url: http://n8n:5678
+        health:
+          url: http://n8n:5678/health
+          interval: 60
+        auth:
+          type: none
+
+    - Zigbee2MQTT:
+        icon: zigbee2mqtt.png
+        href: https://zigbee2mqtt.{{ domain }}
+        description: Zigbee Bridge
+        widget:
+          type: zigbee2mqtt
+          url: http://zigbee2mqtt:8080
+        health:
+          url: http://zigbee2mqtt:8080/api/health
+          interval: 60
+        auth:
+          type: none
+
     - Code Server:
         icon: code-server.png
         href: https://code.{{ domain }}
@@ -486,8 +637,34 @@
         auth:
           type: session
 
+    - GitLab:
+        icon: gitlab.png
+        href: https://gitlab.{{ domain }}
+        description: Git Repository Management
+        widget:
+          type: gitlab
+          url: http://gitlab:80
+        health:
+          url: http://gitlab:80/-/health
+          interval: 60
+        auth:
+          type: session
+
+    - Harbor:
+        icon: harbor.png
+        href: https://harbor.{{ domain }}
+        description: Container Registry
+        widget:
+          type: harbor
+          url: http://harbor:80
+        health:
+          url: http://harbor:80/api/v2.0/health
+          interval: 60
+        auth:
+          type: session
+
 # =============================================================================
-# BACKUP & RECOVERY
+# BACKUP & RECOVERY - Gray/Neutral Theme
 # =============================================================================
 - group: Backup & Recovery
   icon: backup.png
@@ -509,12 +686,184 @@
     - Duplicati:
         icon: duplicati.png
         href: https://duplicati.{{ domain }}
-        description: Encrypted Backup Solution
+        description: Backup with Encryption
         widget:
           type: duplicati
           url: http://duplicati:8200
         health:
-          url: http://duplicati:8200/health
+          url: http://duplicati:8200/api/status
+          interval: 300
+        auth:
+          type: none
+
+    - Restic:
+        icon: restic.png
+        href: https://restic.{{ domain }}
+        description: Fast & Secure Backups
+        widget:
+          type: restic
+          url: http://restic:8080
+        health:
+          url: http://restic:8080/health
+          interval: 300
+        auth:
+          type: none
+
+# =============================================================================
+# UTILITIES & TOOLS - Orange/Amber Theme
+# =============================================================================
+- group: Utilities & Tools
+  icon: tools.png
+  className: utilities-stack
+  items:
+    - Tdarr:
+        icon: tdarr.png
+        href: https://tdarr.{{ domain }}
+        description: Distributed Media Transcoding
+        widget:
+          type: tdarr
+          url: http://tdarr:8265
+        health:
+          url: http://tdarr:8265/api/v2/status
+          interval: 60
+        auth:
+          type: none
+
+    - Unmanic:
+        icon: unmanic.png
+        href: https://unmanic.{{ domain }}
+        description: Media Library Optimizer
+        widget:
+          type: unmanic
+          url: http://unmanic:8888
+        health:
+          url: http://unmanic:8888/api/v2/status
+          interval: 60
+        auth:
+          type: none
+
+    - Requestrr:
+        icon: requestrr.png
+        href: https://requestrr.{{ domain }}
+        description: Discord Bot for Media Requests
+        widget:
+          type: requestrr
+          url: http://requestrr:4545
+        health:
+          url: http://requestrr:4545/health
+          interval: 60
+        auth:
+          type: none
+
+    - Pulsarr:
+        icon: pulsarr.png
+        href: https://pulsarr.{{ domain }}
+        description: ARR Service Status Dashboard
+        widget:
+          type: pulsarr
+          url: http://pulsarr:8080
+        health:
+          url: http://pulsarr:8080/health
+          interval: 60
+        auth:
+          type: none
+
+    - MinIO:
+        icon: minio.png
+        href: https://minio.{{ domain }}
+        description: Object Storage
+        widget:
+          type: minio
+          url: http://minio:9000
+        health:
+          url: http://minio:9000/minio/health/live
+          interval: 60
+        auth:
+          type: none
+
+    - Filebrowser:
+        icon: filebrowser.png
+        href: https://filebrowser.{{ domain }}
+        description: Web File Manager
+        widget:
+          type: filebrowser
+          url: http://filebrowser:80
+        health:
+          url: http://filebrowser:80/health
+          interval: 60
+        auth:
+          type: session
+
+    - Bookstack:
+        icon: bookstack.png
+        href: https://bookstack.{{ domain }}
+        description: Wiki & Documentation
+        widget:
+          type: bookstack
+          url: http://bookstack:80
+        health:
+          url: http://bookstack:80/health
+          interval: 60
+        auth:
+          type: session
+
+# =============================================================================
+# EXTERNAL RESOURCES - Gray/Neutral Theme
+# =============================================================================
+- group: External Resources
+  icon: external.png
+  className: external-stack
+  items:
+    - GitHub:
+        icon: github.png
+        href: https://github.com
+        description: Code Repository & Collaboration
+        widget:
+          type: github
+          url: https://api.github.com
+          key: "{{ github_api_key | default('') }}"
+        health:
+          url: https://www.githubstatus.com/api/v2/status.json
+          interval: 300
+        auth:
+          type: api_key
+          header: Authorization
+
+    - Documentation:
+        icon: docs.png
+        href: https://docs.{{ domain }}
+        description: System Documentation & Guides
+        widget:
+          type: docs
+          url: http://docs:8080
+        health:
+          url: http://docs:8080/health
+          interval: 300
+        auth:
+          type: none
+
+    - Status Page:
+        icon: status.png
+        href: https://status.{{ domain }}
+        description: System Status & Uptime
+        widget:
+          type: status
+          url: http://status:8080
+        health:
+          url: http://status:8080/health
+          interval: 60
+        auth:
+          type: none
+
+    - Support:
+        icon: support.png
+        href: https://support.{{ domain }}
+        description: Support Portal & Help Desk
+        widget:
+          type: support
+          url: http://support:8080
+        health:
+          url: http://support:8080/health
           interval: 300
         auth:
           type: none 

@@ -1,0 +1,244 @@
+# Automation Services Logging Configuration
+# Comprehensive logging setup for automation and orchestration services
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-automation.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # Portainer logs
+  - job_name: portainer
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: portainer
+          component: container_management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/portainer/logs/*.log
+          - {{ logs_dir }}/automation/portainer/*.log
+
+  # Watchtower logs
+  - job_name: watchtower
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: watchtower
+          component: container_updates
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/watchtower/logs/*.log
+          - {{ logs_dir }}/automation/watchtower/*.log
+
+  # Home Assistant logs
+  - job_name: homeassistant
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: homeassistant
+          component: home_automation
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/homeassistant/logs/*.log
+          - {{ logs_dir }}/automation/homeassistant/*.log
+
+  # Node-RED logs
+  - job_name: nodered
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: nodered
+          component: workflow_automation
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/nodered/logs/*.log
+          - {{ logs_dir }}/automation/nodered/*.log
+
+  # Mosquitto logs
+  - job_name: mosquitto
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: mosquitto
+          component: mqtt_broker
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/mosquitto/logs/*.log
+          - {{ logs_dir }}/automation/mosquitto/*.log
+
+  # Cron job logs
+  - job_name: cron
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: cron
+          component: scheduled_tasks
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/cron/*.log
+          - /var/log/cron.log
+
+  # Ansible logs
+  - job_name: ansible
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: ansible
+          component: configuration_management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/ansible/*.log
+          - {{ logs_dir }}/ansible/*.log
+          - /tmp/ansible-*.log
+
+  # Automation API logs
+  - job_name: automation_api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_api
+          component: api
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/api/*.log
+          - {{ docker_dir }}/automation-api/logs/*.log
+
+  # Automation webhook logs
+  - job_name: automation_webhooks
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_webhooks
+          component: webhooks
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/webhooks/*.log
+          - {{ docker_dir }}/automation-webhooks/logs/*.log
+
+  # Automation notification logs
+  - job_name: automation_notifications
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_notifications
+          component: notifications
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/notifications/*.log
+          - {{ docker_dir }}/automation-notifications/logs/*.log
+
+  # Automation backup logs
+  - job_name: automation_backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_backup
+          component: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/backup/*.log
+          - {{ docker_dir }}/automation-backup/logs/*.log
+
+  # Automation security logs
+  - job_name: automation_security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_security
+          component: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/security/*.log
+          - {{ docker_dir }}/automation-security/logs/*.log
+
+  # Automation performance logs
+  - job_name: automation_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_performance
+          component: performance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/performance/*.log
+          - {{ docker_dir }}/automation-performance/logs/*.log
+
+  # Automation error logs
+  - job_name: automation_errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_errors
+          component: errors
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/errors/*.log
+          - {{ docker_dir }}/automation-errors/logs/*.log
+
+  # Automation maintenance logs
+  - job_name: automation_maintenance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: automation
+          service: automation_maintenance
+          component: maintenance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/automation/maintenance/*.log
+          - {{ docker_dir }}/automation-maintenance/logs/*.log 

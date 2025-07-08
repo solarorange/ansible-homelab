@@ -1,0 +1,37 @@
+[Unit]
+Description=Homepage Health Monitor
+Documentation=https://github.com/gethomepage/homepage
+After=network.target docker.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=homepage
+Group=homepage
+WorkingDirectory=/app
+ExecStart=/usr/bin/python3 /app/scripts/health_monitor.py --interval 60
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homepage-health-monitor
+
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/home/homepage
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/app/config /var/log/homepage
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target 
