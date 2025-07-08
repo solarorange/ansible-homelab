@@ -8,7 +8,7 @@ A comprehensive, production-ready homelab automation solution built with Ansible
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/ansible_homelab.git
+   git clone https://github.com/solarorange/ansible_homelab.git
    cd ansible_homelab
    ```
 
