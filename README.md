@@ -12,11 +12,12 @@ A comprehensive, production-ready homelab automation solution built with Ansible
    cd ansible_homelab
    ```
 
-2. **Run the interactive setup**:
+2. **Run the seamless one-touch setup wizard**:
    ```bash
    chmod +x scripts/*.sh
-   ./scripts/setup_environment.sh
+   ./scripts/seamless_setup.sh
    ```
+   > **Recommended:** `seamless_setup.sh` is the preferred, all-in-one interactive setup wizard. It will prompt you for all required values, generate secure credentials, configure everything, and deploy your stack in one go.
 
 3. **Follow the deployment guide**:
    - 📖 **[Quick Start Guide](QUICK_START_GUIDE.md)** - Complete step-by-step setup
@@ -166,10 +167,7 @@ A comprehensive, production-ready homelab automation solution built with Ansible
 # 1. Clone and setup
 git clone https://github.com/yourusername/ansible_homelab.git
 cd ansible_homelab
-./scripts/setup_environment.sh
-
-# 2. Configure and deploy
-./deploy.sh
+./scripts/seamless_setup.sh
 ```
 
 ### **Manual Deployment**
