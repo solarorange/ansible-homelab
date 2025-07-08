@@ -11,9 +11,21 @@ This document provides a comprehensive overview of the staged deployment process
 ### 2. Automated Deployment (Recommended)
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/solarorange/ansible-homelab.git
 cd ansible_homelab
 
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Run the seamless one-touch setup wizard
+./scripts/seamless_setup.sh
+```
+> **Recommended:** `seamless_setup.sh` is the preferred, all-in-one interactive setup wizard. It will prompt you for all required values, generate secure credentials, configure everything, and deploy your stack in one go.
+
+---
+
+### 3. Manual/Advanced Deployment (Optional)
+```bash
 # Create vault file
 cp group_vars/all/vault.yml.template group_vars/all/vault.yml
 ansible-vault edit group_vars/all/vault.yml

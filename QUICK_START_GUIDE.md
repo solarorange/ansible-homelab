@@ -67,11 +67,12 @@ cd ansible_homelab
 chmod +x scripts/*.sh
 ```
 
-### 2.2 Run the Interactive Setup
+### 2.2 Run the Seamless One-Touch Setup Wizard
 ```bash
-# Run the automated setup script
-./scripts/setup_environment.sh
+# Run the seamless setup script
+./scripts/seamless_setup.sh
 ```
+> **Recommended:** `seamless_setup.sh` is the preferred, all-in-one interactive setup wizard. It will prompt you for all required values, generate secure credentials, configure everything, and deploy your stack in one go.
 
 This script will:
 - ✅ Generate secure passwords for all services
@@ -79,6 +80,7 @@ This script will:
 - ✅ Set up API keys and credentials
 - ✅ Create all necessary directories
 - ✅ Configure environment variables
+- ✅ Deploy your entire stack automatically
 
 ### 2.3 Review Configuration
 ```bash

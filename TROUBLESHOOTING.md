@@ -1,8 +1,10 @@
-# 🔧 Troubleshooting Guide
+# 🛠️ Troubleshooting Guide
+
+> **Note:** If you have not yet deployed, use `./scripts/seamless_setup.sh` for the most reliable and automated setup experience.
 
 This guide covers common issues and their solutions for the Ansible Homelab deployment.
 
-## 📋 **Quick Diagnostic Commands**
+## �� **Quick Diagnostic Commands**
 
 ### System Health Check
 ```bash
