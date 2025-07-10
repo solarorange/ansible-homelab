@@ -2,6 +2,29 @@
 # Security Stack Deployment
 # Production-ready Ansible tasks for the complete homelab security stack
 
+- name: Detect manual overrides for ports, certificates, or service enablement
+  block:
+    - name: Warn about risks of manual overrides
+      ansible.builtin.debug:
+        msg: |
+          WARNING: Manual overrides for ports, certificates, or service enablement have been detected.
+          This can cause port conflicts, security issues, or break automation/monitoring.
+          Proceed ONLY if you understand the risks. See documentation for details.
+
+    - name: Require explicit user confirmation to proceed
+      ansible.builtin.pause:
+        prompt: "Manual overrides detected. Type 'yes' to continue, or Ctrl+C to abort: "
+      register: manual_override_confirm
+
+    - name: Fail if user did not confirm manual override risk
+      ansible.builtin.fail:
+        msg: "Deployment aborted due to manual override risk."
+      when: manual_override_confirm.user_input | lower != 'yes'
+  when: >
+    (manual_override_ports is defined and manual_override_ports|length > 0) or
+    (manual_override_certs is defined and manual_override_certs|length > 0) or
+    (manual_override_services is defined and manual_override_services|length > 0)
+
 - name: Include Security Stack deployment tasks
   block:
     - name: Validate Security Stack configuration

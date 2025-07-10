@@ -57,20 +57,20 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
 }
 
+# Function to print error messages
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Homelab Environment Setup Script${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo
 
 # Check if .env file exists
-if [ -f .env ]; then
-    echo -e "${YELLOW}Warning: .env file already exists.${NC}"
-    read -p "Do you want to overwrite it? (y/N): " overwrite
-    if [[ ! $overwrite =~ ^[Yy]$ ]]; then
-        echo -e "${RED}Setup cancelled.${NC}"
-        exit 1
-    fi
-    rm .env
+if [[ ! -f .env ]]; then
+    print_error ".env file not found. Please run setup_environment.sh first."
+    exit 1
 fi
 
 echo -e "${BLUE}Creating .env file...${NC}"

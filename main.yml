@@ -55,6 +55,11 @@
           Services: {{ enabled_services | length }} services enabled
       tags: always
 
+    - name: Pre-deployment infrastructure validation
+      ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
+      tags: [validation, pre-deployment, always]
+      when: validation_enabled | default(true)
+
     - name: Create cache directories
       ansible.builtin.file:
         path: "{{ item }}"
@@ -360,6 +365,11 @@
       tags: [backup, validation]
 
   post_tasks:
+    - name: Post-deployment infrastructure validation
+      ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
+      tags: [validation, post-deployment, always]
+      when: validation_enabled | default(true)
+
     - name: Verify all critical services
       ansible.builtin.include_tasks: tasks/validate.yml
       loop: "{{ critical_services }}"

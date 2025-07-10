@@ -343,6 +343,11 @@ rescue:
         - "{{ docker_dir }}/authentik/config/authentik.yml"
         - "{{ docker_dir }}/authentik/docker-compose.yml"
 
+  - name: Fail playbook if recovery and rollback failed
+    ansible.builtin.fail:
+      msg: "Authentik deployment failed and rollback was unsuccessful. Manual intervention required."
+    when: recovery_complete | default(false) | bool == false
+
 always:
   - name: Cleanup temporary files
     ansible.builtin.file:

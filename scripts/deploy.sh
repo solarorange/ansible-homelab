@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+export SERVICE_NAME="deploy"
+source "$(dirname "$0")/logging_utils.sh"
+
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -19,101 +22,81 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Logging function
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
-}
-
 # Error handling
 error_exit() {
-    log "${RED}ERROR: $1${NC}"
+    log_error "$1" "$2"
     exit 1
-}
-
-# Success message
-success() {
-    log "${GREEN}SUCCESS: $1${NC}"
-}
-
-# Warning message
-warning() {
-    log "${YELLOW}WARNING: $1${NC}"
-}
-
-# Info message
-info() {
-    log "${BLUE}INFO: $1${NC}"
 }
 
 # Check prerequisites
 check_prerequisites() {
-    info "Checking prerequisites..."
+    log_info "check_prerequisites" "Checking prerequisites..."
     
     # Check if we're in the right directory
     if [[ ! -f "$PROJECT_DIR/site.yml" ]]; then
-        error_exit "site.yml not found. Please run this script from the project root."
+        error_exit "check_prerequisites" "site.yml not found. Please run this script from the project root."
     fi
     
     # Check if inventory exists
     if [[ ! -f "$INVENTORY_FILE" ]]; then
-        error_exit "inventory.yml not found. Please configure your inventory first."
+        error_exit "check_prerequisites" "inventory.yml not found. Please configure your inventory first."
     fi
     
     # Check if vault file exists
     if [[ ! -f "$VAULT_FILE" ]]; then
-        error_exit "vault.yml not found. Please create your vault file first."
+        error_exit "check_prerequisites" "vault.yml not found. Please create your vault file first."
     fi
     
     # Check Ansible installation
     if ! command -v ansible-playbook &> /dev/null; then
-        error_exit "ansible-playbook not found. Please install Ansible first."
+        error_exit "check_prerequisites" "ansible-playbook not found. Please install Ansible first."
     fi
     
     # Check Ansible version
     ANSIBLE_VERSION=$(ansible --version | head -n1 | awk '{print $2}')
     if [[ "$ANSIBLE_VERSION" < "2.12" ]]; then
-        warning "Ansible version $ANSIBLE_VERSION detected. Version 2.12+ is recommended."
+        log_warning "check_prerequisites" "Ansible version $ANSIBLE_VERSION detected. Version 2.12+ is recommended."
     fi
     
-    success "Prerequisites check completed"
+    log_success "check_prerequisites" "Prerequisites check completed"
 }
 
 # Validate configuration
 validate_configuration() {
-    info "Validating configuration..."
+    log_info "validate_configuration" "Validating configuration..."
     
     # Test inventory
     if ! ansible-inventory --list -i "$INVENTORY_FILE" &> /dev/null; then
-        error_exit "Invalid inventory configuration"
+        error_exit "validate_configuration" "Invalid inventory configuration"
     fi
     
     # Test vault access
     if ! ansible-vault view "$VAULT_FILE" &> /dev/null; then
-        error_exit "Cannot access vault file. Check your vault password."
+        error_exit "validate_configuration" "Cannot access vault file. Check your vault password."
     fi
     
     # Test playbook syntax
     if ! ansible-playbook --syntax-check "$PROJECT_DIR/site.yml" -i "$INVENTORY_FILE" &> /dev/null; then
-        error_exit "Playbook syntax check failed"
+        error_exit "validate_configuration" "Playbook syntax check failed"
     fi
     
-    success "Configuration validation completed"
+    log_success "validate_configuration" "Configuration validation completed"
 }
 
 # Test connectivity
 test_connectivity() {
-    info "Testing connectivity to target hosts..."
+    log_info "test_connectivity" "Testing connectivity to target hosts..."
     
     if ! ansible all -m ping -i "$INVENTORY_FILE" --ask-vault-pass &> /dev/null; then
-        error_exit "Cannot connect to target hosts. Check your SSH configuration."
+        error_exit "test_connectivity" "Cannot connect to target hosts. Check your SSH configuration."
     fi
     
-    success "Connectivity test completed"
+    log_success "test_connectivity" "Connectivity test completed"
 }
 
 # Create backup
 create_backup() {
-    info "Creating deployment backup..."
+    log_info "create_backup" "Creating deployment backup..."
     
     mkdir -p "$BACKUP_DIR"
     local backup_file="$BACKUP_DIR/deployment_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
@@ -124,24 +107,23 @@ create_backup() {
         --exclude='.git' \
         -C "$PROJECT_DIR" .
     
-    success "Backup created: $backup_file"
+    log_success "create_backup" "Backup created: $backup_file"
 }
 
 # Deploy stage
 deploy_stage() {
     local stage=$1
     local stage_name=$2
-    
-    info "Deploying Stage $stage: $stage_name"
+    log_info "deploy_stage" "Deploying Stage $stage: $stage_name"
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "stage$stage" \
         --ask-vault-pass \
         --diff \
         --verbose; then
-        success "Stage $stage ($stage_name) deployed successfully"
+        log_success "deploy_stage" "Stage $stage ($stage_name) deployed successfully"
     else
-        error_exit "Stage $stage ($stage_name) deployment failed"
+        error_exit "deploy_stage" "Stage $stage ($stage_name) deployment failed"
     fi
 }
 
@@ -150,21 +132,21 @@ validate_stage() {
     local stage=$1
     local stage_name=$2
     
-    info "Validating Stage $stage: $stage_name"
+    log_info "validate_stage" "Validating Stage $stage: $stage_name"
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "validation" \
         --ask-vault-pass \
         --limit "stage$stage"; then
-        success "Stage $stage ($stage_name) validation completed"
+        log_success "validate_stage" "Stage $stage ($stage_name) validation completed"
     else
-        warning "Stage $stage ($stage_name) validation had issues"
+        log_warning "validate_stage" "Stage $stage ($stage_name) validation had issues"
     fi
 }
 
 # Full deployment
 full_deployment() {
-    info "Starting full deployment..."
+    log_info "full_deployment" "Starting full deployment..."
     
     # Stage 1: Infrastructure
     deploy_stage 1 "Infrastructure"
@@ -181,7 +163,7 @@ full_deployment() {
     # Stage 4: Validation
     deploy_stage 4 "Validation"
     
-    success "Full deployment completed successfully!"
+    log_success "full_deployment" "Full deployment completed successfully!"
 }
 
 # Individual stage deployment
@@ -205,7 +187,7 @@ stage_deployment() {
             deploy_stage 4 "Validation"
             ;;
         *)
-            error_exit "Invalid stage number: $stage. Use 1-4."
+            error_exit "main" "Invalid stage number: $stage. Use 1-4."
             ;;
     esac
 }
@@ -214,16 +196,16 @@ stage_deployment() {
 role_deployment() {
     local role=$1
     
-    info "Deploying role: $role"
+    log_info "role_deployment" "Deploying role: $role"
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "$role" \
         --ask-vault-pass \
         --diff \
         --verbose; then
-        success "Role $role deployed successfully"
+        log_success "role_deployment" "Role $role deployed successfully"
     else
-        error_exit "Role $role deployment failed"
+        error_exit "role_deployment" "Role $role deployment failed"
     fi
 }
 
@@ -300,8 +282,7 @@ main() {
     done
     
     # Initialize logging
-    echo "Deployment started at $(date)" > "$LOG_FILE"
-    info "Starting deployment script"
+    log_info "main" "Deployment started at $(date)"
     
     # Check prerequisites
     check_prerequisites
@@ -322,7 +303,7 @@ main() {
             ;;
         stage)
             if [[ $# -eq 0 ]]; then
-                error_exit "Stage number required"
+                error_exit "main" "Stage number required"
             fi
             if [[ "$skip_validation_flag" != true ]]; then
                 validate_configuration
@@ -332,7 +313,7 @@ main() {
             ;;
         role)
             if [[ $# -eq 0 ]]; then
-                error_exit "Role name required"
+                error_exit "main" "Role name required"
             fi
             if [[ "$skip_validation_flag" != true ]]; then
                 validate_configuration
@@ -343,19 +324,18 @@ main() {
         validate)
             validate_configuration
             test_connectivity
-            success "Configuration validation completed successfully"
+            log_success "main" "Configuration validation completed successfully"
             ;;
         test)
             test_connectivity
-            success "Connectivity test completed successfully"
+            log_success "main" "Connectivity test completed successfully"
             ;;
         *)
-            error_exit "Unknown command: $command"
+            error_exit "main" "Unknown command: $command"
             ;;
     esac
     
-    info "Deployment script completed"
-    echo "Deployment completed at $(date)" >> "$LOG_FILE"
+    log_info "main" "Deployment script completed"
 }
 
 # Run main function with all arguments

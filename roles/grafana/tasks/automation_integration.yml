@@ -334,3 +334,7 @@ rescue:
         - "{{ docker_dir }}/monitoring/grafana/scripts/datasource_config.py --test"
         - "{{ docker_dir }}/monitoring/grafana/scripts/dashboard_import.py --test"
         - "{{ docker_dir }}/monitoring/grafana/scripts/alerting_config.py --test" 
+  - name: Fail playbook if recovery and rollback failed
+    ansible.builtin.fail:
+      msg: "Grafana automation integration failed and rollback was unsuccessful. Manual intervention required."
+    when: recovery_complete | default(false) | bool == false 

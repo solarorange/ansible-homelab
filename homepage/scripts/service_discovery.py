@@ -7,8 +7,8 @@ the homepage configuration accordingly. It scans Docker containers, network
 services, and configuration files to build a comprehensive service list.
 """
 
-import os
 import sys
+import os
 import json
 import yaml
 import docker
@@ -18,17 +18,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import logging
 from datetime import datetime
+from logging_config import setup_logging, get_logger, log_function_call, log_execution_time, LogContext
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/var/log/homepage/service_discovery.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Setup centralized logging
+LOG_DIR = os.environ.get('HOMEPAGE_LOG_DIR', './logs')
+setup_logging(log_dir=LOG_DIR, log_level="INFO", json_output=True)
+logger = get_logger("service_discovery")
 
 class ServiceDiscovery:
     """Main service discovery class"""
@@ -422,11 +417,16 @@ class ServiceDiscovery:
             }
         }
         
+        with LogContext(logger, {"service": "service_discovery", "action": "init"}):
+            logger.info("ServiceDiscovery initialized")
+        
         try:
             self.docker_client = docker.from_env()
         except Exception as e:
             logger.warning(f"Could not initialize Docker client: {e}")
     
+    @log_function_call
+    @log_execution_time
     def discover_docker_services(self) -> Dict[str, Any]:
         """Discover services running in Docker containers"""
         if not self.docker_client:
@@ -479,6 +479,8 @@ class ServiceDiscovery:
         
         return services
     
+    @log_function_call
+    @log_execution_time
     def discover_network_services(self) -> Dict[str, Any]:
         """Discover services by scanning network ports"""
         services = {}
@@ -551,6 +553,8 @@ class ServiceDiscovery:
         
         return services
     
+    @log_function_call
+    @log_execution_time
     def check_service_health(self, service: Dict[str, Any]) -> bool:
         """Check if a service is healthy"""
         try:
@@ -729,9 +733,12 @@ class ServiceDiscovery:
         except Exception as e:
             logger.error(f"Error updating services configuration: {e}")
     
+    @log_function_call
+    @log_execution_time
     def run_discovery(self) -> None:
         """Run the complete service discovery process"""
-        logger.info("Starting service discovery...")
+        with LogContext(logger, {"service": "service_discovery", "action": "run_discovery"}):
+            logger.info("Starting service discovery...")
         
         # Discover services
         docker_services = self.discover_docker_services()
@@ -740,29 +747,48 @@ class ServiceDiscovery:
         # Merge services (Docker services take precedence)
         all_services = {**network_services, **docker_services}
         
-        logger.info(f"Discovered {len(all_services)} services")
+        with LogContext(logger, {"service": "service_discovery", "action": "run_discovery"}):
+            logger.info(f"Discovered {len(all_services)} services")
         
         # Check health of discovered services
         healthy_services = {}
         for service_name, service_data in all_services.items():
             if self.check_service_health(service_data):
                 healthy_services[service_name] = service_data
-                logger.info(f"Service {service_name} is healthy")
+                with LogContext(logger, {"service": "service_discovery", "action": "run_discovery", "service_name": service_name}):
+                    logger.info(f"Service {service_name} is healthy")
             else:
-                logger.warning(f"Service {service_name} is not responding")
+                with LogContext(logger, {"service": "service_discovery", "action": "run_discovery", "service_name": service_name}):
+                    logger.warning(f"Service {service_name} is not responding")
         
         # Update configuration
         if healthy_services:
             self.update_services_config(healthy_services)
         else:
-            logger.warning("No healthy services found")
+            with LogContext(logger, {"service": "service_discovery", "action": "run_discovery"}):
+                logger.warning("No healthy services found")
         
-        logger.info("Service discovery completed")
+        with LogContext(logger, {"service": "service_discovery", "action": "run_discovery"}):
+            logger.info("Service discovery completed")
 
 def main():
     """Main entry point"""
     discovery = ServiceDiscovery()
-    discovery.run_discovery()
+    try:
+        discovery.run_discovery()
+        # Check if any healthy services were discovered (by checking if services.yml was updated and is not empty)
+        services_file = discovery.services_file
+        if not services_file.exists():
+            logger.error("No services configuration file generated. Exiting with error.")
+            sys.exit(1)
+        with open(services_file, 'r') as f:
+            config = yaml.safe_load(f)
+            if not config or not any(group.get('items') for group in config):
+                logger.error("No healthy services discovered. Exiting with error.")
+                sys.exit(1)
+    except Exception as e:
+        logger.error(f"Critical error in service discovery: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 

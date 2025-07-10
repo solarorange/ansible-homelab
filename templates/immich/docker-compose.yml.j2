@@ -47,6 +47,10 @@ services:
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
       - "traefik.http.routers.immich-server.middlewares=immich-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-server"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 30s
@@ -85,6 +89,10 @@ services:
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
       - "traefik.http.routers.immich-web.middlewares=immich-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-web"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -111,6 +119,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-postgres"
 
   immich-redis:
     image: redis:alpine
@@ -127,6 +140,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-redis"
 
   immich-machine-learning:
     image: ghcr.io/immich-app/immich-machine-learning:latest
@@ -149,6 +167,11 @@ services:
       retries: 3
     depends_on:
       - immich-server
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-machine-learning"
 
   watchtower:
     name: watchtower
@@ -175,6 +198,10 @@ services:
       - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Host=watchtower.{{ domain }}"
       - "traefik.http.routers.watchtower.middlewares=watchtower-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=infrastructure"
+      - "promtail-service=watchtower"
     depends_on:
       - immich-server
       - immich-web

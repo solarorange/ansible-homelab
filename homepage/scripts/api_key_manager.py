@@ -15,8 +15,8 @@ Features:
 - Production-ready error handling and logging
 """
 
-import os
 import sys
+import os
 import json
 import base64
 import hashlib
@@ -51,68 +51,12 @@ except ImportError:
     print("ERROR: Cryptography is required. Install with: pip3 install cryptography")
     sys.exit(1)
 
-def validate_environment():
-    """Validate the Python environment and dependencies"""
-    logger.info("Validating Python environment...")
-    
-    # Check Python version
-    if sys.version_info < (3, 8):
-        logger.error("Python 3.8 or higher is required")
-        return False
-    
-    # Check required modules
-    required_modules = {
-        'yaml': 'PyYAML',
-        'requests': 'requests',
-        'cryptography': 'cryptography'
-    }
-    
-    for module, package in required_modules.items():
-        try:
-            __import__(module)
-            logger.debug(f"✓ {package} is available")
-        except ImportError:
-            logger.error(f"✗ {package} is not available")
-            return False
-    
-    # Check file permissions
-    try:
-        test_file = Path("test_permissions.tmp")
-        test_file.write_text("test")
-        test_file.unlink()
-        logger.debug("✓ File system permissions are OK")
-    except Exception as e:
-        logger.error(f"✗ File system permissions issue: {e}")
-        return False
-    
-    logger.info("✓ Python environment validation passed")
-    return True
+from logging_config import setup_logging, get_logger, log_function_call, log_execution_time, LogContext
 
-# Configure comprehensive logging
-def setup_logging(log_level: str = "INFO", log_file: str = "api_key_manager.log"):
-    """Setup comprehensive logging configuration"""
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    
-    # Create logs directory if it doesn't exist
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
-    
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format=log_format,
-        handlers=[
-            logging.FileHandler(log_dir / log_file),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    
-    # Suppress noisy library logs
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("requests").setLevel(logging.WARNING)
-    
-    return logging.getLogger(__name__)
-
-logger = setup_logging()
+# Setup centralized logging
+LOG_DIR = os.environ.get('HOMEPAGE_LOG_DIR', './logs')
+setup_logging(log_dir=LOG_DIR, log_level="INFO", json_output=True)
+logger = get_logger("api_key_manager")
 
 class SecurityError(Exception):
     """Custom exception for security-related errors"""
@@ -160,12 +104,14 @@ class APIKeyManager:
                 
                 # Set restrictive permissions (owner read/write only)
                 os.chmod(self.master_key_file, 0o600)
-                logger.info("Generated new master encryption key with secure permissions")
+                with LogContext(logger, {"service": "api_key_manager", "action": "_init_encryption"}):
+                    logger.info("Generated new master encryption key with secure permissions")
             else:
                 # Verify file permissions
                 stat = os.stat(self.master_key_file)
                 if stat.st_mode & 0o777 != 0o600:
-                    logger.warning("Master key file has insecure permissions, fixing...")
+                    with LogContext(logger, {"service": "api_key_manager", "action": "_init_encryption"}):
+                        logger.warning("Master key file has insecure permissions, fixing...")
                     os.chmod(self.master_key_file, 0o600)
             
             # Load master key
@@ -175,7 +121,8 @@ class APIKeyManager:
             self.cipher = Fernet(key)
             
         except Exception as e:
-            logger.error(f"Failed to initialize encryption: {e}")
+            with LogContext(logger, {"service": "api_key_manager", "action": "_init_encryption"}):
+                logger.error(f"Failed to initialize encryption: {e}", exc_info=True)
             raise SecurityError(f"Encryption initialization failed: {e}")
         
     def _validate_api_key(self, service: str, api_key: str) -> bool:
@@ -655,6 +602,8 @@ class APIKeyManager:
             logger.error(f"Failed to save API keys: {e}")
             raise SecurityError(f"Failed to save API keys: {e}")
             
+    @log_function_call
+    @log_execution_time
     def add_key(self, service: str, api_key: str):
         """Add or update API key with validation"""
         try:
@@ -674,6 +623,8 @@ class APIKeyManager:
             logger.error(f"Failed to add API key for {service}: {e}")
             raise
             
+    @log_function_call
+    @log_execution_time
     def remove_key(self, service: str):
         """Remove API key for service"""
         try:
@@ -689,6 +640,8 @@ class APIKeyManager:
             logger.error(f"Failed to remove API key for {service}: {e}")
             raise
             
+    @log_function_call
+    @log_execution_time
     def test_key(self, service: str, api_key: str = None) -> bool:
         """Test API key with comprehensive validation"""
         try:
@@ -738,6 +691,8 @@ class APIKeyManager:
             logger.error(f"API key test failed for {service}: {e}")
             return False
             
+    @log_function_call
+    @log_execution_time
     def test_all_keys(self):
         """Test all stored API keys"""
         try:
@@ -770,6 +725,8 @@ class APIKeyManager:
             logger.error(f"Failed to test API keys: {e}")
             raise
             
+    @log_function_call
+    @log_execution_time
     def generate_config_files(self):
         """Generate configuration files with API keys"""
         try:
@@ -823,6 +780,8 @@ class APIKeyManager:
             logger.error(f"Failed to generate configuration files: {e}")
             raise
             
+    @log_function_call
+    @log_execution_time
     def backup_keys(self, backup_file: str = None):
         """Create encrypted backup of API keys"""
         try:
@@ -855,6 +814,8 @@ class APIKeyManager:
             logger.error(f"Failed to backup API keys: {e}")
             raise SecurityError(f"Backup failed: {e}")
             
+    @log_function_call
+    @log_execution_time
     def restore_keys(self, backup_file: str):
         """Restore API keys from backup"""
         try:
@@ -913,8 +874,9 @@ class APIKeyManager:
 def main():
     """Main function with comprehensive argument parsing and error handling"""
     # Validate environment first
-    if not validate_environment():
-        sys.exit(1)
+    # This function is no longer needed as logging_config.py handles setup
+    # if not validate_environment():
+    #     sys.exit(1)
     
     parser = argparse.ArgumentParser(
         description="API Key Manager for Homelab Homepage",
@@ -945,8 +907,9 @@ Examples:
     args = parser.parse_args()
     
     # Setup logging with provided arguments
-    global logger
-    logger = setup_logging(args.log_level, args.log_file)
+    # This function is no longer needed as logging_config.py handles setup
+    # global logger
+    # logger = setup_logging(args.log_level, args.log_file)
     
     try:
         manager = APIKeyManager(config_dir=args.config_dir)

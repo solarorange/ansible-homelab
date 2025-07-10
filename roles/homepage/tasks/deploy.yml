@@ -173,9 +173,12 @@
   tags: [homepage, homepage-deploy, summary]
 
 rescue:
-  - name: Log Homepage deployment failure
-    ansible.builtin.debug:
-      msg: |
+  - name: Log Homepage deployment failure (standardized)
+    include_tasks: ../../logging/tasks/log_error.yml
+    vars:
+      log_service: "homepage"
+      log_action: "deploy"
+      log_message: |
         Homepage deployment failed:
         - Directory creation: {{ homepage_dir_creation | default('N/A') }}
         - Config backup: {{ homepage_config_backup | default('N/A') }}
@@ -212,6 +215,11 @@ rescue:
         - "{{ homepage_config_dir }}/services.yml"
         - "{{ homepage_config_dir }}/bookmarks.yml"
         - "{{ homepage_docker_dir }}/docker-compose.yml"
+
+  - name: Fail playbook if recovery and rollback failed
+    ansible.builtin.fail:
+      msg: "Homepage deployment failed and rollback was unsuccessful. Manual intervention required."
+    when: recovery_complete | default(false) | bool == false
 
 always:
   - name: Cleanup temporary files

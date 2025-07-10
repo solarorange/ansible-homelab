@@ -37,9 +37,9 @@ services:
     
     - name: "loki"
       status: "{{ 'enabled' if loki_enabled | default(false) else 'disabled' }}"
-      port: "3100"
+      port: "{{ loki_port | default(3100) }}"
       subdomain: "loki"
-      health_check: "http://localhost:3100/ready"
+      health_check: "http://{{ loki_host | default('localhost') }}:{{ loki_port | default(3100) }}/ready"
     
     - name: "alertmanager"
       status: "{{ 'enabled' if alertmanager_enabled | default(false) else 'disabled' }}"

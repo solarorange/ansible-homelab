@@ -30,6 +30,10 @@ services:
       - "traefik.http.middlewares.tautulli-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.tautulli-headers.headers.customrequestheaders.X-Forwarded-Host=tautulli.{{ domain }}"
       - "traefik.http.routers.tautulli.middlewares=tautulli-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=tautulli"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"]
       interval: 30s

@@ -2,6 +2,11 @@
 # Centralized Logging Configuration
 # Handles Loki integration for all services
 
+- name: Log start of logging configuration
+  ansible.builtin.debug:
+    msg: "Starting logging infrastructure configuration"
+  when: logging_enabled | default(true)
+
 - name: Create logging directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -18,6 +23,13 @@
     - "{{ logs_dir }}/containers"
     - "{{ logs_dir }}/security"
   when: logging_enabled | default(true)
+  register: logging_dirs_result
+  failed_when: logging_dirs_result.failed
+
+- name: Log logging directories creation result
+  ansible.builtin.debug:
+    msg: "Created {{ logging_dirs_result.results | length }} logging directories"
+  when: logging_enabled | default(true) and logging_dirs_result is defined
 
 - name: Create Promtail configuration for all services
   ansible.builtin.template:
@@ -28,6 +40,12 @@
     group: "{{ username }}"
   notify: restart promtail
   when: promtail_enabled | default(true)
+  register: promtail_config_result
+
+- name: Log Promtail configuration result
+  ansible.builtin.debug:
+    msg: "Promtail configuration {{ 'created' if promtail_config_result.changed else 'already exists' }}"
+  when: promtail_enabled | default(true) and promtail_config_result is defined
 
 - name: Create log rotation configuration
   ansible.builtin.template:
@@ -36,6 +54,12 @@
     mode: "0644"
   notify: restart logrotate
   when: logrotate_enabled | default(true)
+  register: logrotate_config_result
+
+- name: Log log rotation configuration result
+  ansible.builtin.debug:
+    msg: "Log rotation configuration {{ 'created' if logrotate_config_result.changed else 'already exists' }}"
+  when: logrotate_enabled | default(true) and logrotate_config_result is defined
 
 - name: Configure Docker logging driver
   ansible.builtin.template:
@@ -44,6 +68,12 @@
     mode: "0644"
   notify: restart docker
   when: docker_enabled | default(true)
+  register: docker_config_result
+
+- name: Log Docker logging configuration result
+  ansible.builtin.debug:
+    msg: "Docker logging configuration {{ 'created' if docker_config_result.changed else 'already exists' }}"
+  when: docker_enabled | default(true) and docker_config_result is defined
 
 - name: Create logging health check script
   ansible.builtin.template:
@@ -53,6 +83,12 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   when: logging_enabled | default(true)
+  register: healthcheck_script_result
+
+- name: Log health check script creation result
+  ansible.builtin.debug:
+    msg: "Health check script {{ 'created' if healthcheck_script_result.changed else 'already exists' }}"
+  when: logging_enabled | default(true) and healthcheck_script_result is defined
 
 - name: Create logging management script
   ansible.builtin.template:
@@ -62,6 +98,12 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   when: logging_enabled | default(true)
+  register: manage_script_result
+
+- name: Log management script creation result
+  ansible.builtin.debug:
+    msg: "Management script {{ 'created' if manage_script_result.changed else 'already exists' }}"
+  when: logging_enabled | default(true) and manage_script_result is defined
 
 - name: Setup logging monitoring
   ansible.builtin.template:
@@ -72,6 +114,12 @@
     group: "{{ username }}"
   notify: restart prometheus
   when: logging_prometheus_enabled | default(true)
+  register: monitoring_config_result
+
+- name: Log monitoring configuration result
+  ansible.builtin.debug:
+    msg: "Logging monitoring configuration {{ 'created' if monitoring_config_result.changed else 'already exists' }}"
+  when: logging_prometheus_enabled | default(true) and monitoring_config_result is defined
 
 - name: Create logging dashboard
   ansible.builtin.template:
@@ -81,4 +129,15 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   notify: restart grafana
-  when: logging_grafana_enabled | default(true) 
+  when: logging_grafana_enabled | default(true)
+  register: dashboard_config_result
+
+- name: Log dashboard configuration result
+  ansible.builtin.debug:
+    msg: "Logging dashboard configuration {{ 'created' if dashboard_config_result.changed else 'already exists' }}"
+  when: logging_grafana_enabled | default(true) and dashboard_config_result is defined
+
+- name: Log completion of logging configuration
+  ansible.builtin.debug:
+    msg: "Logging infrastructure configuration completed successfully"
+  when: logging_enabled | default(true) 

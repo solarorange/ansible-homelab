@@ -54,6 +54,11 @@ update_threshold() {
     fi
 }
 
+# Function to print error messages
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 echo -e "${YELLOW}Setting up monitoring thresholds...${NC}"
 echo ""
 

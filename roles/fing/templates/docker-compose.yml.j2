@@ -198,6 +198,10 @@ services:
       - "traefik.http.routers.fing-api.rule=Host(`{{ fing_domain }}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.fing-api.entrypoints=websecure"
       - "traefik.http.routers.fing-api.tls.certresolver={{ fing_traefik_ssl_resolver }}"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=monitoring"
+      - "promtail-service=fing"
       - "traefik.http.routers.fing-api.middlewares={{ fing_traefik_middleware }}"
       - "traefik.http.services.fing-api.loadbalancer.server.port={{ fing_api_port }}"
       

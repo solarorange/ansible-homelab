@@ -1,5 +1,19 @@
 # Homelab Services Documentation
 
+## Important: Risks of Manual Overrides (Ports, Certificates, Service Enablement)
+
+Manual overrides—such as setting ports, certificates, or enabling/disabling services directly via extra-vars, inventory, or ad-hoc variable assignment—can introduce significant risks:
+- **Port Conflicts:** Overriding default ports may cause services to fail or expose them unintentionally.
+- **Certificate Issues:** Manually specifying certificates can result in expired, invalid, or insecure (self-signed) certificates, breaking HTTPS or exposing you to MITM attacks.
+- **Service Enablement:** Enabling or disabling services outside the recommended configuration can break dependencies, monitoring, or security automation.
+
+**Best Practice:**
+- Always use `group_vars` or role defaults for configuration.
+- Avoid manual overrides unless absolutely necessary and you fully understand the risks.
+- Review the [Ansible pre-task warnings](../roles/automation/tasks/main.yml) and confirm you wish to proceed if overrides are detected.
+
+> **Note:** The playbooks now include pre-tasks that detect manual overrides and require explicit user confirmation before proceeding. If you see a warning, review your configuration and only continue if you are certain.
+
 ## Core Infrastructure
 
 ### Traefik

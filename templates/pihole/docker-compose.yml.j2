@@ -37,6 +37,10 @@ services:
       - "traefik.http.routers.pihole.tls.certresolver=letsencrypt"
       - "traefik.http.services.pihole.loadbalancer.server.port=80"
       - "traefik.http.routers.pihole.middlewares=authelia@file"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=security"
+      - "promtail-service=pihole"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/admin/api.php?status"]
       interval: 30s

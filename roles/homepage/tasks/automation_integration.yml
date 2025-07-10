@@ -225,3 +225,7 @@ rescue:
         - "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
         - "{{ homepage_docker_dir }}/scripts/service_discovery.py --test"
         - "{{ homepage_docker_dir }}/scripts/homepage_automation.py --validate" 
+  - name: Fail playbook if recovery and rollback failed
+    ansible.builtin.fail:
+      msg: "Homepage automation integration failed and rollback was unsuccessful. Manual intervention required."
+    when: recovery_complete | default(false) | bool == false 

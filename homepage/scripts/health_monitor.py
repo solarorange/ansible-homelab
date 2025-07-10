@@ -6,8 +6,8 @@ This script monitors the health of all services in the homelab and provides
 real-time status information for the homepage dashboard.
 """
 
-import os
 import sys
+import os
 import json
 import yaml
 import requests
@@ -20,17 +20,12 @@ import logging
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from enum import Enum
+from logging_config import setup_logging, get_logger, log_function_call, log_execution_time, LogContext
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/var/log/homepage/health_monitor.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Setup centralized logging
+LOG_DIR = os.environ.get('HOMEPAGE_LOG_DIR', './logs')
+setup_logging(log_dir=LOG_DIR, log_level="INFO", json_output=True)
+logger = get_logger("health_monitor")
 
 class ServiceStatus(Enum):
     """Service status enumeration"""
@@ -85,13 +80,18 @@ class HealthMonitor:
                                 'config': service_config
                             }
                 
-                logger.info(f"Loaded {len(self.services)} services")
+                with LogContext(logger, {"service": "health_monitor", "action": "load_services"}):
+                    logger.info(f"Loaded {len(self.services)} services")
             else:
-                logger.warning(f"Services file not found: {self.services_file}")
+                with LogContext(logger, {"service": "health_monitor", "action": "load_services"}):
+                    logger.warning(f"Services file not found: {self.services_file}")
         
         except Exception as e:
-            logger.error(f"Error loading services: {e}")
+            with LogContext(logger, {"service": "health_monitor", "action": "load_services"}):
+                logger.error(f"Error loading services: {e}", exc_info=True)
     
+    @log_function_call
+    @log_execution_time
     async def check_service_health(self, service_name: str, service_config: Dict[str, Any]) -> ServiceHealth:
         """Check health of a single service"""
         start_time = time.time()
@@ -216,10 +216,12 @@ class HealthMonitor:
             with open(self.health_file, 'w') as f:
                 json.dump(serializable_data, f, indent=2)
             
-            logger.info(f"Saved health data for {len(health_data)} services")
+            with LogContext(logger, {"service": "health_monitor", "action": "save_health_data"}):
+                logger.info(f"Saved health data for {len(health_data)} services")
         
         except Exception as e:
-            logger.error(f"Error saving health data: {e}")
+            with LogContext(logger, {"service": "health_monitor", "action": "save_health_data"}):
+                logger.error(f"Error saving health data: {e}", exc_info=True)
     
     def generate_health_summary(self, health_data: Dict[str, ServiceHealth]) -> Dict[str, Any]:
         """Generate a summary of service health"""
@@ -290,14 +292,19 @@ class HealthMonitor:
             with open(summary_file, 'w') as f:
                 json.dump(summary, f, indent=2)
             
-            logger.info("Saved health summary")
+            with LogContext(logger, {"service": "health_monitor", "action": "save_health_summary"}):
+                logger.info("Saved health summary")
         
         except Exception as e:
-            logger.error(f"Error saving health summary: {e}")
+            with LogContext(logger, {"service": "health_monitor", "action": "save_health_summary"}):
+                logger.error(f"Error saving health summary: {e}", exc_info=True)
     
+    @log_function_call
+    @log_execution_time
     async def run_monitoring_cycle(self) -> None:
         """Run a single monitoring cycle"""
-        logger.info("Starting health monitoring cycle...")
+        with LogContext(logger, {"service": "health_monitor", "action": "run_monitoring_cycle"}):
+            logger.info("Starting health monitoring cycle...")
         
         try:
             # Check all services
@@ -312,27 +319,32 @@ class HealthMonitor:
             
             # Log summary
             summary_data = summary['summary']
-            logger.info(
-                f"Health check completed: {summary_data['online_services']}/{summary_data['total_services']} "
-                f"services online ({summary_data['uptime_percentage']:.1f}% uptime)"
-            )
+            with LogContext(logger, {"service": "health_monitor", "action": "run_monitoring_cycle"}):
+                logger.info(
+                    f"Health check completed: {summary_data['online_services']}/{summary_data['total_services']} "
+                    f"services online ({summary_data['uptime_percentage']:.1f}% uptime)"
+                )
             
             # Log offline services
             offline_services = summary['by_status']['offline']
             if offline_services:
-                logger.warning(f"Offline services: {', '.join(offline_services)}")
+                with LogContext(logger, {"service": "health_monitor", "action": "run_monitoring_cycle"}):
+                    logger.warning(f"Offline services: {', '.join(offline_services)}")
             
             # Log warning services
             warning_services = summary['by_status']['warning']
             if warning_services:
-                logger.warning(f"Warning services: {', '.join(warning_services)}")
+                with LogContext(logger, {"service": "health_monitor", "action": "run_monitoring_cycle"}):
+                    logger.warning(f"Warning services: {', '.join(warning_services)}")
         
         except Exception as e:
-            logger.error(f"Error in monitoring cycle: {e}")
+            with LogContext(logger, {"service": "health_monitor", "action": "run_monitoring_cycle"}):
+                logger.error(f"Error in monitoring cycle: {e}", exc_info=True)
     
     async def run_continuous_monitoring(self, interval: int = 60) -> None:
         """Run continuous monitoring with specified interval"""
-        logger.info(f"Starting continuous monitoring with {interval}s interval...")
+        with LogContext(logger, {"service": "health_monitor", "action": "run_continuous_monitoring"}):
+            logger.info(f"Starting continuous monitoring with {interval}s interval...")
         
         try:
             while True:
@@ -340,15 +352,18 @@ class HealthMonitor:
                     await self.run_monitoring_cycle()
                     await asyncio.sleep(interval)
                 except KeyboardInterrupt:
-                    logger.info("Monitoring stopped by user")
+                    with LogContext(logger, {"service": "health_monitor", "action": "run_continuous_monitoring"}):
+                        logger.info("Monitoring stopped by user")
                     break
                 except Exception as e:
-                    logger.error(f"Error in monitoring cycle: {e}")
+                    with LogContext(logger, {"service": "health_monitor", "action": "run_continuous_monitoring"}):
+                        logger.error(f"Error in monitoring cycle: {e}", exc_info=True)
                     await asyncio.sleep(interval)
         finally:
             if self.session:
                 await self.session.close()
-                logger.info("Health monitoring session closed")
+                with LogContext(logger, {"service": "health_monitor", "action": "run_continuous_monitoring"}):
+                    logger.info("Health monitoring session closed")
 
 def main():
     """Main entry point"""
@@ -363,10 +378,14 @@ def main():
     
     monitor = HealthMonitor(args.config_dir)
     
-    if args.once:
-        asyncio.run(monitor.run_monitoring_cycle())
-    else:
-        asyncio.run(monitor.run_continuous_monitoring(args.interval))
+    try:
+        if args.once:
+            asyncio.run(monitor.run_monitoring_cycle())
+        else:
+            asyncio.run(monitor.run_continuous_monitoring(args.interval))
+    except Exception as e:
+        logger.error(f"Critical error in health monitoring: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 

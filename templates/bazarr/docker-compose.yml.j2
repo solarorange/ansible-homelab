@@ -33,6 +33,10 @@ services:
       - "traefik.http.middlewares.bazarr-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.bazarr-headers.headers.customrequestheaders.X-Forwarded-Host=bazarr.{{ domain }}"
       - "traefik.http.routers.bazarr.middlewares=bazarr-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=bazarr"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6767/api/health"]
       interval: 30s

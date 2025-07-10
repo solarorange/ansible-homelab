@@ -22,88 +22,93 @@ LOG_DIR="$SCRIPT_DIR/logs"
 # Create necessary directories
 mkdir -p "$BACKUP_DIR" "$LOG_DIR"
 
-# Logging function
-log() {
-    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
-}
-
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
-    exit 1
-}
-
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
-}
-
-info() {
-    echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
-}
+# Source standardized logging utility
+if [[ -f "$SCRIPT_DIR/../scripts/logging_utils.sh" ]]; then
+    source "$SCRIPT_DIR/../scripts/logging_utils.sh"
+else
+    # Fallback logging functions if utility not available
+    log_info() {
+        echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] [INFO]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
+    }
+    
+    log_error() {
+        echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] [ERROR]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
+        exit 1
+    }
+    
+    log_warning() {
+        echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] [WARNING]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
+    }
+    
+    log_debug() {
+        echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] [DEBUG]${NC} $1" | tee -a "$LOG_DIR/deploy.log"
+    }
+fi
 
 # Function to check prerequisites
 check_prerequisites() {
-    log "Checking prerequisites..."
+    log_info "Checking prerequisites..."
     
     # Check if Docker is installed
     if ! command -v docker &> /dev/null; then
-        error "Docker is not installed. Please install Docker first."
+        log_error "Docker is not installed. Please install Docker first."
     fi
     
     # Check if Docker Compose is installed
     if ! command -v docker-compose &> /dev/null; then
-        error "Docker Compose is not installed. Please install Docker Compose first."
+        log_error "Docker Compose is not installed. Please install Docker Compose first."
     fi
     
     # Check if Docker daemon is running
     if ! docker info &> /dev/null; then
-        error "Docker daemon is not running. Please start Docker first."
+        log_error "Docker daemon is not running. Please start Docker first."
     fi
     
     # Check if config files exist
     if [[ ! -f "$CONFIG_DIR/config.yml" ]]; then
-        error "Configuration file not found: $CONFIG_DIR/config.yml"
+        log_error "Configuration file not found: $CONFIG_DIR/config.yml"
     fi
     
     if [[ ! -f "$CONFIG_DIR/services.yml" ]]; then
-        error "Services configuration not found: $CONFIG_DIR/services.yml"
+        log_error "Services configuration not found: $CONFIG_DIR/services.yml"
     fi
     
-    log "Prerequisites check passed!"
+    log_info "Prerequisites check passed!"
 }
 
 # Function to backup existing configuration
 backup_config() {
     if [[ -d "$CONFIG_DIR" ]]; then
         local backup_file="$BACKUP_DIR/homepage-config-$(date +%Y%m%d-%H%M%S).tar.gz"
-        log "Creating backup of existing configuration..."
+        log_info "Creating backup of existing configuration..."
         tar -czf "$backup_file" -C "$SCRIPT_DIR" config/
-        log "Backup created: $backup_file"
+        log_info "Backup created: $backup_file"
     fi
 }
 
 # Function to validate configuration
 validate_config() {
-    log "Validating configuration files..."
+    log_info "Validating configuration files..."
     
     # Check YAML syntax
     if command -v python3 &> /dev/null; then
-        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/config.yml'))" || error "Invalid YAML syntax in config.yml"
-        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/services.yml'))" || error "Invalid YAML syntax in services.yml"
-        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/bookmarks.yml'))" || error "Invalid YAML syntax in bookmarks.yml"
+        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/config.yml'))" || log_error "Invalid YAML syntax in config.yml"
+        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/services.yml'))" || log_error "Invalid YAML syntax in services.yml"
+        python3 -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/bookmarks.yml'))" || log_error "Invalid YAML syntax in bookmarks.yml"
     elif command -v python &> /dev/null; then
-        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/config.yml'))" || error "Invalid YAML syntax in config.yml"
-        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/services.yml'))" || error "Invalid YAML syntax in services.yml"
-        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/bookmarks.yml'))" || error "Invalid YAML syntax in bookmarks.yml"
+        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/config.yml'))" || log_error "Invalid YAML syntax in config.yml"
+        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/services.yml'))" || log_error "Invalid YAML syntax in services.yml"
+        python -c "import yaml; yaml.safe_load(open('$CONFIG_DIR/bookmarks.yml'))" || log_error "Invalid YAML syntax in bookmarks.yml"
     else
-        warning "Python not found, skipping YAML validation"
+        log_warning "Python not found, skipping YAML validation"
     fi
     
-    log "Configuration validation passed!"
+    log_info "Configuration validation passed!"
 }
 
 # Function to setup environment
 setup_environment() {
-    log "Setting up environment..."
+    log_info "Setting up environment..."
     
     # Create .env file if it doesn't exist
     if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
@@ -138,58 +143,58 @@ BACKUP_RETENTION_DAYS=30
 HEALTH_CHECK_INTERVAL=30
 LOG_LEVEL=info
 EOF
-        warning "Created .env file. Please edit it with your actual values before deployment."
+        log_warning "Created .env file. Please edit it with your actual values before deployment."
     else
-        info ".env file already exists"
+        log_info ".env file already exists"
     fi
 }
 
 # Function to deploy Homepage
 deploy_homepage() {
-    log "Deploying Homepage dashboard..."
+    log_info "Deploying Homepage dashboard..."
     
     # Pull latest images
-    log "Pulling latest Docker images..."
+    log_info "Pulling latest Docker images..."
     docker-compose pull
     
     # Start services
-    log "Starting Homepage services..."
+    log_info "Starting Homepage services..."
     docker-compose up -d
     
     # Wait for services to be ready
-    log "Waiting for services to be ready..."
+    log_info "Waiting for services to be ready..."
     sleep 10
     
     # Check service status
     if docker-compose ps | grep -q "Up"; then
-        log "Homepage deployed successfully!"
+        log_info "Homepage deployed successfully!"
     else
-        error "Failed to deploy Homepage. Check logs with: docker-compose logs"
+        log_error "Failed to deploy Homepage. Check logs with: docker-compose logs"
     fi
 }
 
 # Function to check service health
 check_health() {
-    log "Checking service health..."
+    log_info "Checking service health..."
     
     # Wait a bit for services to fully start
     sleep 5
     
     # Check if Homepage is responding
     if curl -f -s http://localhost:3000/health &> /dev/null; then
-        log "Homepage health check passed!"
+        log_info "Homepage health check passed!"
     else
-        warning "Homepage health check failed. Service may still be starting..."
+        log_warning "Homepage health check failed. Service may still be starting..."
     fi
     
     # Check container status
-    log "Container status:"
+    log_info "Container status:"
     docker-compose ps
 }
 
 # Function to show deployment info
 show_info() {
-    log "Deployment completed successfully!"
+    log_info "Deployment completed successfully!"
     echo
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}  HOMEPAGE DASHBOARD DEPLOYMENT INFO${NC}"

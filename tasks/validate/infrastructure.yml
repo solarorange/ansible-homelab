@@ -1,0 +1,293 @@
+---
+# Infrastructure Validation Tasks
+# Validates DNS records, firewall rules, and SSL certificates
+# Fails deployment if any checks do not pass
+
+- name: Infrastructure Validation - DNS Records, Firewall, and SSL Certificates
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    validation_failed: false
+    validation_errors: []
+    
+  pre_tasks:
+    - name: Install required packages for validation
+      ansible.builtin.apt:
+        name:
+          - dnsutils
+          - curl
+          - openssl
+          - ufw
+          - net-tools
+          - nmap
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+      tags: [validation, prerequisites]
+
+    - name: Copy validation script to target server
+      ansible.builtin.copy:
+        src: scripts/validate_infrastructure.py
+        dest: /usr/local/bin/validate_infrastructure.py
+        mode: '0755'
+        owner: root
+        group: root
+      tags: [validation, setup]
+
+  tasks:
+    # =============================================================================
+    # COMPREHENSIVE INFRASTRUCTURE VALIDATION
+    # =============================================================================
+    
+    - name: Run comprehensive infrastructure validation
+      ansible.builtin.command: >
+        /usr/local/bin/validate_infrastructure.py
+        --domain {{ domain }}
+        --server-ip {{ ansible_default_ipv4.address }}
+        --output /tmp/validation_results.json
+      register: validation_result
+      failed_when: false
+      changed_when: false
+      tags: [validation, comprehensive]
+
+    - name: Load validation results
+      ansible.builtin.slurp:
+        src: /tmp/validation_results.json
+      register: validation_results_file
+      when: validation_result.rc == 0
+      tags: [validation, results]
+
+    - name: Parse validation results
+      ansible.builtin.set_fact:
+        validation_data: "{{ validation_results_file.content | b64decode | from_json }}"
+      when: validation_result.rc == 0
+      tags: [validation, results]
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        var: validation_data
+      when: validation_result.rc == 0
+      tags: [validation, results]
+
+    # =============================================================================
+    # INDIVIDUAL VALIDATION CHECKS (Fallback)
+    # =============================================================================
+    
+    - name: Fallback DNS validation
+      block:
+        - name: Check DNS resolution for {{ item }}
+          ansible.builtin.command: "nslookup {{ item }}"
+          register: dns_check
+          failed_when: false
+          changed_when: false
+          loop:
+            - "{{ domain }}"
+            - "traefik.{{ domain }}"
+            - "auth.{{ domain }}"
+            - "grafana.{{ domain }}"
+          tags: [validation, dns, fallback]
+
+        - name: Validate DNS resolution
+          ansible.builtin.assert:
+            that:
+              - "item.rc == 0"
+              - "ansible_default_ipv4.address in item.stdout"
+            fail_msg: "DNS resolution failed for {{ item.item }}"
+            success_msg: "DNS resolution successful for {{ item.item }}"
+          loop: "{{ dns_check.results }}"
+          tags: [validation, dns, fallback]
+      when: validation_result.rc != 0
+      tags: [validation, fallback]
+
+    - name: Fallback firewall validation
+      block:
+        - name: Check UFW status
+          ansible.builtin.command: "ufw status numbered"
+          register: ufw_status
+          changed_when: false
+          tags: [validation, firewall, fallback]
+
+        - name: Validate UFW is active
+          ansible.builtin.assert:
+            that:
+              - "ufw_status.rc == 0"
+              - "'Status: active' in ufw_status.stdout"
+            fail_msg: "UFW firewall is not enabled or active"
+            success_msg: "UFW firewall is enabled and active"
+          tags: [validation, firewall, fallback]
+
+        - name: Check required ports are open
+          ansible.builtin.command: "ufw status | grep -E '{{ item }}/'"
+          register: port_check
+          failed_when: false
+          changed_when: false
+          loop:
+            - "80/tcp"
+            - "443/tcp"
+            - "22/tcp"
+          tags: [validation, firewall, fallback]
+
+        - name: Validate required ports
+          ansible.builtin.assert:
+            that:
+              - "item.rc == 0"
+              - "'ALLOW' in item.stdout"
+            fail_msg: "Required port {{ item.item }} is not open"
+            success_msg: "Required port {{ item.item }} is open"
+          loop: "{{ port_check.results }}"
+          tags: [validation, firewall, fallback]
+      when: validation_result.rc != 0
+      tags: [validation, fallback]
+
+    - name: Fallback SSL validation
+      block:
+        - name: Check SSL certificate for {{ item }}
+          ansible.builtin.command: >
+            openssl s_client -connect {{ item }}:443 -servername {{ item }}
+            -verify_return_error -CAfile /etc/ssl/certs/ca-certificates.crt
+            -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates
+          register: ssl_check
+          failed_when: false
+          changed_when: false
+          loop:
+            - "{{ domain }}"
+            - "traefik.{{ domain }}"
+          tags: [validation, ssl, fallback]
+
+        - name: Validate SSL certificates
+          ansible.builtin.assert:
+            that:
+              - "item.rc == 0"
+              - "'notAfter' in item.stdout"
+            fail_msg: "SSL certificate validation failed for {{ item.item }}"
+            success_msg: "SSL certificate validation successful for {{ item.item }}"
+          loop: "{{ ssl_check.results }}"
+          tags: [validation, ssl, fallback]
+      when: validation_result.rc != 0
+      tags: [validation, fallback]
+
+    # =============================================================================
+    # TRAEFIK VALIDATION
+    # =============================================================================
+    
+    - name: Check Traefik container status
+      ansible.builtin.docker_container_info:
+        name: traefik
+      register: traefik_status
+      tags: [validation, traefik]
+
+    - name: Validate Traefik is running
+      ansible.builtin.assert:
+        that:
+          - "traefik_status.exists"
+          - "traefik_status.container.State.Running"
+        fail_msg: "Traefik container is not running"
+        success_msg: "Traefik container is running"
+      tags: [validation, traefik]
+
+    - name: Check Traefik API health
+      ansible.builtin.uri:
+        url: "http://localhost:8080/api/health"
+        method: GET
+        status_code: [200]
+        timeout: 10
+      register: traefik_health
+      failed_when: false
+      tags: [validation, traefik]
+
+    - name: Validate Traefik API is responding
+      ansible.builtin.assert:
+        that:
+          - "traefik_health.status == 200"
+        fail_msg: "Traefik API is not responding properly"
+        success_msg: "Traefik API is responding correctly"
+      tags: [validation, traefik]
+
+    # =============================================================================
+    # FINAL VALIDATION SUMMARY AND FAILURE HANDLING
+    # =============================================================================
+    
+    - name: Set validation status based on results
+      ansible.builtin.set_fact:
+        validation_failed: "{{ validation_result.rc != 0 }}"
+        validation_errors: "{{ validation_data.errors | default([]) }}"
+        validation_warnings: "{{ validation_data.warnings | default([]) }}"
+      when: validation_result.rc == 0
+      tags: [validation, summary]
+
+    - name: Display comprehensive validation summary
+      ansible.builtin.debug:
+        msg: |
+          =============================================================================
+          INFRASTRUCTURE VALIDATION SUMMARY
+          =============================================================================
+          
+          {% if validation_result.rc == 0 %}
+          ✅ VALIDATION COMPLETED SUCCESSFULLY
+          
+          Domain: {{ domain }}
+          Server IP: {{ ansible_default_ipv4.address }}
+          
+          {% if validation_data.errors %}
+          ❌ ERRORS ({{ validation_data.errors | length }}):
+          {% for error in validation_data.errors %}
+            • {{ error }}
+          {% endfor %}
+          {% endif %}
+          
+          {% if validation_data.warnings %}
+          ⚠️  WARNINGS ({{ validation_data.warnings | length }}):
+          {% for warning in validation_data.warnings %}
+            • {{ warning }}
+          {% endfor %}
+          {% endif %}
+          
+          {% if not validation_data.errors and not validation_data.warnings %}
+          🎉 ALL CHECKS PASSED - Infrastructure is ready for deployment!
+          {% endif %}
+          
+          {% else %}
+          ❌ VALIDATION FAILED
+          
+          The validation script encountered errors. Check the output above for details.
+          {% endif %}
+          
+          =============================================================================
+      tags: [validation, summary]
+
+    - name: Fail deployment if validation failed
+      ansible.builtin.fail:
+        msg: |
+          =============================================================================
+          INFRASTRUCTURE VALIDATION FAILED
+          =============================================================================
+          
+          The following validation checks failed:
+          {% if validation_data.errors %}
+          {% for error in validation_data.errors %}
+          • {{ error }}
+          {% endfor %}
+          {% else %}
+          • Validation script execution failed
+          {% endif %}
+          
+          Please fix the issues above before proceeding with deployment.
+          
+          To troubleshoot:
+          1. Check DNS records are pointing to {{ ansible_default_ipv4.address }}
+          2. Verify firewall rules allow ports 80, 443, 22
+          3. Ensure SSL certificates are valid and not expired
+          4. Confirm Traefik is running and accessible
+          
+          =============================================================================
+      when: validation_failed | default(false)
+      tags: [validation, failure]
+
+    - name: Clean up validation files
+      ansible.builtin.file:
+        path: /tmp/validation_results.json
+        state: absent
+      tags: [validation, cleanup] 

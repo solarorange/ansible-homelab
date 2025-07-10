@@ -118,6 +118,12 @@ if [[ ! -d "$TASKS_DIR" ]]; then
     exit 1
 fi
 
+# Check if required file exists
+if [[ ! -f "tasks/obsolete_tasks.yml" ]]; then
+    print_error "Required file tasks/obsolete_tasks.yml not found."
+    exit 1
+fi
+
 # Create backup directory
 if [[ "$DRY_RUN" != "true" ]]; then
     echo -e "${YELLOW}Creating backup directory: $BACKUP_DIR${NC}"
@@ -160,6 +166,11 @@ check_retained() {
     if file_exists "$file"; then
         echo -e "${GREEN}✓ Retained: $file${NC}"
     fi
+}
+
+# Function to print error messages
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 echo -e "${BLUE}=== Processing Obsolete Tasks ===${NC}"

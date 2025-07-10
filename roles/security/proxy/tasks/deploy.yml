@@ -385,6 +385,11 @@ rescue:
         - "{{ docker_dir }}/traefik/config/traefik.yml"
         - "{{ docker_dir }}/traefik/dynamic/middlewares.yml"
 
+  - name: Fail playbook if recovery and rollback failed
+    ansible.builtin.fail:
+      msg: "Traefik deployment failed and rollback was unsuccessful. Manual intervention required."
+    when: recovery_complete | default(false) | bool == false
+
 always:
   - name: Cleanup temporary files
     ansible.builtin.file:

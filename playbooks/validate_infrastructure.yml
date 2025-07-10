@@ -1,0 +1,80 @@
+---
+# Infrastructure Validation Playbook
+# Standalone playbook to validate DNS records, firewall rules, and SSL certificates
+# Usage: ansible-playbook playbooks/validate_infrastructure.yml
+
+- name: Infrastructure Validation
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  vars:
+    # Override these variables if needed
+    validation_strict_mode: "{{ validation_strict_mode | default(true) }}"
+    validation_skip_ssl: "{{ validation_skip_ssl | default(false) }}"
+    validation_skip_firewall: "{{ validation_skip_firewall | default(false) }}"
+    validation_skip_dns: "{{ validation_skip_dns | default(false) }}"
+  
+  pre_tasks:
+    - name: Display validation configuration
+      ansible.builtin.debug:
+        msg: |
+          =============================================================================
+          INFRASTRUCTURE VALIDATION CONFIGURATION
+          =============================================================================
+          
+          Domain: {{ domain }}
+          Server IP: {{ ansible_default_ipv4.address }}
+          Strict Mode: {{ validation_strict_mode }}
+          
+          Validation Checks:
+          - DNS Records: {{ 'SKIPPED' if validation_skip_dns else 'ENABLED' }}
+          - Firewall Rules: {{ 'SKIPPED' if validation_skip_firewall else 'ENABLED' }}
+          - SSL Certificates: {{ 'SKIPPED' if validation_skip_ssl else 'ENABLED' }}
+          - Traefik Status: ENABLED
+          
+          =============================================================================
+      tags: [validation, config]
+
+  tasks:
+    - name: Include infrastructure validation tasks
+      ansible.builtin.include_tasks: ../tasks/validate/infrastructure.yml
+      tags: [validation, comprehensive]
+
+  post_tasks:
+    - name: Generate validation report
+      ansible.builtin.template:
+        src: ../templates/validation_report.md.j2
+        dest: "{{ playbook_dir }}/validation_report_{{ ansible_date_time.iso8601_basic_short }}.md"
+        mode: '0644'
+      when: validation_result is defined
+      tags: [validation, report]
+
+    - name: Display validation completion message
+      ansible.builtin.debug:
+        msg: |
+          =============================================================================
+          VALIDATION COMPLETED
+          =============================================================================
+          
+          {% if validation_result.rc == 0 %}
+          ✅ Infrastructure validation completed successfully!
+          
+          Report saved to: {{ playbook_dir }}/validation_report_{{ ansible_date_time.iso8601_basic_short }}.md
+          
+          {% if validation_data.errors %}
+          ⚠️  {{ validation_data.errors | length }} error(s) found - review and fix before deployment
+          {% endif %}
+          
+          {% if validation_data.warnings %}
+          ⚠️  {{ validation_data.warnings | length }} warning(s) found - consider addressing
+          {% endif %}
+          
+          {% else %}
+          ❌ Infrastructure validation failed!
+          
+          Please review the errors above and fix them before proceeding with deployment.
+          {% endif %}
+          
+          =============================================================================
+      tags: [validation, summary] 

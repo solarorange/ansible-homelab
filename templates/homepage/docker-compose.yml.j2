@@ -16,6 +16,17 @@ services:
       - TZ={{ homepage_timezone | default('America/New_York') }}
     networks:
       - {{ homepage_network | default('watchtower') }}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.{{ domain }}`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls=true"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=homepage"
+      - "promtail-service=homepage"
 
 networks:
   {{ homepage_network | default('watchtower') }}:

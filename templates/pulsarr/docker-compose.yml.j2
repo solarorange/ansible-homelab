@@ -32,6 +32,10 @@ services:
       - "traefik.http.middlewares.pulsarr-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.pulsarr-headers.headers.customrequestheaders.X-Forwarded-Host=pulsarr.{{ domain }}"
       - "traefik.http.routers.pulsarr.middlewares=pulsarr-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=pulsarr"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s

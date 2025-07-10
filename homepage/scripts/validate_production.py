@@ -15,8 +15,8 @@ Features:
 - Integration validation
 """
 
-import os
 import sys
+import os
 import json
 import yaml
 import subprocess
@@ -26,13 +26,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 import logging
+from logging_config import setup_logging, get_logger, log_function_call, log_execution_time, LogContext
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Setup centralized logging
+LOG_DIR = os.environ.get('HOMEPAGE_LOG_DIR', './logs')
+setup_logging(log_dir=LOG_DIR, log_level="INFO", json_output=True)
+logger = get_logger("validate_production")
 
 class ValidationError(Exception):
     """Custom exception for validation errors"""
@@ -57,7 +56,8 @@ class ProductionValidator:
         
     def run_all_validations(self) -> Dict:
         """Run all validation checks"""
-        logger.info("Starting comprehensive production validation...")
+        with LogContext(logger, {"service": "validate_production", "action": "run_all_validations"}):
+            logger.info("Starting comprehensive production validation...")
         
         try:
             self._validate_environment()
@@ -69,11 +69,14 @@ class ProductionValidator:
             self._determine_overall_status()
             
         except Exception as e:
-            logger.error(f"Validation failed: {e}")
+            with LogContext(logger, {"service": "validate_production", "action": "run_all_validations"}):
+                logger.error(f"Validation failed: {e}", exc_info=True)
             self.results["overall_status"] = "FAILED"
             
         return self.results
     
+    @log_function_call
+    @log_execution_time
     def _validate_environment(self):
         """Validate Python environment and dependencies"""
         logger.info("Validating environment...")
@@ -118,6 +121,8 @@ class ProductionValidator:
                 self.results["environment"][f"system_{dep}"] = "FAIL"
                 logger.error(f"✗ {dep} not found")
     
+    @log_function_call
+    @log_execution_time
     def _validate_configuration(self):
         """Validate configuration files"""
         logger.info("Validating configuration...")
@@ -160,6 +165,8 @@ class ProductionValidator:
             self.results["configuration"]["placeholder_values"] = "FAIL"
             logger.error(f"✗ Placeholder check failed: {e}")
     
+    @log_function_call
+    @log_execution_time
     def _validate_security(self):
         """Validate security configuration"""
         logger.info("Validating security...")
@@ -194,6 +201,8 @@ class ProductionValidator:
             self.results["security"]["api_key_manager"] = "FAIL"
             logger.error(f"✗ API key manager test failed: {e}")
     
+    @log_function_call
+    @log_execution_time
     def _validate_deployment(self):
         """Validate deployment status"""
         logger.info("Validating deployment...")
@@ -239,6 +248,8 @@ class ProductionValidator:
             self.results["deployment"]["homepage_access"] = "FAIL"
             logger.error(f"✗ Homepage access failed: {e}")
     
+    @log_function_call
+    @log_execution_time
     def _validate_performance(self):
         """Validate performance metrics"""
         logger.info("Validating performance...")
@@ -296,6 +307,8 @@ class ProductionValidator:
             self.results["performance"]["resource_usage"] = "FAIL"
             logger.error(f"✗ Resource usage check failed: {e}")
     
+    @log_function_call
+    @log_execution_time
     def _validate_integration(self):
         """Validate service integration"""
         logger.info("Validating integration...")

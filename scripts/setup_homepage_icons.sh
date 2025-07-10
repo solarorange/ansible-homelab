@@ -104,6 +104,17 @@ declare -a icons=(
 
 echo "Setting up Homepage icons..."
 
+# Function to print error messages
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Check if icons directory exists
+if [[ ! -d "$ICONS_DIR" ]]; then
+    print_error "Icons directory $ICONS_DIR not found."
+    exit 1
+fi
+
 # Download each icon
 for icon in "${icons[@]}"; do
     if [ ! -f "$ICONS_DIR/$icon" ]; then
