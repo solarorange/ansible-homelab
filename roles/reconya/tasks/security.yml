@@ -1,0 +1,115 @@
+---
+# Reconya Security Configuration
+# Configure security features for Reconya
+
+- name: Configure Reconya security
+  block:
+    - name: Create Reconya security configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}/security"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Configure Reconya security headers
+      ansible.builtin.template:
+        src: security_headers.yml.j2
+        dest: "{{ reconya_config_dir }}/security/headers.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_security_headers | default(true)
+
+    - name: Configure Reconya rate limiting
+      ansible.builtin.template:
+        src: rate_limit.yml.j2
+        dest: "{{ reconya_config_dir }}/security/rate_limit.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_rate_limiting | default(true)
+
+    - name: Configure Reconya CORS settings
+      ansible.builtin.template:
+        src: cors.yml.j2
+        dest: "{{ reconya_config_dir }}/security/cors.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_cors_enabled | default(false)
+
+  tags: [reconya, security]
+
+- name: Configure Reconya CrowdSec integration
+  block:
+    - name: Create Reconya CrowdSec configuration
+      ansible.builtin.template:
+        src: crowdsec.yml.j2
+        dest: "{{ crowdsec_config_dir }}/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_crowdsec_enabled | default(true)
+
+    - name: Configure Reconya CrowdSec collections
+      ansible.builtin.template:
+        src: crowdsec_collections.yml.j2
+        dest: "{{ crowdsec_config_dir }}/reconya_collections.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_crowdsec_enabled | default(true)
+
+  tags: [reconya, security]
+
+- name: Configure Reconya Fail2ban integration
+  block:
+    - name: Create Reconya Fail2ban jail configuration
+      ansible.builtin.template:
+        src: fail2ban_jail.conf.j2
+        dest: "/etc/fail2ban/jail.d/reconya.conf"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      when: reconya_fail2ban_enabled | default(true)
+
+    - name: Create Reconya Fail2ban filter configuration
+      ansible.builtin.template:
+        src: fail2ban_filter.conf.j2
+        dest: "/etc/fail2ban/filter.d/reconya.conf"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      when: reconya_fail2ban_enabled | default(true)
+
+    - name: Restart Fail2ban service
+      ansible.builtin.service:
+        name: fail2ban
+        state: restarted
+      become: true
+      when: reconya_fail2ban_enabled | default(true)
+
+  tags: [reconya, security]
+
+- name: Configure Reconya network security
+  block:
+    - name: Configure Reconya firewall rules
+      ansible.builtin.template:
+        src: firewall_rules.yml.j2
+        dest: "{{ reconya_config_dir }}/security/firewall_rules.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Configure Reconya network access controls
+      ansible.builtin.template:
+        src: network_access.yml.j2
+        dest: "{{ reconya_config_dir }}/security/network_access.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  tags: [reconya, security] 

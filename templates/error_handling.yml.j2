@@ -1,0 +1,43 @@
+---
+# Comprehensive Error Handling Template
+# Include this template in tasks that use ignore_errors: true
+
+- name: Handle task errors gracefully
+  block:
+    - name: Log error details
+      ansible.builtin.debug:
+        msg: |
+          Task completed with warnings:
+          - Task: {{ ansible_play_name }}
+          - Error: {{ task_result.stderr | default('None') }}
+          - RC: {{ task_result.rc | default('None') }}
+          - Status: {{ task_result.failed | default(false) }}
+      when: task_result is defined and task_result is failed
+      
+    - name: Send error notification
+      ansible.builtin.uri:
+        url: "{{ notification_webhook | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "⚠️ Task Warning: {{ ansible_play_name }} completed with warnings",
+            "details": "{{ task_result.stderr | default('None') }}"
+          }
+        status_code: [200, 201, 202]
+      when: 
+        - task_result is defined and task_result is failed
+        - notification_webhook is defined
+      ignore_errors: true
+      
+    - name: Update error tracking
+      ansible.builtin.lineinfile:
+        path: "{{ logs_dir }}/task-errors.log"
+        line: "$(date '+%Y-%m-%d %H:%M:%S') - {{ ansible_play_name }} - {{ task_result.stderr | default('Unknown error') }}"
+        create: true
+      when: task_result is defined and task_result is failed
+      
+    - name: Continue execution
+      ansible.builtin.debug:
+        msg: "Continuing execution despite warnings"
+      when: task_result is defined and task_result is failed 

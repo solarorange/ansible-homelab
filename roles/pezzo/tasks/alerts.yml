@@ -1,0 +1,152 @@
+---
+# Pezzo Alerting Tasks
+# Configure alerting functionality for Pezzo services
+
+- name: Create Pezzo alerting configuration directory
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}/alerts"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo AlertManager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/alertmanager.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_alerting_provider == "alertmanager"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo Prometheus alerting rules
+  ansible.builtin.template:
+    src: prometheus_alerts.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/prometheus_alerts.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_alerting_enabled | default(true)
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo notification templates
+  ansible.builtin.template:
+    src: notification_templates.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/notification_templates.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alerting script
+  ansible.builtin.template:
+    src: alerting.sh.j2
+    dest: "{{ pezzo_config_dir }}/alerting.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert testing script
+  ansible.builtin.template:
+    src: test_alerts.sh.j2
+    dest: "{{ pezzo_config_dir }}/test_alerts.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert history script
+  ansible.builtin.template:
+    src: alert_history.sh.j2
+    dest: "{{ pezzo_config_dir }}/alert_history.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Setup Pezzo alert monitoring cron job
+  ansible.builtin.cron:
+    name: "Pezzo Alert Monitoring"
+    minute: "*/2"
+    job: "{{ pezzo_config_dir }}/alerting.sh >> {{ logs_dir }}/pezzo/alerts/monitoring.log 2>&1"
+    user: "{{ username }}"
+  when: pezzo_alerting_enabled | default(true)
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alerting log directory
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/pezzo/alerts"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert escalation configuration
+  ansible.builtin.template:
+    src: alert_escalation.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/alert_escalation.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert routing configuration
+  ansible.builtin.template:
+    src: alert_routing.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/alert_routing.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert suppression configuration
+  ansible.builtin.template:
+    src: alert_suppression.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/alert_suppression.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert aggregation configuration
+  ansible.builtin.template:
+    src: alert_aggregation.yml.j2
+    dest: "{{ pezzo_config_dir }}/alerts/alert_aggregation.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Create Pezzo alert documentation
+  ansible.builtin.template:
+    src: alerts_readme.md.j2
+    dest: "{{ pezzo_config_dir }}/alerts/README.md"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, alerts]
+
+- name: Display Pezzo alerting configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Alerting Configuration Complete:
+      - Alerting Enabled: {{ pezzo_alerting_enabled | default(true) }}
+      - Alerting Provider: {{ pezzo_alerting_provider | default('alertmanager') }}
+      - Alerting Webhook: {{ pezzo_alerting_webhook | default('http://alertmanager:9093/api/v1/alerts') }}
+      - AlertManager Config: {{ pezzo_config_dir }}/alerts/alertmanager.yml
+      - Prometheus Alerts: {{ pezzo_config_dir }}/alerts/prometheus_alerts.yml
+      - Notification Templates: {{ pezzo_config_dir }}/alerts/notification_templates.yml
+      - Alert Escalation: {{ pezzo_config_dir }}/alerts/alert_escalation.yml
+      - Alert Routing: {{ pezzo_config_dir }}/alerts/alert_routing.yml
+      - Alert Suppression: {{ pezzo_config_dir }}/alerts/alert_suppression.yml
+      - Alert Aggregation: {{ pezzo_config_dir }}/alerts/alert_aggregation.yml
+      - Alerting Script: {{ pezzo_config_dir }}/alerting.sh
+      - Test Alerts: {{ pezzo_config_dir }}/test_alerts.sh
+      - Alert History: {{ pezzo_config_dir }}/alert_history.sh
+      - Configuration: {{ pezzo_config_dir }}/alerts/
+      - Logs: {{ logs_dir }}/pezzo/alerts/
+  tags: [pezzo, alerts] 

@@ -1,0 +1,233 @@
+version: '3.8'
+
+networks:
+  {{ immich_network_name }}:
+    external: {{ immich_network_external | lower }}
+
+services:
+  # Immich Server
+  {% if immich_components.server.enabled | default(true) %}
+  immich-server:
+    image: "{{ immich_components.server.image }}"
+    container_name: "{{ immich_components.server.container_name }}"
+    restart: "{{ immich_container_restart_policy }}"
+    networks:
+      - "{{ immich_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in immich_components.server.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in immich_components.server.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ immich_ports.server }}:{{ immich_ports.server }}"
+    labels:
+      - "traefik.enable={{ 'true' if immich_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.immich-server.rule=Host(`{{ immich_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.immich-server.entrypoints=websecure"
+      - "traefik.http.routers.immich-server.tls.certresolver={{ immich_traefik_ssl_resolver }}"
+      - "traefik.http.services.immich-server.loadbalancer.server.port={{ immich_ports.server }}"
+      - "traefik.http.routers.immich-server.middlewares={{ immich_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "immich.prometheus.scrape=true"
+      - "immich.prometheus.port={{ immich_ports.server }}"
+      - "immich.prometheus.path=/metrics"
+      # Loki scraping label
+      - "immich.loki.scrape=true"
+    healthcheck:
+      test: {{ immich_components.server.healthcheck.test }}
+      interval: "{{ immich_components.server.healthcheck.interval }}"
+      timeout: "{{ immich_components.server.healthcheck.timeout }}"
+      retries: {{ immich_components.server.healthcheck.retries }}
+    depends_on:
+      {% for dependency in immich_components.server.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ immich_components.server.resources.limits.cpus }}'
+          memory: {{ immich_components.server.resources.limits.memory }}
+        reservations:
+          cpus: '{{ immich_components.server.resources.reservations.cpus }}'
+          memory: {{ immich_components.server.resources.reservations.memory }}
+  {% endif %}
+
+  # Immich Web
+  {% if immich_components.web.enabled | default(true) %}
+  immich-web:
+    image: "{{ immich_components.web.image }}"
+    container_name: "{{ immich_components.web.container_name }}"
+    restart: "{{ immich_container_restart_policy }}"
+    networks:
+      - "{{ immich_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in immich_components.web.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in immich_components.web.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ immich_ports.web }}:{{ immich_ports.web }}"
+    labels:
+      - "traefik.enable={{ 'true' if immich_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.immich-web.rule=Host(`{{ immich_subdomain }}.{{ domain }}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.immich-web.entrypoints=websecure"
+      - "traefik.http.routers.immich-web.tls.certresolver={{ immich_traefik_ssl_resolver }}"
+      - "traefik.http.services.immich-web.loadbalancer.server.port={{ immich_ports.web }}"
+      - "traefik.http.routers.immich-web.middlewares={{ immich_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "immich.prometheus.scrape=true"
+      - "immich.prometheus.port={{ immich_ports.web }}"
+      - "immich.prometheus.path=/metrics"
+      # Loki scraping label
+      - "immich.loki.scrape=true"
+    healthcheck:
+      test: {{ immich_components.web.healthcheck.test }}
+      interval: "{{ immich_components.web.healthcheck.interval }}"
+      timeout: "{{ immich_components.web.healthcheck.timeout }}"
+      retries: {{ immich_components.web.healthcheck.retries }}
+    depends_on:
+      {% for dependency in immich_components.web.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ immich_components.web.resources.limits.cpus }}'
+          memory: {{ immich_components.web.resources.limits.memory }}
+        reservations:
+          cpus: '{{ immich_components.web.resources.reservations.cpus }}'
+          memory: {{ immich_components.web.resources.reservations.memory }}
+  {% endif %}
+
+  # Immich PostgreSQL Database
+  {% if immich_components.postgres.enabled | default(true) %}
+  immich-postgres:
+    image: "{{ immich_components.postgres.image }}"
+    container_name: "{{ immich_components.postgres.container_name }}"
+    restart: "{{ immich_container_restart_policy }}"
+    networks:
+      - "{{ immich_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in immich_components.postgres.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in immich_components.postgres.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "immich.prometheus.scrape=true"
+      - "immich.prometheus.port=5432"
+      # Loki scraping label
+      - "immich.loki.scrape=true"
+    healthcheck:
+      test: {{ immich_components.postgres.healthcheck.test }}
+      interval: "{{ immich_components.postgres.healthcheck.interval }}"
+      timeout: "{{ immich_components.postgres.healthcheck.timeout }}"
+      retries: {{ immich_components.postgres.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ immich_components.postgres.resources.limits.cpus }}'
+          memory: {{ immich_components.postgres.resources.limits.memory }}
+        reservations:
+          cpus: '{{ immich_components.postgres.resources.reservations.cpus }}'
+          memory: {{ immich_components.postgres.resources.reservations.memory }}
+  {% endif %}
+
+  # Immich Redis Cache
+  {% if immich_components.redis.enabled | default(true) %}
+  immich-redis:
+    image: "{{ immich_components.redis.image }}"
+    container_name: "{{ immich_components.redis.container_name }}"
+    restart: "{{ immich_container_restart_policy }}"
+    networks:
+      - "{{ immich_network_name }}"
+    command: "{{ immich_components.redis.command }}"
+    volumes:
+      {% for volume in immich_components.redis.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "immich.prometheus.scrape=true"
+      - "immich.prometheus.port=6379"
+      # Loki scraping label
+      - "immich.loki.scrape=true"
+    healthcheck:
+      test: {{ immich_components.redis.healthcheck.test }}
+      interval: "{{ immich_components.redis.healthcheck.interval }}"
+      timeout: "{{ immich_components.redis.healthcheck.timeout }}"
+      retries: {{ immich_components.redis.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ immich_components.redis.resources.limits.cpus }}'
+          memory: {{ immich_components.redis.resources.limits.memory }}
+        reservations:
+          cpus: '{{ immich_components.redis.resources.reservations.cpus }}'
+          memory: {{ immich_components.redis.resources.reservations.memory }}
+  {% endif %}
+
+  # Immich Machine Learning
+  {% if immich_components.machine_learning.enabled | default(true) %}
+  immich-machine-learning:
+    image: "{{ immich_components.machine_learning.image }}"
+    container_name: "{{ immich_components.machine_learning.container_name }}"
+    restart: "{{ immich_container_restart_policy }}"
+    networks:
+      - "{{ immich_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in immich_components.machine_learning.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in immich_components.machine_learning.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ immich_ports.machine_learning }}:{{ immich_ports.machine_learning }}"
+    labels:
+      # Prometheus scraping labels
+      - "immich.prometheus.scrape=true"
+      - "immich.prometheus.port={{ immich_ports.machine_learning }}"
+      - "immich.prometheus.path=/metrics"
+      # Loki scraping label
+      - "immich.loki.scrape=true"
+    healthcheck:
+      test: {{ immich_components.machine_learning.healthcheck.test }}
+      interval: "{{ immich_components.machine_learning.healthcheck.interval }}"
+      timeout: "{{ immich_components.machine_learning.healthcheck.timeout }}"
+      retries: {{ immich_components.machine_learning.healthcheck.retries }}
+    depends_on:
+      {% for dependency in immich_components.machine_learning.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ immich_components.machine_learning.resources.limits.cpus }}'
+          memory: {{ immich_components.machine_learning.resources.limits.memory }}
+        reservations:
+          cpus: '{{ immich_components.machine_learning.resources.reservations.cpus }}'
+          memory: {{ immich_components.machine_learning.resources.reservations.memory }}
+  {% endif %} 

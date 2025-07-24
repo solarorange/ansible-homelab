@@ -1,0 +1,52 @@
+---
+# Vaultwarden Deployment
+# Production-ready Ansible tasks for Vaultwarden password manager deployment
+
+- name: Include Vaultwarden deployment tasks
+  block:
+    - name: Validate Vaultwarden configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [vaultwarden, validation]
+
+    - name: Setup Vaultwarden prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [vaultwarden, setup]
+
+    - name: Configure Vaultwarden variables
+      ansible.builtin.include_tasks: configure.yml
+      tags: [vaultwarden, config]
+
+    - name: Deploy Vaultwarden services
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [vaultwarden, deploy]
+
+    - name: Configure Vaultwarden monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: vaultwarden_monitoring_enabled | default(true)
+      tags: [vaultwarden, monitoring]
+
+    - name: Configure Vaultwarden security
+      ansible.builtin.include_tasks: security.yml
+      tags: [vaultwarden, security]
+
+    - name: Configure Vaultwarden backup
+      ansible.builtin.include_tasks: backup.yml
+      when: vaultwarden_backup_enabled | default(true)
+      tags: [vaultwarden, backup]
+
+    - name: Configure Vaultwarden homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: vaultwarden_homepage_enabled | default(true)
+      tags: [vaultwarden, homepage]
+
+    - name: Configure Vaultwarden alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: vaultwarden_alerting_enabled | default(true)
+      tags: [vaultwarden, alerts]
+
+    - name: Validate Vaultwarden deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [vaultwarden, validation]
+
+  when: vaultwarden_enabled | default(true)
+  tags: [vaultwarden, always] 

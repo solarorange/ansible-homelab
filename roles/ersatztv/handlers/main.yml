@@ -1,0 +1,94 @@
+---
+# ErsatzTV Service Handlers
+# Handlers for ErsatzTV service management
+
+- name: restart ersatztv
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart ersatztv"
+
+- name: reload ersatztv
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: started
+    restart: yes
+  listen: "reload ersatztv"
+
+- name: stop ersatztv
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: stopped
+  listen: "stop ersatztv"
+
+- name: start ersatztv
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: started
+  listen: "start ersatztv"
+
+- name: restart docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  listen: "restart docker"
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  listen: "reload systemd"
+
+- name: restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  listen: "restart fail2ban"
+
+- name: restart crowdsec
+  ansible.builtin.service:
+    name: crowdsec
+    state: restarted
+  listen: "restart crowdsec"
+
+- name: restart traefik
+  community.docker.docker_container:
+    name: traefik
+    state: started
+    restart: yes
+  listen: "restart traefik"
+
+- name: restart homepage
+  community.docker.docker_container:
+    name: homepage
+    state: started
+    restart: yes
+  listen: "restart homepage"
+
+- name: restart prometheus
+  community.docker.docker_container:
+    name: prometheus
+    state: started
+    restart: yes
+  listen: "restart prometheus"
+
+- name: restart grafana
+  community.docker.docker_container:
+    name: grafana
+    state: started
+    restart: yes
+  listen: "restart grafana"
+
+- name: restart loki
+  community.docker.docker_container:
+    name: loki
+    state: started
+    restart: yes
+  listen: "restart loki"
+
+- name: restart alertmanager
+  community.docker.docker_container:
+    name: alertmanager
+    state: started
+    restart: yes
+  listen: "restart alertmanager" 

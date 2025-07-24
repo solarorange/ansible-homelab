@@ -1,0 +1,126 @@
+---
+# DumbAssets Alerting Tasks
+# Configure alerting and notification systems
+
+- name: Create DumbAssets Prometheus alerting rules
+  ansible.builtin.template:
+    src: prometheus-alerts.yml.j2
+    dest: "{{ docker_config_root }}/prometheus/rules/dumbassets-alerts.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload prometheus
+  register: dumbassets_prometheus_alerts
+  tags: [dumbassets, alerts, prometheus]
+
+- name: Create DumbAssets Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ docker_config_root }}/alertmanager/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload alertmanager
+  register: dumbassets_alertmanager_config
+  tags: [dumbassets, alerts, alertmanager]
+
+- name: Create DumbAssets notification templates
+  ansible.builtin.template:
+    src: notification-templates.yml.j2
+    dest: "{{ docker_config_root }}/alertmanager/templates/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload alertmanager
+  register: dumbassets_notification_templates
+  tags: [dumbassets, alerts, templates]
+
+- name: Create DumbAssets Discord notification configuration
+  ansible.builtin.template:
+    src: discord-notifications.yml.j2
+    dest: "{{ docker_config_root }}/notifications/discord/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_discord_notifications
+  tags: [dumbassets, alerts, discord]
+
+- name: Create DumbAssets email notification configuration
+  ansible.builtin.template:
+    src: email-notifications.yml.j2
+    dest: "{{ docker_config_root }}/notifications/email/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_email_notifications
+  tags: [dumbassets, alerts, email]
+
+- name: Create DumbAssets Slack notification configuration
+  ansible.builtin.template:
+    src: slack-notifications.yml.j2
+    dest: "{{ docker_config_root }}/notifications/slack/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_slack_notifications
+  tags: [dumbassets, alerts, slack]
+
+- name: Create DumbAssets Telegram notification configuration
+  ansible.builtin.template:
+    src: telegram-notifications.yml.j2
+    dest: "{{ docker_config_root }}/notifications/telegram/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_telegram_notifications
+  tags: [dumbassets, alerts, telegram]
+
+- name: Create DumbAssets webhook notification configuration
+  ansible.builtin.template:
+    src: webhook-notifications.yml.j2
+    dest: "{{ docker_config_root }}/notifications/webhook/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_webhook_notifications
+  tags: [dumbassets, alerts, webhook]
+
+- name: Configure DumbAssets alerting thresholds
+  ansible.builtin.template:
+    src: alerting-thresholds.yml.j2
+    dest: "{{ docker_config_root }}/monitoring/thresholds/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  register: dumbassets_alerting_thresholds
+  tags: [dumbassets, alerts, thresholds]
+
+- name: Create DumbAssets alerting escalation rules
+  ansible.builtin.template:
+    src: escalation-rules.yml.j2
+    dest: "{{ docker_config_root }}/alertmanager/escalations/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload alertmanager
+  register: dumbassets_escalation_rules
+  tags: [dumbassets, alerts, escalation]
+
+- name: Display DumbAssets alerting configuration summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Alerting Configuration Summary:
+      - Prometheus Alerts: {{ dumbassets_prometheus_alerts.changed }}
+      - Alertmanager Config: {{ dumbassets_alertmanager_config.changed }}
+      - Notification Templates: {{ dumbassets_notification_templates.changed }}
+      - Discord Notifications: {{ dumbassets_discord_notifications.changed }}
+      - Email Notifications: {{ dumbassets_email_notifications.changed }}
+      - Slack Notifications: {{ dumbassets_slack_notifications.changed }}
+      - Telegram Notifications: {{ dumbassets_telegram_notifications.changed }}
+      - Webhook Notifications: {{ dumbassets_webhook_notifications.changed }}
+      - Alerting Thresholds: {{ dumbassets_alerting_thresholds.changed }}
+      - Escalation Rules: {{ dumbassets_escalation_rules.changed }}
+      - Critical Alerts: {{ dumbassets_alerting_critical }}
+      - Warning Alerts: {{ dumbassets_alerting_warning }}
+      - Info Alerts: {{ dumbassets_alerting_info }}
+  tags: [dumbassets, alerts, summary] 

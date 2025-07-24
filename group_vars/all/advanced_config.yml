@@ -13,7 +13,7 @@ ansible_ssh_pipelining: true
 ansible_gather_timeout: 30
 ansible_command_timeout: 60
 
-# Resource optimization
+# Enhanced resource optimization
 resource_limits:
   max_concurrent_containers: 20
   max_concurrent_backups: 3
@@ -22,8 +22,69 @@ resource_limits:
   memory_threshold: 85
   disk_io_threshold: 70
   network_bandwidth_limit: "100M"
+  
+  # Enhanced container resource limits
+  container_limits:
+    # Critical services (high priority)
+    critical:
+      cpu_limit: "1.0"
+      cpu_reservation: "0.5"
+      memory_limit: "1G"
+      memory_reservation: "512M"
+      pids_limit: 100
+      services:
+        - traefik
+        - authentik
+        - prometheus
+        - grafana
+        - postgresql
+        - redis
+    
+    # High-performance services
+    high_performance:
+      cpu_limit: "2.0"
+      cpu_reservation: "1.0"
+      memory_limit: "2G"
+      memory_reservation: "1G"
+      pids_limit: 200
+      services:
+        - jellyfin
+        - plex
+        - emby
+        - tdarr
+        - immich
+    
+    # Standard services
+    standard:
+      cpu_limit: "1.0"
+      cpu_reservation: "0.25"
+      memory_limit: "512M"
+      memory_reservation: "256M"
+      pids_limit: 50
+      services:
+        - sonarr
+        - radarr
+        - lidarr
+        - readarr
+        - prowlarr
+        - bazarr
+        - sabnzbd
+        - qbittorrent
+    
+    # Background services (low priority)
+    background:
+      cpu_limit: "0.5"
+      cpu_reservation: "0.1"
+      memory_limit: "256M"
+      memory_reservation: "128M"
+      pids_limit: 25
+      services:
+        - watchtower
+        - backup
+        - utilities
+        - monitoring_agents
 
-# Docker optimization
+# Enhanced Docker optimization
 docker_optimization:
   storage_driver: overlay2
   log_driver: json-file
@@ -33,9 +94,52 @@ docker_optimization:
     nofile:
       soft: 65536
       hard: 65536
+    nproc:
+      soft: 32768
+      hard: 32768
+    core:
+      soft: 0
+      hard: 0
   live_restore: true
   userland_proxy: false
   experimental: false
+  
+  # Enhanced resource management
+  resource_management:
+    # CPU scheduling
+    cpu_scheduling:
+      cpu_period: 100000
+      cpu_quota: 100000
+      cpu_shares: 1024
+      cpu_rt_runtime: 950000
+      cpu_rt_period: 1000000
+    
+    # Memory management
+    memory_management:
+      memory_swap: "2G"
+      memory_swappiness: 10
+      kernel_memory: "128M"
+      memory_reservation: "256M"
+    
+    # I/O management
+    io_management:
+      blkio_weight: 500
+      blkio_weight_device: []
+      device_read_bps: []
+      device_write_bps: []
+      device_read_iops: []
+      device_write_iops: []
+    
+    # Network management
+    network_management:
+      network_mode: bridge
+      dns: ["8.8.8.8", "8.8.4.4"]
+      dns_search: []
+      dns_opt: []
+      extra_hosts: []
+      ipc_mode: private
+      uts_mode: private
+      pid_mode: private
 
 #==============================================================================
 # CONDITIONAL EXECUTION
@@ -46,28 +150,33 @@ host_capabilities:
   # Auto-detect based on system resources
   auto_detect_resources: true
   
-  # Minimum requirements for each role
+  # Enhanced minimum requirements for each role
   minimum_requirements:
     security:
       memory: "512M"
       cpu_cores: 1
       disk_space: "1G"
+      network_bandwidth: "10M"
     databases:
       memory: "1G"
       cpu_cores: 2
       disk_space: "5G"
+      network_bandwidth: "50M"
     storage:
       memory: "1G"
       cpu_cores: 2
       disk_space: "10G"
+      network_bandwidth: "100M"
     media:
       memory: "2G"
       cpu_cores: 4
       disk_space: "20G"
+      network_bandwidth: "500M"
     logging:
       memory: "1G"
       cpu_cores: 2
       disk_space: "5G"
+      network_bandwidth: "50M"
 
 # Smart conditional execution
 conditional_execution:

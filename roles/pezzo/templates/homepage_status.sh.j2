@@ -1,0 +1,114 @@
+#!/bin/bash
+# Pezzo Homepage Status Check Script
+# Monitors Pezzo service status and updates Homepage
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/homepage"
+DOMAIN="{{ domain }}"
+PEZZO_SUBDOMAIN="{{ pezzo_subdomain }}"
+STATUS_FILE="$LOGS_DIR/status.json"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOGS_DIR/status.log"
+}
+
+# Function to check Pezzo API health
+check_pezzo_api() {
+    local url="https://$PEZZO_SUBDOMAIN.$DOMAIN/api/healthz"
+    local response=$(curl -f -s -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    local status_code="${response: -3}"
+    
+    if [ "$status_code" = "200" ]; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check Pezzo console
+check_pezzo_console() {
+    local url="https://$PEZZO_SUBDOMAIN.$DOMAIN"
+    local response=$(curl -f -s -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    local status_code="${response: -3}"
+    
+    if [ "$status_code" = "200" ]; then
+        echo "online"
+    else
+        echo "offline"
+    fi
+}
+
+# Function to check Docker containers
+check_pezzo_containers() {
+    local containers=("pezzo-server" "pezzo-console" "pezzo-postgres" "pezzo-redis" "pezzo-clickhouse")
+    local all_running=true
+    
+    for container in "${containers[@]}"; do
+        if ! docker ps --format "table {{.Names}}" | grep -q "^$container$"; then
+            all_running=false
+            break
+        fi
+    done
+    
+    if [ "$all_running" = true ]; then
+        echo "running"
+    else
+        echo "stopped"
+    fi
+}
+
+# Function to generate status JSON
+generate_status_json() {
+    local api_status=$(check_pezzo_api)
+    local console_status=$(check_pezzo_console)
+    local containers_status=$(check_pezzo_containers)
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    cat > "$STATUS_FILE" << EOF
+{
+  "timestamp": "$timestamp",
+  "service": "pezzo",
+  "status": {
+    "api": "$api_status",
+    "console": "$console_status",
+    "containers": "$containers_status"
+  },
+  "overall": "$(if [ "$api_status" = "healthy" ] && [ "$console_status" = "online" ] && [ "$containers_status" = "running" ]; then echo "healthy"; else echo "unhealthy"; fi)"
+}
+EOF
+}
+
+# Function to update Homepage if needed
+update_homepage() {
+    if [ -f "$PEZZO_CONFIG_DIR/homepage_integration.sh" ]; then
+        log "Updating Homepage configuration"
+        "$PEZZO_CONFIG_DIR/homepage_integration.sh" > /dev/null 2>&1 || log "Warning: Homepage update failed"
+    fi
+}
+
+# Main execution
+main() {
+    log "Starting Pezzo status check"
+    
+    # Generate status JSON
+    generate_status_json
+    
+    # Log status
+    overall_status=$(jq -r '.overall' "$STATUS_FILE" 2>/dev/null || echo "unknown")
+    log "Pezzo overall status: $overall_status"
+    
+    # Update Homepage if status changed
+    update_homepage
+    
+    log "Pezzo status check completed"
+}
+
+# Execute main function
+main "$@" 

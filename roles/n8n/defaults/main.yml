@@ -1,0 +1,232 @@
+---
+# n8n Configuration
+# Production-ready defaults for n8n workflow automation deployment
+
+# Service Configuration
+n8n_enabled: true
+n8n_version: "{{ n8n_version | default('latest') }}"
+n8n_network_name: "n8n"
+n8n_network_external: true
+
+# Container Configuration
+n8n_container_restart_policy: "unless-stopped"
+n8n_container_network_mode: "bridge"
+
+# Port Configuration
+n8n_port: 5678
+
+# Domain Configuration
+n8n_subdomain: "n8n"
+
+# Authentication Configuration
+n8n_auth_enabled: true
+n8n_auth_method: "authentik"  # Options: authentik, basic, none
+n8n_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+
+# Database Configuration
+n8n_database_type: "postgresql"
+n8n_database_host: "n8n-postgres"
+n8n_database_port: 5432
+n8n_database_name: "{{ n8n_database_name | default('n8n') }}"
+n8n_database_user: "{{ n8n_database_user | default('postgres') }}"
+n8n_database_password: "{{ vault_n8n_postgres_password | default('') }}"
+
+# Service Components
+n8n_components:
+  app:
+    enabled: true
+    image: "n8nio/n8n:latest"
+    container_name: "n8n-app"
+    port: 5678
+    volumes:
+      - "{{ docker_dir }}/n8n/app:/home/node/.n8n"
+      - "{{ logs_dir }}/n8n/app:/home/node/.n8n/logs"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST={{ n8n_database_host }}
+      - DB_POSTGRESDB_PORT={{ n8n_database_port }}
+      - DB_POSTGRESDB_DATABASE={{ n8n_database_name }}
+      - DB_POSTGRESDB_USER={{ n8n_database_user }}
+      - DB_POSTGRESDB_PASSWORD={{ n8n_database_password }}
+      - N8N_BASIC_AUTH_ACTIVE={{ 'true' if n8n_auth_method == 'basic' else 'false' }}
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD={{ vault_n8n_admin_password | default('') }}
+      - N8N_HOST={{ n8n_subdomain }}.{{ domain }}
+      - N8N_PORT={{ n8n_port }}
+      - N8N_PROTOCOL=https
+      - N8N_USER_MANAGEMENT_DISABLED={{ 'true' if n8n_auth_method == 'authentik' else 'false' }}
+      - N8N_ENCRYPTION_KEY={{ vault_n8n_encryption_key | default('') }}
+      - N8N_LOG_LEVEL={{ n8n_log_level | default('info') }}
+      - N8N_DIAGNOSTICS_ENABLED={{ n8n_diagnostics_enabled | default(false) }}
+      - N8N_TEMPLATES_ENABLED={{ n8n_templates_enabled | default(true) }}
+      - N8N_ONBOARDING_FLOW_DISABLED={{ not n8n_onboarding_enabled | default(true) }}
+      - N8N_PERSONALIZATION_ENABLED={{ n8n_personalization_enabled | default(false) }}
+      - N8N_EMAIL_MODE=smtp
+      - N8N_SMTP_HOST={{ n8n_smtp_host | default('') }}
+      - N8N_SMTP_PORT={{ n8n_smtp_port | default(587) }}
+      - N8N_SMTP_USER={{ n8n_smtp_user | default('') }}
+      - N8N_SMTP_PASS={{ n8n_smtp_pass | default('') }}
+      - N8N_SMTP_SENDER={{ n8n_smtp_sender | default('') }}
+      - TZ={{ timezone }}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    depends_on:
+      - n8n-postgres
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        cpus: '0.5'
+        memory: 512M
+
+  postgres:
+    enabled: true
+    image: "postgres:15-alpine"
+    container_name: "n8n-postgres"
+    volumes:
+      - "{{ docker_dir }}/n8n/postgres:/var/lib/postgresql/data"
+      - "{{ logs_dir }}/n8n/postgres:/logs"
+    environment:
+      - POSTGRES_USER={{ n8n_database_user }}
+      - POSTGRES_PASSWORD={{ n8n_database_password }}
+      - POSTGRES_DB={{ n8n_database_name }}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ n8n_database_user }}"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    resources:
+      limits:
+        cpus: '1'
+        memory: 1G
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+
+# Monitoring Integration
+n8n_monitoring_enabled: true
+n8n_metrics_enabled: true
+n8n_health_check_enabled: true
+n8n_health_check_interval: "{{ n8n_health_check_interval | default(30) }}"
+
+# Security Configuration
+n8n_security_headers: true
+n8n_rate_limiting: true
+n8n_rate_limit_requests: "{{ n8n_rate_limit_requests | default(100) }}"
+n8n_rate_limit_window: "{{ n8n_rate_limit_window | default(60) }}"
+n8n_cors_enabled: "{{ n8n_cors_enabled | default(false) }}"
+n8n_cors_origins: "{{ n8n_cors_origins | default([]) }}"
+n8n_allow_anonymous_access: "{{ n8n_allow_anonymous_access | default(false) }}"
+
+# Backup Configuration
+n8n_backup_enabled: true
+n8n_backup_schedule: "{{ n8n_backup_schedule | default('0 3 * * *') }}"  # Daily at 3 AM
+n8n_backup_retention: "{{ n8n_backup_retention | default(7) }}"  # Keep backups for 7 days
+n8n_backup_compression: "{{ n8n_backup_compression | default(true) }}"
+n8n_backup_include_database: "{{ n8n_backup_include_database | default(true) }}"
+n8n_backup_include_config: "{{ n8n_backup_include_config | default(true) }}"
+n8n_backup_dir: "{{ backup_dir }}/n8n"
+n8n_backup_retention_days: "{{ n8n_backup_retention_days | default(7) }}"
+n8n_backup_log_file: "{{ logs_dir }}/n8n/backup/backup.log"
+n8n_backup_max_log_size: "{{ n8n_backup_max_log_size | default('10M') }}"
+n8n_backup_notifications_enabled: "{{ n8n_backup_notifications_enabled | default(true) }}"
+
+# Logging Configuration
+n8n_log_level: "{{ n8n_log_level | default('info') }}"  # Options: debug, info, warn, error
+n8n_log_format: "{{ n8n_log_format | default('json') }}"
+n8n_log_retention: "{{ n8n_log_retention | default(30) }}"  # Days
+n8n_log_rotation: true
+n8n_health_check_log_file: "{{ logs_dir }}/n8n/health/health.log"
+n8n_health_check_max_log_size: "{{ n8n_health_check_max_log_size | default('10M') }}"
+n8n_health_check_retention_days: "{{ n8n_health_check_retention_days | default(7) }}"
+n8n_health_check_timeout: "{{ n8n_health_check_timeout | default(30) }}"
+
+# Resource Limits
+n8n_memory_limit: "4g"
+n8n_cpu_limit: "2.0"
+n8n_storage_limit: "100g"
+
+# Traefik Configuration
+n8n_traefik_enabled: true
+n8n_traefik_network: "{{ traefik_network | default('homelab') }}"
+n8n_traefik_middleware: "secure-headers,compress"
+n8n_traefik_auth_middleware: "authentik@docker"
+n8n_traefik_ssl_enabled: true
+n8n_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+
+# Homepage Integration
+n8n_homepage_enabled: true
+n8n_homepage_category: "{{ n8n_homepage_category | default('Automation') }}"
+n8n_homepage_description: "{{ n8n_homepage_description | default('Workflow Automation & Integration Platform') }}"
+n8n_homepage_icon: "n8n.png"
+n8n_homepage_widget_enabled: "{{ n8n_homepage_widget_enabled | default(true) }}"
+
+# Telegraf Integration
+n8n_telegraf_enabled: true
+n8n_telegraf_metrics: true
+n8n_telegraf_logs: true
+
+# Prometheus Integration
+n8n_prometheus_enabled: true
+n8n_prometheus_metrics: true
+n8n_prometheus_scrape_interval: "{{ n8n_prometheus_scrape_interval | default(30) }}"
+
+# Grafana Integration
+n8n_grafana_enabled: true
+n8n_grafana_dashboard: true
+n8n_grafana_datasource: "prometheus"
+
+# Loki Integration
+n8n_loki_enabled: true
+n8n_loki_logs: true
+
+# Alerting Configuration
+n8n_alerting_enabled: true
+n8n_alerting_provider: "{{ n8n_alerting_provider | default('alertmanager') }}"
+n8n_alerting_webhook: "{{ n8n_alerting_webhook | default('http://alertmanager:9093/api/v1/alerts') }}"
+
+# CrowdSec Integration
+n8n_crowdsec_enabled: true
+n8n_crowdsec_collections:
+  - "crowdsecurity/nginx"
+  - "crowdsecurity/http-cve"
+
+# Fail2ban Integration
+n8n_fail2ban_enabled: true
+n8n_fail2ban_jail: "{{ n8n_fail2ban_jail | default('n8n') }}"
+n8n_fail2ban_max_retry: "{{ n8n_fail2ban_max_retry | default(5) }}"
+n8n_fail2ban_bantime: "{{ n8n_fail2ban_bantime | default(3600) }}"
+
+# Service Dependencies
+n8n_dependencies:
+  - "docker"
+  - "traefik"
+  - "monitoring_infrastructure"
+
+# Health Check Configuration
+n8n_health_check_url: "/healthz"
+n8n_health_check_timeout: 10
+n8n_health_check_retries: 3
+
+# Service configuration directories
+n8n_config_dir: "{{ docker_dir }}/n8n"
+n8n_app_config_dir: "{{ docker_dir }}/n8n/app"
+n8n_postgres_config_dir: "{{ docker_dir }}/n8n/postgres"
+
+# Service container names
+n8n_app_container_name: "n8n-app"
+n8n_postgres_container_name: "n8n-postgres"
+
+# Service ports
+n8n_app_port: 5678
+
+# Email Configuration (Optional)
+n8n_smtp_host: "{{ vault_n8n_smtp_host | default('') }}"
+n8n_smtp_port: "{{ vault_n8n_smtp_port | default(587) }}"
+n8n_smtp_user: "{{ vault_n8n_smtp_user | default('') }}"
+n8n_smtp_pass: "{{ vault_n8n_smtp_pass | default('') }}"
+n8n_smtp_sender: "{{ vault_n8n_smtp_sender | default('') }}" 

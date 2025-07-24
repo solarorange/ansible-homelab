@@ -1,0 +1,113 @@
+---
+# Pezzo Homepage Integration Tasks
+# Configure Homepage integration for Pezzo services
+
+- name: Create Pezzo Homepage configuration directory
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}/homepage"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage service configuration
+  ansible.builtin.template:
+    src: homepage_service.yml.j2
+    dest: "{{ pezzo_config_dir }}/homepage/service.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_homepage_enabled | default(true)
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage widget configuration
+  ansible.builtin.template:
+    src: homepage_widget.yml.j2
+    dest: "{{ pezzo_config_dir }}/homepage/widget.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_homepage_widget_enabled | default(true)
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage bookmark configuration
+  ansible.builtin.template:
+    src: homepage_bookmarks.yml.j2
+    dest: "{{ pezzo_config_dir }}/homepage/bookmarks.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage icon
+  ansible.builtin.copy:
+    src: "{{ pezzo_homepage_icon | default('pezzo.png') }}"
+    dest: "{{ pezzo_config_dir }}/homepage/{{ pezzo_homepage_icon | default('pezzo.png') }}"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage integration script
+  ansible.builtin.template:
+    src: homepage_integration.sh.j2
+    dest: "{{ pezzo_config_dir }}/homepage_integration.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage status check script
+  ansible.builtin.template:
+    src: homepage_status.sh.j2
+    dest: "{{ pezzo_config_dir }}/homepage_status.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Setup Pezzo Homepage status monitoring cron job
+  ansible.builtin.cron:
+    name: "Pezzo Homepage Status Update"
+    minute: "*/5"
+    job: "{{ pezzo_config_dir }}/homepage_status.sh >> {{ logs_dir }}/pezzo/homepage/status.log 2>&1"
+    user: "{{ username }}"
+  when: pezzo_homepage_enabled | default(true)
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage log directory
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/pezzo/homepage"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Create Pezzo Homepage configuration documentation
+  ansible.builtin.template:
+    src: homepage_readme.md.j2
+    dest: "{{ pezzo_config_dir }}/homepage/README.md"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, homepage]
+
+- name: Display Pezzo Homepage configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Homepage Integration Complete:
+      - Homepage Enabled: {{ pezzo_homepage_enabled | default(true) }}
+      - Widget Enabled: {{ pezzo_homepage_widget_enabled | default(true) }}
+      - Category: {{ pezzo_homepage_category | default('AI & Development') }}
+      - Description: {{ pezzo_homepage_description | default('AI Prompt Management & Analytics Platform') }}
+      - Icon: {{ pezzo_homepage_icon | default('pezzo.png') }}
+      - Service Config: {{ pezzo_config_dir }}/homepage/service.yml
+      - Widget Config: {{ pezzo_config_dir }}/homepage/widget.yml
+      - Bookmarks: {{ pezzo_config_dir }}/homepage/bookmarks.yml
+      - Integration Script: {{ pezzo_config_dir }}/homepage_integration.sh
+      - Status Script: {{ pezzo_config_dir }}/homepage_status.sh
+      - Configuration: {{ pezzo_config_dir }}/homepage/
+      - Logs: {{ logs_dir }}/pezzo/homepage/
+  tags: [pezzo, homepage] 

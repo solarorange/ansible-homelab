@@ -1,0 +1,90 @@
+---
+# Reconya Prerequisites Setup
+# Create required directories and set up dependencies
+
+- name: Create Reconya directories
+  block:
+    - name: Create Reconya configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya data directory
+      ansible.builtin.file:
+        path: "{{ reconya_data_dir }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya logs directory
+      ansible.builtin.file:
+        path: "{{ reconya_logs_dir }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya backup directory
+      ansible.builtin.file:
+        path: "{{ reconya_backup_dir }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: reconya_backup_enabled | default(true)
+
+    - name: Create Reconya health check log directory
+      ansible.builtin.file:
+        path: "{{ reconya_health_check_log_file | dirname }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: reconya_health_check_enabled | default(true)
+
+  tags: [reconya, setup]
+
+- name: Install Reconya dependencies
+  block:
+    - name: Install nmap for network scanning
+      ansible.builtin.package:
+        name: nmap
+        state: present
+      become: true
+
+    - name: Set nmap capabilities for MAC address detection
+      ansible.builtin.file:
+        path: /usr/bin/nmap
+        mode: "u+s"
+        owner: root
+        group: root
+      become: true
+
+    - name: Install curl for health checks
+      ansible.builtin.package:
+        name: curl
+        state: present
+      become: true
+
+  tags: [reconya, setup]
+
+- name: Configure Reconya network access
+  block:
+    - name: Ensure Docker network exists
+      community.docker.docker_network:
+        name: "{{ reconya_network_name }}"
+        state: present
+        external: "{{ reconya_network_external }}"
+
+    - name: Verify network scanning capabilities
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.selinux.status == "disabled" or ansible_facts.selinux.status == "permissive"
+        fail_msg: "SELinux must be disabled or permissive for network scanning"
+        success_msg: "SELinux configuration is compatible"
+
+  tags: [reconya, setup] 

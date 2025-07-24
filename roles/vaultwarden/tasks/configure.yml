@@ -1,0 +1,252 @@
+---
+# Vaultwarden Configuration Tasks
+# Automatically configures all required variables for seamless setup
+
+- name: Generate Vaultwarden admin token if not provided
+  ansible.builtin.set_fact:
+    vaultwarden_admin_token: "{{ vault_vaultwarden_admin_token | default('') }}"
+  when: vault_vaultwarden_admin_token is not defined or vault_vaultwarden_admin_token == ''
+
+- name: Generate secure admin token for Vaultwarden
+  ansible.builtin.set_fact:
+    vaultwarden_admin_token: "{{ vault_vaultwarden_admin_token }}"
+  when: vaultwarden_admin_token == ''
+
+- name: Generate PostgreSQL password if using PostgreSQL and not provided
+  ansible.builtin.set_fact:
+    vaultwarden_postgres_password: "{{ vault_vaultwarden_postgres_password | default('') }}"
+  when: vaultwarden_database_type == 'postgresql' and (vault_vaultwarden_postgres_password is not defined or vault_vaultwarden_postgres_password == '')
+
+- name: Generate secure PostgreSQL password for Vaultwarden
+  ansible.builtin.set_fact:
+    vaultwarden_postgres_password: "{{ vault_vaultwarden_postgres_password }}"
+  when: vaultwarden_database_type == 'postgresql' and vaultwarden_postgres_password == ''
+
+- name: Configure Vaultwarden SMTP settings if provided
+  ansible.builtin.set_fact:
+    vaultwarden_smtp_configured: "{{ vaultwarden_smtp_host is defined and vaultwarden_smtp_host != '' }}"
+  when: vaultwarden_smtp_host is defined
+
+- name: Set default SMTP configuration
+  ansible.builtin.set_fact:
+    vaultwarden_smtp_host: "{{ vaultwarden_smtp_host | default('') }}"
+    vaultwarden_smtp_from: "{{ vaultwarden_smtp_from | default('vaultwarden@' + domain) }}"
+    vaultwarden_smtp_port: "{{ vaultwarden_smtp_port | default('587') }}"
+    vaultwarden_smtp_ssl: "{{ vaultwarden_smtp_ssl | default('true') }}"
+    vaultwarden_smtp_username: "{{ vaultwarden_smtp_username | default('') }}"
+    vaultwarden_smtp_password: "{{ vaultwarden_smtp_password | default('') }}"
+
+- name: Generate Homepage API key for Vaultwarden if not provided
+  ansible.builtin.set_fact:
+    vaultwarden_homepage_api_key: "{{ vault_homepage_api_keys.vaultwarden | default('') }}"
+  when: vaultwarden_homepage_enabled and (vault_homepage_api_keys.vaultwarden is not defined or vault_homepage_api_keys.vaultwarden == '')
+
+- name: Generate secure Homepage API key for Vaultwarden
+  ansible.builtin.set_fact:
+    vaultwarden_homepage_api_key: "{{ vault_homepage_api_key }}"
+  when: vaultwarden_homepage_enabled and vaultwarden_homepage_api_key == ''
+
+- name: Configure Vaultwarden domain settings
+  ansible.builtin.set_fact:
+    vaultwarden_domain: "https://{{ vaultwarden_subdomain }}.{{ domain }}"
+    vaultwarden_internal_domain: "http://{{ vaultwarden_app_container_name }}:{{ vaultwarden_port }}"
+
+- name: Configure Vaultwarden database URL
+  ansible.builtin.set_fact:
+    vaultwarden_database_url: "{{ 'postgresql://' + vaultwarden_database_user + ':' + vaultwarden_postgres_password + '@' + vaultwarden_database_host + ':' + vaultwarden_database_port | string + '/' + vaultwarden_database_name if vaultwarden_database_type == 'postgresql' else 'data/db.sqlite3' }}"
+
+- name: Configure Vaultwarden backup settings
+  ansible.builtin.set_fact:
+    vaultwarden_backup_include_attachments: "{{ vaultwarden_backup_include_attachments | default(true) }}"
+    vaultwarden_backup_include_database: "{{ vaultwarden_backup_include_database | default(true) }}"
+    vaultwarden_backup_include_config: "{{ vaultwarden_backup_include_config | default(true) }}"
+
+- name: Configure Vaultwarden monitoring settings
+  ansible.builtin.set_fact:
+    vaultwarden_prometheus_port: "{{ prometheus_port | default(9090) }}"
+    vaultwarden_grafana_port: "{{ grafana_port | default(3000) }}"
+    vaultwarden_alertmanager_port: "{{ alertmanager_port | default(9093) }}"
+
+- name: Configure Vaultwarden security settings
+  ansible.builtin.set_fact:
+    vaultwarden_cors_origins: "{{ vaultwarden_cors_origins | default([]) }}"
+    vaultwarden_allow_anonymous_access: "{{ vaultwarden_allow_anonymous_access | default(false) }}"
+
+- name: Configure Vaultwarden resource limits
+  ansible.builtin.set_fact:
+    vaultwarden_memory_limit: "{{ vaultwarden_memory_limit | default('1G') }}"
+    vaultwarden_cpu_limit: "{{ vaultwarden_cpu_limit | default('1.0') }}"
+
+- name: Configure Vaultwarden logging settings
+  ansible.builtin.set_fact:
+    vaultwarden_log_level: "{{ vaultwarden_log_level | default('info') }}"
+    vaultwarden_log_format: "{{ vaultwarden_log_format | default('json') }}"
+
+- name: Configure Vaultwarden alerting settings
+  ansible.builtin.set_fact:
+    vaultwarden_alerting_webhook: "{{ vaultwarden_alerting_webhook | default('http://alertmanager:' + (alertmanager_port | default(9093) | string) + '/api/v1/alerts') }}"
+
+- name: Display Vaultwarden configuration summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN CONFIGURATION SUMMARY
+      ========================================
+      
+      Service Configuration:
+      - Domain: {{ vaultwarden_domain }}
+      - Subdomain: {{ vaultwarden_subdomain }}.{{ domain }}
+      - Port: {{ vaultwarden_port }}
+      - WebSocket Port: {{ vaultwarden_websocket_port }}
+      
+      Database Configuration:
+      - Type: {{ vaultwarden_database_type }}
+      - URL: {{ vaultwarden_database_url }}
+      {% if vaultwarden_database_type == 'postgresql' %}
+      - Host: {{ vaultwarden_database_host }}
+      - Port: {{ vaultwarden_database_port }}
+      - Database: {{ vaultwarden_database_name }}
+      - User: {{ vaultwarden_database_user }}
+      - Password: {{ 'SET' if vaultwarden_postgres_password else 'NOT SET' }}
+      {% endif %}
+      
+      Authentication:
+      - Admin Token: {{ 'SET' if vaultwarden_admin_token else 'NOT SET' }}
+      - Auth Method: {{ vaultwarden_auth_method }}
+      - Admin Email: {{ vaultwarden_admin_email }}
+      
+      SMTP Configuration:
+      - Host: {{ vaultwarden_smtp_host if vaultwarden_smtp_host else 'NOT CONFIGURED' }}
+      - From: {{ vaultwarden_smtp_from }}
+      - Port: {{ vaultwarden_smtp_port }}
+      - SSL: {{ vaultwarden_smtp_ssl }}
+      
+      Integration:
+      - Homepage API Key: {{ 'SET' if vaultwarden_homepage_api_key else 'NOT SET' }}
+      - Monitoring: {{ 'ENABLED' if vaultwarden_monitoring_enabled else 'DISABLED' }}
+      - Backup: {{ 'ENABLED' if vaultwarden_backup_enabled else 'DISABLED' }}
+      - Alerting: {{ 'ENABLED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+      
+      Security:
+      - SSL: {{ 'ENABLED' if vaultwarden_ssl_enabled else 'DISABLED' }}
+      - Security Headers: {{ 'ENABLED' if vaultwarden_security_headers else 'DISABLED' }}
+      - Rate Limiting: {{ 'ENABLED' if vaultwarden_rate_limiting else 'DISABLED' }}
+      - CORS: {{ 'ENABLED' if vaultwarden_cors_enabled else 'DISABLED' }}
+      
+      ========================================
+  tags: [vaultwarden, vaultwarden-config, summary] 
+
+- name: Create Vaultwarden secrets directory
+  ansible.builtin.file:
+    path: "{{ vaultwarden_config_dir }}/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+  tags: [vaultwarden, vaultwarden-config, secrets]
+
+- name: Save Vaultwarden admin token to secure file
+  ansible.builtin.copy:
+    content: |
+      # Vaultwarden Admin Token
+      # Generated on {{ ansible_date_time.iso8601 }}
+      # 
+      # This token is required for admin access to Vaultwarden
+      # Store this securely and do not share
+      #
+      ADMIN_TOKEN={{ vaultwarden_admin_token }}
+    dest: "{{ vaultwarden_config_dir }}/secrets/admin_token.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: vaultwarden_admin_token != ''
+  tags: [vaultwarden, vaultwarden-config, secrets]
+
+- name: Save Vaultwarden PostgreSQL password to secure file
+  ansible.builtin.copy:
+    content: |
+      # Vaultwarden PostgreSQL Password
+      # Generated on {{ ansible_date_time.iso8601 }}
+      # 
+      # This password is used for the PostgreSQL database
+      # Store this securely and do not share
+      #
+      POSTGRES_PASSWORD={{ vaultwarden_postgres_password }}
+    dest: "{{ vaultwarden_config_dir }}/secrets/postgres_password.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: vaultwarden_database_type == 'postgresql' and vaultwarden_postgres_password != ''
+  tags: [vaultwarden, vaultwarden-config, secrets]
+
+- name: Save Vaultwarden Homepage API key to secure file
+  ansible.builtin.copy:
+    content: |
+      # Vaultwarden Homepage API Key
+      # Generated on {{ ansible_date_time.iso8601 }}
+      # 
+      # This key is used for Homepage integration
+      # Store this securely and do not share
+      #
+      HOMEPAGE_API_KEY={{ vaultwarden_homepage_api_key }}
+    dest: "{{ vaultwarden_config_dir }}/secrets/homepage_api_key.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: vaultwarden_homepage_enabled and vaultwarden_homepage_api_key != ''
+  tags: [vaultwarden, vaultwarden-config, secrets]
+
+- name: Create Vaultwarden configuration summary file
+  ansible.builtin.copy:
+    content: |
+      # Vaultwarden Configuration Summary
+      # Generated on {{ ansible_date_time.iso8601 }}
+      #
+      # Service Configuration
+      DOMAIN={{ vaultwarden_domain }}
+      SUBDOMAIN={{ vaultwarden_subdomain }}.{{ domain }}
+      PORT={{ vaultwarden_port }}
+      WEBSOCKET_PORT={{ vaultwarden_websocket_port }}
+      
+      # Database Configuration
+      DATABASE_TYPE={{ vaultwarden_database_type }}
+      DATABASE_URL={{ vaultwarden_database_url }}
+      {% if vaultwarden_database_type == 'postgresql' %}
+      DATABASE_HOST={{ vaultwarden_database_host }}
+      DATABASE_PORT={{ vaultwarden_database_port }}
+      DATABASE_NAME={{ vaultwarden_database_name }}
+      DATABASE_USER={{ vaultwarden_database_user }}
+      {% endif %}
+      
+      # Authentication
+      AUTH_METHOD={{ vaultwarden_auth_method }}
+      ADMIN_EMAIL={{ vaultwarden_admin_email }}
+      
+      # SMTP Configuration
+      SMTP_HOST={{ vaultwarden_smtp_host }}
+      SMTP_FROM={{ vaultwarden_smtp_from }}
+      SMTP_PORT={{ vaultwarden_smtp_port }}
+      SMTP_SSL={{ vaultwarden_smtp_ssl }}
+      
+      # Integration
+      HOMEPAGE_ENABLED={{ vaultwarden_homepage_enabled }}
+      MONITORING_ENABLED={{ vaultwarden_monitoring_enabled }}
+      BACKUP_ENABLED={{ vaultwarden_backup_enabled }}
+      ALERTING_ENABLED={{ vaultwarden_alerting_enabled }}
+      
+      # Security
+      SSL_ENABLED={{ vaultwarden_ssl_enabled }}
+      SECURITY_HEADERS={{ vaultwarden_security_headers }}
+      RATE_LIMITING={{ vaultwarden_rate_limiting }}
+      CORS_ENABLED={{ vaultwarden_cors_enabled }}
+      
+      # Directories
+      CONFIG_DIR={{ vaultwarden_config_dir }}
+      DATA_DIR={{ vaultwarden_data_dir }}
+      BACKUP_DIR={{ vaultwarden_backup_dir }}
+      LOGS_DIR={{ logs_dir }}/vaultwarden
+    dest: "{{ vaultwarden_config_dir }}/config_summary.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [vaultwarden, vaultwarden-config, summary] 

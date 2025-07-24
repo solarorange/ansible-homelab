@@ -1,0 +1,130 @@
+---
+# Vaultwarden Prerequisites
+# Ensures all required dependencies and system configurations are in place
+
+- name: Check Vaultwarden system requirements
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= 2048
+      - ansible_processor_cores >= 2
+      - ansible_distribution in ['Ubuntu', 'Debian', 'CentOS', 'RedHat', 'Rocky', 'AlmaLinux']
+    fail_msg: "System does not meet Vaultwarden requirements. Minimum: 2GB RAM, 2 CPU cores, supported Linux distribution"
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Ensure required packages are installed
+  ansible.builtin.package:
+    name:
+      - curl
+      - wget
+      - jq
+      - sqlite3
+    state: present
+  tags: [vaultwarden, vaultwarden-setup, packages]
+
+- name: Check Docker availability
+  ansible.builtin.command: docker --version
+  register: docker_version_check
+  changed_when: false
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-setup, docker]
+
+- name: Fail if Docker is not available
+  ansible.builtin.fail:
+    msg: "Docker is required for Vaultwarden deployment but is not installed or not accessible"
+  when: docker_version_check.rc != 0
+  tags: [vaultwarden, vaultwarden-setup, docker]
+
+- name: Check Docker Compose availability
+  ansible.builtin.command: docker-compose --version
+  register: docker_compose_version_check
+  changed_when: false
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-setup, docker]
+
+- name: Fail if Docker Compose is not available
+  ansible.builtin.fail:
+    msg: "Docker Compose is required for Vaultwarden deployment but is not installed or not accessible"
+  when: docker_compose_version_check.rc != 0
+  tags: [vaultwarden, vaultwarden-setup, docker]
+
+- name: Validate Vaultwarden configuration variables
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_enabled is defined
+      - vaultwarden_subdomain is defined
+      - vaultwarden_port is defined
+      - vaultwarden_config_dir is defined
+      - vaultwarden_data_dir is defined
+      - vaultwarden_backup_dir is defined
+    fail_msg: "Required Vaultwarden configuration variables are not defined"
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Check for port conflicts
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ vaultwarden_port }}"
+    timeout: 1
+  register: port_check
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Warn about port conflicts
+  ansible.builtin.debug:
+    msg: "Warning: Port {{ vaultwarden_port }} is already in use. This may cause deployment issues."
+  when: port_check.elapsed > 0
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Ensure required directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}"
+    - "{{ data_dir }}"
+    - "{{ backup_dir }}"
+    - "{{ logs_dir }}"
+  tags: [vaultwarden, vaultwarden-setup, directories]
+
+- name: Check available disk space
+  ansible.builtin.stat:
+    path: "{{ vaultwarden_data_dir | dirname }}"
+  register: disk_space_check
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Ensure sufficient disk space
+  ansible.builtin.assert:
+    that:
+      - disk_space_check.stat.exists
+    fail_msg: "Data directory does not exist or is not accessible"
+  tags: [vaultwarden, vaultwarden-setup, validation]
+
+- name: Display Vaultwarden prerequisites status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN PREREQUISITES STATUS
+      ========================================
+      
+      System Requirements:
+      - Memory: {{ ansible_memtotal_mb }}MB (Required: 2048MB)
+      - CPU Cores: {{ ansible_processor_cores }} (Required: 2)
+      - Distribution: {{ ansible_distribution }}
+      
+      Docker Status:
+      - Docker: {{ 'AVAILABLE' if docker_version_check.rc == 0 else 'NOT AVAILABLE' }}
+      - Docker Compose: {{ 'AVAILABLE' if docker_compose_version_check.rc == 0 else 'NOT AVAILABLE' }}
+      
+      Configuration:
+      - Enabled: {{ vaultwarden_enabled }}
+      - Subdomain: {{ vaultwarden_subdomain }}.{{ domain }}
+      - Port: {{ vaultwarden_port }}
+      - Database Type: {{ vaultwarden_database_type }}
+      
+      Directories:
+      - Config: {{ vaultwarden_config_dir }}
+      - Data: {{ vaultwarden_data_dir }}
+      - Backup: {{ vaultwarden_backup_dir }}
+      
+      ========================================
+  tags: [vaultwarden, vaultwarden-setup, summary] 

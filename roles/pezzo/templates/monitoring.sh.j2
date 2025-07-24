@@ -1,0 +1,223 @@
+#!/bin/bash
+# Pezzo Monitoring Script
+# Collects and reports monitoring data for Pezzo services
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/monitoring"
+MONITORING_LOG="$LOGS_DIR/monitoring.log"
+METRICS_FILE="$LOGS_DIR/metrics.json"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$MONITORING_LOG"
+}
+
+# Function to get container stats
+get_container_stats() {
+    local container_name="$1"
+    local stats=$(docker stats --no-stream --format "json" "$container_name" 2>/dev/null || echo "{}")
+    echo "$stats"
+}
+
+# Function to get container logs count
+get_log_count() {
+    local container_name="$1"
+    local log_count=$(docker logs --since 1h "$container_name" 2>/dev/null | wc -l)
+    echo "$log_count"
+}
+
+# Function to get service response time
+get_response_time() {
+    local url="$1"
+    local service_name="$2"
+    
+    local start_time=$(date +%s.%N)
+    if curl -f -s --max-time 10 "$url" > /dev/null 2>&1; then
+        local end_time=$(date +%s.%N)
+        local response_time=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+        echo "$response_time"
+    else
+        echo "0"
+    fi
+}
+
+# Function to get database metrics
+get_database_metrics() {
+    local container_name="pezzo-postgres"
+    
+    # Get connection count
+    local connections=$(docker exec "$container_name" psql -U {{ pezzo_database_user }} -d {{ pezzo_database_name }} -t -c "SELECT count(*) FROM pg_stat_activity;" 2>/dev/null || echo "0")
+    
+    # Get database size
+    local db_size=$(docker exec "$container_name" psql -U {{ pezzo_database_user }} -d {{ pezzo_database_name }} -t -c "SELECT pg_size_pretty(pg_database_size('{{ pezzo_database_name }}'));" 2>/dev/null || echo "0")
+    
+    echo "{\"connections\": $connections, \"size\": \"$db_size\"}"
+}
+
+# Function to get Redis metrics
+get_redis_metrics() {
+    local container_name="pezzo-redis"
+    
+    # Get memory usage
+    local memory=$(docker exec "$container_name" redis-cli info memory | grep "used_memory_human:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    
+    # Get connected clients
+    local clients=$(docker exec "$container_name" redis-cli info clients | grep "connected_clients:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    
+    echo "{\"memory\": \"$memory\", \"clients\": $clients}"
+}
+
+# Function to get ClickHouse metrics
+get_clickhouse_metrics() {
+    local container_name="pezzo-clickhouse"
+    
+    # Get table count
+    local table_count=$(docker exec "$container_name" clickhouse-client --query "SELECT count() FROM system.tables WHERE database = 'default';" 2>/dev/null || echo "0")
+    
+    # Get database size
+    local db_size=$(docker exec "$container_name" clickhouse-client --query "SELECT formatReadableSize(sum(bytes)) FROM system.parts WHERE active;" 2>/dev/null || echo "0")
+    
+    echo "{\"tables\": $table_count, \"size\": \"$db_size\"}"
+}
+
+# Function to collect all metrics
+collect_metrics() {
+    log "Collecting Pezzo monitoring metrics"
+    
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local metrics="{}"
+    
+    # Container stats
+    local server_stats=$(get_container_stats "pezzo-server")
+    local console_stats=$(get_container_stats "pezzo-console")
+    local postgres_stats=$(get_container_stats "pezzo-postgres")
+    local redis_stats=$(get_container_stats "pezzo-redis")
+    local clickhouse_stats=$(get_container_stats "pezzo-clickhouse")
+    
+    # Service response times
+    local api_response_time=$(get_response_time "https://{{ pezzo_subdomain }}.{{ domain }}/api/healthz" "API")
+    local console_response_time=$(get_response_time "https://{{ pezzo_subdomain }}.{{ domain }}" "Console")
+    
+    # Database metrics
+    local db_metrics=$(get_database_metrics)
+    local redis_metrics=$(get_redis_metrics)
+    local clickhouse_metrics=$(get_clickhouse_metrics)
+    
+    # Log counts
+    local server_logs=$(get_log_count "pezzo-server")
+    local console_logs=$(get_log_count "pezzo-console")
+    local postgres_logs=$(get_log_count "pezzo-postgres")
+    local redis_logs=$(get_log_count "pezzo-redis")
+    
+    # Build metrics JSON
+    metrics=$(cat << EOF
+{
+  "timestamp": "$timestamp",
+  "service": "pezzo",
+  "containers": {
+    "server": $server_stats,
+    "console": $console_stats,
+    "postgres": $postgres_stats,
+    "redis": $redis_stats,
+    "clickhouse": $clickhouse_stats
+  },
+  "response_times": {
+    "api": $api_response_time,
+    "console": $console_response_time
+  },
+  "databases": {
+    "postgres": $db_metrics,
+    "redis": $redis_metrics,
+    "clickhouse": $clickhouse_metrics
+  },
+  "logs": {
+    "server": $server_logs,
+    "console": $console_logs,
+    "postgres": $postgres_logs,
+    "redis": $redis_logs
+  }
+}
+EOF
+)
+    
+    # Save metrics to file
+    echo "$metrics" > "$METRICS_FILE"
+    log "Metrics collected and saved to $METRICS_FILE"
+}
+
+# Function to send metrics to monitoring system
+send_metrics() {
+    if [ -f "$METRICS_FILE" ]; then
+        # Send to Prometheus if available
+        if curl -f -s "http://prometheus:9090/-/healthy" > /dev/null 2>&1; then
+            log "Sending metrics to Prometheus"
+            # Implementation depends on Prometheus pushgateway or similar
+        fi
+        
+        # Send to InfluxDB if available
+        if curl -f -s "http://influxdb:8086/ping" > /dev/null 2>&1; then
+            log "Sending metrics to InfluxDB"
+            # Implementation depends on InfluxDB configuration
+        fi
+    fi
+}
+
+# Function to generate monitoring report
+generate_report() {
+    log "Generating monitoring report"
+    
+    if [ -f "$METRICS_FILE" ]; then
+        local report_file="$LOGS_DIR/report_$(date +%Y%m%d_%H%M%S).txt"
+        
+        cat > "$report_file" << EOF
+Pezzo Monitoring Report
+Generated: $(date)
+========================================
+
+Container Status:
+$(docker ps --filter "name=pezzo" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}")
+
+Service Health:
+- API Response Time: $(jq -r '.response_times.api' "$METRICS_FILE" 2>/dev/null || echo "N/A") seconds
+- Console Response Time: $(jq -r '.response_times.console' "$METRICS_FILE" 2>/dev/null || echo "N/A") seconds
+
+Database Status:
+- PostgreSQL: $(jq -r '.databases.postgres.connections' "$METRICS_FILE" 2>/dev/null || echo "N/A") connections
+- Redis: $(jq -r '.databases.redis.clients' "$METRICS_FILE" 2>/dev/null || echo "N/A") clients
+- ClickHouse: $(jq -r '.databases.clickhouse.tables' "$METRICS_FILE" 2>/dev/null || echo "N/A") tables
+
+Log Activity (last hour):
+- Server: $(jq -r '.logs.server' "$METRICS_FILE" 2>/dev/null || echo "N/A") lines
+- Console: $(jq -r '.logs.console' "$METRICS_FILE" 2>/dev/null || echo "N/A") lines
+- PostgreSQL: $(jq -r '.logs.postgres' "$METRICS_FILE" 2>/dev/null || echo "N/A") lines
+- Redis: $(jq -r '.logs.redis' "$METRICS_FILE" 2>/dev/null || echo "N/A") lines
+EOF
+        
+        log "Report generated: $report_file"
+    fi
+}
+
+# Main monitoring function
+main_monitoring() {
+    log "Starting Pezzo monitoring"
+    
+    # Collect metrics
+    collect_metrics
+    
+    # Send metrics to monitoring systems
+    send_metrics
+    
+    # Generate report
+    generate_report
+    
+    log "Pezzo monitoring completed"
+}
+
+# Execute main monitoring function
+main_monitoring "$@" 

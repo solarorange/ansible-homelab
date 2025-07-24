@@ -1,0 +1,14 @@
+# Linkwarden Backup Schedule Configuration
+# Cron job configuration for automated backups
+
+schedule:
+  - name: "linkwarden-daily-backup"
+    cron: "{{ linkwarden_backup_schedule | default('0 2 * * *') }}"
+    command: "{{ linkwarden_config_dir }}/scripts/backup.sh"
+    enabled: {{ linkwarden_backup_enabled | default(true) | lower }}
+    retention:
+      days: {{ linkwarden_backup_retention_days | default(7) }}
+      keep_last: 10
+    notifications:
+      on_success: {{ linkwarden_backup_notifications_enabled | default(true) | lower }}
+      on_failure: {{ linkwarden_backup_notifications_enabled | default(true) | lower }} 

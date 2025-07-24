@@ -1,0 +1,48 @@
+---
+# Immich Deployment
+# Production-ready Ansible tasks for Immich photo management deployment
+
+- name: Include Immich deployment tasks
+  block:
+    - name: Validate Immich configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [immich, validation]
+
+    - name: Setup Immich prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [immich, setup]
+
+    - name: Deploy Immich services
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [immich, deploy]
+
+    - name: Configure Immich monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: immich_monitoring_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Configure Immich security
+      ansible.builtin.include_tasks: security.yml
+      tags: [immich, security]
+
+    - name: Configure Immich backup
+      ansible.builtin.include_tasks: backup.yml
+      when: immich_backup_enabled | default(true)
+      tags: [immich, backup]
+
+    - name: Configure Immich homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: immich_homepage_enabled | default(true)
+      tags: [immich, homepage]
+
+    - name: Configure Immich alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: immich_alerting_enabled | default(true)
+      tags: [immich, alerts]
+
+    - name: Validate Immich deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [immich, validation]
+
+  when: immich_enabled | default(true)
+  tags: [immich, always] 

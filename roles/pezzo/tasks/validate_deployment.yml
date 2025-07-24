@@ -1,0 +1,246 @@
+---
+# Pezzo Deployment Validation Tasks
+# Validate Pezzo deployment after completion
+
+- name: Wait for Pezzo services to be fully ready
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ item }}"
+    delay: 30
+    timeout: 600
+  loop:
+    - "{{ pezzo_server_port }}"
+    - "{{ pezzo_console_port }}"
+    - "{{ pezzo_proxy_port }}"
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo container health
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  register: container_health
+  loop:
+    - "{{ pezzo_server_container_name }}"
+    - "{{ pezzo_console_container_name }}"
+    - "{{ pezzo_proxy_container_name }}"
+    - "{{ pezzo_postgres_container_name }}"
+    - "{{ pezzo_redis_container_name }}"
+    - "{{ pezzo_clickhouse_container_name }}"
+    - "{{ pezzo_supertokens_container_name }}"
+    - "{{ pezzo_local_kms_container_name }}"
+  tags: [pezzo, validation]
+
+- name: Check Pezzo container status
+  ansible.builtin.assert:
+    that:
+      - item.container.State.Status == "running"
+      - item.container.State.Health.Status == "healthy"
+    fail_msg: "Container {{ item.container.Name }} is not healthy: {{ item.container.State.Status }} - {{ item.container.State.Health.Status }}"
+    success_msg: "Container {{ item.container.Name }} is healthy"
+  loop: "{{ container_health.results }}"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo API endpoints
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ item.port }}{{ item.path }}"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: api_test
+  loop:
+    - { port: "{{ pezzo_server_port }}", path: "/api/healthz" }
+    - { port: "{{ pezzo_console_port }}", path: "/health" }
+    - { port: "{{ pezzo_proxy_port }}", path: "/health" }
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo API responses
+  ansible.builtin.debug:
+    msg: "API endpoint {{ item.url }} returned status {{ item.status }}"
+  loop: "{{ api_test.results }}"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo database connectivity
+  ansible.builtin.command: "docker exec {{ pezzo_postgres_container_name }} pg_isready -U {{ pezzo_database_user }} -d {{ pezzo_database_name }}"
+  register: db_test
+  changed_when: false
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo database connectivity
+  ansible.builtin.assert:
+    that:
+      - db_test.rc == 0
+    fail_msg: "Database connectivity test failed"
+    success_msg: "Database connectivity test passed"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo Redis connectivity
+  ansible.builtin.command: "docker exec {{ pezzo_redis_container_name }} redis-cli ping"
+  register: redis_test
+  changed_when: false
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo Redis connectivity
+  ansible.builtin.assert:
+    that:
+      - redis_test.rc == 0
+      - "PONG" in redis_test.stdout
+    fail_msg: "Redis connectivity test failed"
+    success_msg: "Redis connectivity test passed"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo ClickHouse connectivity
+  ansible.builtin.command: "docker exec {{ pezzo_clickhouse_container_name }} clickhouse-client --query 'SELECT 1'"
+  register: clickhouse_test
+  changed_when: false
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo ClickHouse connectivity
+  ansible.builtin.assert:
+    that:
+      - clickhouse_test.rc == 0
+      - "1" in clickhouse_test.stdout
+    fail_msg: "ClickHouse connectivity test failed"
+    success_msg: "ClickHouse connectivity test passed"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo SuperTokens connectivity
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:3567/hello"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: supertokens_test
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo SuperTokens connectivity
+  ansible.builtin.assert:
+    that:
+      - supertokens_test.status == 200
+    fail_msg: "SuperTokens connectivity test failed"
+    success_msg: "SuperTokens connectivity test passed"
+  tags: [pezzo, validation]
+
+- name: Test Pezzo Local KMS connectivity
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9981/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: kms_test
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo Local KMS connectivity
+  ansible.builtin.assert:
+    that:
+      - kms_test.status == 200
+    fail_msg: "Local KMS connectivity test failed"
+    success_msg: "Local KMS connectivity test passed"
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo systemd service status
+  ansible.builtin.systemd:
+    name: pezzo
+  register: service_status
+  tags: [pezzo, validation]
+
+- name: Check Pezzo systemd service
+  ansible.builtin.assert:
+    that:
+      - service_status.status.ActiveState == "active"
+      - service_status.status.UnitFileState == "enabled"
+    fail_msg: "Pezzo systemd service is not active"
+    success_msg: "Pezzo systemd service is active and enabled"
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: config_files
+  loop:
+    - "{{ pezzo_config_dir }}/docker-compose.yml"
+    - "{{ pezzo_config_dir }}/.env"
+    - "{{ pezzo_config_dir }}/backup_full.sh"
+    - "{{ pezzo_config_dir }}/health_check.sh"
+    - "{{ pezzo_config_dir }}/manage_service.sh"
+  tags: [pezzo, validation]
+
+- name: Check Pezzo configuration files
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Configuration file {{ item.item }} does not exist"
+    success_msg: "Configuration file {{ item.item }} exists"
+  loop: "{{ config_files.results }}"
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo log directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: log_dirs
+  loop:
+    - "{{ logs_dir }}/pezzo"
+    - "{{ logs_dir }}/pezzo/server"
+    - "{{ logs_dir }}/pezzo/console"
+    - "{{ logs_dir }}/pezzo/proxy"
+    - "{{ logs_dir }}/pezzo/postgres"
+    - "{{ logs_dir }}/pezzo/redis"
+    - "{{ logs_dir }}/pezzo/clickhouse"
+    - "{{ logs_dir }}/pezzo/supertokens"
+    - "{{ logs_dir }}/pezzo/local-kms"
+  tags: [pezzo, validation]
+
+- name: Check Pezzo log directories
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Log directory {{ item.item }} does not exist"
+    success_msg: "Log directory {{ item.item }} exists"
+  loop: "{{ log_dirs.results }}"
+  tags: [pezzo, validation]
+
+- name: Verify Pezzo backup directory
+  ansible.builtin.stat:
+    path: "{{ pezzo_backup_dir }}"
+  register: backup_dir_check
+  tags: [pezzo, validation]
+
+- name: Check Pezzo backup directory
+  ansible.builtin.assert:
+    that:
+      - backup_dir_check.stat.exists
+    fail_msg: "Backup directory {{ pezzo_backup_dir }} does not exist"
+    success_msg: "Backup directory {{ pezzo_backup_dir }} exists"
+  tags: [pezzo, validation]
+
+- name: Run Pezzo comprehensive validation script
+  ansible.builtin.command: "{{ pezzo_config_dir }}/verify_service.sh"
+  register: validation_result
+  changed_when: false
+  tags: [pezzo, validation]
+
+- name: Display Pezzo validation results
+  ansible.builtin.debug:
+    msg: "{{ validation_result.stdout_lines }}"
+  tags: [pezzo, validation]
+
+- name: Display Pezzo deployment validation summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Deployment Validation Complete:
+      - All containers are running and healthy
+      - All API endpoints are responding
+      - Database connectivity verified
+      - Redis connectivity verified
+      - ClickHouse connectivity verified
+      - SuperTokens connectivity verified
+      - Local KMS connectivity verified
+      - Systemd service is active and enabled
+      - All configuration files exist
+      - All log directories exist
+      - Backup directory exists
+      - Comprehensive validation passed
+      
+      Pezzo is ready for use at:
+      - Server: https://{{ pezzo_subdomain }}.{{ domain }}
+      - Console: https://console.{{ pezzo_subdomain }}.{{ domain }}
+      - Proxy: https://proxy.{{ pezzo_subdomain }}.{{ domain }}
+  tags: [pezzo, validation] 

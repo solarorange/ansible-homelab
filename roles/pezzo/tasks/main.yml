@@ -1,0 +1,48 @@
+---
+# Pezzo Deployment
+# Production-ready Ansible tasks for Pezzo AI prompt management deployment
+
+- name: Include Pezzo deployment tasks
+  block:
+    - name: Validate Pezzo configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [pezzo, validation]
+
+    - name: Setup Pezzo prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [pezzo, setup]
+
+    - name: Deploy Pezzo services
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [pezzo, deploy]
+
+    - name: Configure Pezzo monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: pezzo_monitoring_enabled | default(true)
+      tags: [pezzo, monitoring]
+
+    - name: Configure Pezzo security
+      ansible.builtin.include_tasks: security.yml
+      tags: [pezzo, security]
+
+    - name: Configure Pezzo backup
+      ansible.builtin.include_tasks: backup.yml
+      when: pezzo_backup_enabled | default(true)
+      tags: [pezzo, backup]
+
+    - name: Configure Pezzo homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: pezzo_homepage_enabled | default(true)
+      tags: [pezzo, homepage]
+
+    - name: Configure Pezzo alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: pezzo_alerting_enabled | default(true)
+      tags: [pezzo, alerts]
+
+    - name: Validate Pezzo deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [pezzo, validation]
+
+  when: pezzo_enabled | default(true)
+  tags: [pezzo, always] 

@@ -1,0 +1,89 @@
+# n8n CrowdSec Configuration
+# CrowdSec configuration for n8n security monitoring
+
+api:
+  server:
+    listen_uri: 127.0.0.1:8080
+    profiles_path: /etc/crowdsec/profiles.yaml
+    use_forwarded_for_headers: true
+    forwarded_for_headers:
+      - X-Forwarded-For
+      - X-Real-IP
+
+common:
+  daemonize: false
+  pid_dir: /var/run/
+  log_media: stdout
+  log_level: info
+  working_dir: /etc/crowdsec/
+
+config_paths:
+  config_dir: /etc/crowdsec
+  data_dir: /var/lib/crowdsec/data/
+  simulation_path: /etc/crowdsec/simulation.yaml
+  hub_dir: /etc/crowdsec/hub/
+  index_path: /etc/crowdsec/hub/.index
+
+db_config:
+  type: sqlite
+  db_path: /var/lib/crowdsec/crowdsec.db
+  max_open_conns: 100
+
+disapi:
+  client:
+    credentials_path: /etc/crowdsec/local_api_credentials.yaml
+  server:
+    listen_uri: 127.0.0.1:6060
+    profiles_path: /etc/crowdsec/profiles.yaml
+
+plugin_config:
+  user: ""
+  group: ""
+
+prometheus:
+  enabled: true
+  listen_addr: 127.0.0.1
+  listen_port: 6060
+
+acquisition:
+  - filename: /var/log/n8n/access.log
+    labels:
+      type: n8n
+      service: n8n
+    journalctl_filter:
+      - _SYSTEMD_UNIT=n8n.service
+
+  - filename: /var/log/n8n/error.log
+    labels:
+      type: n8n_error
+      service: n8n
+    journalctl_filter:
+      - _SYSTEMD_UNIT=n8n.service
+
+collections:
+  - crowdsecurity/nginx
+  - crowdsecurity/http-cve
+  - crowdsecurity/wordpress
+  - crowdsecurity/php
+  - crowdsecurity/http-probing
+  - crowdsecurity/http-bad-user-agent
+  - crowdsecurity/http-backdoors-attempts
+  - crowdsecurity/http-path-traversal-probing
+  - crowdsecurity/http-open-proxy
+  - crowdsecurity/http-crawl-non_statics
+  - crowdsecurity/http-sensitive-files
+  - crowdsecurity/http-generic-bf
+  - crowdsecurity/http-w00tw00t
+  - crowdsecurity/http-locations
+
+scenarios:
+  - crowdsecurity/http-probing
+  - crowdsecurity/http-bad-user-agent
+  - crowdsecurity/http-backdoors-attempts
+  - crowdsecurity/http-path-traversal-probing
+  - crowdsecurity/http-open-proxy
+  - crowdsecurity/http-crawl-non_statics
+  - crowdsecurity/http-sensitive-files
+  - crowdsecurity/http-generic-bf
+  - crowdsecurity/http-w00tw00t
+  - crowdsecurity/http-locations 

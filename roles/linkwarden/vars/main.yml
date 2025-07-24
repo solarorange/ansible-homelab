@@ -1,0 +1,40 @@
+---
+# Linkwarden Role Variables
+# Role-specific variables for Linkwarden deployment
+
+# Service metadata
+linkwarden_service_name: "Linkwarden"
+linkwarden_service_description: "Self-hosted bookmark management platform"
+linkwarden_service_version: "latest"
+linkwarden_service_repository: "https://github.com/linkwarden/linkwarden"
+
+# Container images
+linkwarden_app_image: "ghcr.io/linkwarden/linkwarden:latest"
+linkwarden_postgres_image: "postgres:15-alpine"
+
+# Service ports (internal)
+linkwarden_app_internal_port: 3002
+linkwarden_postgres_internal_port: 5432
+
+# Health check endpoints
+linkwarden_health_endpoint: "/api/health"
+linkwarden_ready_endpoint: "/api/ready"
+
+# Default environment variables
+linkwarden_default_env:
+  NODE_ENV: "production"
+  TZ: "{{ timezone | default('UTC') }}"
+  PUID: "{{ PUID | default(1000) }}"
+  PGID: "{{ PGID | default(1000) }}"
+
+# Service dependencies
+linkwarden_required_services:
+  - docker
+  - traefik
+  - postgresql
+
+# Optional dependencies
+linkwarden_optional_services:
+  - authentik
+  - monitoring_stack
+  - backup_system 

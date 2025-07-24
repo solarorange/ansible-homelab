@@ -1,65 +1,108 @@
 ---
-# Security Services Validation
+# Security Validation
+# Validates security configurations for all services
 
-- name: Validate Docker installation
-  ansible.builtin.shell: docker --version
-  register: docker_version
-  failed_when: false
-  changed_when: false
+- name: Validate security configuration
+  block:
+    - name: Check for privileged containers
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "Up.*privileged" | wc -l
+      register: privileged_containers
+      changed_when: false
 
-- name: Display Docker version
-  ansible.builtin.debug:
-    msg: "Docker version: {{ docker_version.stdout }}"
+    - name: Fail if privileged containers detected
+      ansible.builtin.fail:
+        msg: "Security violation: {{ privileged_containers.stdout }} privileged containers detected"
+      when: privileged_containers.stdout | int > 0
+      tags: [validation, security, critical]
 
-- name: Validate Traefik container
-  ansible.builtin.docker_container_info:
-    name: traefik
-  register: traefik_status
-  failed_when: false
+    - name: Check for containers without security options
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "SecurityOpt"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_security
+      changed_when: false
 
-- name: Check Traefik status
-  ansible.builtin.debug:
-    msg: "Traefik status: {{ 'Running' if traefik_status.exists and traefik_status.container.State.Running else 'Not running' }}"
+    - name: Warn about containers without security options
+      ansible.builtin.debug:
+        msg: "Containers without security options: {{ containers_without_security.stdout_lines }}"
+      when: containers_without_security.stdout_lines | length > 0
 
-- name: Validate Authentik container
-  ansible.builtin.docker_container_info:
-    name: authentik
-  register: authentik_status
-  failed_when: false
+    - name: Check for containers running as root
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          user=$(docker inspect "$container" | jq -r '.[0].Config.User // "root"')
+          if [ "$user" = "root" ] || [ "$user" = "" ]; then
+            echo "$container"
+          fi
+        done
+      register: containers_as_root
+      changed_when: false
 
-- name: Check Authentik status
-  ansible.builtin.debug:
-    msg: "Authentik status: {{ 'Running' if authentik_status.exists and authentik_status.container.State.Running else 'Not running' }}"
+    - name: Warn about containers running as root
+      ansible.builtin.debug:
+        msg: "Containers running as root: {{ containers_as_root.stdout_lines }}"
+      when: containers_as_root.stdout_lines | length > 0
 
-- name: Validate Pi-hole container
-  ansible.builtin.docker_container_info:
-    name: pihole
-  register: pihole_status
-  failed_when: false
+    - name: Check for containers without read-only filesystem
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "ReadonlyRootfs.*true"; then
+            echo "$container"
+          fi
+        done
+      register: containers_not_readonly
+      changed_when: false
 
-- name: Check Pi-hole status
-  ansible.builtin.debug:
-    msg: "Pi-hole status: {{ 'Running' if pihole_status.exists and pihole_status.container.State.Running else 'Not running' }}"
+    - name: Warn about containers without read-only filesystem
+      ansible.builtin.debug:
+        msg: "Containers without read-only filesystem: {{ containers_not_readonly.stdout_lines }}"
+      when: containers_not_readonly.stdout_lines | length > 0
 
-- name: Test Traefik API
-  ansible.builtin.uri:
-    url: "http://localhost:8080/api/http/routers"
-    method: GET
-    status_code: [200, 401, 403]
-  register: traefik_api_test
-  failed_when: false
-  changed_when: false
+    - name: Check for containers without tmpfs mounts
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "Tmpfs"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_tmpfs
+      changed_when: false
 
-- name: Check Traefik API response
-  ansible.builtin.debug:
-    msg: "Traefik API status: {{ traefik_api_test.status }}"
+    - name: Warn about containers without tmpfs mounts
+      ansible.builtin.debug:
+        msg: "Containers without tmpfs mounts: {{ containers_without_tmpfs.stdout_lines }}"
+      when: containers_without_tmpfs.stdout_lines | length > 0
 
-- name: Validate firewall rules
-  ansible.builtin.shell: ufw status
-  register: firewall_status
-  failed_when: false
-  changed_when: false
+    - name: Validate Traefik security configuration
+      ansible.builtin.uri:
+        url: "http://localhost:8080/api/rawdata"
+        method: GET
+        status_code: [401, 403]
+        timeout: 10
+        validate_certs: false
+      register: traefik_api_security
+      when: "'traefik' in enabled_services"
 
-- name: Display firewall status
-  ansible.builtin.debug:
-    var: firewall_status.stdout_lines 
+    - name: Check Traefik API security
+      ansible.builtin.assert:
+        that:
+          - traefik_api_security.status in [401, 403]
+        fail_msg: "Traefik API is not properly secured"
+      when: "'traefik' in enabled_services"
+
+    - name: Check for exposed sensitive ports
+      ansible.builtin.shell: |
+        netstat -tlnp | grep -E ":(22|3306|5432|6379|27017|9200)" | wc -l
+      register: exposed_sensitive_ports
+      changed_when: false
+
+    - name: Warn about exposed sensitive ports
+      ansible.builtin.debug:
+        msg: "WARNING: {{ exposed_sensitive_ports.stdout }} sensitive ports exposed"
+      when: exposed_sensitive_ports.stdout | int > 0
+
+  tags: [validation, security] 

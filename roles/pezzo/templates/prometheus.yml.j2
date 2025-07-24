@@ -1,0 +1,62 @@
+# Pezzo Prometheus Configuration
+# Metrics scraping configuration for Pezzo services
+
+global:
+  scrape_interval: {{ pezzo_prometheus_scrape_interval | default(30) }}s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Pezzo Server metrics
+  - job_name: 'pezzo-server'
+    static_configs:
+      - targets: ['pezzo-server:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    honor_labels: true
+    labels:
+      service: 'pezzo-server'
+      environment: 'production'
+
+  # Pezzo Console metrics
+  - job_name: 'pezzo-console'
+    static_configs:
+      - targets: ['pezzo-console:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    honor_labels: true
+    labels:
+      service: 'pezzo-console'
+      environment: 'production'
+
+  # PostgreSQL metrics
+  - job_name: 'pezzo-postgres'
+    static_configs:
+      - targets: ['pezzo-postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    honor_labels: true
+    labels:
+      service: 'pezzo-postgres'
+      environment: 'production'
+
+  # Redis metrics
+  - job_name: 'pezzo-redis'
+    static_configs:
+      - targets: ['pezzo-redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    honor_labels: true
+    labels:
+      service: 'pezzo-redis'
+      environment: 'production'
+
+  # ClickHouse metrics
+  - job_name: 'pezzo-clickhouse'
+    static_configs:
+      - targets: ['pezzo-clickhouse:8123']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    honor_labels: true
+    labels:
+      service: 'pezzo-clickhouse'
+      environment: 'production' 

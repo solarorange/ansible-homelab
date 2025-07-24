@@ -45,7 +45,7 @@ echo
 echo "2. Update these key values:"
 echo "   - DOMAIN=yourdomain.com"
 echo "   - OPENWEATHER_API_KEY=your_api_key"
-echo "   - ADMIN_PASSWORD=your_secure_password"
+echo "   - ADMIN_PASSWORD={{ vault_homepage_admin_password }}"
 echo
 echo "3. Add your service API keys"
 echo

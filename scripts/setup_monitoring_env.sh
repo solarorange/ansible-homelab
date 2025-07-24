@@ -32,13 +32,13 @@ SLACK_CHANNEL=$(prompt_with_default "SLACK_CHANNEL" "#alerts" "Enter Slack chann
 
 # InfluxDB Configuration
 INFLUXDB_USERNAME=$(prompt_with_default "INFLUXDB_USERNAME" "admin" "Enter InfluxDB username")
-INFLUXDB_PASSWORD=$(prompt_with_default "INFLUXDB_PASSWORD" "changeme" "Enter InfluxDB password")
+INFLUXDB_PASSWORD={{ vault_influxdb_admin_password }}
 INFLUXDB_ORG=$(prompt_with_default "INFLUXDB_ORG" "watchtower" "Enter InfluxDB organization")
 INFLUXDB_BUCKET=$(prompt_with_default "INFLUXDB_BUCKET" "watchtower" "Enter InfluxDB bucket")
 
 # Grafana Configuration
 GRAFANA_ADMIN_USER=$(prompt_with_default "GRAFANA_ADMIN_USER" "admin" "Enter Grafana admin username")
-GRAFANA_ADMIN_PASSWORD=$(prompt_with_default "GRAFANA_ADMIN_PASSWORD" "changeme" "Enter Grafana admin password")
+GRAFANA_ADMIN_PASSWORD={{ vault_grafana_admin_password }}
 GRAFANA_DOMAIN=$(prompt_with_default "GRAFANA_DOMAIN" "grafana.local" "Enter Grafana domain")
 
 # Backup Configuration

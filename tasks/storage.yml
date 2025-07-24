@@ -95,7 +95,13 @@
           echo mq-deadline > /sys/block/{{ item }}/queue/scheduler
         fi
       loop: "{{ storage_devices.stdout_lines }}"
+      register: ssd_scheduler
       ignore_errors: true
+      
+    - name: Handle SSD scheduler errors
+      ansible.builtin.debug:
+        msg: "SSD scheduler configuration completed with warnings for some devices"
+      when: ssd_scheduler.results | selectattr('failed', 'equalto', true) | list | length > 0
 
     - name: Set I/O scheduler for HDDs (bfq)
       ansible.builtin.shell: |
@@ -103,7 +109,13 @@
           echo bfq > /sys/block/{{ item }}/queue/scheduler
         fi
       loop: "{{ storage_devices.stdout_lines }}"
+      register: hdd_scheduler
       ignore_errors: true
+      
+    - name: Handle HDD scheduler errors
+      ansible.builtin.debug:
+        msg: "HDD scheduler configuration completed with warnings for some devices"
+      when: hdd_scheduler.results | selectattr('failed', 'equalto', true) | list | length > 0
 
 - name: Configure SMART monitoring
   block:

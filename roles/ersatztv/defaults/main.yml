@@ -1,0 +1,226 @@
+---
+# ErsatzTV Configuration
+# Production-ready defaults for homelab ErsatzTV deployment
+
+# WARNING: Manual overrides for ports, certificates, or service enablement (e.g., via extra-vars or direct variable assignment)
+# can cause port conflicts, security issues, or break automation/monitoring. Avoid manual overrides unless absolutely necessary.
+# Use group_vars or role defaults for configuration. If manual overrides are detected, the playbook will require explicit confirmation.
+# See documentation for details on risks and best practices.
+
+# Service Configuration
+ersatztv_enabled: true
+ersatztv_version: "latest"
+ersatztv_network_name: "media"
+ersatztv_network_external: true
+
+# Container Configuration
+ersatztv_container_restart_policy: "unless-stopped"
+ersatztv_container_network_mode: "bridge"
+
+# Port Configuration
+ersatztv_port: 8409
+ersatztv_web_port: 8409
+
+# Domain Configuration
+ersatztv_subdomain: "ersatztv"
+ersatztv_domain: "{{ ersatztv_subdomain }}.{{ domain }}"
+
+# Image Configuration
+ersatztv_image: "ghcr.io/ersatztv/ersatztv:latest"
+ersatztv_image_pull_policy: "always"
+ersatztv_container_name: "ersatztv"
+
+# Directory Configuration
+ersatztv_config_dir: "{{ docker_root }}/ersatztv/config"
+ersatztv_data_dir: "{{ docker_root }}/ersatztv/data"
+ersatztv_logs_dir: "{{ docker_root }}/ersatztv/logs"
+ersatztv_transcode_dir: "{{ docker_root }}/ersatztv/transcode"
+ersatztv_cache_dir: "{{ docker_root }}/ersatztv/cache"
+
+# Media Library Configuration
+ersatztv_media_mounts:
+  - "{{ data_dir }}/media/movies:/media/movies:ro"
+  - "{{ data_dir }}/media/tv:/media/tv:ro"
+  - "{{ data_dir }}/media/music:/media/music:ro"
+  - "{{ data_dir }}/media/anime:/media/anime:ro"
+
+# Authentication Configuration
+ersatztv_auth_enabled: true
+ersatztv_auth_method: "authentik"  # Options: authentik, basic, none
+ersatztv_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+
+# Database Configuration
+ersatztv_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
+ersatztv_database_host: "{{ postgresql_host | default('postgresql') }}"
+ersatztv_database_port: "{{ postgresql_port | default(5432) }}"
+ersatztv_database_name: "ersatztv"
+ersatztv_database_user: "ersatztv"
+ersatztv_database_password: "{{ vault_ersatztv_database_password | default('') }}"
+
+# Hardware Acceleration Configuration
+ersatztv_hardware_acceleration: "none"  # Options: none, vaapi, nvenc, qsv
+ersatztv_vaapi_device: "/dev/dri/renderD128"
+ersatztv_nvidia_runtime: false
+ersatztv_nvidia_visible_devices: "all"
+
+# Transcoding Configuration
+ersatztv_transcode_enabled: true
+ersatztv_transcode_threads: 2
+ersatztv_transcode_quality: "medium"  # Options: low, medium, high
+ersatztv_transcode_format: "h264"  # Options: h264, h265, vp9
+
+# Streaming Configuration
+ersatztv_streaming_mode: "mpegts"  # Options: mpegts, hls
+ersatztv_streaming_quality: "720p"  # Options: 480p, 720p, 1080p
+ersatztv_streaming_bitrate: "2000k"
+ersatztv_streaming_framerate: 30
+
+# Channel Configuration
+ersatztv_channels_enabled: true
+ersatztv_default_channel_count: 10
+ersatztv_channel_scheduling: "random"  # Options: random, chronological, smart
+
+# Filler Content Configuration
+ersatztv_filler_enabled: true
+ersatztv_preroll_enabled: true
+ersatztv_midroll_enabled: true
+ersatztv_postroll_enabled: true
+ersatztv_filler_duration: 30  # seconds
+
+# Subtitle Configuration
+ersatztv_subtitles_enabled: true
+ersatztv_subtitle_burn_in: false
+ersatztv_subtitle_language: "eng"
+
+# Traefik Configuration
+ersatztv_traefik_enabled: true
+ersatztv_traefik_ssl_resolver: "cloudflare"
+ersatztv_traefik_auth_enabled: true
+ersatztv_traefik_network: "homelab"
+
+# Monitoring Configuration
+ersatztv_monitoring_enabled: true
+ersatztv_prometheus_enabled: true
+ersatztv_prometheus_port: 8409
+ersatztv_prometheus_path: "/metrics"
+ersatztv_healthcheck_enabled: true
+ersatztv_healthcheck_interval: "30s"
+ersatztv_healthcheck_timeout: "10s"
+ersatztv_healthcheck_retries: 3
+ersatztv_healthcheck_start_period: "40s"
+
+# Security Configuration
+ersatztv_security_enabled: true
+ersatztv_security_headers_enabled: true
+ersatztv_cors_enabled: true
+ersatztv_cors_origins: "*"
+ersatztv_rate_limiting_enabled: true
+ersatztv_rate_limit_requests: 100
+ersatztv_rate_limit_window: "1m"
+
+# Backup Configuration
+ersatztv_backup_enabled: true
+ersatztv_backup_retention: 30
+ersatztv_backup_schedule: "0 2 * * *"
+ersatztv_backup_include_logs: true
+ersatztv_backup_include_cache: false
+
+# Logging Configuration
+ersatztv_logging_enabled: true
+ersatztv_log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+ersatztv_log_rotation_enabled: true
+ersatztv_log_rotation_max_size: "100M"
+ersatztv_log_rotation_max_files: 10
+
+# Resource Configuration
+ersatztv_resources:
+  limits:
+    cpus: '2'
+    memory: 4G
+  reservations:
+    cpus: '0.5'
+    memory: 1G
+
+# Environment Variables
+ersatztv_environment:
+  - "TZ={{ timezone }}"
+  - "PUID={{ user_id | default(1000) }}"
+  - "PGID={{ group_id | default(1000) }}"
+  - "ERSATZTV_LOG_LEVEL={{ ersatztv_log_level }}"
+  - "ERSATZTV_TRANSCODE_THREADS={{ ersatztv_transcode_threads }}"
+  - "ERSATZTV_STREAMING_MODE={{ ersatztv_streaming_mode }}"
+  - "ERSATZTV_STREAMING_QUALITY={{ ersatztv_streaming_quality }}"
+  - "ERSATZTV_STREAMING_BITRATE={{ ersatztv_streaming_bitrate }}"
+  - "ERSATZTV_STREAMING_FRAMERATE={{ ersatztv_streaming_framerate }}"
+
+# Homepage Integration
+ersatztv_homepage_enabled: true
+ersatztv_homepage_group: "Media"
+ersatztv_homepage_icon: "ersatztv.png"
+ersatztv_homepage_description: "Custom Live TV Channels"
+ersatztv_homepage_widget: "ersatztv"
+
+# Alerting Configuration
+ersatztv_alerting_enabled: true
+ersatztv_alerting_channels:
+  - email
+  - slack
+  - discord
+ersatztv_alerting_conditions:
+  - service_down
+  - high_cpu_usage
+  - high_memory_usage
+  - transcoding_errors
+  - stream_errors
+
+# Performance Configuration
+ersatztv_performance_monitoring: true
+ersatztv_performance_metrics:
+  - cpu_usage
+  - memory_usage
+  - disk_usage
+  - network_usage
+  - transcoding_performance
+  - stream_quality
+
+# Integration Configuration
+ersatztv_plex_integration: false
+ersatztv_plex_url: ""
+ersatztv_plex_token: ""
+
+ersatztv_jellyfin_integration: false
+ersatztv_jellyfin_url: ""
+ersatztv_jellyfin_api_key: ""
+
+ersatztv_emby_integration: false
+ersatztv_emby_url: ""
+ersatztv_emby_api_key: ""
+
+# Advanced Configuration
+ersatztv_advanced_enabled: false
+ersatztv_advanced_options:
+  enable_debug: false
+  enable_profiling: false
+  enable_tracing: false
+  custom_ffmpeg_args: ""
+  custom_streaming_args: ""
+
+# Validation Configuration
+ersatztv_validation_enabled: true
+ersatztv_validation_timeout: 300
+ersatztv_validation_retries: 3
+ersatztv_validation_checks:
+  - service_health
+  - web_interface
+  - api_endpoints
+  - transcoding
+  - streaming
+
+# Maintenance Configuration
+ersatztv_maintenance_enabled: true
+ersatztv_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM Sunday
+ersatztv_maintenance_tasks:
+  - cleanup_logs
+  - cleanup_cache
+  - optimize_database
+  - update_metadata 

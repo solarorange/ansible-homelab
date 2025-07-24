@@ -36,10 +36,17 @@
     content: |
       #!/bin/bash
       
-      # Wait for InfluxDB to be ready
-      until curl -s http://localhost:8086/health; do
-        echo "Waiting for InfluxDB to be ready..."
-        sleep 5
+      # Wait for InfluxDB to be ready with proper timeout
+      timeout=60
+      counter=0
+      until curl -s http://localhost:8086/health > /dev/null 2>&1; do
+        echo "Waiting for InfluxDB to be ready... (${counter}/${timeout}s)"
+        sleep 1
+        counter=$((counter + 1))
+        if [ $counter -ge $timeout ]; then
+          echo "Timeout waiting for InfluxDB to be ready"
+          exit 1
+        fi
       done
       
       # Create initial setup if not already done

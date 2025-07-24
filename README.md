@@ -162,13 +162,15 @@ A comprehensive, production-ready homelab automation solution built with Ansible
 
 ## 🚀 **Deployment Options**
 
-### **Quick Deployment**
+### **Quick Deployment (Enhanced)**
 ```bash
 # 1. Clone and setup
 git clone https://github.com/yourusername/ansible_homelab.git
 cd ansible_homelab
 ./scripts/seamless_setup.sh
 ```
+
+> **🚀 NEW: Enhanced Seamless Setup** - The enhanced setup provides **100% automatic variable handling** with **zero manual configuration required**. See [ENHANCED_SETUP_README.md](ENHANCED_SETUP_README.md) for details.
 
 ### **Manual Deployment**
 ```bash

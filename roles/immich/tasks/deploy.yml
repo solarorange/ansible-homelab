@@ -1,0 +1,118 @@
+---
+# Deploy Immich Services
+# Production-ready deployment tasks for Immich
+
+- name: Deploy Immich services
+  block:
+    - name: Generate Immich Docker Compose configuration
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ immich_config_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, deploy]
+
+    - name: Generate Immich environment file
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ immich_config_dir }}/.env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [immich, deploy]
+
+    - name: Generate Immich Traefik configuration
+      ansible.builtin.template:
+        src: traefik.yml.j2
+        dest: "{{ immich_config_dir }}/traefik.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_traefik_enabled | default(true)
+      tags: [immich, deploy]
+
+    - name: Pull Immich Docker images
+      community.docker.docker_image:
+        name: "{{ item.image }}"
+        source: pull
+        force_source: yes
+      loop:
+        - "{{ immich_components.server }}"
+        - "{{ immich_components.web }}"
+        - "{{ immich_components.postgres }}"
+        - "{{ immich_components.redis }}"
+        - "{{ immich_components.machine_learning }}"
+      tags: [immich, deploy]
+
+    - name: Stop existing Immich containers
+      community.docker.docker_compose:
+        project_src: "{{ immich_config_dir }}"
+        state: absent
+      tags: [immich, deploy]
+
+    - name: Deploy Immich services
+      community.docker.docker_compose:
+        project_src: "{{ immich_config_dir }}"
+        state: present
+        pull: yes
+        build: no
+        remove_orphans: yes
+      tags: [immich, deploy]
+
+    - name: Wait for Immich services to be ready
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ immich_ports.server }}"
+        delay: 10
+        timeout: 300
+      tags: [immich, deploy]
+
+    - name: Check Immich service health
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ immich_ports.server }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: health_check
+      retries: 5
+      delay: 10
+      until: health_check.status == 200
+      tags: [immich, deploy]
+
+    - name: Create Immich admin user
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ immich_ports.server }}/api/auth/admin-sign-up"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          email: "{{ immich_admin_email }}"
+          password: "{{ vault_immich_admin_password }}"
+          firstName: "Admin"
+          lastName: "User"
+        status_code: [200, 201, 409]  # 409 if user already exists
+        timeout: 30
+      register: admin_creation
+      tags: [immich, deploy]
+
+    - name: Display Immich deployment status
+      ansible.builtin.debug:
+        msg: |
+          Immich deployment completed successfully!
+          
+          Access URLs:
+          - Web Interface: https://{{ immich_subdomain }}.{{ domain }}
+          - API: https://{{ immich_subdomain }}.{{ domain }}/api
+          
+          Admin credentials:
+          - Email: {{ immich_admin_email }}
+          - Password: (check vault or use default)
+          
+          Service status:
+          - Server: {{ health_check.status }}
+          - Admin user: {{ 'Created' if admin_creation.status in [200, 201] else 'Already exists' }}
+      tags: [immich, deploy]
+
+  tags: [immich, deploy, always] 

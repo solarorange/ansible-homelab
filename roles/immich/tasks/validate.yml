@@ -1,0 +1,91 @@
+---
+# Validate Immich Configuration
+# Production-ready validation tasks for Immich deployment
+
+- name: Validate Immich configuration
+  block:
+    - name: Check if Immich is enabled
+      ansible.builtin.assert:
+        that:
+          - immich_enabled | default(true) is boolean
+        fail_msg: "immich_enabled must be a boolean value"
+        success_msg: "Immich is enabled for deployment"
+
+    - name: Validate Immich domain configuration
+      ansible.builtin.assert:
+        that:
+          - immich_subdomain is defined
+          - immich_subdomain is string
+          - immich_subdomain | length > 0
+        fail_msg: "immich_subdomain must be a non-empty string"
+        success_msg: "Immich subdomain is properly configured"
+
+    - name: Validate Immich database configuration
+      ansible.builtin.assert:
+        that:
+          - immich_database_host is defined
+          - immich_database_port is defined
+          - immich_database_name is defined
+          - immich_database_user is defined
+        fail_msg: "Immich database configuration is incomplete"
+        success_msg: "Immich database configuration is valid"
+
+    - name: Validate Immich Redis configuration
+      ansible.builtin.assert:
+        that:
+          - immich_redis_host is defined
+          - immich_redis_port is defined
+        fail_msg: "Immich Redis configuration is incomplete"
+        success_msg: "Immich Redis configuration is valid"
+
+    - name: Validate Immich port configuration
+      ansible.builtin.assert:
+        that:
+          - immich_ports.server is defined
+          - immich_ports.web is defined
+          - immich_ports.machine_learning is defined
+          - immich_ports.server is number
+          - immich_ports.web is number
+          - immich_ports.machine_learning is number
+        fail_msg: "Immich port configuration is invalid"
+        success_msg: "Immich port configuration is valid"
+
+    - name: Validate Immich component configuration
+      ansible.builtin.assert:
+        that:
+          - immich_components is defined
+          - immich_components is mapping
+        fail_msg: "Immich components configuration is missing or invalid"
+        success_msg: "Immich components configuration is valid"
+
+    - name: Check for required vault variables
+      ansible.builtin.assert:
+        that:
+          - vault_immich_postgres_password is defined or immich_database_password is defined
+          - vault_immich_redis_password is defined or immich_redis_password is defined
+          - vault_immich_jwt_secret is defined
+        fail_msg: "Required Immich vault variables are missing"
+        success_msg: "All required Immich vault variables are present"
+
+    - name: Validate Immich directory paths
+      ansible.builtin.assert:
+        that:
+          - docker_dir is defined
+          - data_dir is defined
+          - logs_dir is defined
+          - backup_dir is defined
+        fail_msg: "Required directory paths are not defined"
+        success_msg: "All required directory paths are defined"
+
+    - name: Check for port conflicts
+      ansible.builtin.shell: |
+        netstat -tlnp 2>/dev/null | grep -E ":({{ immich_ports.server }}|{{ immich_ports.web }}|{{ immich_ports.machine_learning }})\s" || true
+      register: port_check
+      changed_when: false
+
+    - name: Warn about potential port conflicts
+      ansible.builtin.debug:
+        msg: "Warning: Port conflicts detected for Immich services"
+      when: port_check.stdout != ""
+
+  tags: [immich, validation, always] 

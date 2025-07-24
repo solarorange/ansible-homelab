@@ -1,0 +1,31 @@
+---
+# Linkwarden Backup Configuration
+# Configures backup settings for Linkwarden
+
+- name: Create Linkwarden backup schedule
+  ansible.builtin.template:
+    src: backup-schedule.yml.j2
+    dest: "{{ backup_config_dir }}/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_backup_enabled | default(true)
+  tags: [linkwarden, backup]
+
+- name: Configure Linkwarden backup retention
+  ansible.builtin.template:
+    src: backup-retention.yml.j2
+    dest: "{{ backup_config_dir }}/linkwarden-retention.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_backup_enabled | default(true)
+  tags: [linkwarden, backup]
+
+- name: Test Linkwarden backup
+  ansible.builtin.command: "{{ linkwarden_config_dir }}/scripts/backup.sh"
+  register: linkwarden_backup_test
+  changed_when: linkwarden_backup_test.rc == 0
+  failed_when: linkwarden_backup_test.rc != 0
+  when: linkwarden_backup_enabled | default(true)
+  tags: [linkwarden, backup] 

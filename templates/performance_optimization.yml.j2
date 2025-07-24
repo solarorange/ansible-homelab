@@ -1,0 +1,136 @@
+---
+# Performance Optimization Template
+# Include this template to optimize system performance
+
+- name: Optimize system performance
+  block:
+    - name: Optimize kernel parameters
+      ansible.builtin.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: true
+      loop:
+        - { name: 'vm.swappiness', value: '10' }
+        - { name: 'vm.dirty_ratio', value: '15' }
+        - { name: 'vm.dirty_background_ratio', value: '5' }
+        - { name: 'net.core.rmem_max', value: '16777216' }
+        - { name: 'net.core.wmem_max', value: '16777216' }
+        - { name: 'net.ipv4.tcp_rmem', value: '4096 87380 16777216' }
+        - { name: 'net.ipv4.tcp_wmem', value: '4096 65536 16777216' }
+        - { name: 'net.core.netdev_max_backlog', value: '5000' }
+        - { name: 'net.ipv4.tcp_congestion_control', value: 'bbr' }
+        
+    - name: Optimize file system parameters
+      ansible.builtin.mount:
+        path: "{{ item.path }}"
+        fstype: "{{ item.fstype }}"
+        opts: "{{ item.opts }}"
+        state: mounted
+      loop:
+        - { path: '/', fstype: 'ext4', opts: 'defaults,noatime,nodiratime,commit=60' }
+        - { path: '{{ data_dir }}', fstype: 'ext4', opts: 'defaults,noatime,nodiratime,commit=60' }
+      when: item.path != '/' or ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='fstype') | first == 'ext4'
+      
+    - name: Optimize Docker daemon settings
+      ansible.builtin.copy:
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2",
+            "data-root": "{{ docker_dir }}/docker-data",
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "live-restore": true,
+            "max-concurrent-downloads": 10,
+            "max-concurrent-uploads": 5,
+            "storage-opts": [
+              "overlay2.override_kernel_check=true"
+            ],
+            "default-ulimits": {
+              "nofile": {
+                "Hard": 64000,
+                "Name": "nofile",
+                "Soft": 64000
+              }
+            }
+          }
+        dest: /etc/docker/daemon.json
+        backup: true
+      notify: restart docker
+      
+    - name: Optimize systemd settings
+      ansible.builtin.ini_file:
+        path: /etc/systemd/system.conf
+        section: Manager
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        backup: true
+      loop:
+        - { option: 'DefaultTimeoutStartSec', value: '30s' }
+        - { option: 'DefaultTimeoutStopSec', value: '30s' }
+        - { option: 'DefaultRestartSec', value: '100ms' }
+        - { option: 'DefaultStartLimitIntervalSec', value: '10s' }
+        - { option: 'DefaultStartLimitBurst', value: '5' }
+        
+    - name: Optimize journald settings
+      ansible.builtin.ini_file:
+        path: /etc/systemd/journald.conf
+        section: Journal
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        backup: true
+      loop:
+        - { option: 'Storage', value: 'persistent' }
+        - { option: 'Compress', value: 'yes' }
+        - { option: 'SystemMaxUse', value: '1G' }
+        - { option: 'SystemMaxFileSize', value: '50M' }
+        - { option: 'MaxRetentionSec', value: '30day' }
+      notify: restart systemd-journald
+      
+    - name: Create performance monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Performance monitoring script
+          
+          echo "System Performance Report - $(date)"
+          echo "=================================="
+          
+          # CPU usage
+          echo -e "\nCPU Usage:"
+          top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1
+          
+          # Memory usage
+          echo -e "\nMemory Usage:"
+          free -h | grep -E "Mem|Swap"
+          
+          # Disk usage
+          echo -e "\nDisk Usage:"
+          df -h | grep -E "Filesystem|/$|{{ data_dir }}"
+          
+          # Docker resource usage
+          echo -e "\nDocker Resource Usage:"
+          docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
+          
+          # Network connections
+          echo -e "\nNetwork Connections:"
+          ss -tuln | wc -l
+          
+          # Load average
+          echo -e "\nLoad Average:"
+          uptime | awk -F'load average:' '{print $2}'
+        dest: "{{ config_dir }}/performance-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+        
+    - name: Schedule performance monitoring
+      ansible.builtin.cron:
+        name: "Performance monitoring"
+        minute: "*/15"
+        job: "{{ config_dir }}/performance-monitor.sh >> {{ logs_dir }}/performance.log 2>&1"
+        user: "{{ username }}" 

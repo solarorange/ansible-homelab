@@ -139,7 +139,7 @@
     - name: Create test data
       ansible.builtin.shell: |
         echo "test data" > {{ test_dir }}/test_file.txt
-        docker exec postgresql psql -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c "CREATE TABLE test_table (id serial PRIMARY KEY, data text); INSERT INTO test_table (data) VALUES ('test');"
+        docker exec postgresql psql -U {{ vault_postgresql_user }} -d homelab -c "CREATE TABLE test_table (id serial PRIMARY KEY, data text); INSERT INTO test_table (data) VALUES ('test');"
       register: test_data_creation
       changed_when: false
       tags: [integration, backup]

@@ -133,7 +133,7 @@ PGID=1000
 
 # Security configuration
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your_secure_password
+ADMIN_PASSWORD={{ vault_homepage_admin_password }}
 
 # Backup configuration
 BACKUP_ENABLED=true

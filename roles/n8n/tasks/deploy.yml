@@ -1,0 +1,90 @@
+---
+# n8n Service Deployment
+# Deploy n8n workflow automation platform
+
+- name: Copy n8n Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ n8n_config_dir }}/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [n8n, deploy]
+
+- name: Stop existing n8n containers
+  community.docker.docker_compose:
+    project_src: "{{ n8n_config_dir }}"
+    state: absent
+  ignore_errors: true
+  tags: [n8n, deploy]
+
+- name: Remove existing n8n containers
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+    force_kill: true
+  loop:
+    - "{{ n8n_app_container_name }}"
+    - "{{ n8n_postgres_container_name }}"
+  ignore_errors: true
+  tags: [n8n, deploy]
+
+- name: Pull n8n Docker images
+  community.docker.docker_image:
+    name: "{{ item }}"
+    source: pull
+    force_source: true
+  loop:
+    - "{{ n8n_components.app.image }}"
+    - "{{ n8n_components.postgres.image }}"
+  tags: [n8n, deploy]
+
+- name: Deploy n8n services
+  community.docker.docker_compose:
+    project_src: "{{ n8n_config_dir }}"
+    state: present
+    pull: true
+    build: false
+  tags: [n8n, deploy]
+
+- name: Wait for n8n services to be ready
+  ansible.builtin.wait_for:
+    port: "{{ n8n_port }}"
+    host: "127.0.0.1"
+    delay: 10
+    timeout: 300
+  tags: [n8n, deploy]
+
+- name: Verify n8n app container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_app_container_name }}"
+  register: n8n_app_info
+  tags: [n8n, deploy]
+
+- name: Verify n8n postgres container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_postgres_container_name }}"
+  register: n8n_postgres_info
+  tags: [n8n, deploy]
+
+- name: Check n8n app health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: n8n_health_check
+  retries: 10
+  delay: 30
+  until: n8n_health_check.status == 200
+  tags: [n8n, deploy]
+
+- name: Display n8n deployment status
+  ansible.builtin.debug:
+    msg: |
+      n8n Deployment Status:
+      - App Container: {{ n8n_app_info.exists }}
+      - Postgres Container: {{ n8n_postgres_info.exists }}
+      - Health Check: {{ n8n_health_check.status }}
+      - URL: https://{{ n8n_subdomain }}.{{ domain }}
+  tags: [n8n, deploy] 

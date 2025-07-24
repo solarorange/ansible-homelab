@@ -1,0 +1,33 @@
+---
+# Linkwarden Security Configuration
+# Configures security settings for Linkwarden
+
+- name: Configure CrowdSec for Linkwarden
+  ansible.builtin.template:
+    src: crowdsec.yml.j2
+    dest: "{{ crowdsec_config_dir }}/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_crowdsec_enabled | default(true)
+  tags: [linkwarden, security]
+
+- name: Configure Fail2ban for Linkwarden
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "{{ fail2ban_config_dir }}/jail.d/linkwarden.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_fail2ban_enabled | default(true)
+  tags: [linkwarden, security]
+
+- name: Configure security headers for Linkwarden
+  ansible.builtin.template:
+    src: security-headers.yml.j2
+    dest: "{{ traefik_config_dir }}/middleware/linkwarden-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_security_headers | default(true)
+  tags: [linkwarden, security] 

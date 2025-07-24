@@ -1,0 +1,91 @@
+---
+# n8n Prerequisites Setup
+# Setup required directories, permissions, and dependencies
+
+- name: Create n8n configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ n8n_config_dir }}"
+    - "{{ n8n_app_config_dir }}"
+    - "{{ n8n_postgres_config_dir }}"
+    - "{{ logs_dir }}/n8n"
+    - "{{ logs_dir }}/n8n/app"
+    - "{{ logs_dir }}/n8n/postgres"
+    - "{{ logs_dir }}/n8n/backup"
+    - "{{ logs_dir }}/n8n/health"
+    - "{{ backup_dir }}/n8n"
+  tags: [n8n, setup]
+
+- name: Create n8n backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ n8n_backup_dir }}"
+    - "{{ n8n_backup_dir }}/database"
+    - "{{ n8n_backup_dir }}/config"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, setup]
+
+- name: Create n8n monitoring directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ prometheus_config_dir }}/n8n"
+    - "{{ grafana_config_dir }}/n8n"
+    - "{{ loki_config_dir }}/n8n"
+  when: n8n_monitoring_enabled | default(true)
+  tags: [n8n, setup]
+
+- name: Create n8n security directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ crowdsec_config_dir }}/n8n"
+    - "{{ fail2ban_config_dir }}/n8n"
+  tags: [n8n, setup]
+
+- name: Ensure Docker network exists for n8n
+  community.docker.docker_network:
+    name: "{{ n8n_network_name }}"
+    state: present
+    external: "{{ n8n_network_external }}"
+  tags: [n8n, setup]
+
+- name: Install required packages for n8n
+  ansible.builtin.package:
+    name:
+      - curl
+      - jq
+      - postgresql-client
+    state: present
+  tags: [n8n, setup]
+
+- name: Set proper permissions for n8n directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    recurse: true
+  loop:
+    - "{{ n8n_config_dir }}"
+    - "{{ logs_dir }}/n8n"
+    - "{{ backup_dir }}/n8n"
+  tags: [n8n, setup] 

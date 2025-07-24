@@ -1,0 +1,150 @@
+---
+# n8n Deployment Validation
+# Validate that n8n is properly deployed and functioning
+
+- name: Wait for n8n services to be fully ready
+  ansible.builtin.wait_for:
+    port: "{{ n8n_port }}"
+    host: "127.0.0.1"
+    delay: 30
+    timeout: 600
+  tags: [n8n, validation]
+
+- name: Verify n8n app container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_app_container_name }}"
+  register: n8n_app_status
+  tags: [n8n, validation]
+
+- name: Verify n8n postgres container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_postgres_container_name }}"
+  register: n8n_postgres_status
+  tags: [n8n, validation]
+
+- name: Check n8n app health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: n8n_health_check
+  tags: [n8n, validation]
+
+- name: Check n8n web interface
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}"
+    method: GET
+    status_code: [200, 302]
+    timeout: 30
+  register: n8n_web_check
+  tags: [n8n, validation]
+
+- name: Verify n8n database connection
+  ansible.builtin.command: "docker exec {{ n8n_postgres_container_name }} pg_isready -U {{ n8n_database_user }}"
+  register: n8n_db_check
+  changed_when: false
+  tags: [n8n, validation]
+
+- name: Check n8n logs for errors
+  ansible.builtin.command: "docker logs {{ n8n_app_container_name }} --tail 50"
+  register: n8n_logs
+  changed_when: false
+  tags: [n8n, validation]
+
+- name: Verify n8n Traefik integration
+  ansible.builtin.uri:
+    url: "https://{{ n8n_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 401, 403]
+    timeout: 30
+    validate_certs: false
+  register: n8n_traefik_check
+  tags: [n8n, validation]
+
+- name: Verify n8n monitoring integration
+  ansible.builtin.uri:
+    url: "http://localhost:{{ n8n_port }}/metrics"
+    method: GET
+    status_code: [200, 401, 403]
+    timeout: 10
+  register: n8n_metrics_check
+  when: n8n_prometheus_enabled | default(true)
+  tags: [n8n, validation]
+
+- name: Verify n8n backup functionality
+  ansible.builtin.command: "{{ n8n_config_dir }}/backup.sh test"
+  register: n8n_backup_validation
+  changed_when: false
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, validation]
+
+- name: Verify n8n Homepage integration
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/services"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: n8n_homepage_check
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, validation]
+
+- name: Check n8n resource usage
+  ansible.builtin.command: "docker stats {{ n8n_app_container_name }} --no-stream --format 'table {{.CPUPerc}}\t{{.MemUsage}}'"
+  register: n8n_resource_usage
+  changed_when: false
+  tags: [n8n, validation]
+
+- name: Validate n8n configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: n8n_config_files
+  loop:
+    - "{{ n8n_config_dir }}/docker-compose.yml"
+    - "{{ n8n_backup_dir }}"
+    - "{{ logs_dir }}/n8n"
+  tags: [n8n, validation]
+
+- name: Display n8n deployment validation results
+  ansible.builtin.debug:
+    msg: |
+      n8n Deployment Validation Results:
+      
+      Container Status:
+      - App Container: {{ 'Running' if n8n_app_status.exists else 'Not Running' }}
+      - Postgres Container: {{ 'Running' if n8n_postgres_status.exists else 'Not Running' }}
+      
+      Service Health:
+      - Health Endpoint: {{ n8n_health_check.status | default('Unknown') }}
+      - Web Interface: {{ n8n_web_check.status | default('Unknown') }}
+      - Database: {{ 'Connected' if n8n_db_check.rc == 0 else 'Not Connected' }}
+      
+      Integration Status:
+      - Traefik: {{ n8n_traefik_check.status | default('Unknown') }}
+      - Monitoring: {{ n8n_metrics_check.status | default('Unknown') }}
+      - Homepage: {{ n8n_homepage_check.status | default('Unknown') }}
+      - Backup: {{ 'Working' if n8n_backup_validation.rc == 0 else 'Not Working' }}
+      
+      Configuration:
+      - Docker Compose: {{ 'Exists' if n8n_config_files.results[0].stat.exists else 'Missing' }}
+      - Backup Directory: {{ 'Exists' if n8n_config_files.results[1].stat.exists else 'Missing' }}
+      - Logs Directory: {{ 'Exists' if n8n_config_files.results[2].stat.exists else 'Missing' }}
+      
+      Access Information:
+      - Local URL: http://localhost:{{ n8n_port }}
+      - External URL: https://{{ n8n_subdomain }}.{{ domain }}
+      - Admin Email: {{ n8n_admin_email }}
+  tags: [n8n, validation]
+
+- name: Fail if n8n deployment validation fails
+  ansible.builtin.fail:
+    msg: |
+      n8n deployment validation failed:
+      - App Container: {{ n8n_app_status.exists }}
+      - Health Check: {{ n8n_health_check.status | default('Unknown') }}
+      - Database: {{ n8n_db_check.rc }}
+  when: 
+    - not n8n_app_status.exists
+    - n8n_health_check.status != 200
+    - n8n_db_check.rc != 0
+  tags: [n8n, validation] 

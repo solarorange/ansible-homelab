@@ -1,0 +1,206 @@
+#!/bin/bash
+# Pezzo Service Management Script
+# Manages Pezzo service operations (start, stop, restart, status)
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo"
+SERVICE_NAME="pezzo"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 {start|stop|restart|status|logs|backup|update|health}"
+    echo ""
+    echo "Commands:"
+    echo "  start   - Start Pezzo services"
+    echo "  stop    - Stop Pezzo services"
+    echo "  restart - Restart Pezzo services"
+    echo "  status  - Show service status"
+    echo "  logs    - Show service logs"
+    echo "  backup  - Create backup"
+    echo "  update  - Update services"
+    echo "  health  - Run health check"
+    echo ""
+    exit 1
+}
+
+# Function to start services
+start_services() {
+    log "Starting Pezzo services"
+    cd "$PEZZO_CONFIG_DIR"
+    
+    if docker-compose up -d; then
+        log "✓ Pezzo services started successfully"
+        return 0
+    else
+        log "✗ Failed to start Pezzo services"
+        return 1
+    fi
+}
+
+# Function to stop services
+stop_services() {
+    log "Stopping Pezzo services"
+    cd "$PEZZO_CONFIG_DIR"
+    
+    if docker-compose down; then
+        log "✓ Pezzo services stopped successfully"
+        return 0
+    else
+        log "✗ Failed to stop Pezzo services"
+        return 1
+    fi
+}
+
+# Function to restart services
+restart_services() {
+    log "Restarting Pezzo services"
+    stop_services
+    sleep 5
+    start_services
+}
+
+# Function to show service status
+show_status() {
+    log "Pezzo service status:"
+    echo ""
+    
+    cd "$PEZZO_CONFIG_DIR"
+    docker-compose ps
+    
+    echo ""
+    log "Container health status:"
+    docker ps --filter "name=pezzo" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+}
+
+# Function to show service logs
+show_logs() {
+    local service="${1:-}"
+    
+    if [ -n "$service" ]; then
+        log "Showing logs for $service:"
+        cd "$PEZZO_CONFIG_DIR"
+        docker-compose logs -f "$service"
+    else
+        log "Showing all Pezzo logs:"
+        cd "$PEZZO_CONFIG_DIR"
+        docker-compose logs -f
+    fi
+}
+
+# Function to create backup
+create_backup() {
+    log "Creating Pezzo backup"
+    
+    if [ -f "$PEZZO_CONFIG_DIR/backup.sh" ]; then
+        if "$PEZZO_CONFIG_DIR/backup.sh"; then
+            log "✓ Backup completed successfully"
+            return 0
+        else
+            log "✗ Backup failed"
+            return 1
+        fi
+    else
+        log "✗ Backup script not found"
+        return 1
+    fi
+}
+
+# Function to update services
+update_services() {
+    log "Updating Pezzo services"
+    cd "$PEZZO_CONFIG_DIR"
+    
+    # Pull latest images
+    if docker-compose pull; then
+        log "✓ Images updated successfully"
+    else
+        log "✗ Failed to update images"
+        return 1
+    fi
+    
+    # Restart services with new images
+    restart_services
+}
+
+# Function to run health check
+run_health_check() {
+    log "Running Pezzo health check"
+    
+    if [ -f "$PEZZO_CONFIG_DIR/health_check.sh" ]; then
+        if "$PEZZO_CONFIG_DIR/health_check.sh"; then
+            log "✓ Health check passed"
+            return 0
+        else
+            log "✗ Health check failed"
+            return 1
+        fi
+    else
+        log "✗ Health check script not found"
+        return 1
+    fi
+}
+
+# Function to verify service
+verify_service() {
+    log "Verifying Pezzo service"
+    
+    if [ -f "$PEZZO_CONFIG_DIR/verify_service.sh" ]; then
+        if "$PEZZO_CONFIG_DIR/verify_service.sh"; then
+            log "✓ Service verification passed"
+            return 0
+        else
+            log "✗ Service verification failed"
+            return 1
+        fi
+    else
+        log "✗ Service verification script not found"
+        return 1
+    fi
+}
+
+# Main function
+main() {
+    case "$1" in
+        start)
+            start_services
+            ;;
+        stop)
+            stop_services
+            ;;
+        restart)
+            restart_services
+            ;;
+        status)
+            show_status
+            ;;
+        logs)
+            show_logs "$2"
+            ;;
+        backup)
+            create_backup
+            ;;
+        update)
+            update_services
+            ;;
+        health)
+            run_health_check
+            ;;
+        verify)
+            verify_service
+            ;;
+        *)
+            show_usage
+            ;;
+    esac
+}
+
+# Execute main function with arguments
+main "$@" 

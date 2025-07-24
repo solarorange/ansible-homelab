@@ -1,0 +1,174 @@
+---
+# Vaultwarden Deployment Validation
+# Validates the complete Vaultwarden deployment
+
+- name: Check Vaultwarden container status
+  community.docker.docker_container_info:
+    name: "{{ vaultwarden_app_container_name }}"
+  register: vaultwarden_container_status
+  tags: [vaultwarden, vaultwarden-validation, container]
+
+- name: Verify Vaultwarden container is running
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_container_status.exists
+      - vaultwarden_container_status.container.State.Status == "running"
+    fail_msg: "Vaultwarden container is not running properly"
+  tags: [vaultwarden, vaultwarden-validation, container]
+
+- name: Check Vaultwarden PostgreSQL container status (if enabled)
+  community.docker.docker_container_info:
+    name: "{{ vaultwarden_postgres_container_name }}"
+  register: vaultwarden_postgres_status
+  when: vaultwarden_database_type == 'postgresql'
+  tags: [vaultwarden, vaultwarden-validation, database]
+
+- name: Verify Vaultwarden PostgreSQL container is running (if enabled)
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_postgres_status.exists
+      - vaultwarden_postgres_status.container.State.Status == "running"
+    fail_msg: "Vaultwarden PostgreSQL container is not running properly"
+  when: vaultwarden_database_type == 'postgresql'
+  tags: [vaultwarden, vaultwarden-validation, database]
+
+- name: Test Vaultwarden health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vaultwarden_port }}/alive"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 10
+  register: vaultwarden_health_check
+  tags: [vaultwarden, vaultwarden-validation, health]
+
+- name: Verify Vaultwarden health endpoint
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_health_check.status in [200, 302, 401]
+    fail_msg: "Vaultwarden health endpoint is not responding properly"
+  tags: [vaultwarden, vaultwarden-validation, health]
+
+- name: Test Vaultwarden web interface
+  ansible.builtin.uri:
+    url: "https://{{ vaultwarden_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: vaultwarden_web_check
+  tags: [vaultwarden, vaultwarden-validation, web]
+
+- name: Verify Vaultwarden web interface
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_web_check.status in [200, 302, 401]
+    fail_msg: "Vaultwarden web interface is not accessible"
+  tags: [vaultwarden, vaultwarden-validation, web]
+
+- name: Check Vaultwarden data directory
+  ansible.builtin.stat:
+    path: "{{ vaultwarden_data_dir }}"
+  register: vaultwarden_data_check
+  tags: [vaultwarden, vaultwarden-validation, data]
+
+- name: Verify Vaultwarden data directory
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_data_check.stat.exists
+      - vaultwarden_data_check.stat.isdir
+    fail_msg: "Vaultwarden data directory does not exist or is not accessible"
+  tags: [vaultwarden, vaultwarden-validation, data]
+
+- name: Check Vaultwarden configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ vaultwarden_config_dir }}/docker-compose.yml"
+    - "{{ vaultwarden_data_dir }}/config.json"
+  register: vaultwarden_config_check
+  tags: [vaultwarden, vaultwarden-validation, config]
+
+- name: Verify Vaultwarden configuration files
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Vaultwarden configuration file {{ item.item }} does not exist"
+  loop: "{{ vaultwarden_config_check.results }}"
+  tags: [vaultwarden, vaultwarden-validation, config]
+
+- name: Test Vaultwarden database connectivity (if PostgreSQL)
+  ansible.builtin.command: "docker exec {{ vaultwarden_postgres_container_name }} pg_isready -U {{ vaultwarden_database_user }}"
+  register: vaultwarden_db_check
+  when: vaultwarden_database_type == 'postgresql'
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-validation, database]
+
+- name: Verify Vaultwarden database connectivity (if PostgreSQL)
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_db_check.rc == 0
+    fail_msg: "Vaultwarden database connectivity test failed"
+  when: vaultwarden_database_type == 'postgresql'
+  tags: [vaultwarden, vaultwarden-validation, database]
+
+- name: Check Vaultwarden logs for errors
+  ansible.builtin.command: "docker logs {{ vaultwarden_app_container_name }} --tail 50"
+  register: vaultwarden_logs_check
+  changed_when: false
+  tags: [vaultwarden, vaultwarden-validation, logs]
+
+- name: Verify Vaultwarden logs
+  ansible.builtin.assert:
+    that:
+      - "'ERROR' not in vaultwarden_logs_check.stdout"
+      - "'FATAL' not in vaultwarden_logs_check.stdout"
+    fail_msg: "Vaultwarden logs contain errors"
+  tags: [vaultwarden, vaultwarden-validation, logs]
+
+- name: Test Vaultwarden backup functionality
+  ansible.builtin.command: "{{ vaultwarden_config_dir }}/scripts/backup.sh --test"
+  register: vaultwarden_backup_test
+  changed_when: false
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-validation, backup]
+
+- name: Verify Vaultwarden backup functionality
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_backup_test.rc == 0
+    fail_msg: "Vaultwarden backup test failed"
+  tags: [vaultwarden, vaultwarden-validation, backup]
+
+- name: Display Vaultwarden deployment validation results
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN DEPLOYMENT VALIDATION RESULTS
+      ========================================
+      
+      Container Status:
+      - Main Container: {{ 'RUNNING' if vaultwarden_container_status.container.State.Status == 'running' else 'FAILED' }}
+      {% if vaultwarden_database_type == 'postgresql' %}
+      - PostgreSQL Container: {{ 'RUNNING' if vaultwarden_postgres_status.container.State.Status == 'running' else 'FAILED' }}
+      {% endif %}
+      
+      Service Health:
+      - Health Endpoint: {{ 'RESPONDING' if vaultwarden_health_check.status in [200, 302, 401] else 'FAILED' }}
+      - Web Interface: {{ 'ACCESSIBLE' if vaultwarden_web_check.status in [200, 302, 401] else 'FAILED' }}
+      
+      Data & Configuration:
+      - Data Directory: {{ 'EXISTS' if vaultwarden_data_check.stat.exists else 'MISSING' }}
+      - Config Files: {{ 'VALID' if vaultwarden_config_check.results | selectattr('stat.exists') | list | length == vaultwarden_config_check.results | length else 'INVALID' }}
+      
+      {% if vaultwarden_database_type == 'postgresql' %}
+      Database:
+      - Connectivity: {{ 'OK' if vaultwarden_db_check.rc == 0 else 'FAILED' }}
+      {% endif %}
+      
+      Logs & Backup:
+      - Logs: {{ 'CLEAN' if 'ERROR' not in vaultwarden_logs_check.stdout and 'FATAL' not in vaultwarden_logs_check.stdout else 'ERRORS' }}
+      - Backup Test: {{ 'PASSED' if vaultwarden_backup_test.rc == 0 else 'FAILED' }}
+      
+      Overall Status: {{ 'SUCCESS' if vaultwarden_container_status.container.State.Status == 'running' and vaultwarden_health_check.status in [200, 302, 401] and vaultwarden_web_check.status in [200, 302, 401] else 'FAILED' }}
+      
+      ========================================
+  tags: [vaultwarden, vaultwarden-validation, summary] 

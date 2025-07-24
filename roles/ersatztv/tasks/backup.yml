@@ -1,0 +1,83 @@
+---
+# ErsatzTV Backup Configuration
+# Configure automated backup and recovery for ErsatzTV
+
+- name: Create ErsatzTV backup configuration
+  ansible.builtin.template:
+    src: backup.yml.j2
+    dest: "{{ ersatztv_config_dir }}/backup.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ ersatztv_config_dir }}/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ ersatztv_config_dir }}/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV backup verification script
+  ansible.builtin.template:
+    src: backup-verify.sh.j2
+    dest: "{{ ersatztv_config_dir }}/backup-verify.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV backup cleanup script
+  ansible.builtin.template:
+    src: backup-cleanup.sh.j2
+    dest: "{{ ersatztv_config_dir }}/backup-cleanup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV backup cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Backup"
+    minute: "{{ ersatztv_backup_schedule.split(' ')[0] }}"
+    hour: "{{ ersatztv_backup_schedule.split(' ')[1] }}"
+    day: "{{ ersatztv_backup_schedule.split(' ')[2] }}"
+    month: "{{ ersatztv_backup_schedule.split(' ')[3] }}"
+    weekday: "{{ ersatztv_backup_schedule.split(' ')[4] }}"
+    job: "{{ ersatztv_config_dir }}/backup.sh >> {{ ersatztv_logs_dir }}/backup.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_backup_enabled
+  tags: [ersatztv, backup]
+
+- name: Create ErsatzTV backup cleanup cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Backup Cleanup"
+    hour: "3"
+    minute: "0"
+    job: "{{ ersatztv_config_dir }}/backup-cleanup.sh >> {{ ersatztv_logs_dir }}/backup-cleanup.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_backup_enabled
+  tags: [ersatztv, backup]
+
+- name: Display ErsatzTV backup configuration
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Backup Configuration:
+      - Backup Enabled: {{ ersatztv_backup_enabled }}
+      - Backup Retention: {{ ersatztv_backup_retention }} days
+      - Backup Schedule: {{ ersatztv_backup_schedule }}
+      - Include Logs: {{ ersatztv_backup_include_logs }}
+      - Include Cache: {{ ersatztv_backup_include_cache }}
+      - Backup Directory: {{ backup_dir }}/ersatztv
+  tags: [ersatztv, backup] 

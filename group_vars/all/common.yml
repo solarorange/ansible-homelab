@@ -27,7 +27,95 @@ docker_data_root: "{{ docker_root }}/data"
 docker_config_root: "{{ docker_root }}/config"
 docker_logs_root: "{{ docker_root }}/logs"
 
+# Docker networks with proper segmentation
+docker_networks:
+  - name: frontend
+    driver: bridge
+    internal: false
+    ipam_config:
+      - subnet: "172.20.0.0/24"
+        gateway: "172.20.0.1"
+  - name: backend
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.21.0.0/24"
+        gateway: "172.21.0.1"
+  - name: database
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.22.0.0/24"
+        gateway: "172.22.0.1"
+  - name: monitoring
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.23.0.0/24"
+        gateway: "172.23.0.1"
+  - name: security
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.24.0.0/24"
+        gateway: "172.24.0.1"
+  - name: media
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.25.0.0/24"
+        gateway: "172.25.0.1"
+
+# Service network assignments for security
+service_network_assignments:
+  # Frontend services (public access)
+  frontend:
+    - traefik
+    - homepage
+    - portainer
+  
+  # Backend services (internal only)
+  backend:
+    - authentik
+    - grafana
+    - prometheus
+    - alertmanager
+  
+  # Database services (isolated)
+  database:
+    - postgresql
+    - redis
+    - mariadb
+    - influxdb
+  
+  # Monitoring services (isolated)
+  monitoring:
+    - loki
+    - promtail
+    - blackbox_exporter
+  
+  # Security services (isolated)
+  security:
+    - vault
+    - crowdsec
+    - fail2ban
+  
+  # Media services (isolated)
+  media:
+    - sonarr
+    - radarr
+    - lidarr
+    - jellyfin
+    - plex
+
 # Cloudflare Configuration
 cloudflare_enabled: "{{ lookup('env', 'CLOUDFLARE_ENABLED') | default('false') | bool }}"
 cloudflare_email: "{{ lookup('env', 'CLOUDFLARE_EMAIL') | default('') }}"
-cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}" 
+cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}"
+
+# Reconya Configuration
+reconya_enabled: "{{ lookup('env', 'RECONYA_ENABLED') | default('false') | bool }}"
+reconya_network_range: "{{ lookup('env', 'RECONYA_NETWORK_RANGE') | default('192.168.1.0/24') }}"
+reconya_scan_interval: "{{ lookup('env', 'RECONYA_SCAN_INTERVAL') | default(300) | int }}"
+reconya_max_devices: "{{ lookup('env', 'RECONYA_MAX_DEVICES') | default(1000) | int }}"
+reconya_subdomain: "{{ lookup('env', 'RECONYA_SUBDOMAIN') | default('reconya') }}" 

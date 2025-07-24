@@ -1,0 +1,48 @@
+---
+# Linkwarden Deployment
+# Production-ready Ansible tasks for Linkwarden bookmark management deployment
+
+- name: Include Linkwarden deployment tasks
+  block:
+    - name: Validate Linkwarden configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [linkwarden, validation]
+
+    - name: Setup Linkwarden prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [linkwarden, setup]
+
+    - name: Deploy Linkwarden services
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [linkwarden, deploy]
+
+    - name: Configure Linkwarden monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: linkwarden_monitoring_enabled | default(true)
+      tags: [linkwarden, monitoring]
+
+    - name: Configure Linkwarden security
+      ansible.builtin.include_tasks: security.yml
+      tags: [linkwarden, security]
+
+    - name: Configure Linkwarden backup
+      ansible.builtin.include_tasks: backup.yml
+      when: linkwarden_backup_enabled | default(true)
+      tags: [linkwarden, backup]
+
+    - name: Configure Linkwarden homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: linkwarden_homepage_enabled | default(true)
+      tags: [linkwarden, homepage]
+
+    - name: Configure Linkwarden alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: linkwarden_alerting_enabled | default(true)
+      tags: [linkwarden, alerts]
+
+    - name: Validate Linkwarden deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [linkwarden, validation]
+
+  when: linkwarden_enabled | default(true)
+  tags: [linkwarden, always] 

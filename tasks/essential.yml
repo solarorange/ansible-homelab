@@ -42,6 +42,11 @@
   ignore_errors: true
   changed_when: reboot_required_rhel.rc != 0
   when: ansible_os_family == "RedHat"
+  
+- name: Handle RedHat reboot check errors
+  ansible.builtin.debug:
+    msg: "RedHat reboot check completed with warnings: {{ reboot_required_rhel.stderr | default('None') }}"
+  when: ansible_os_family == "RedHat" and reboot_required_rhel is failed
 
 - name: Reboot system if required
   ansible.builtin.reboot:

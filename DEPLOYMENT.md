@@ -195,6 +195,10 @@ All sensitive information is stored in `group_vars/all/vault.yml`:
 - `vault_sonarr_api_key`
 - `vault_radarr_api_key`
 - `vault_lidarr_api_key`
+- `vault_lidarr_username`
+- `vault_lidarr_password`
+- `vault_lidarr_anonymous_id`
+- `vault_qbittorrent_password`
 - `vault_readarr_api_key`
 - `vault_prowlarr_api_key`
 - `vault_bazarr_api_key`

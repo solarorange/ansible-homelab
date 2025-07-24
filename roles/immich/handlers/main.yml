@@ -1,0 +1,71 @@
+---
+# Immich Handlers
+# Production-ready handlers for Immich role
+
+- name: restart immich services
+  community.docker.docker_compose:
+    project_src: "{{ immich_config_dir }}"
+    state: present
+    restarted: yes
+  listen: "restart immich"
+
+- name: reload immich configuration
+  community.docker.docker_compose:
+    project_src: "{{ immich_config_dir }}"
+    state: present
+    pull: yes
+  listen: "reload immich"
+
+- name: restart immich monitoring
+  ansible.builtin.systemd:
+    name: immich-monitoring
+    state: restarted
+  listen: "restart immich monitoring"
+
+- name: restart immich security
+  ansible.builtin.systemd:
+    name: immich-security
+    state: restarted
+  listen: "restart immich security"
+
+- name: restart immich alerts
+  ansible.builtin.systemd:
+    name: immich-alerts
+    state: restarted
+  listen: "restart immich alerts"
+
+- name: restart immich homepage
+  ansible.builtin.systemd:
+    name: immich-homepage
+    state: restarted
+  listen: "restart immich homepage"
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  listen: "reload systemd"
+
+- name: restart cron
+  ansible.builtin.service:
+    name: cron
+    state: restarted
+  listen: "restart cron"
+
+- name: reload traefik
+  community.docker.docker_container:
+    name: traefik
+    state: started
+    restart: yes
+  listen: "reload traefik"
+
+- name: backup immich
+  ansible.builtin.shell: "{{ immich_config_dir }}/backup.sh"
+  become: yes
+  become_user: "{{ ansible_user }}"
+  listen: "backup immich"
+
+- name: verify immich backup
+  ansible.builtin.shell: "{{ immich_config_dir }}/verify-backup.sh"
+  become: yes
+  become_user: "{{ ansible_user }}"
+  listen: "verify immich backup" 

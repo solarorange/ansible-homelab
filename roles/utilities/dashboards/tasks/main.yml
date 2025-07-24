@@ -36,7 +36,7 @@
 
 - name: Generate API keys for dashboard services
   ansible.builtin.set_fact:
-    homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({item: lookup('password', '/dev/null length=32 chars=ascii_letters,digits')}) }}"
+    homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({item: vault_homepage_api_key}) }}"
   loop:
     - portainer
     - tdarr

@@ -1,0 +1,107 @@
+---
+# Reconya Backup Configuration
+# Configure backup functionality for Reconya
+
+- name: Configure Reconya backup
+  block:
+    - name: Create Reconya backup configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}/backup"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya backup configuration
+      ansible.builtin.template:
+        src: backup_config.yml.j2
+        dest: "{{ reconya_config_dir }}/backup/config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create Reconya backup script
+      ansible.builtin.template:
+        src: backup_script.sh.j2
+        dest: "{{ reconya_config_dir }}/backup/backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya restore script
+      ansible.builtin.template:
+        src: restore_script.sh.j2
+        dest: "{{ reconya_config_dir }}/backup/restore.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [reconya, backup]
+
+- name: Configure Reconya backup scheduling
+  block:
+    - name: Set up Reconya backup cron job
+      ansible.builtin.cron:
+        name: "Reconya Backup"
+        hour: "{{ reconya_backup_schedule.split()[1] | default('2') }}"
+        minute: "{{ reconya_backup_schedule.split()[0] | default('0') }}"
+        day: "{{ reconya_backup_schedule.split()[2] | default('*') }}"
+        month: "{{ reconya_backup_schedule.split()[3] | default('*') }}"
+        weekday: "{{ reconya_backup_schedule.split()[4] | default('*') }}"
+        job: "{{ reconya_config_dir }}/backup/backup.sh >> {{ reconya_backup_log_file }} 2>&1"
+        user: "{{ username }}"
+        state: present
+
+    - name: Set up Reconya backup retention cleanup
+      ansible.builtin.cron:
+        name: "Reconya Backup Cleanup"
+        hour: "3"
+        minute: "0"
+        job: "find {{ reconya_backup_dir }} -name '*.tar.gz' -mtime +{{ reconya_backup_retention_days | default(7) }} -delete"
+        user: "{{ username }}"
+        state: present
+
+  tags: [reconya, backup]
+
+- name: Configure Reconya backup monitoring
+  block:
+    - name: Create Reconya backup monitoring configuration
+      ansible.builtin.template:
+        src: backup_monitor.yml.j2
+        dest: "{{ reconya_config_dir }}/backup/monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_backup_notifications_enabled | default(true)
+
+    - name: Set up Reconya backup notification script
+      ansible.builtin.template:
+        src: backup_notify.sh.j2
+        dest: "{{ reconya_config_dir }}/backup/notify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: reconya_backup_notifications_enabled | default(true)
+
+  tags: [reconya, backup]
+
+- name: Configure Reconya backup verification
+  block:
+    - name: Create Reconya backup verification script
+      ansible.builtin.template:
+        src: backup_verify.sh.j2
+        dest: "{{ reconya_config_dir }}/backup/verify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Set up Reconya backup verification cron job
+      ansible.builtin.cron:
+        name: "Reconya Backup Verification"
+        hour: "4"
+        minute: "0"
+        job: "{{ reconya_config_dir }}/backup/verify.sh >> {{ reconya_backup_log_file }} 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [reconya, backup] 

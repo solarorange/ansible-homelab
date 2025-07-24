@@ -1,0 +1,105 @@
+---
+# Reconya Alerting Configuration
+# Configure alerting functionality for Reconya
+
+- name: Configure Reconya alerting
+  block:
+    - name: Create Reconya alerting configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}/alerts"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya Alertmanager configuration
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ alertmanager_config_dir }}/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_alerting_enabled | default(true)
+
+    - name: Create Reconya alert rules
+      ansible.builtin.template:
+        src: alert_rules.yml.j2
+        dest: "{{ prometheus_config_dir }}/reconya_alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_alerting_enabled | default(true)
+
+  tags: [reconya, alerts]
+
+- name: Configure Reconya notification channels
+  block:
+    - name: Create Reconya Slack notification configuration
+      ansible.builtin.template:
+        src: slack_notify.yml.j2
+        dest: "{{ reconya_config_dir }}/alerts/slack.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: vault_slack_webhook is defined and vault_slack_webhook | length > 0
+
+    - name: Create Reconya Discord notification configuration
+      ansible.builtin.template:
+        src: discord_notify.yml.j2
+        dest: "{{ reconya_config_dir }}/alerts/discord.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: vault_discord_webhook is defined and vault_discord_webhook | length > 0
+
+    - name: Create Reconya email notification configuration
+      ansible.builtin.template:
+        src: email_notify.yml.j2
+        dest: "{{ reconya_config_dir }}/alerts/email.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: vault_smtp_username is defined and vault_smtp_username | length > 0
+
+  tags: [reconya, alerts]
+
+- name: Configure Reconya alert thresholds
+  block:
+    - name: Create Reconya alert threshold configuration
+      ansible.builtin.template:
+        src: alert_thresholds.yml.j2
+        dest: "{{ reconya_config_dir }}/alerts/thresholds.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create Reconya alert escalation configuration
+      ansible.builtin.template:
+        src: alert_escalation.yml.j2
+        dest: "{{ reconya_config_dir }}/alerts/escalation.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  tags: [reconya, alerts]
+
+- name: Configure Reconya alert testing
+  block:
+    - name: Create Reconya alert test script
+      ansible.builtin.template:
+        src: alert_test.sh.j2
+        dest: "{{ reconya_config_dir }}/alerts/test.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Set up Reconya alert test cron job
+      ansible.builtin.cron:
+        name: "Reconya Alert Test"
+        hour: "*/6"
+        minute: "0"
+        job: "{{ reconya_config_dir }}/alerts/test.sh >> {{ reconya_logs_dir }}/alerts/test.log 2>&1"
+        user: "{{ username }}"
+        state: present
+
+  tags: [reconya, alerts] 

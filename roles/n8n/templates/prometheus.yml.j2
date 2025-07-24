@@ -1,0 +1,63 @@
+# n8n Prometheus Configuration
+# Scrape configuration for n8n metrics
+
+scrape_configs:
+  - job_name: 'n8n'
+    static_configs:
+      - targets: ['n8n-app:5678']
+    metrics_path: '/metrics'
+    scrape_interval: {{ n8n_prometheus_scrape_interval | default(30) }}s
+    scrape_timeout: 10s
+    honor_labels: true
+    scheme: http
+    
+    # Relabeling rules
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '${1}'
+      
+      - source_labels: [__address__]
+        target_label: __address__
+        regex: '([^:]+):(\d+)'
+        replacement: '${1}:{{ n8n_port }}'
+      
+      - source_labels: []
+        target_label: job
+        replacement: 'n8n'
+      
+      - source_labels: []
+        target_label: service
+        replacement: 'n8n'
+      
+      - source_labels: []
+        target_label: environment
+        replacement: 'production'
+
+  - job_name: 'n8n-postgres'
+    static_configs:
+      - targets: ['n8n-postgres:5432']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+    scheme: http
+    
+    # Relabeling rules
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '${1}'
+      
+      - source_labels: []
+        target_label: job
+        replacement: 'n8n-postgres'
+      
+      - source_labels: []
+        target_label: service
+        replacement: 'n8n'
+      
+      - source_labels: []
+        target_label: environment
+        replacement: 'production' 

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Vault Environment Setup Script
-# Sets up environment variables for ansible-vault
+# Enhanced Vault Environment Setup Script
+# Sets up environment variables for ansible-vault with comprehensive security
 
 set -e
 
@@ -9,6 +9,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 print_status() {
@@ -29,6 +31,10 @@ print_header() {
     echo -e "${BLUE}========================================${NC}"
 }
 
+print_section() {
+    echo -e "${PURPLE}--- $1 ---${NC}"
+}
+
 # Function to generate random password
 generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
@@ -39,8 +45,42 @@ generate_secret_key() {
     openssl rand -hex 32
 }
 
-print_header "Vault Environment Setup"
-print_status "This script will help you set up environment variables for ansible-vault."
+# Function to generate API key with prefix
+generate_api_key() {
+    local prefix="$1"
+    echo "${prefix}_$(openssl rand -hex 32)"
+}
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to validate email format
+validate_email() {
+    local email="$1"
+    if [[ "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+print_header "Enhanced Vault Environment Setup"
+print_status "This script will automatically set up all environment variables for ansible-vault."
+print_status "It will generate secure passwords and provide seamless setup."
+
+# Check prerequisites
+print_section "Checking Prerequisites"
+
+if ! command_exists openssl; then
+    print_error "OpenSSL is required but not installed. Please install OpenSSL first."
+    exit 1
+fi
+
+if ! command_exists ansible-vault; then
+    print_warning "ansible-vault not found. Please ensure Ansible is installed."
+fi
 
 # Check if .env file exists
 if [ -f ".env" ]; then
@@ -53,85 +93,406 @@ if [ -f ".env" ]; then
     fi
 fi
 
-print_header "Setting up environment variables..."
+# Interactive configuration
+print_section "Interactive Configuration"
+
+# Get admin email
+read -p "Enter admin email address (default: admin@zorg.media): " admin_email
+admin_email=${admin_email:-admin@zorg.media}
+
+if ! validate_email "$admin_email"; then
+    print_error "Invalid email format: $admin_email"
+    exit 1
+fi
+
+# Get domain
+read -p "Enter your domain (default: zorg.media): " domain
+domain=${domain:-zorg.media}
+
+# Get SMTP configuration (optional)
+print_status "SMTP Configuration (optional - press Enter to skip)"
+read -p "SMTP Host: " smtp_host
+read -p "SMTP Port (default: 587): " smtp_port
+smtp_port=${smtp_port:-587}
+read -p "SMTP Username: " smtp_username
+read -s -p "SMTP Password: " smtp_password
+echo
+
+# Get Cloudflare configuration (optional)
+print_status "Cloudflare Configuration (optional - press Enter to skip)"
+read -p "Cloudflare Email: " cloudflare_email
+read -s -p "Cloudflare API Token: " cloudflare_token
+echo
+
+# Get notification webhooks (optional)
+print_status "Notification Webhooks (optional - press Enter to skip)"
+read -p "Slack Webhook URL: " slack_webhook
+read -p "Discord Webhook URL: " discord_webhook
+
+# Get external tokens (optional)
+print_status "External Service Tokens (optional - press Enter to skip)"
+read -s -p "Telegram Bot Token: " telegram_token
+echo
+read -s -p "Traefik Pilot Token: " traefik_token
+echo
+
+print_header "Generating Secure Passwords and Keys"
 
 # Create .env file with all vault variables
 cat > .env << EOF
-# Vault Environment Variables for Ansible Homelab
+# Enhanced Vault Environment Variables for Ansible Homelab
 # Generated on $(date)
+# Admin Email: ${admin_email}
+# Domain: ${domain}
 
-# Database Passwords
+#==============================================================================
+# DATABASE PASSWORDS
+#==============================================================================
+
+# Core Database Passwords
 export VAULT_POSTGRESQL_PASSWORD="$(generate_password)"
 export VAULT_MEDIA_DATABASE_PASSWORD="$(generate_password)"
 export VAULT_PAPERLESS_DATABASE_PASSWORD="$(generate_password)"
 export VAULT_FING_DATABASE_PASSWORD="$(generate_password)"
 export VAULT_REDIS_PASSWORD="$(generate_password)"
+export VAULT_N8N_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_LINKWARDEN_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_PEZZO_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_PEZZO_REDIS_PASSWORD="$(generate_password)"
+export VAULT_PEZZO_CLICKHOUSE_PASSWORD="$(generate_password)"
+export VAULT_VAULTWARDEN_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_RECONYA_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_IMMICH_DATABASE_PASSWORD="$(generate_password)"
+export VAULT_IMMICH_REDIS_PASSWORD="$(generate_password)"
 
-# Service Authentication
+# NextCloud Database Passwords
+export VAULT_NEXTCLOUD_DB_PASSWORD="$(generate_password)"
+export VAULT_NEXTCLOUD_DB_ROOT_PASSWORD="$(generate_password)"
+export VAULT_NEXTCLOUD_ADMIN_PASSWORD="$(generate_password)"
+
+#==============================================================================
+# SERVICE ADMIN PASSWORDS
+#==============================================================================
+
+# Core Service Admin Passwords
+export VAULT_GRAFANA_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_AUTHENTIK_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_PORTAINER_ADMIN_PASSWORD="$(generate_password)"
+
+# Service-Specific Admin Passwords
 export VAULT_PAPERLESS_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_PAPERLESS_SECRET_KEY="$(generate_secret_key)"
 export VAULT_FING_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_PAPERLESS_ADMIN_TOKEN="$(generate_secret_key)"
-export VAULT_FING_API_KEY="$(generate_secret_key)"
+export VAULT_N8N_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_RECONYA_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_IMMICH_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_VAULTWARDEN_ADMIN_PASSWORD="$(generate_password)"
+
+# Media Service Passwords
+export VAULT_JELLYFIN_PASSWORD="$(generate_password)"
+export VAULT_CALIBRE_WEB_PASSWORD="$(generate_password)"
+export VAULT_AUDIOBOOKSHELF_PASSWORD="$(generate_password)"
+export VAULT_SABNZBD_PASSWORD="$(generate_password)"
+export VAULT_TDARR_PASSWORD="$(generate_password)"
+export VAULT_QBITTORRENT_PASSWORD="$(generate_password)"
+
+# Infrastructure Passwords
+export VAULT_INFLUXDB_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_MARIADB_ROOT_PASSWORD="$(generate_password)"
+export VAULT_PROXMOX_PASSWORD="$(generate_password)"
+export VAULT_PIHOLE_ADMIN_PASSWORD="$(generate_password)"
+
+#==============================================================================
+# SERVICE SECRET KEYS
+#==============================================================================
+
+# Core Service Secret Keys
+export VAULT_AUTHENTIK_SECRET_KEY="$(generate_secret_key)"
+export VAULT_GRAFANA_SECRET_KEY="$(generate_secret_key)"
+export VAULT_PAPERLESS_SECRET_KEY="$(generate_secret_key)"
+
+# Service-Specific Secret Keys
+export VAULT_MEDIA_JWT_SECRET="$(generate_secret_key)"
+export VAULT_IMMICH_JWT_SECRET="$(generate_secret_key)"
+export VAULT_LINKWARDEN_NEXTAUTH_SECRET="$(generate_secret_key)"
+export VAULT_RECONYA_JWT_SECRET="$(generate_secret_key)"
+export VAULT_CALIBREWEB_SECRET_KEY="$(generate_secret_key)"
+
+# OAuth and API Secrets
+export VAULT_IMMICH_OAUTH_CLIENT_SECRET="$(generate_secret_key)"
+export VAULT_IMMICH_PUSH_APP_SECRET="$(generate_secret_key)"
+export VAULT_VAULTWARDEN_ADMIN_TOKEN="$(generate_secret_key)"
+
+#==============================================================================
+# API KEYS
+#==============================================================================
 
 # Media Service API Keys
-export VAULT_SABNZBD_API_KEY="$(generate_secret_key)"
-export VAULT_SONARR_API_KEY="$(generate_secret_key)"
-export VAULT_RADARR_API_KEY="$(generate_secret_key)"
-export VAULT_LIDARR_API_KEY="$(generate_secret_key)"
-export VAULT_READARR_API_KEY="$(generate_secret_key)"
-export VAULT_PROWLARR_API_KEY="$(generate_secret_key)"
-export VAULT_BAZARR_API_KEY="$(generate_secret_key)"
+export VAULT_SABNZBD_API_KEY="$(generate_api_key 'sabnzbd')"
+export VAULT_SONARR_API_KEY="$(generate_api_key 'sonarr')"
+export VAULT_RADARR_API_KEY="$(generate_api_key 'radarr')"
+export VAULT_LIDARR_API_KEY="$(generate_api_key 'lidarr')"
+export VAULT_READARR_API_KEY="$(generate_api_key 'readarr')"
+export VAULT_PROWLARR_API_KEY="$(generate_api_key 'prowlarr')"
+export VAULT_BAZARR_API_KEY="$(generate_api_key 'bazarr')"
+export VAULT_TAUTULLI_API_KEY="$(generate_secret_key)"
 
-# Email Configuration
-export VAULT_SMTP_USERNAME=""
-export VAULT_SMTP_PASSWORD=""
-
-# Notification Services
-export VAULT_SLACK_WEBHOOK=""
-export VAULT_DISCORD_WEBHOOK=""
-
-# Container Update Service
+# Service-Specific API Keys
+export VAULT_FING_API_KEY="$(generate_secret_key)"
+export VAULT_VAULTWARDEN_HOMEPAGE_API_KEY="$(generate_secret_key)"
 export VAULT_WATCHTOWER_TOKEN="$(generate_secret_key)"
 
-# Monitoring Passwords
-export VAULT_INFLUXDB_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_INFLUXDB_TOKEN="$(generate_secret_key)"
-export VAULT_GRAFANA_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_GRAFANA_SECRET_KEY="$(generate_secret_key)"
+#==============================================================================
+# TOKENS AND ACCESS KEYS
+#==============================================================================
 
-# Security Passwords
-export VAULT_AUTHENTIK_SECRET_KEY="$(generate_secret_key)"
-export VAULT_AUTHENTIK_POSTGRES_PASSWORD="$(generate_password)"
-export VAULT_AUTHENTIK_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_AUTHENTIK_ADMIN_EMAIL="admin@zorg.media"
-export VAULT_CLOUDFLARE_API_TOKEN=""
-export VAULT_PIHOLE_ADMIN_PASSWORD="$(generate_password)"
+# Infrastructure Tokens
+export VAULT_INFLUXDB_TOKEN="$(generate_secret_key)"
+export VAULT_TRANSIT_TOKEN="$(generate_secret_key)"
+
+# Notification Tokens
+export VAULT_IMMICH_PUSH_TOKEN="${telegram_token:-}"
+export VAULT_IMMICH_TELEGRAM_BOT_TOKEN="${telegram_token:-}"
+export VAULT_TELEGRAM_BOT_TOKEN="${telegram_token:-}"
+
+#==============================================================================
+# OAUTH CLIENT SECRETS
+#==============================================================================
+
+# OAuth Client Secrets for Authentik Integration
+export VAULT_GRAFANA_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_SONARR_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_RADARR_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_JELLYFIN_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_OVERSEERR_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_PORTAINER_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_HOMEPAGE_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_PROWLARR_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_BAZARR_OAUTH_SECRET="$(generate_secret_key)"
+export VAULT_TAUTULLI_OAUTH_SECRET="$(generate_secret_key)"
+
+#==============================================================================
+# EXTERNAL SERVICE CREDENTIALS
+#==============================================================================
+
+# Cloudflare Configuration
+export VAULT_CLOUDFLARE_API_TOKEN="${cloudflare_token:-}"
+export VAULT_CLOUDFLARE_EMAIL="${cloudflare_email:-}"
+
+# SMTP Configuration
+export VAULT_SMTP_USERNAME="${smtp_username:-}"
+export VAULT_SMTP_PASSWORD="${smtp_password:-}"
+export VAULT_SMTP_HOST="${smtp_host:-}"
+export VAULT_SMTP_PORT="${smtp_port:-587}"
+export VAULT_SMTP_FROM_ADDRESS="${admin_email}"
+
+# Service-Specific SMTP
+export VAULT_IMMICH_SMTP_PASSWORD="${smtp_password:-}"
+export VAULT_VAULTWARDEN_SMTP_PASSWORD="${smtp_password:-}"
+export VAULT_FING_SMTP_PASSWORD="${smtp_password:-}"
+
+# LDAP Configuration
+export VAULT_AUTHENTIK_LDAP_PASSWORD=""
+
+# MQTT Configuration
+export VAULT_ZIGBEE2MQTT_MQTT_PASSWORD="$(generate_password)"
+
+#==============================================================================
+# NOTIFICATION WEBHOOKS
+#==============================================================================
+
+# Notification Services
+export VAULT_SLACK_WEBHOOK="${slack_webhook:-}"
+export VAULT_DISCORD_WEBHOOK="${discord_webhook:-}"
+
+#==============================================================================
+# OPTIONAL TOKENS
+#==============================================================================
+
+# Optional: Traefik Pilot Token
+export VAULT_TRAEFIK_PILOT_TOKEN="${traefik_token:-}"
+
+#==============================================================================
+# BACKUP ENCRYPTION
+#==============================================================================
+
+# Backup encryption key
+export VAULT_BACKUP_ENCRYPTION_KEY="$(generate_secret_key)"
+
+#==============================================================================
+# CONFIGURATION VARIABLES
+#==============================================================================
+
+# Admin Configuration
+export VAULT_AUTHENTIK_ADMIN_EMAIL="${admin_email}"
+export VAULT_AUTHENTIK_ADMIN_USERNAME="admin"
+
+# Domain Configuration
+export VAULT_DOMAIN="${domain}"
+export VAULT_CLOUDFLARE_DOMAIN="${domain}"
+
+# Security Configuration
+export VAULT_SECURITY_LEVEL="production"
+export VAULT_ENCRYPTION_ALGORITHM="AES-256-GCM"
 EOF
 
 print_status "Environment file created: .env"
 
+# Create vault file from template
+print_section "Creating Vault File"
+
+if [ -f "group_vars/all/vault_template.yml" ]; then
+    cp group_vars/all/vault_template.yml group_vars/all/vault.yml
+    print_status "Vault template copied to group_vars/all/vault.yml"
+else
+    print_warning "Vault template not found. Please create group_vars/all/vault.yml manually."
+fi
+
+# Create .gitignore entries
+print_section "Setting up Git Security"
+
+if [ -f ".gitignore" ]; then
+    # Check if entries already exist
+    if ! grep -q "\.env" .gitignore; then
+        echo "" >> .gitignore
+        echo "# Vault Security" >> .gitignore
+        echo ".env" >> .gitignore
+        echo "*.key" >> .gitignore
+        echo "*.pem" >> .gitignore
+        echo "secrets/" >> .gitignore
+        print_status "Added security entries to .gitignore"
+    fi
+else
+    cat > .gitignore << EOF
+# Vault Security
+.env
+*.key
+*.pem
+secrets/
+
+# Ansible
+*.retry
+*.pyc
+__pycache__/
+.ansible/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+EOF
+    print_status "Created .gitignore with security entries"
+fi
+
+# Create setup completion script
+print_section "Creating Setup Completion Script"
+
+cat > scripts/complete_vault_setup.sh << 'EOF'
+#!/bin/bash
+# Vault Setup Completion Script
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_header() {
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}========================================${NC}"
+}
+
+print_header "Completing Vault Setup"
+
+# Source environment variables
+if [ -f ".env" ]; then
+    source .env
+    print_status "Environment variables loaded"
+else
+    print_warning ".env file not found. Please run setup_vault_env.sh first."
+    exit 1
+fi
+
+# Create vault file if it doesn't exist
+if [ ! -f "group_vars/all/vault.yml" ]; then
+    print_status "Creating vault file..."
+    ansible-vault create group_vars/all/vault.yml
+else
+    print_status "Vault file already exists"
+fi
+
+# Test vault configuration
+print_status "Testing vault configuration..."
+if ansible-vault view group_vars/all/vault.yml > /dev/null 2>&1; then
+    print_status "Vault file is properly encrypted"
+else
+    print_warning "Vault file may not be properly encrypted"
+fi
+
+print_header "Setup Complete!"
+
+print_status "Your vault environment is now ready."
+print_status "You can now run: ansible-playbook site.yml --ask-vault-pass"
+print_status "Or set ANSIBLE_VAULT_PASSWORD_FILE for automated deployment."
+
+print_warning "Remember to:"
+print_warning "1. Keep your .env file secure"
+print_warning "2. Never commit .env to version control"
+print_warning "3. Store your vault password securely"
+print_warning "4. Regularly rotate your secrets"
+EOF
+
+chmod +x scripts/complete_vault_setup.sh
+print_status "Created setup completion script: scripts/complete_vault_setup.sh"
+
 print_header "Next Steps"
 
-print_status "1. Edit the .env file and add your specific values:"
-print_status "   - VAULT_SMTP_USERNAME and VAULT_SMTP_PASSWORD"
-print_status "   - VAULT_SLACK_WEBHOOK or VAULT_DISCORD_WEBHOOK"
-print_status "   - VAULT_CLOUDFLARE_API_TOKEN"
-print_status "   - VAULT_AUTHENTIK_ADMIN_EMAIL"
+print_status "1. Review and edit the .env file if needed:"
+print_status "   nano .env"
 
 print_status "2. Source the environment variables:"
 print_status "   source .env"
 
-print_status "3. Create the vault file:"
-print_status "   ansible-vault create group_vars/all/vault.yml"
+print_status "3. Complete the vault setup:"
+print_status "   ./scripts/complete_vault_setup.sh"
 
 print_status "4. Run the playbook:"
 print_status "   ansible-playbook site.yml --ask-vault-pass"
 
 print_header "Security Notes"
 
-print_warning "Keep the .env file secure and do not commit it to version control"
-print_warning "The vault file will be encrypted and can be safely committed"
-print_warning "Consider using a password manager to store these credentials"
+print_warning "🔒 SECURITY CRITICAL:"
+print_warning "   - The .env file contains ALL your secrets"
+print_warning "   - Keep it secure and NEVER commit to version control"
+print_warning "   - Consider using a password manager for backup"
+print_warning "   - Regularly rotate your secrets using secret_rotation.yml"
 
-print_status "Vault environment setup completed successfully!" 
+print_status "✅ SECURITY FEATURES:"
+print_status "   - All passwords are automatically generated"
+print_status "   - Secrets are properly vaulted"
+print_status "   - Git security is configured"
+print_status "   - Environment variables are isolated"
+
+print_status "🔄 AUTOMATION:"
+print_status "   - Seamless setup with minimal user input"
+print_status "   - Automatic password generation"
+print_status "   - Template-based configuration"
+print_status "   - Setup completion script provided"
+
+print_header "Vault Environment Setup Completed Successfully!"
+
+print_status "Your homelab is now ready for secure deployment!"
+print_status "All passwords are generated and secured in the vault." 

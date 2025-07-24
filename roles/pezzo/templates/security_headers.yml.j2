@@ -1,0 +1,118 @@
+# Pezzo Security Headers Configuration
+# Security headers for Traefik middleware
+
+# Content Security Policy
+content_security_policy:
+  enabled: true
+  value: |
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net;
+    font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net;
+    img-src 'self' data: https:;
+    connect-src 'self' https://api.{{ pezzo_subdomain }}.{{ domain }} wss://{{ pezzo_subdomain }}.{{ domain }};
+    frame-src 'none';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    upgrade-insecure-requests;
+
+# HTTP Strict Transport Security
+hsts:
+  enabled: true
+  max_age: 31536000
+  include_subdomains: true
+  preload: true
+
+# X-Frame-Options
+x_frame_options:
+  enabled: true
+  value: "DENY"
+
+# X-Content-Type-Options
+x_content_type_options:
+  enabled: true
+  value: "nosniff"
+
+# X-XSS-Protection
+x_xss_protection:
+  enabled: true
+  value: "1; mode=block"
+
+# Referrer Policy
+referrer_policy:
+  enabled: true
+  value: "strict-origin-when-cross-origin"
+
+# Permissions Policy
+permissions_policy:
+  enabled: true
+  value: |
+    accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+
+# Cross-Origin Resource Policy
+cross_origin_resource_policy:
+  enabled: true
+  value: "same-origin"
+
+# Cross-Origin Embedder Policy
+cross_origin_embedder_policy:
+  enabled: true
+  value: "require-corp"
+
+# Cross-Origin Opener Policy
+cross_origin_opener_policy:
+  enabled: true
+  value: "same-origin"
+
+# Custom headers
+custom_headers:
+  X-Powered-By: "Pezzo AI Platform"
+  X-Server: "Pezzo/1.0"
+  X-Request-ID: "{{ .RequestID }}"
+
+# Rate limiting
+rate_limiting:
+  enabled: {{ pezzo_rate_limiting | default(true) }}
+  requests_per_second: {{ pezzo_rate_limit_requests | default(100) }}
+  burst: 50
+  window: {{ pezzo_rate_limit_window | default(60) }}
+
+# IP filtering
+ip_filtering:
+  enabled: false
+  whitelist: []
+  blacklist: []
+  allow_private: true
+  allow_loopback: true
+
+# CORS configuration
+cors:
+  enabled: {{ pezzo_cors_enabled | default(false) }}
+  allowed_origins: {{ pezzo_cors_origins | default([]) }}
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["Content-Type", "Authorization", "X-Requested-With"]
+  allow_credentials: true
+  max_age: 86400
+
+# Authentication headers
+auth_headers:
+  enabled: true
+  require_auth: true
+  auth_header: "Authorization"
+  auth_type: "Bearer"
+  session_cookie: "pezzo_session"
+  csrf_cookie: "pezzo_csrf"
+  csrf_header: "X-CSRF-Token"
+
+# Security monitoring
+monitoring:
+  enabled: true
+  log_violations: true
+  alert_on_violations: true
+  metrics:
+    security_events: true
+    blocked_requests: true
+    auth_failures: true
+    rate_limit_hits: true 

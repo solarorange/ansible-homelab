@@ -1,0 +1,77 @@
+---
+# Resource Limits Validation
+# Validates that all services have proper resource limits configured
+
+- name: Validate resource limits for all services
+  block:
+    - name: Check Docker containers for resource limits
+      ansible.builtin.shell: |
+        docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+      register: docker_stats
+      changed_when: false
+
+    - name: Display resource usage
+      ansible.builtin.debug:
+        var: docker_stats.stdout_lines
+
+    - name: Check for containers without resource limits
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "Memory\|CpuShares\|MemorySwap"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_limits
+      changed_when: false
+
+    - name: Warn about containers without resource limits
+      ansible.builtin.debug:
+        msg: "Containers without resource limits: {{ containers_without_limits.stdout_lines }}"
+      when: containers_without_limits.stdout_lines | length > 0
+
+    - name: Validate resource limits in docker-compose files
+      ansible.builtin.find:
+        paths: "{{ docker_dir }}"
+        patterns: "docker-compose.yml"
+        recurse: yes
+      register: docker_compose_files
+
+    - name: Check resource limit syntax in docker-compose files
+      ansible.builtin.shell: |
+        for file in {{ docker_compose_files.files | map(attribute='path') | list | join(' ') }}; do
+          if [ -f "$file" ]; then
+            if ! grep -q "deploy:" "$file" || ! grep -q "resources:" "$file"; then
+              echo "Missing resource limits in: $file"
+            fi
+          fi
+        done
+      register: missing_resource_limits
+      changed_when: false
+
+    - name: Report missing resource limits
+      ansible.builtin.debug:
+        var: missing_resource_limits.stdout_lines
+      when: missing_resource_limits.stdout_lines | length > 0
+
+    - name: Check system resource usage
+      ansible.builtin.shell: |
+        echo "=== System Resource Usage ==="
+        echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)%"
+        echo "Memory Usage: $(free | grep Mem | awk '{printf "%.2f%%", $3/$2 * 100.0}')"
+        echo "Disk Usage: $(df -h / | awk 'NR==2 {print $5}')"
+      register: system_resource_usage
+      changed_when: false
+
+    - name: Display system resource usage
+      ansible.builtin.debug:
+        var: system_resource_usage.stdout_lines
+
+    - name: Check for resource exhaustion
+      ansible.builtin.assert:
+        that:
+          - ansible_memtotal_mb - ansible_memfree_mb < ansible_memtotal_mb * 0.9
+          - ansible_diskspace_available > 10
+        fail_msg: "System resources are critically low"
+      tags: [validation, resources, critical]
+
+  tags: [validation, resources] 

@@ -1,0 +1,99 @@
+version: '3.8'
+
+networks:
+  {{ ersatztv_network_name }}:
+    external: {{ ersatztv_network_external | lower }}
+
+services:
+  ersatztv:
+    image: "{{ ersatztv_image }}"
+    container_name: "{{ ersatztv_container_name }}"
+    restart: "{{ ersatztv_container_restart_policy }}"
+    networks:
+      - "{{ ersatztv_network_name }}"
+    environment:
+      - TZ={{ timezone }}
+      - PUID={{ user_id | default(1000) }}
+      - PGID={{ group_id | default(1000) }}
+      {% for env_var in ersatztv_environment %}
+      - {{ env_var }}
+      {% endfor %}
+      {% if ersatztv_hardware_acceleration == "vaapi" %}
+      - VAAPI_DEVICE={{ ersatztv_vaapi_device }}
+      {% endif %}
+      {% if ersatztv_hardware_acceleration == "nvenc" %}
+      - NVIDIA_VISIBLE_DEVICES={{ ersatztv_nvidia_visible_devices }}
+      {% endif %}
+    volumes:
+      - "{{ ersatztv_config_dir }}:/config"
+      - "{{ ersatztv_data_dir }}:/data"
+      - "{{ ersatztv_logs_dir }}:/logs"
+      - "{{ ersatztv_transcode_dir }}:/transcode"
+      - "{{ ersatztv_cache_dir }}:/cache"
+      {% for media_mount in ersatztv_media_mounts %}
+      - "{{ media_mount }}"
+      {% endfor %}
+    ports:
+      - "{{ ersatztv_port }}:{{ ersatztv_port }}"
+    {% if ersatztv_hardware_acceleration == "vaapi" %}
+    devices:
+      - "{{ ersatztv_vaapi_device }}:{{ ersatztv_vaapi_device }}"
+    {% endif %}
+    {% if ersatztv_hardware_acceleration == "nvenc" %}
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES={{ ersatztv_nvidia_visible_devices }}
+    {% endif %}
+    labels:
+      - "traefik.enable={{ 'true' if ersatztv_traefik_enabled else 'false' }}"
+      - "traefik.docker.network={{ ersatztv_network_name }}"
+      - "traefik.http.routers.ersatztv.rule=Host(`{{ ersatztv_domain }}`)"
+      - "traefik.http.routers.ersatztv.entrypoints=websecure"
+      - "traefik.http.routers.ersatztv.tls.certresolver={{ ersatztv_traefik_ssl_resolver }}"
+      - "traefik.http.services.ersatztv.loadbalancer.server.port={{ ersatztv_port }}"
+      {% if ersatztv_traefik_auth_enabled %}
+      - "traefik.http.middlewares.ersatztv-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.ersatztv-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.ersatztv.middlewares=ersatztv-auth"
+      {% endif %}
+      - "traefik.http.middlewares.ersatztv-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.ersatztv-headers.headers.customrequestheaders.X-Forwarded-Host={{ ersatztv_domain }}"
+      - "traefik.http.routers.ersatztv.middlewares=ersatztv-headers"
+      {% if ersatztv_prometheus_enabled %}
+      - "prometheus.enable=true"
+      - "prometheus.job=ersatztv"
+      - "prometheus.port={{ ersatztv_prometheus_port }}"
+      - "prometheus.path={{ ersatztv_prometheus_path }}"
+      {% endif %}
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=ersatztv"
+      - "homepage.group={{ ersatztv_homepage_group }}"
+      - "homepage.icon={{ ersatztv_homepage_icon }}"
+      - "homepage.description={{ ersatztv_homepage_description }}"
+      - "homepage.widget={{ ersatztv_homepage_widget }}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{ ersatztv_port }}/api/health"]
+      interval: "{{ ersatztv_healthcheck_interval }}"
+      timeout: "{{ ersatztv_healthcheck_timeout }}"
+      retries: {{ ersatztv_healthcheck_retries }}
+      start_period: "{{ ersatztv_healthcheck_start_period }}"
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ ersatztv_resources.limits.cpus }}'
+          memory: {{ ersatztv_resources.limits.memory }}
+        reservations:
+          cpus: '{{ ersatztv_resources.reservations.cpus }}'
+          memory: {{ ersatztv_resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

@@ -1,0 +1,191 @@
+---
+# Validate Immich Deployment
+# Production-ready deployment validation tasks for Immich
+
+- name: Validate Immich deployment
+  block:
+    - name: Check Immich container status
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      register: container_status
+      loop:
+        - "{{ immich_server_container_name }}"
+        - "{{ immich_web_container_name }}"
+        - "{{ immich_postgres_container_name }}"
+        - "{{ immich_redis_container_name }}"
+        - "{{ immich_ml_container_name }}"
+      tags: [immich, validation]
+
+    - name: Verify Immich containers are running
+      ansible.builtin.assert:
+        that:
+          - item.State.Status == "running"
+        fail_msg: "Container {{ item.Name }} is not running. Status: {{ item.State.Status }}"
+        success_msg: "Container {{ item.Name }} is running successfully"
+      loop: "{{ container_status.results }}"
+      tags: [immich, validation]
+
+    - name: Check Immich service health endpoints
+      ansible.builtin.uri:
+        url: "{{ item.url }}"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: health_checks
+      loop:
+        - url: "http://127.0.0.1:{{ immich_ports.server }}/api/health"
+          service: "Immich Server"
+        - url: "http://127.0.0.1:{{ immich_ports.web }}/health"
+          service: "Immich Web"
+        - url: "http://127.0.0.1:{{ immich_ports.machine_learning }}/health"
+          service: "Immich ML"
+      tags: [immich, validation]
+
+    - name: Verify Immich health checks
+      ansible.builtin.assert:
+        that:
+          - item.status == 200
+        fail_msg: "Health check failed for {{ item.item.service }}. Status: {{ item.status }}"
+        success_msg: "Health check passed for {{ item.item.service }}"
+      loop: "{{ health_checks.results }}"
+      tags: [immich, validation]
+
+    - name: Check Immich database connectivity
+      ansible.builtin.shell: |
+        docker exec {{ immich_postgres_container_name }} pg_isready -U {{ immich_database_user }} -d {{ immich_database_name }}
+      register: db_check
+      changed_when: false
+      tags: [immich, validation]
+
+    - name: Verify Immich database connectivity
+      ansible.builtin.assert:
+        that:
+          - db_check.rc == 0
+        fail_msg: "Database connectivity check failed"
+        success_msg: "Database connectivity check passed"
+      tags: [immich, validation]
+
+    - name: Check Immich Redis connectivity
+      ansible.builtin.shell: |
+        docker exec {{ immich_redis_container_name }} redis-cli -a {{ immich_redis_password }} ping
+      register: redis_check
+      changed_when: false
+      tags: [immich, validation]
+
+    - name: Verify Immich Redis connectivity
+      ansible.builtin.assert:
+        that:
+          - redis_check.stdout.strip() == "PONG"
+        fail_msg: "Redis connectivity check failed"
+        success_msg: "Redis connectivity check passed"
+      tags: [immich, validation]
+
+    - name: Check Immich port accessibility
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ item }}"
+        timeout: 30
+      loop:
+        - "{{ immich_ports.server }}"
+        - "{{ immich_ports.web }}"
+        - "{{ immich_ports.machine_learning }}"
+      tags: [immich, validation]
+
+    - name: Verify Immich Traefik integration
+      ansible.builtin.uri:
+        url: "https://{{ immich_subdomain }}.{{ domain }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 30
+        validate_certs: no
+      register: traefik_check
+      when: immich_traefik_enabled | default(true)
+      tags: [immich, validation]
+
+    - name: Verify Immich Traefik integration
+      ansible.builtin.assert:
+        that:
+          - traefik_check.status == 200
+        fail_msg: "Traefik integration check failed"
+        success_msg: "Traefik integration check passed"
+      when: immich_traefik_enabled | default(true)
+      tags: [immich, validation]
+
+    - name: Check Immich log files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: log_files
+      loop:
+        - "{{ logs_dir }}/immich/server/immich-server.log"
+        - "{{ logs_dir }}/immich/web/immich-web.log"
+        - "{{ logs_dir }}/immich/postgres/postgres.log"
+        - "{{ logs_dir }}/immich/redis/redis.log"
+        - "{{ logs_dir }}/immich/ml/immich-ml.log"
+      tags: [immich, validation]
+
+    - name: Verify Immich log files exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Log file {{ item.item }} does not exist"
+        success_msg: "Log file {{ item.item }} exists"
+      loop: "{{ log_files.results }}"
+      tags: [immich, validation]
+
+    - name: Check Immich backup configuration
+      ansible.builtin.stat:
+        path: "{{ immich_config_dir }}/backup.sh"
+      register: backup_script
+      tags: [immich, validation]
+
+    - name: Verify Immich backup script exists
+      ansible.builtin.assert:
+        that:
+          - backup_script.stat.exists
+        fail_msg: "Backup script does not exist"
+        success_msg: "Backup script exists"
+      tags: [immich, validation]
+
+    - name: Check Immich monitoring configuration
+      ansible.builtin.stat:
+        path: "{{ immich_config_dir }}/health-check.sh"
+      register: monitoring_script
+      tags: [immich, validation]
+
+    - name: Verify Immich monitoring script exists
+      ansible.builtin.assert:
+        that:
+          - monitoring_script.stat.exists
+        fail_msg: "Monitoring script does not exist"
+        success_msg: "Monitoring script exists"
+      tags: [immich, validation]
+
+    - name: Display Immich deployment validation summary
+      ansible.builtin.debug:
+        msg: |
+          Immich deployment validation completed successfully!
+          
+          Service Status:
+          - Server: Running
+          - Web: Running
+          - PostgreSQL: Running
+          - Redis: Running
+          - Machine Learning: Running
+          
+          Health Checks:
+          - API Health: OK
+          - Database: OK
+          - Redis: OK
+          - Traefik: OK
+          
+          Configuration:
+          - Backup: Configured
+          - Monitoring: Configured
+          - Logging: Configured
+          
+          Access URLs:
+          - Web Interface: https://{{ immich_subdomain }}.{{ domain }}
+          - API: https://{{ immich_subdomain }}.{{ domain }}/api
+      tags: [immich, validation]
+
+  tags: [immich, validation, always] 

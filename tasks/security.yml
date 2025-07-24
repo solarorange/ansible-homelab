@@ -279,7 +279,13 @@
     - name: Set AppArmor profiles to enforce mode
       ansible.builtin.shell: |
         aa-enforce /etc/apparmor.d/*
+      register: apparmor_enforce
       ignore_errors: true
+      
+    - name: Handle AppArmor enforce errors
+      ansible.builtin.debug:
+        msg: "AppArmor enforce completed with warnings: {{ apparmor_enforce.stderr | default('None') }}"
+      when: apparmor_enforce is failed
       # Sets all profiles to enforce mode
       # Provides maximum security
 
@@ -351,7 +357,13 @@
   block:
     - name: Update ClamAV signatures
       ansible.builtin.command: freshclam
+      register: clamav_update
       ignore_errors: true
+      
+    - name: Handle ClamAV update errors
+      ansible.builtin.debug:
+        msg: "ClamAV update completed with warnings: {{ clamav_update.stderr | default('None') }}"
+      when: clamav_update is failed
 
     - name: Configure ClamAV daemon
       ansible.builtin.lineinfile:
@@ -733,7 +745,7 @@
 
 - name: Create vault password file
   copy:
-    content: "{{ vault_password | default(lookup('password', '/dev/null length=32 chars=ascii_letters,digits')) }}"
+    content: "{{ vault_fail2ban_secret_key }}"
     dest: "{{ ansible_user_home }}/.ansible/vault_pass"
     mode: '0600'
   when: not vault_pass_file.stat.exists
@@ -765,20 +777,20 @@
         homelab_pub: "{{ lookup('file', ansible_user_home + '/.ssh/homelab_key.pub') }}"
       
       vault_credentials:
-        admin_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-        database_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+        admin_password: "{{ vault_fail2ban_secret_key }}"
+        database_password: "{{ vault_pihole_database_password }}"
         api_keys:
-          traefik: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-          portainer: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-          monitoring: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+          traefik: "{{ vault_traefik_api_key }}"
+          portainer: "{{ vault_portainer_api_key }}"
+          monitoring: "{{ vault_grafana_api_key }}"
       
       vault_certificates:
-        ssl_cert: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-        ssl_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+        ssl_cert: "{{ vault_ssl_cert_key }}"
+        ssl_key: "{{ vault_ssl_private_key }}"
       
       vault_secrets:
-        jwt_secret: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
-        encryption_key: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+        jwt_secret: "{{ vault_jwt_secret }}"
+        encryption_key: "{{ vault_encryption_key }}"
     dest: "{{ playbook_dir }}/group_vars/all/vault.yml"
     mode: '0600'
   when: not vault_file.stat.exists

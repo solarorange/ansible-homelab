@@ -1,0 +1,145 @@
+---
+# Port Conflict Validation
+# Validates that no port conflicts exist before deploying services
+
+- name: Gather current port usage
+  ansible.builtin.shell: |
+    netstat -tlnp | grep LISTEN | awk '{print $4}' | sed 's/.*://' | sort -u
+  register: current_ports
+  changed_when: false
+  tags: [validation, ports]
+
+- name: Define service port mappings
+  ansible.builtin.set_fact:
+    service_ports:
+      traefik: 80,443,8080
+      authentik: 9000,9443
+      grafana: 3000
+      prometheus: 9090
+      influxdb: 8086
+      loki: 3100
+      promtail: 9080
+      alertmanager: 9093
+      blackbox_exporter: 9115
+      crowdsec: 8080
+      fail2ban: 8080
+      vault: 8200
+      wireguard: 51820
+      pihole: 53,80,443
+      nginx_proxy_manager: 80,443,81
+      fing: 3008
+      sabnzbd: 8080
+      qbittorrent: 8080,6881
+      sonarr: 8989
+      radarr: 7878
+      lidarr: 8686
+      readarr: 8787
+      prowlarr: 9696
+      bazarr: 6767
+      jellyfin: 8096
+      emby: 8096
+      tdarr: 8265
+      overseerr: 5055
+      tautulli: 8181
+      immich: 3001
+      calibre_web: 8083
+      audiobookshelf: 13378
+      komga: 8080
+      ersatztv: 8409
+      nextcloud: 8080
+      samba: 139,445
+      syncthing: 8384,22000
+      gitlab: 80,443,22
+      harbor: 80,443
+      minio: 9000,9001
+      paperless: 8010
+      bookstack: 6875
+      filebrowser: 8080
+      linkwarden: 3000
+      vaultwarden: 80
+      mosquitto: 1883,8883
+      zigbee2mqtt: 8080
+      home_assistant: 8123
+      nodered: 1880
+      n8n: 5678
+      pezzo: 3000
+      backup: 8080
+      kopia: 51515
+      homepage: 3000
+      portainer: 9000
+      watchtower: 8080
+  tags: [validation, ports]
+
+- name: Parse current ports into list
+  ansible.builtin.set_fact:
+    used_ports: "{{ current_ports.stdout_lines | map('int') | list }}"
+  tags: [validation, ports]
+
+- name: Validate port assignments for enabled services
+  ansible.builtin.assert:
+    that:
+      - item.port not in used_ports
+    fail_msg: |
+      Port conflict detected for service {{ item.service }}:
+      - Port {{ item.port }} is already in use
+      - Currently used ports: {{ used_ports | join(', ') }}
+      - Please reconfigure {{ item.service }} to use a different port
+  loop: "{{ enabled_services | map('extract', service_ports) | list | map('split', ',') | flatten | map('int') | map('combine', {'service': enabled_services}) }}"
+  when: 
+    - item in enabled_services
+    - service_ports[item] is defined
+  tags: [validation, ports]
+
+- name: Check for port conflicts between services
+  ansible.builtin.assert:
+    that:
+      - service_ports[item] not in (enabled_services | map('extract', service_ports) | list | map('split', ',') | flatten | map('int') | list | difference([service_ports[item]]))
+    fail_msg: |
+      Port conflict detected between services:
+      - Service {{ item }} uses port(s): {{ service_ports[item] }}
+      - This conflicts with another enabled service
+      - Please reconfigure one of the services to use different ports
+  loop: "{{ enabled_services }}"
+  when: 
+    - item in enabled_services
+    - service_ports[item] is defined
+  tags: [validation, ports]
+
+- name: Validate Docker port mappings
+  ansible.builtin.assert:
+    that:
+      - docker_port_mappings[item] is not defined or docker_port_mappings[item] not in used_ports
+    fail_msg: |
+      Docker port mapping conflict for {{ item }}:
+      - Port {{ docker_port_mappings[item] }} conflicts with system port
+      - Please reconfigure Docker port mapping
+  loop: "{{ enabled_services }}"
+  when: 
+    - item in enabled_services
+    - docker_port_mappings is defined
+    - docker_port_mappings[item] is defined
+  tags: [validation, ports]
+
+- name: Display port validation summary
+  ansible.builtin.debug:
+    msg: |
+      Port Validation Summary:
+      - Total services to deploy: {{ enabled_services | length }}
+      - Ports currently in use: {{ used_ports | length }}
+      - Port validation: PASSED
+      - No conflicts detected
+  when: enabled_services | length > 0
+  tags: [validation, ports]
+
+- name: Create port usage report
+  ansible.builtin.template:
+    src: templates/port_usage_report.j2
+    dest: "{{ logs_dir }}/port_validation_report.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  vars:
+    report_timestamp: "{{ ansible_date_time.iso8601 }}"
+    total_services: "{{ enabled_services | length }}"
+    total_ports: "{{ used_ports | length }}"
+  tags: [validation, ports] 

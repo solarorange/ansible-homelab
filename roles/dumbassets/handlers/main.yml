@@ -1,0 +1,65 @@
+---
+# DumbAssets Role Handlers
+# Service restart and reload handlers
+
+- name: restart dumbassets
+  community.docker.docker_compose:
+    project_src: "{{ dumbassets_docker_dir }}"
+    state: present
+    restarted: true
+  listen: "restart dumbassets"
+
+- name: reload dumbassets
+  community.docker.docker_compose:
+    project_src: "{{ dumbassets_docker_dir }}"
+    state: present
+    pull: true
+  listen: "reload dumbassets"
+
+- name: stop dumbassets
+  community.docker.docker_compose:
+    project_src: "{{ dumbassets_docker_dir }}"
+    state: absent
+  listen: "stop dumbassets"
+
+- name: start dumbassets
+  community.docker.docker_compose:
+    project_src: "{{ dumbassets_docker_dir }}"
+    state: present
+  listen: "start dumbassets"
+
+- name: reload prometheus
+  community.docker.docker_container:
+    name: prometheus
+    restart: true
+  listen: "reload prometheus"
+
+- name: reload grafana
+  community.docker.docker_container:
+    name: grafana
+    restart: true
+  listen: "reload grafana"
+
+- name: reload loki
+  community.docker.docker_container:
+    name: loki
+    restart: true
+  listen: "reload loki"
+
+- name: reload alertmanager
+  community.docker.docker_container:
+    name: alertmanager
+    restart: true
+  listen: "reload alertmanager"
+
+- name: reload homepage
+  community.docker.docker_container:
+    name: homepage
+    restart: true
+  listen: "reload homepage"
+
+- name: restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  listen: "restart fail2ban" 

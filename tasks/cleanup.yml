@@ -39,7 +39,13 @@
       ansible.builtin.shell: |
         docker image prune -f
       changed_when: false
+      register: docker_prune
       ignore_errors: true
+      
+    - name: Handle Docker prune errors
+      ansible.builtin.debug:
+        msg: "Docker prune completed with warnings: {{ docker_prune.stderr | default('None') }}"
+      when: docker_prune is failed
 
 - name: System log cleanup
   block:
@@ -58,19 +64,37 @@
       loop:
         - /tmp/*
         - /var/tmp/*
+      register: temp_cleanup
       ignore_errors: true
+      
+    - name: Handle temporary file cleanup errors
+      ansible.builtin.debug:
+        msg: "Temporary file cleanup completed with warnings for some files"
+      when: temp_cleanup.results | selectattr('failed', 'equalto', true) | list | length > 0
 
 - name: Optimize system performance
   block:
     - name: Update locate database
       ansible.builtin.command: updatedb
       changed_when: false
+      register: updatedb_result
       ignore_errors: true
+      
+    - name: Handle updatedb errors
+      ansible.builtin.debug:
+        msg: "Updatedb completed with warnings: {{ updatedb_result.stderr | default('None') }}"
+      when: updatedb_result is failed
 
     - name: Rebuild font cache
       ansible.builtin.command: fc-cache -f -v
       changed_when: false
+      register: fc_cache_result
       ignore_errors: true
+      
+    - name: Handle font cache errors
+      ansible.builtin.debug:
+        msg: "Font cache rebuild completed with warnings: {{ fc_cache_result.stderr | default('None') }}"
+      when: fc_cache_result is failed
 
     - name: Update shared library cache
       ansible.builtin.command: ldconfig

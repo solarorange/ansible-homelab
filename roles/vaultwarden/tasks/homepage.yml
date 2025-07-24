@@ -1,0 +1,88 @@
+---
+# Vaultwarden Homepage Integration
+# Configures Vaultwarden integration with Homepage dashboard
+
+- name: Update Homepage services configuration for Vaultwarden
+  ansible.builtin.template:
+    src: homepage-services.yml.j2
+    dest: "{{ homepage_config_dir }}/services.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_homepage_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, services]
+
+- name: Update Homepage bookmarks configuration for Vaultwarden
+  ansible.builtin.template:
+    src: homepage-bookmarks.yml.j2
+    dest: "{{ homepage_config_dir }}/bookmarks.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_homepage_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, bookmarks]
+
+- name: Update Homepage widgets configuration for Vaultwarden
+  ansible.builtin.template:
+    src: homepage-widgets.yml.j2
+    dest: "{{ homepage_config_dir }}/widgets.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_homepage_widget_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, widgets]
+
+- name: Create Vaultwarden icon for Homepage
+  ansible.builtin.copy:
+    src: "{{ vaultwarden_homepage_icon }}"
+    dest: "{{ homepage_config_dir }}/icons/{{ vaultwarden_homepage_icon }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_homepage_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, icons]
+
+- name: Restart Homepage service for Vaultwarden integration
+  ansible.builtin.systemd:
+    name: homepage
+    state: restarted
+  when: vaultwarden_homepage_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, restart]
+
+- name: Verify Vaultwarden Homepage integration
+  ansible.builtin.uri:
+    url: "http://localhost:{{ homepage_port }}/api/services"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 10
+  register: vaultwarden_homepage_verification
+  when: vaultwarden_homepage_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-homepage, verify]
+
+- name: Display Vaultwarden Homepage integration status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN HOMEPAGE INTEGRATION STATUS
+      ========================================
+      
+      Homepage Integration:
+      - Enabled: {{ 'YES' if vaultwarden_homepage_enabled else 'NO' }}
+      - Category: {{ vaultwarden_homepage_category }}
+      - Description: {{ vaultwarden_homepage_description }}
+      - Icon: {{ vaultwarden_homepage_icon }}
+      - Widget Enabled: {{ 'YES' if vaultwarden_homepage_widget_enabled else 'NO' }}
+      
+      Service Configuration:
+      - URL: https://{{ vaultwarden_subdomain }}.{{ domain }}
+      - Health Check: http://vaultwarden:{{ vaultwarden_port }}/alive
+      - API Key: {{ 'CONFIGURED' if vault_homepage_api_keys.vaultwarden else 'NOT CONFIGURED' }}
+      
+      Integration Status:
+      - Services Config: {{ 'UPDATED' if vaultwarden_homepage_enabled else 'SKIPPED' }}
+      - Bookmarks Config: {{ 'UPDATED' if vaultwarden_homepage_enabled else 'SKIPPED' }}
+      - Widgets Config: {{ 'UPDATED' if vaultwarden_homepage_widget_enabled else 'SKIPPED' }}
+      - Icon: {{ 'CREATED' if vaultwarden_homepage_enabled else 'SKIPPED' }}
+      
+      ========================================
+  tags: [vaultwarden, vaultwarden-homepage, summary] 

@@ -1,0 +1,51 @@
+---
+# Reconya Configuration Validation
+# Validate all configuration parameters before deployment
+
+- name: Validate Reconya configuration parameters
+  block:
+    - name: Check if Reconya is enabled
+      ansible.builtin.assert:
+        that:
+          - reconya_enabled is defined
+          - reconya_enabled | bool
+        fail_msg: "Reconya is not enabled in configuration"
+        success_msg: "Reconya is enabled"
+
+    - name: Validate Reconya network configuration
+      ansible.builtin.assert:
+        that:
+          - reconya_network_range is defined
+          - reconya_network_range is match("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}/[0-9]{1,2}$")
+        fail_msg: "Invalid network range format. Expected format: 192.168.1.0/24"
+        success_msg: "Network range is valid"
+
+    - name: Validate Reconya port configuration
+      ansible.builtin.assert:
+        that:
+          - reconya_port is defined
+          - reconya_port is number
+          - reconya_port >= 1024
+          - reconya_port <= 65535
+        fail_msg: "Invalid port number. Must be between 1024 and 65535"
+        success_msg: "Port configuration is valid"
+
+    - name: Validate Reconya authentication configuration
+      ansible.builtin.assert:
+        that:
+          - reconya_admin_username is defined
+          - reconya_admin_username | length > 0
+          - reconya_admin_password is defined
+          - reconya_admin_password | length > 0
+        fail_msg: "Authentication credentials must be configured"
+        success_msg: "Authentication configuration is valid"
+
+    - name: Validate Reconya database configuration
+      ansible.builtin.assert:
+        that:
+          - reconya_database_type is defined
+          - reconya_database_type in ["sqlite", "postgresql", "mysql"]
+        fail_msg: "Invalid database type. Supported: sqlite, postgresql, mysql"
+        success_msg: "Database configuration is valid"
+
+  tags: [reconya, validation] 

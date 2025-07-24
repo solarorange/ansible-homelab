@@ -83,7 +83,13 @@
     - name: Reset UFW to defaults
       community.general.ufw:
         state: reset
+      register: ufw_reset
       ignore_errors: true
+      
+    - name: Handle UFW reset errors
+      ansible.builtin.debug:
+        msg: "UFW reset completed with warnings: {{ ufw_reset.stderr | default('None') }}"
+      when: ufw_reset is failed
 
     - name: Set UFW default policies
       community.general.ufw:
@@ -292,7 +298,15 @@
           echo -e "\nReal-time Monitor (10 seconds):"
           vnstat -l -i {{ ansible_default_ipv4.interface }} &
           VNSTAT_PID=$!
-          sleep 10
+          
+          # Wait for real-time monitoring with proper timeout
+          timeout=10
+          counter=0
+          while [ $counter -lt $timeout ]; do
+              sleep 1
+              counter=$((counter + 1))
+          done
+          
           kill $VNSTAT_PID 2>/dev/null
         dest: "{{ config_dir }}/bandwidth-report.sh"
         owner: "{{ username }}"

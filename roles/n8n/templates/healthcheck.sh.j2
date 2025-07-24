@@ -1,0 +1,116 @@
+#!/bin/bash
+# n8n Health Check Script
+# Monitor n8n service health and send alerts if needed
+
+set -euo pipefail
+
+# Configuration
+SERVICE_NAME="n8n"
+HEALTH_URL="http://localhost:{{ n8n_port }}/healthz"
+LOG_FILE="{{ n8n_health_check_log_file }}"
+MAX_LOG_SIZE="{{ n8n_health_check_max_log_size | default('10M') }}"
+RETENTION_DAYS="{{ n8n_health_check_retention_days | default(7) }}"
+TIMEOUT="{{ n8n_health_check_timeout | default(30) }}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Check if log file exists and rotate if needed
+if [[ -f "$LOG_FILE" ]]; then
+    LOG_SIZE=$(du -h "$LOG_FILE" | cut -f1)
+    if [[ "$LOG_SIZE" > "$MAX_LOG_SIZE" ]]; then
+        mv "$LOG_FILE" "${LOG_FILE}.old"
+        log "Log file rotated"
+    fi
+fi
+
+# Clean up old log files
+find "$(dirname "$LOG_FILE")" -name "*.old" -mtime +$RETENTION_DAYS -delete 2>/dev/null || true
+
+# Health check function
+check_health() {
+    local response_code
+    local response_time
+    
+    # Check if n8n container is running
+    if ! docker ps --format "table {{.Names}}" | grep -q "n8n-app"; then
+        log "${RED}ERROR: n8n container is not running${NC}"
+        return 1
+    fi
+    
+    # Check health endpoint
+    response_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$HEALTH_URL" || echo "000")
+    response_time=$(curl -s -o /dev/null -w "%{time_total}" --max-time $TIMEOUT "$HEALTH_URL" || echo "0")
+    
+    if [[ "$response_code" == "200" ]]; then
+        log "${GREEN}SUCCESS: n8n is healthy (${response_time}s)${NC}"
+        return 0
+    else
+        log "${RED}ERROR: n8n health check failed (HTTP $response_code)${NC}"
+        return 1
+    fi
+}
+
+# Check database connectivity
+check_database() {
+    if docker exec n8n-postgres pg_isready -U postgres >/dev/null 2>&1; then
+        log "${GREEN}SUCCESS: Database connection is healthy${NC}"
+        return 0
+    else
+        log "${RED}ERROR: Database connection failed${NC}"
+        return 1
+    fi
+}
+
+# Check resource usage
+check_resources() {
+    local cpu_usage
+    local memory_usage
+    
+    cpu_usage=$(docker stats n8n-app --no-stream --format "{{.CPUPerc}}" | sed 's/%//')
+    memory_usage=$(docker stats n8n-app --no-stream --format "{{.MemPerc}}" | sed 's/%//')
+    
+    log "Resource Usage - CPU: ${cpu_usage}%, Memory: ${memory_usage}%"
+    
+    # Alert if usage is high
+    if (( $(echo "$cpu_usage > 80" | bc -l) )); then
+        log "${YELLOW}WARNING: High CPU usage (${cpu_usage}%)${NC}"
+    fi
+    
+    if (( $(echo "$memory_usage > 80" | bc -l) )); then
+        log "${YELLOW}WARNING: High memory usage (${memory_usage}%)${NC}"
+    fi
+}
+
+# Main health check
+main() {
+    log "Starting n8n health check..."
+    
+    local health_status=0
+    local db_status=0
+    
+    # Perform health checks
+    check_health || health_status=1
+    check_database || db_status=1
+    check_resources
+    
+    # Overall status
+    if [[ $health_status -eq 0 && $db_status -eq 0 ]]; then
+        log "${GREEN}n8n health check completed successfully${NC}"
+        exit 0
+    else
+        log "${RED}n8n health check failed${NC}"
+        exit 1
+    fi
+}
+
+# Run main function
+main "$@" 

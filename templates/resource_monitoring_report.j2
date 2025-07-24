@@ -1,0 +1,124 @@
+# Resource Monitoring Report
+# Generated: {{ report_timestamp }}
+
+## System Information
+- Host: {{ inventory_hostname }}
+- System: {{ system_info }}
+- User: {{ ansible_user }}
+- Timestamp: {{ report_timestamp }}
+
+## Resource Usage Summary
+- CPU Usage: {{ cpu_usage }}%
+- Memory Usage: {{ memory_usage }}%
+- Disk Usage: {{ disk_usage }}%
+- Load Average: {{ system_resources.stdout_lines[4] | regex_search('Load Average: (.+)') | regex_replace('Load Average: (.+)', '\\1') }}
+- Active Connections: {{ system_resources.stdout_lines[5] | regex_search('Active Connections: (\\d+)') | regex_replace('Active Connections: (\\d+)', '\\1') | int }}
+
+## Resource Thresholds
+- CPU Warning: {{ resource_thresholds.cpu_warning }}%
+- CPU Critical: {{ resource_thresholds.cpu_critical }}%
+- Memory Warning: {{ resource_thresholds.memory_warning }}%
+- Memory Critical: {{ resource_thresholds.memory_critical }}%
+- Disk Warning: {{ resource_thresholds.disk_warning }}%
+- Disk Critical: {{ resource_thresholds.disk_critical }}%
+
+## Status Assessment
+{% if cpu_usage >= resource_thresholds.cpu_critical %}
+- CPU: CRITICAL ({{ cpu_usage }}% > {{ resource_thresholds.cpu_critical }}%)
+{% elif cpu_usage >= resource_thresholds.cpu_warning %}
+- CPU: WARNING ({{ cpu_usage }}% > {{ resource_thresholds.cpu_warning }}%)
+{% else %}
+- CPU: OK ({{ cpu_usage }}% < {{ resource_thresholds.cpu_warning }}%)
+{% endif %}
+
+{% if memory_usage >= resource_thresholds.memory_critical %}
+- Memory: CRITICAL ({{ memory_usage }}% > {{ resource_thresholds.memory_critical }}%)
+{% elif memory_usage >= resource_thresholds.memory_warning %}
+- Memory: WARNING ({{ memory_usage }}% > {{ resource_thresholds.memory_warning }}%)
+{% else %}
+- Memory: OK ({{ memory_usage }}% < {{ resource_thresholds.memory_warning }}%)
+{% endif %}
+
+{% if disk_usage >= resource_thresholds.disk_critical %}
+- Disk: CRITICAL ({{ disk_usage }}% > {{ resource_thresholds.disk_critical }}%)
+{% elif disk_usage >= resource_thresholds.disk_warning %}
+- Disk: WARNING ({{ disk_usage }}% > {{ resource_thresholds.disk_warning }}%)
+{% else %}
+- Disk: OK ({{ disk_usage }}% < {{ resource_thresholds.disk_warning }}%)
+{% endif %}
+
+## Docker Container Resources
+{% if container_stats | length > 0 %}
+### Container Usage Summary
+- Total Containers: {{ container_stats | length }}
+- High Resource Containers: {{ high_resource_containers | length }}
+
+### Container Details
+{% for container in container_stats %}
+#### {{ container[0] }}
+- CPU Usage: {{ container[1] }}
+- Memory Usage: {{ container[2] }}
+- Memory Percentage: {{ container[3] }}
+- Network I/O: {{ container[4] }}
+- Block I/O: {{ container[5] }}
+{% endfor %}
+
+{% if high_resource_containers | length > 0 %}
+### High Resource Containers
+{% for container in high_resource_containers %}
+- {{ container[0] }}: CPU {{ container[1] }}, Memory {{ container[3] }}
+{% endfor %}
+{% endif %}
+{% else %}
+No Docker containers running
+{% endif %}
+
+## Recommendations
+{% if cpu_usage >= resource_thresholds.cpu_warning %}
+1. **CPU Optimization Needed:**
+   - Consider scaling services horizontally
+   - Optimize resource-intensive processes
+   - Review and adjust CPU limits for containers
+{% endif %}
+
+{% if memory_usage >= resource_thresholds.memory_warning %}
+2. **Memory Optimization Needed:**
+   - Review memory usage by containers
+   - Consider adding more RAM
+   - Optimize application memory usage
+   - Implement memory limits for containers
+{% endif %}
+
+{% if disk_usage >= resource_thresholds.disk_warning %}
+3. **Disk Space Optimization Needed:**
+   - Clean up old logs and temporary files
+   - Review Docker image and container cleanup
+   - Consider expanding storage capacity
+   - Implement log rotation policies
+{% endif %}
+
+{% if high_resource_containers | length > 0 %}
+4. **Container Optimization:**
+   - Review resource limits for high-usage containers
+   - Consider container-specific optimizations
+   - Monitor for memory leaks or inefficient processes
+{% endif %}
+
+## System Health Score
+{% set health_score = 100 %}
+{% if cpu_usage >= resource_thresholds.cpu_critical %}{% set health_score = health_score - 30 %}{% elif cpu_usage >= resource_thresholds.cpu_warning %}{% set health_score = health_score - 15 %}{% endif %}
+{% if memory_usage >= resource_thresholds.memory_critical %}{% set health_score = health_score - 30 %}{% elif memory_usage >= resource_thresholds.memory_warning %}{% set health_score = health_score - 15 %}{% endif %}
+{% if disk_usage >= resource_thresholds.disk_critical %}{% set health_score = health_score - 30 %}{% elif disk_usage >= resource_thresholds.disk_warning %}{% set health_score = health_score - 15 %}{% endif %}
+{% if high_resource_containers | length > 0 %}{% set health_score = health_score - 10 %}{% endif %}
+
+**Overall System Health: {{ health_score }}/100**
+{% if health_score >= 80 %}
+- Status: HEALTHY
+{% elif health_score >= 60 %}
+- Status: WARNING
+{% else %}
+- Status: CRITICAL
+{% endif %}
+
+---
+Report generated by Ansible Homelab Resource Monitoring 

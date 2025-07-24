@@ -1,0 +1,116 @@
+---
+# Vaultwarden Configuration Validation
+# Validates all configuration parameters and system requirements
+
+- name: Validate Vaultwarden basic configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_enabled is defined
+      - vaultwarden_subdomain is defined
+      - vaultwarden_port is defined
+      - vaultwarden_database_type in ['sqlite', 'postgresql']
+    fail_msg: "Invalid Vaultwarden basic configuration"
+  tags: [vaultwarden, vaultwarden-validation, config]
+
+- name: Validate Vaultwarden network configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_network_name is defined
+      - vaultwarden_traefik_enabled is defined
+      - vaultwarden_traefik_network is defined
+    fail_msg: "Invalid Vaultwarden network configuration"
+  tags: [vaultwarden, vaultwarden-validation, network]
+
+- name: Validate Vaultwarden security configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_security_headers is defined
+      - vaultwarden_rate_limiting is defined
+      - vaultwarden_cors_enabled is defined
+    fail_msg: "Invalid Vaultwarden security configuration"
+  tags: [vaultwarden, vaultwarden-validation, security]
+
+- name: Validate Vaultwarden monitoring configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_monitoring_enabled is defined
+      - vaultwarden_health_check_enabled is defined
+      - vaultwarden_prometheus_enabled is defined
+    fail_msg: "Invalid Vaultwarden monitoring configuration"
+  tags: [vaultwarden, vaultwarden-validation, monitoring]
+
+- name: Validate Vaultwarden backup configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_backup_enabled is defined
+      - vaultwarden_backup_retention_days is defined
+      - vaultwarden_backup_schedule is defined
+    fail_msg: "Invalid Vaultwarden backup configuration"
+  tags: [vaultwarden, vaultwarden-validation, backup]
+
+- name: Validate Vaultwarden homepage integration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_homepage_enabled is defined
+      - vaultwarden_homepage_category is defined
+      - vaultwarden_homepage_description is defined
+    fail_msg: "Invalid Vaultwarden homepage integration configuration"
+  tags: [vaultwarden, vaultwarden-validation, homepage]
+
+- name: Validate Vaultwarden port configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_port >= 1
+      - vaultwarden_port <= 65535
+      - vaultwarden_websocket_port >= 1
+      - vaultwarden_websocket_port <= 65535
+    fail_msg: "Invalid Vaultwarden port configuration"
+  tags: [vaultwarden, vaultwarden-validation, ports]
+
+- name: Validate Vaultwarden resource limits
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_memory_limit is defined
+      - vaultwarden_cpu_limit is defined
+      - vaultwarden_storage_limit is defined
+    fail_msg: "Invalid Vaultwarden resource limits configuration"
+  tags: [vaultwarden, vaultwarden-validation, resources]
+
+- name: Check Vaultwarden domain configuration
+  ansible.builtin.assert:
+    that:
+      - domain is defined
+      - vaultwarden_subdomain is defined
+    fail_msg: "Vaultwarden domain configuration is incomplete"
+  tags: [vaultwarden, vaultwarden-validation, domain]
+
+- name: Validate Vaultwarden database configuration
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_database_type in ['sqlite', 'postgresql']
+      - vaultwarden_database_type == 'sqlite' or (vaultwarden_database_host is defined and vaultwarden_database_port is defined)
+    fail_msg: "Invalid Vaultwarden database configuration"
+  tags: [vaultwarden, vaultwarden-validation, database]
+
+- name: Display Vaultwarden validation results
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN CONFIGURATION VALIDATION
+      ========================================
+      
+      Basic Configuration: ✓
+      Network Configuration: ✓
+      Security Configuration: ✓
+      Monitoring Configuration: ✓
+      Backup Configuration: ✓
+      Homepage Integration: ✓
+      Port Configuration: ✓
+      Resource Limits: ✓
+      Domain Configuration: ✓
+      Database Configuration: ✓
+      
+      All Vaultwarden configuration parameters are valid.
+      
+      ========================================
+  tags: [vaultwarden, vaultwarden-validation, summary] 

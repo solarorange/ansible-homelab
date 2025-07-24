@@ -341,13 +341,13 @@ media_players:
     environment:
       - DB_HOSTNAME=immich-postgres
       - DB_USERNAME=postgres
-      - DB_PASSWORD=postgres
+      - DB_PASSWORD={{ vault_media_database_password }}
       - DB_DATABASE_NAME=immich
       - REDIS_HOSTNAME=immich-redis
       - REDIS_PORT=6379
       - REDIS_DBINDEX=0
-      - REDIS_PASSWORD=redis
-      - JWT_SECRET={{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}
+      - REDIS_PASSWORD={{ vault_redis_password }}
+      - JWT_SECRET={{ vault_media_jwt_secret }}
       - NODE_ENV=production
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
@@ -394,7 +394,7 @@ media_immich_components:
       - "{{ logs_dir }}/immich/immich-postgres:/logs"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD={{ vault_media_database_password }}
       - POSTGRES_DB=immich
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -481,7 +481,7 @@ media_storage_limit: "500g"
 
 # Traefik Configuration
 media_traefik_enabled: true
-media_traefik_network: "{{ traefik_network | default('homelab') }}"
+media_traefik_network: "{{ traefik_network }}"
 media_traefik_middleware: "secure-headers,compress"
 media_traefik_auth_middleware: "authentik@docker"
 media_traefik_ssl_enabled: true
@@ -698,3 +698,11 @@ media_lidarr_api_key: "{{ vault_lidarr_api_key | default('') }}"
 media_readarr_api_key: "{{ vault_readarr_api_key | default('') }}"
 media_prowlarr_api_key: "{{ vault_prowlarr_api_key | default('') }}"
 media_bazarr_api_key: "{{ vault_bazarr_api_key | default('') }}"
+
+# Lidarr Additional Configuration
+media_lidarr_username: "{{ vault_lidarr_username }}"
+media_lidarr_password: "{{ vault_lidarr_password | default('') }}"
+media_lidarr_anonymous_id: "{{ vault_lidarr_anonymous_id | default('') }}"
+media_qbittorrent_username: "{{ vault_qbittorrent_username }}"
+media_qbittorrent_password: "{{ vault_qbittorrent_password | default('') }}"
+media_lastfm_username: "{{ vault_lastfm_username | default('') }}"

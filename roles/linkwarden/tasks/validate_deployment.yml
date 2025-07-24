@@ -1,0 +1,42 @@
+---
+# Linkwarden Deployment Validation
+# Validates Linkwarden deployment after completion
+
+- name: Validate Linkwarden service health
+  ansible.builtin.uri:
+    url: "http://localhost:{{ linkwarden_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: linkwarden_health_validation
+  tags: [linkwarden, validation]
+
+- name: Validate Linkwarden database connection
+  ansible.builtin.command: "{{ linkwarden_config_dir }}/scripts/healthcheck.sh"
+  register: linkwarden_db_validation
+  changed_when: linkwarden_db_validation.rc == 0
+  failed_when: linkwarden_db_validation.rc != 0
+  tags: [linkwarden, validation]
+
+- name: Validate Linkwarden external access
+  ansible.builtin.uri:
+    url: "https://{{ linkwarden_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 302]
+    timeout: 30
+  register: linkwarden_external_validation
+  tags: [linkwarden, validation]
+
+- name: Display Linkwarden validation results
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      LINKWARDEN VALIDATION RESULTS
+      ========================================
+      
+      Health Check: {{ 'PASS' if linkwarden_health_validation.status in [200, 302, 401] else 'FAIL' }}
+      Database: {{ 'PASS' if linkwarden_db_validation.rc == 0 else 'FAIL' }}
+      External Access: {{ 'PASS' if linkwarden_external_validation.status in [200, 302] else 'FAIL' }}
+      
+      ========================================
+  tags: [linkwarden, validation] 

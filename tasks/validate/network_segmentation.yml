@@ -1,0 +1,75 @@
+---
+# Network Segmentation Validation
+# Validates that proper network segmentation is implemented
+
+- name: Validate network segmentation
+  block:
+    - name: Check Docker networks
+      ansible.builtin.shell: |
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}\t{{.Internal}}"
+      register: docker_networks
+      changed_when: false
+
+    - name: Display network configuration
+      ansible.builtin.debug:
+        var: docker_networks.stdout_lines
+
+    - name: Validate network isolation
+      ansible.builtin.shell: |
+        for network in {{ docker_networks.stdout_lines | select('match', '^[a-zA-Z]') | map('regex_replace', '^([a-zA-Z0-9_-]+).*', '\\1') | list | join(' ') }}; do
+          if [ "$network" != "bridge" ] && [ "$network" != "host" ] && [ "$network" != "none" ]; then
+            echo "Checking network: $network"
+            docker network inspect "$network" | grep -E "(Internal|Subnet|Gateway)"
+          fi
+        done
+      register: network_inspection
+      changed_when: false
+
+    - name: Display network inspection results
+      ansible.builtin.debug:
+        var: network_inspection.stdout_lines
+
+    - name: Check for services on correct networks
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}\t{{.Networks}}" | while read container networks; do
+          container_name=$(echo "$container" | cut -f1)
+          network_list=$(echo "$container" | cut -f2)
+          echo "Container: $container_name, Networks: $network_list"
+        done
+      register: container_networks
+      changed_when: false
+
+    - name: Display container network assignments
+      ansible.builtin.debug:
+        var: container_networks.stdout_lines
+
+    - name: Validate service network assignments
+      ansible.builtin.assert:
+        that:
+          - docker_networks is success
+          - network_inspection is success
+        fail_msg: "Network validation failed"
+      tags: [validation, network]
+
+    - name: Check for services on public networks that should be internal
+      ansible.builtin.shell: |
+        for service in {{ service_network_assignments.backend | default([]) | join(' ') }}; do
+          if docker ps --format "{{.Names}}" | grep -q "$service"; then
+            networks=$(docker inspect "$service" | jq -r '.[0].NetworkSettings.Networks | keys[]')
+            for network in $networks; do
+              if [ "$network" = "frontend" ]; then
+                echo "WARNING: $service is on frontend network but should be internal"
+              fi
+            done
+          fi
+        done
+      register: network_violations
+      changed_when: false
+      when: service_network_assignments is defined
+
+    - name: Report network violations
+      ansible.builtin.debug:
+        var: network_violations.stdout_lines
+      when: network_violations.stdout_lines | length > 0
+
+  tags: [validation, network] 

@@ -1,0 +1,295 @@
+---
+# ErsatzTV Prerequisites Setup
+# Setup required directories, permissions, and dependencies
+
+- name: Create ErsatzTV user and group
+  ansible.builtin.user:
+    name: "{{ username }}"
+    group: "{{ username }}"
+    system: false
+    create_home: true
+    shell: /bin/bash
+    state: present
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV base directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  loop:
+    - "{{ ersatztv_config_dir }}"
+    - "{{ ersatztv_data_dir }}"
+    - "{{ ersatztv_logs_dir }}"
+    - "{{ ersatztv_transcode_dir }}"
+    - "{{ ersatztv_cache_dir }}"
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV subdirectories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  loop:
+    - "{{ ersatztv_config_dir }}/database"
+    - "{{ ersatztv_config_dir }}/logs"
+    - "{{ ersatztv_config_dir }}/cache"
+    - "{{ ersatztv_data_dir }}/media"
+    - "{{ ersatztv_data_dir }}/channels"
+    - "{{ ersatztv_data_dir }}/collections"
+    - "{{ ersatztv_data_dir }}/filler"
+    - "{{ ersatztv_logs_dir }}/application"
+    - "{{ ersatztv_logs_dir }}/transcoding"
+    - "{{ ersatztv_logs_dir }}/streaming"
+  tags: [ersatztv, setup]
+
+- name: Set proper permissions for ErsatzTV directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+    recurse: true
+  loop:
+    - "{{ ersatztv_config_dir }}"
+    - "{{ ersatztv_data_dir }}"
+    - "{{ ersatztv_logs_dir }}"
+    - "{{ ersatztv_transcode_dir }}"
+    - "{{ ersatztv_cache_dir }}"
+  tags: [ersatztv, setup]
+
+- name: Create Docker network for ErsatzTV
+  community.docker.docker_network:
+    name: "{{ ersatztv_network_name }}"
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: "172.23.0.0/16"
+        gateway: "172.23.0.1"
+  tags: [ersatztv, setup]
+
+- name: Install required system packages
+  ansible.builtin.package:
+    name:
+      - curl
+      - wget
+      - jq
+      - sqlite3
+      - ffmpeg
+    state: present
+  tags: [ersatztv, setup]
+
+- name: Check for hardware acceleration support
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: hw_accel_check
+  loop:
+    - "/dev/dri/renderD128"
+    - "/dev/dri/card0"
+    - "/dev/nvidia0"
+  tags: [ersatztv, setup]
+
+- name: Set hardware acceleration variables
+  ansible.builtin.set_fact:
+    ersatztv_vaapi_available: "{{ hw_accel_check.results[0].stat.exists }}"
+    ersatztv_nvidia_available: "{{ hw_accel_check.results[2].stat.exists }}"
+  tags: [ersatztv, setup]
+
+- name: Install VAAPI drivers if available
+  ansible.builtin.package:
+    name:
+      - intel-media-va-driver
+      - intel-media-va-driver-non-free
+    state: present
+  when: ersatztv_vaapi_available and ersatztv_hardware_acceleration == "vaapi"
+  tags: [ersatztv, setup]
+
+- name: Install NVIDIA drivers if available
+  ansible.builtin.package:
+    name:
+      - nvidia-container-toolkit
+      - nvidia-docker2
+    state: present
+  when: ersatztv_nvidia_available and ersatztv_hardware_acceleration == "nvenc"
+  tags: [ersatztv, setup]
+
+- name: Configure NVIDIA Docker runtime
+  ansible.builtin.lineinfile:
+    path: /etc/docker/daemon.json
+    regexp: '^  "default-runtime":'
+    line: '  "default-runtime": "nvidia",'
+    insertafter: '^{'
+    create: yes
+  when: ersatztv_nvidia_available and ersatztv_hardware_acceleration == "nvenc"
+  notify: restart docker
+  tags: [ersatztv, setup]
+
+- name: Add NVIDIA runtime configuration
+  ansible.builtin.lineinfile:
+    path: /etc/docker/daemon.json
+    regexp: '^  "runtimes":'
+    line: |
+      "runtimes": {
+        "nvidia": {
+          "path": "nvidia-container-runtime",
+          "runtimeArgs": []
+        }
+      }
+    insertafter: '^{'
+    create: yes
+  when: ersatztv_nvidia_available and ersatztv_hardware_acceleration == "nvenc"
+  notify: restart docker
+  tags: [ersatztv, setup]
+
+- name: Create logrotate configuration for ErsatzTV
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.d/ersatztv
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [ersatztv, setup]
+
+- name: Create systemd service file for ErsatzTV
+  ansible.builtin.template:
+    src: ersatztv.service.j2
+    dest: /etc/systemd/system/ersatztv.service
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [ersatztv, setup]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  tags: [ersatztv, setup]
+
+- name: Enable ErsatzTV service
+  ansible.builtin.systemd:
+    name: ersatztv
+    enabled: yes
+    state: stopped
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV configuration template
+  ansible.builtin.template:
+    src: appsettings.json.j2
+    dest: "{{ ersatztv_config_dir }}/appsettings.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ ersatztv_config_dir }}/.env"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV startup script
+  ansible.builtin.template:
+    src: start.sh.j2
+    dest: "{{ ersatztv_config_dir }}/start.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ ersatztv_config_dir }}/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ ersatztv_config_dir }}/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ ersatztv_config_dir }}/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV maintenance script
+  ansible.builtin.template:
+    src: maintenance.sh.j2
+    dest: "{{ ersatztv_config_dir }}/maintenance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV monitoring script
+  ansible.builtin.template:
+    src: monitoring.sh.j2
+    dest: "{{ ersatztv_config_dir }}/monitoring.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV log directory with proper permissions
+  ansible.builtin.file:
+    path: "{{ ersatztv_logs_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+    recurse: true
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV cache directory with proper permissions
+  ansible.builtin.file:
+    path: "{{ ersatztv_cache_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+    recurse: true
+  tags: [ersatztv, setup]
+
+- name: Create ErsatzTV transcode directory with proper permissions
+  ansible.builtin.file:
+    path: "{{ ersatztv_transcode_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+    recurse: true
+  tags: [ersatztv, setup]
+
+- name: Verify ErsatzTV prerequisites
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Prerequisites Summary:
+      - User: {{ username }}
+      - Config Directory: {{ ersatztv_config_dir }}
+      - Data Directory: {{ ersatztv_data_dir }}
+      - Logs Directory: {{ ersatztv_logs_dir }}
+      - Transcode Directory: {{ ersatztv_transcode_dir }}
+      - Cache Directory: {{ ersatztv_cache_dir }}
+      - Network: {{ ersatztv_network_name }}
+      - VAAPI Available: {{ ersatztv_vaapi_available }}
+      - NVIDIA Available: {{ ersatztv_nvidia_available }}
+      - Hardware Acceleration: {{ ersatztv_hardware_acceleration }}
+  tags: [ersatztv, setup] 

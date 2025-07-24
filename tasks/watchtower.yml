@@ -183,7 +183,7 @@
                 memory: 128M
           tmpfs:
             - /tmp
-          command: redis-server --requirepass {{ authentik_redis_password | default('changeme') }}
+          command: redis-server --requirepass {{ vault_authentik_redis_password }}
           volumes:
             - {{ data_dir }}/watchtower/authentik/redis:/data
             - {{ logs_dir }}/watchtower/authentik/redis:/logs
@@ -191,7 +191,7 @@
           networks:
             - security
           healthcheck:
-            test: ["CMD", "redis-cli", "-a", "{{ authentik_redis_password | default('changeme') }}", "ping"]
+            test: ["CMD", "redis-cli", "-a", "{{ vault_authentik_redis_password }}", "ping"]
             interval: 30s
             timeout: 10s
             retries: 3

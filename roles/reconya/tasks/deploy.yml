@@ -1,0 +1,119 @@
+---
+# Reconya Service Deployment
+# Deploy Reconya using Docker Compose with proper configuration
+
+- name: Deploy Reconya services
+  block:
+    - name: Create Reconya Docker Compose file
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ reconya_config_dir }}/docker-compose.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      register: reconya_compose_file
+
+    - name: Create Reconya environment file
+      ansible.builtin.template:
+        src: .env.j2
+        dest: "{{ reconya_config_dir }}/.env"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0600"
+      register: reconya_env_file
+
+    - name: Pull Reconya Docker images
+      community.docker.docker_image:
+        name: "{{ reconya_components.backend.image }}"
+        source: pull
+        force_source: true
+      register: reconya_image_pull
+
+    - name: Deploy Reconya containers
+      community.docker.docker_compose:
+        project_src: "{{ reconya_config_dir }}"
+        state: present
+        pull: true
+        build: false
+        remove_orphans: true
+      register: reconya_deploy
+      async: 300
+      poll: 10
+
+    - name: Wait for Reconya services to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ reconya_port }}"
+        timeout: 120
+        delay: 10
+      when: reconya_deploy is success
+      register: reconya_ready
+
+    - name: Verify Reconya container status
+      community.docker.docker_container_info:
+        name: "{{ reconya_backend_container_name }}"
+      register: reconya_container_info
+
+    - name: Display Reconya deployment status
+      ansible.builtin.debug:
+        msg: 
+          - "Reconya deployment completed successfully"
+          - "Container: {{ reconya_container_info.container.State.Status }}"
+          - "Port: {{ reconya_port }}"
+          - "URL: https://{{ reconya_subdomain }}.{{ domain }}"
+
+  tags: [reconya, deploy]
+
+- name: Configure Reconya post-deployment
+  block:
+    - name: Create Reconya health check script
+      ansible.builtin.template:
+        src: health_check.sh.j2
+        dest: "{{ reconya_config_dir }}/health_check.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: reconya_health_check_enabled | default(true)
+
+    - name: Create Reconya backup script
+      ansible.builtin.template:
+        src: backup.sh.j2
+        dest: "{{ reconya_config_dir }}/backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      when: reconya_backup_enabled | default(true)
+
+    - name: Set up Reconya log rotation
+      ansible.builtin.template:
+        src: logrotate.conf.j2
+        dest: "/etc/logrotate.d/reconya"
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      when: reconya_log_rotation | default(true)
+
+  tags: [reconya, deploy]
+
+- name: Configure Reconya monitoring
+  block:
+    - name: Create Reconya Prometheus configuration
+      ansible.builtin.template:
+        src: prometheus.yml.j2
+        dest: "{{ prometheus_config_dir }}/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_prometheus_enabled | default(true)
+
+    - name: Create Reconya Grafana dashboard
+      ansible.builtin.template:
+        src: grafana_dashboard.json.j2
+        dest: "{{ grafana_dashboards_dir }}/reconya.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_grafana_enabled | default(true)
+
+  tags: [reconya, deploy] 

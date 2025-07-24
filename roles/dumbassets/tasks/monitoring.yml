@@ -1,0 +1,80 @@
+---
+# DumbAssets Monitoring Tasks
+# Configure monitoring integration with Prometheus, Grafana, and logging
+
+- name: Create DumbAssets Prometheus monitoring configuration
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ docker_config_root }}/prometheus/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload prometheus
+  register: dumbassets_prometheus_config
+  tags: [dumbassets, monitoring, prometheus]
+
+- name: Create DumbAssets Grafana dashboard
+  ansible.builtin.template:
+    src: dashboard.json.j2
+    dest: "{{ docker_config_root }}/grafana/provisioning/dashboards/dumbassets.json"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload grafana
+  register: dumbassets_grafana_dashboard
+  tags: [dumbassets, monitoring, grafana]
+
+- name: Create DumbAssets logging configuration
+  ansible.builtin.template:
+    src: logging.yml.j2
+    dest: "{{ docker_config_root }}/loki/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload loki
+  register: dumbassets_logging_config
+  tags: [dumbassets, monitoring, logging]
+
+- name: Create DumbAssets alerting rules
+  ansible.builtin.template:
+    src: alerting.yml.j2
+    dest: "{{ docker_config_root }}/prometheus/rules/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload prometheus
+  register: dumbassets_alerting_rules
+  tags: [dumbassets, monitoring, alerting]
+
+- name: Configure DumbAssets log rotation
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: "/etc/logrotate.d/dumbassets"
+    owner: root
+    group: root
+    mode: "0644"
+  register: dumbassets_logrotate_config
+  tags: [dumbassets, monitoring, logging]
+
+- name: Create DumbAssets metrics endpoint configuration
+  ansible.builtin.template:
+    src: metrics.yml.j2
+    dest: "{{ docker_config_root }}/prometheus/targets/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload prometheus
+  register: dumbassets_metrics_config
+  tags: [dumbassets, monitoring, metrics]
+
+- name: Display DumbAssets monitoring configuration summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Monitoring Configuration Summary:
+      - Prometheus Config: {{ dumbassets_prometheus_config.changed }}
+      - Grafana Dashboard: {{ dumbassets_grafana_dashboard.changed }}
+      - Logging Config: {{ dumbassets_logging_config.changed }}
+      - Alerting Rules: {{ dumbassets_alerting_rules.changed }}
+      - Log Rotation: {{ dumbassets_logrotate_config.changed }}
+      - Metrics Endpoint: {{ dumbassets_metrics_config.changed }}
+  tags: [dumbassets, monitoring, summary] 

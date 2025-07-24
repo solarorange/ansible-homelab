@@ -1,0 +1,117 @@
+---
+# n8n Security Configuration
+# Configure security features, rate limiting, and access controls
+
+- name: Create n8n CrowdSec configuration
+  ansible.builtin.template:
+    src: crowdsec.yml.j2
+    dest: "{{ crowdsec_config_dir }}/n8n/crowdsec.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_crowdsec_enabled | default(true)
+  tags: [n8n, security]
+
+- name: Create n8n Fail2ban configuration
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "{{ fail2ban_config_dir }}/n8n/fail2ban.conf"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_fail2ban_enabled | default(true)
+  tags: [n8n, security]
+
+- name: Create n8n security headers configuration
+  ansible.builtin.template:
+    src: security-headers.yml.j2
+    dest: "{{ traefik_config_dir }}/n8n/security-headers.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_security_headers | default(true)
+  tags: [n8n, security]
+
+- name: Create n8n rate limiting configuration
+  ansible.builtin.template:
+    src: rate-limit.yml.j2
+    dest: "{{ traefik_config_dir }}/n8n/rate-limit.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_rate_limiting | default(true)
+  tags: [n8n, security]
+
+- name: Configure n8n firewall rules
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{ n8n_port }}"
+    action: accept
+    comment: "Allow n8n access"
+  when: n8n_firewall_enabled | default(true)
+  tags: [n8n, security]
+
+- name: Create n8n SSL configuration
+  ansible.builtin.template:
+    src: ssl.yml.j2
+    dest: "{{ traefik_config_dir }}/n8n/ssl.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_traefik_ssl_enabled | default(true)
+  tags: [n8n, security]
+
+- name: Set secure file permissions for n8n
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ n8n_config_dir }}/docker-compose.yml"
+    - "{{ n8n_backup_dir }}"
+  tags: [n8n, security]
+
+- name: Create n8n access control list
+  ansible.builtin.template:
+    src: acl.yml.j2
+    dest: "{{ n8n_config_dir }}/acl.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [n8n, security]
+
+- name: Restart security services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  loop:
+    - crowdsec
+    - fail2ban
+    - traefik
+  ignore_errors: true
+  tags: [n8n, security]
+
+- name: Verify n8n security configuration
+  ansible.builtin.uri:
+    url: "https://{{ n8n_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 401, 403]
+    timeout: 10
+    validate_certs: false
+  register: n8n_security_check
+  tags: [n8n, security]
+
+- name: Display n8n security status
+  ansible.builtin.debug:
+    msg: |
+      n8n Security Status:
+      - CrowdSec: {{ n8n_crowdsec_enabled | default(true) }}
+      - Fail2ban: {{ n8n_fail2ban_enabled | default(true) }}
+      - Security Headers: {{ n8n_security_headers | default(true) }}
+      - Rate Limiting: {{ n8n_rate_limiting | default(true) }}
+      - SSL: {{ n8n_traefik_ssl_enabled | default(true) }}
+      - Access Control: Enabled
+  tags: [n8n, security] 

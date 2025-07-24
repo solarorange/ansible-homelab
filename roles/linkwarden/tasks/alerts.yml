@@ -1,0 +1,33 @@
+---
+# Linkwarden Alerting Configuration
+# Configures alerting for Linkwarden
+
+- name: Configure AlertManager alerts for Linkwarden
+  ansible.builtin.template:
+    src: alertmanager-alerts.yml.j2
+    dest: "{{ alertmanager_config_dir }}/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_alerting_enabled | default(true)
+  tags: [linkwarden, alerts]
+
+- name: Configure Prometheus alert rules for Linkwarden
+  ansible.builtin.template:
+    src: prometheus-alerts.yml.j2
+    dest: "{{ prometheus_config_dir }}/alerts/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_alerting_enabled | default(true)
+  tags: [linkwarden, alerts]
+
+- name: Configure Grafana alerts for Linkwarden
+  ansible.builtin.template:
+    src: grafana-alerts.yml.j2
+    dest: "{{ grafana_config_dir }}/alerts/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_alerting_enabled | default(true)
+  tags: [linkwarden, alerts] 

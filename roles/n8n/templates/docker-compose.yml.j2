@@ -1,0 +1,99 @@
+version: '3.8'
+
+networks:
+  {{ n8n_network_name }}:
+    external: {{ n8n_network_external | lower }}
+
+services:
+  # n8n App
+  {% if n8n_components.app.enabled | default(true) %}
+  n8n-app:
+    image: "{{ n8n_components.app.image }}"
+    container_name: "{{ n8n_components.app.container_name }}"
+    restart: "{{ n8n_container_restart_policy }}"
+    networks:
+      - "{{ n8n_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in n8n_components.app.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in n8n_components.app.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ n8n_port }}:{{ n8n_port }}"
+    labels:
+      - "traefik.enable={{ 'true' if n8n_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.n8n.rule=Host(`{{ n8n_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver={{ n8n_traefik_ssl_resolver }}"
+      - "traefik.http.services.n8n.loadbalancer.server.port={{ n8n_port }}"
+      - "traefik.http.routers.n8n.middlewares={{ n8n_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "n8n.prometheus.scrape=true"
+      - "n8n.prometheus.port={{ n8n_port }}"
+      - "n8n.prometheus.path=/metrics"
+      # Loki scraping label
+      - "n8n.loki.scrape=true"
+    healthcheck:
+      test: {{ n8n_components.app.healthcheck.test }}
+      interval: "{{ n8n_components.app.healthcheck.interval }}"
+      timeout: "{{ n8n_components.app.healthcheck.timeout }}"
+      retries: {{ n8n_components.app.healthcheck.retries }}
+    depends_on:
+      {% for dependency in n8n_components.app.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ n8n_components.app.resources.limits.cpus }}'
+          memory: {{ n8n_components.app.resources.limits.memory }}
+        reservations:
+          cpus: '{{ n8n_components.app.resources.reservations.cpus }}'
+          memory: {{ n8n_components.app.resources.reservations.memory }}
+  {% endif %}
+
+  # n8n PostgreSQL Database
+  {% if n8n_components.postgres.enabled | default(true) %}
+  n8n-postgres:
+    image: "{{ n8n_components.postgres.image }}"
+    container_name: "{{ n8n_components.postgres.container_name }}"
+    restart: "{{ n8n_container_restart_policy }}"
+    networks:
+      - "{{ n8n_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in n8n_components.postgres.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in n8n_components.postgres.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "n8n.prometheus.scrape=true"
+      - "n8n.prometheus.port=5432"
+      # Loki scraping label
+      - "n8n.loki.scrape=true"
+    healthcheck:
+      test: {{ n8n_components.postgres.healthcheck.test }}
+      interval: "{{ n8n_components.postgres.healthcheck.interval }}"
+      timeout: "{{ n8n_components.postgres.healthcheck.timeout }}"
+      retries: {{ n8n_components.postgres.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ n8n_components.postgres.resources.limits.cpus }}'
+          memory: {{ n8n_components.postgres.resources.limits.memory }}
+        reservations:
+          cpus: '{{ n8n_components.postgres.resources.reservations.cpus }}'
+          memory: {{ n8n_components.postgres.resources.reservations.memory }}
+  {% endif %} 

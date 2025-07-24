@@ -1,0 +1,64 @@
+---
+# Reconya Service Handlers
+# Handlers for Reconya service management
+
+- name: restart reconya
+  community.docker.docker_compose:
+    project_src: "{{ reconya_config_dir }}"
+    state: present
+    restarted: true
+  listen: "restart reconya"
+
+- name: reload reconya
+  community.docker.docker_compose:
+    project_src: "{{ reconya_config_dir }}"
+    state: present
+    pull: true
+  listen: "reload reconya"
+
+- name: stop reconya
+  community.docker.docker_compose:
+    project_src: "{{ reconya_config_dir }}"
+    state: absent
+  listen: "stop reconya"
+
+- name: start reconya
+  community.docker.docker_compose:
+    project_src: "{{ reconya_config_dir }}"
+    state: present
+  listen: "start reconya"
+
+- name: restart prometheus
+  ansible.builtin.service:
+    name: prometheus
+    state: restarted
+  become: true
+  listen: "restart prometheus"
+
+- name: restart grafana
+  ansible.builtin.service:
+    name: grafana
+    state: restarted
+  become: true
+  listen: "restart grafana"
+
+- name: restart alertmanager
+  ansible.builtin.service:
+    name: alertmanager
+    state: restarted
+  become: true
+  listen: "restart alertmanager"
+
+- name: restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  become: true
+  listen: "restart fail2ban"
+
+- name: reload crowdsec
+  ansible.builtin.service:
+    name: crowdsec
+    state: reloaded
+  become: true
+  listen: "reload crowdsec" 

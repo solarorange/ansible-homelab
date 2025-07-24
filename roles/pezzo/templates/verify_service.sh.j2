@@ -1,0 +1,183 @@
+#!/bin/bash
+# Pezzo Service Verification Script
+# Verifies that all Pezzo services are running correctly
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo"
+DOMAIN="{{ domain }}"
+PEZZO_SUBDOMAIN="{{ pezzo_subdomain }}"
+VERIFY_LOG="$LOGS_DIR/verify.log"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$VERIFY_LOG"
+}
+
+# Function to check if container is running
+check_container() {
+    local container_name="$1"
+    local service_name="$2"
+    
+    if docker ps --format "table {{.Names}}" | grep -q "^$container_name$"; then
+        log "✓ $service_name container is running"
+        return 0
+    else
+        log "✗ $service_name container is not running"
+        return 1
+    fi
+}
+
+# Function to check container health
+check_health() {
+    local container_name="$1"
+    local service_name="$2"
+    
+    local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "unknown")
+    
+    if [ "$health_status" = "healthy" ]; then
+        log "✓ $service_name health check passed"
+        return 0
+    else
+        log "✗ $service_name health check failed (status: $health_status)"
+        return 1
+    fi
+}
+
+# Function to check service endpoint
+check_endpoint() {
+    local url="$1"
+    local service_name="$2"
+    local timeout="${3:-10}"
+    
+    if curl -f -s --max-time "$timeout" "$url" > /dev/null 2>&1; then
+        log "✓ $service_name endpoint is accessible"
+        return 0
+    else
+        log "✗ $service_name endpoint is not accessible"
+        return 1
+    fi
+}
+
+# Function to check database connectivity
+check_database() {
+    local container_name="pezzo-postgres"
+    
+    if docker exec "$container_name" pg_isready -U {{ pezzo_database_user }} > /dev/null 2>&1; then
+        log "✓ PostgreSQL database is accessible"
+        return 0
+    else
+        log "✗ PostgreSQL database is not accessible"
+        return 1
+    fi
+}
+
+# Function to check Redis connectivity
+check_redis() {
+    local container_name="pezzo-redis"
+    
+    if docker exec "$container_name" redis-cli ping | grep -q "PONG"; then
+        log "✓ Redis is accessible"
+        return 0
+    else
+        log "✗ Redis is not accessible"
+        return 1
+    fi
+}
+
+# Function to check ClickHouse connectivity
+check_clickhouse() {
+    local container_name="pezzo-clickhouse"
+    
+    if docker exec "$container_name" clickhouse-client --query "SELECT 1" > /dev/null 2>&1; then
+        log "✓ ClickHouse is accessible"
+        return 0
+    else
+        log "✗ ClickHouse is not accessible"
+        return 1
+    fi
+}
+
+# Function to check Traefik integration
+check_traefik() {
+    local traefik_containers=$(docker ps --filter "name=traefik" --format "table {{.Names}}" | wc -l)
+    
+    if [ "$traefik_containers" -gt 1 ]; then
+        log "✓ Traefik is running"
+        return 0
+    else
+        log "✗ Traefik is not running"
+        return 1
+    fi
+}
+
+# Function to check network connectivity
+check_network() {
+    local network_name="{{ pezzo_network_name }}"
+    
+    if docker network ls --format "table {{.Name}}" | grep -q "^$network_name$"; then
+        log "✓ Pezzo network exists"
+        return 0
+    else
+        log "✗ Pezzo network does not exist"
+        return 1
+    fi
+}
+
+# Main verification function
+main_verify() {
+    log "Starting Pezzo service verification"
+    
+    local all_passed=true
+    
+    # Check containers are running
+    log "=== Container Status ==="
+    check_container "pezzo-server" "Pezzo Server" || all_passed=false
+    check_container "pezzo-console" "Pezzo Console" || all_passed=false
+    check_container "pezzo-postgres" "PostgreSQL" || all_passed=false
+    check_container "pezzo-redis" "Redis" || all_passed=false
+    check_container "pezzo-clickhouse" "ClickHouse" || all_passed=false
+    check_container "pezzo-supertokens" "SuperTokens" || all_passed=false
+    check_container "pezzo-local-kms" "Local KMS" || all_passed=false
+    
+    # Check container health
+    log "=== Health Checks ==="
+    check_health "pezzo-server" "Pezzo Server" || all_passed=false
+    check_health "pezzo-console" "Pezzo Console" || all_passed=false
+    check_health "pezzo-postgres" "PostgreSQL" || all_passed=false
+    check_health "pezzo-redis" "Redis" || all_passed=false
+    check_health "pezzo-clickhouse" "ClickHouse" || all_passed=false
+    
+    # Check service endpoints
+    log "=== Service Endpoints ==="
+    check_endpoint "https://$PEZZO_SUBDOMAIN.$DOMAIN/api/healthz" "Pezzo API" || all_passed=false
+    check_endpoint "https://$PEZZO_SUBDOMAIN.$DOMAIN" "Pezzo Console" || all_passed=false
+    
+    # Check database connectivity
+    log "=== Database Connectivity ==="
+    check_database || all_passed=false
+    check_redis || all_passed=false
+    check_clickhouse || all_passed=false
+    
+    # Check infrastructure
+    log "=== Infrastructure ==="
+    check_traefik || all_passed=false
+    check_network || all_passed=false
+    
+    # Final result
+    if [ "$all_passed" = true ]; then
+        log "✓ All Pezzo services are running correctly"
+        exit 0
+    else
+        log "✗ Some Pezzo services have issues"
+        exit 1
+    fi
+}
+
+# Execute main verification function
+main_verify "$@" 

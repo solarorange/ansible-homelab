@@ -1,0 +1,235 @@
+# Lidarr Download Clients Configuration
+# Auto-generated during deployment - DO NOT EDIT MANUALLY
+
+# Download Client Configuration for Lidarr
+# This file is automatically configured by the Ansible playbook
+
+# Usenet Download Clients
+usenet_clients:
+  - name: "SABnzbd"
+    type: "sabnzbd"
+    host: "sabnzbd"
+    port: {{ media_sabnzbd_port | default(8080) }}
+    api_key: "{{ vault_sabnzbd_api_key | default('') }}"
+    category: "music"
+    recent_priority: "normal"
+    older_priority: "normal"
+    add_paused: false
+    use_ssl: false
+    url_base: ""
+    username: ""
+    password: ""
+
+# Torrent Download Clients
+torrent_clients:
+  - name: "qBittorrent"
+    type: "qbittorrent"
+    host: "qbittorrent"
+    port: {{ media_qbittorrent_port | default(8081) }}
+    username: "{{ media_qbittorrent_username | default('admin') }}"
+    password: "{{ vault_qbittorrent_password | default('') }}"
+    category: "music"
+    recent_priority: "normal"
+    older_priority: "normal"
+    add_paused: false
+    use_ssl: false
+    url_base: ""
+    path: "{{ data_dir }}/downloads/music"
+
+# Indexer Configuration
+indexers:
+  - name: "Prowlarr"
+    type: "newznab"
+    host: "prowlarr"
+    port: {{ media_prowlarr_port | default(9696) }}
+    api_key: "{{ vault_prowlarr_api_key | default('') }}"
+    categories: [3000, 3010, 3020, 3030, 3040, 3050]
+    use_ssl: false
+    url_base: ""
+    username: ""
+    password: ""
+
+# Quality Profile Configuration
+quality_profiles:
+  - name: "Standard"
+    cutoff: "MP3-320"
+    items:
+      - "MP3-320"
+      - "MP3-256"
+      - "MP3-192"
+      - "MP3-128"
+      - "MP3-V0"
+      - "MP3-V2"
+      - "FLAC"
+      - "ALAC"
+      - "AAC-320"
+      - "AAC-256"
+      - "AAC-192"
+      - "AAC-128"
+      - "OGG-Vorbis-Q10"
+      - "OGG-Vorbis-Q9"
+      - "OGG-Vorbis-Q8"
+      - "OGG-Vorbis-Q7"
+      - "OGG-Vorbis-Q6"
+      - "OGG-Vorbis-Q5"
+      - "OGG-Vorbis-Q4"
+      - "OGG-Vorbis-Q3"
+      - "OGG-Vorbis-Q2"
+      - "OGG-Vorbis-Q1"
+      - "OGG-Vorbis-Q0"
+
+# Metadata Profile Configuration
+metadata_profiles:
+  - name: "Standard"
+    primary_album_types:
+      - "Album"
+      - "EP"
+      - "Single"
+    secondary_album_types:
+      - "Compilation"
+      - "Soundtrack"
+      - "Live"
+      - "Remix"
+      - "Mixtape"
+      - "Demo"
+      - "Bootleg"
+      - "Interview"
+      - "Audiobook"
+      - "Other"
+
+# Root Folder Configuration
+root_folders:
+  - path: "{{ data_dir }}/media/music"
+    name: "Music"
+
+# Import List Configuration
+import_lists:
+  - name: "Last.fm User"
+    type: "lastfmuser"
+    username: "{{ media_lastfm_username | default('') }}"
+    count: 100
+    monitor: "specificAlbum"
+    root_folder_path: "{{ data_dir }}/media/music"
+    quality_profile_id: 1
+    metadata_profile_id: 1
+
+# Notification Configuration
+notifications:
+  - name: "Discord"
+    type: "discord"
+    webhook_url: "{{ vault_discord_webhook | default('') }}"
+    include_health_warnings: true
+    include_manual_interactions: true
+    on_grab: true
+    on_download: true
+    on_upgrade: true
+    on_rename: true
+    on_health_issue: true
+    on_application_update: true
+
+  - name: "Email"
+    type: "email"
+    server: "{{ vault_smtp_server | default('') }}"
+    port: {{ vault_smtp_port | default(587) }}
+    username: "{{ vault_smtp_username | default('') }}"
+    password: "{{ vault_smtp_password | default('') }}"
+    from: "{{ vault_smtp_from | default('lidarr@' + domain) }}"
+    to: "{{ vault_smtp_to | default(admin_email) }}"
+    use_ssl: true
+    include_health_warnings: true
+    include_manual_interactions: true
+    on_grab: true
+    on_download: true
+    on_upgrade: true
+    on_rename: true
+    on_health_issue: true
+    on_application_update: true
+
+# Connection Configuration
+connections:
+  - name: "Plex"
+    type: "plex"
+    host: "plex"
+    port: {{ media_plex_port | default(32400) }}
+    username: "{{ vault_plex_username | default('') }}"
+    password: "{{ vault_plex_password | default('') }}"
+    update_library: true
+    use_ssl: false
+    auth_token: "{{ vault_plex_token | default('') }}"
+
+  - name: "Jellyfin"
+    type: "jellyfin"
+    host: "jellyfin"
+    port: {{ media_jellyfin_port | default(8096) }}
+    username: "{{ vault_jellyfin_username | default('') }}"
+    password: "{{ vault_jellyfin_password | default('') }}"
+    update_library: true
+    use_ssl: false
+    api_key: "{{ vault_jellyfin_api_key | default('') }}"
+
+# Auto Tagging Configuration
+auto_tagging:
+  - name: "Genre"
+    remove_tags_automatically: true
+    tags:
+      - "{{ item }}"
+    specifications:
+      - name: "Genre"
+        implementation: "GenreSpecification"
+        negate: false
+        required: false
+        value: ""
+
+# Backup Configuration
+backup:
+  folder: "{{ docker_dir }}/lidarr/backup"
+  interval: 7
+  retention: 28
+  include_metadata: true
+  include_logs: true
+
+# Update Configuration
+update:
+  mechanism: "builtIn"
+  automatically: true
+  script_path: ""
+  update_time: "00:00"
+
+# Security Configuration
+security:
+  authentication_method: "forms"
+  authentication_required: "enabled"
+  username: "{{ vault_lidarr_username | default('admin') }}"
+  password: "{{ vault_lidarr_password | default('') }}"
+
+# SSL Configuration
+ssl:
+  enabled: false
+  port: 9898
+  cert_path: ""
+  cert_password: ""
+
+# Proxy Configuration
+proxy:
+  enabled: false
+  type: "http"
+  hostname: ""
+  port: 8080
+  username: ""
+  password: ""
+  bypass_filter: ""
+  bypass_local_addresses: true
+
+# Analytics Configuration
+analytics:
+  enabled: true
+  anonymous_id: "{{ vault_lidarr_anonymous_id | default('') }}"
+
+# Instance Configuration
+instance:
+  name: "Lidarr"
+  application_url: "https://lidarr.{{ domain }}"
+  port: {{ media_lidarr_port | default(8686) }}
+  api_key: "{{ vault_lidarr_api_key | default('') }}"
+  branch: "main"
+  log_level: "info" 

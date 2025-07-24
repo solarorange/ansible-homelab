@@ -1,0 +1,86 @@
+---
+# DumbAssets Validation Tasks
+# Pre-deployment validation and configuration checks
+
+- name: Validate DumbAssets configuration variables
+  ansible.builtin.assert:
+    that:
+      - dumbassets_enabled is defined
+      - dumbassets_container_name is defined
+      - dumbassets_image is defined
+      - dumbassets_port is defined
+      - dumbassets_network is defined
+      - dumbassets_subdomain is defined
+      - dumbassets_docker_dir is defined
+      - dumbassets_data_dir is defined
+    fail_msg: "Required DumbAssets configuration variables are not defined"
+  tags: [dumbassets, validation, config]
+
+- name: Validate DumbAssets port configuration
+  ansible.builtin.assert:
+    that:
+      - dumbassets_port is number
+      - dumbassets_port >= 1
+      - dumbassets_port <= 65535
+    fail_msg: "DumbAssets port must be a valid port number between 1 and 65535"
+  tags: [dumbassets, validation, config]
+
+- name: Validate DumbAssets PIN configuration
+  ansible.builtin.assert:
+    that:
+      - dumbassets_pin is defined
+      - dumbassets_pin | length >= 4
+      - dumbassets_pin is string
+    fail_msg: "DumbAssets PIN must be at least 4 characters long (default: 1234)"
+  tags: [dumbassets, validation, config]
+
+- name: Check if DumbAssets port is available
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ dumbassets_port }}"
+    state: stopped
+    timeout: 5
+  ignore_errors: true
+  register: dumbassets_port_check
+  tags: [dumbassets, validation, ports]
+
+- name: Fail if DumbAssets port is already in use
+  ansible.builtin.fail:
+    msg: "Port {{ dumbassets_port }} is already in use by another service"
+  when: dumbassets_port_check.state == "started"
+  tags: [dumbassets, validation, ports]
+
+- name: Validate DumbAssets directory permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+  loop:
+    - "{{ docker_root }}"
+    - "{{ docker_data_root }}"
+    - "{{ docker_config_root }}"
+    - "{{ docker_logs_root }}"
+  tags: [dumbassets, validation, directories]
+
+- name: Validate DumbAssets dependencies
+  ansible.builtin.assert:
+    that:
+      - traefik_enabled | default(false)
+    fail_msg: "Traefik must be enabled for DumbAssets to function properly"
+  tags: [dumbassets, validation, dependencies]
+
+- name: Display DumbAssets validation summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Validation Summary:
+      - Service: {{ dumbassets_enabled }}
+      - Container: {{ dumbassets_container_name }}
+      - Image: {{ dumbassets_image }}
+      - Port: {{ dumbassets_port }}
+      - Network: {{ dumbassets_network }}
+      - Subdomain: {{ dumbassets_subdomain }}
+      - Data Directory: {{ dumbassets_data_dir }}
+      - PIN Protection: {{ dumbassets_pin | length >= 4 }}
+  tags: [dumbassets, validation, summary] 

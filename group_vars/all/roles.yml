@@ -1,54 +1,38 @@
----
-# Master Role Configuration
-# Centralized configuration for all homelab roles
-
-#==============================================================================
-# ROLE ENABLEMENT FLAGS
-#==============================================================================
-
-# Core infrastructure roles (must run first)
 security_enabled: true
 databases_enabled: true
 storage_enabled: true
-
-# Monitoring and logging roles
 logging_enabled: true
 certificate_management_enabled: true
-
-# Service roles
 media_enabled: true
 automation_enabled: true
 utilities_enabled: true
 paperless_ngx_enabled: true
 fing_enabled: true
-
-#==============================================================================
-# ROLE DEPENDENCIES AND EXECUTION ORDER
-#==============================================================================
-
-# Role execution order (dependencies)
 role_dependencies:
-  # Infrastructure (no dependencies)
   security: []
   databases: []
   storage: []
-  
-  # Monitoring (depends on infrastructure)
-  logging: [security, databases]
-  certificate_management: [security]
-  
-  # Services (depend on infrastructure and monitoring)
-  media: [databases, storage, security]
-  automation: [databases, security]
-  utilities: [databases, security]
-  paperless_ngx: [databases, storage, security]
-  fing: [security]
-
-#==============================================================================
-# SECURITY ROLE CONFIGURATION
-#==============================================================================
-
-# Security role components
+  logging:
+  - security
+  - databases
+  certificate_management:
+  - security
+  media:
+  - databases
+  - storage
+  - security
+  automation:
+  - databases
+  - security
+  utilities:
+  - databases
+  - security
+  paperless_ngx:
+  - databases
+  - storage
+  - security
+  fing:
+  - security
 security_authentication_enabled: true
 security_proxy_enabled: true
 security_dns_enabled: true
@@ -58,163 +42,80 @@ security_monitoring_enabled: true
 security_backup_enabled: true
 security_homepage_enabled: true
 security_alerting_enabled: true
-
-#==============================================================================
-# DATABASES ROLE CONFIGURATION
-#==============================================================================
-
-# Database services
 databases_cache_enabled: true
 databases_relational_enabled: true
 databases_search_enabled: true
-
-# Cache databases
 redis_enabled: true
-redis_password: "{{ vault_redis_password }}"
-
-# Relational databases
+redis_password: '{{ vault_redis_password }}'
 postgresql_enabled: true
-postgresql_password: "{{ vault_postgresql_password }}"
+postgresql_password: '{{ vault_postgresql_password }}'
 mariadb_enabled: true
-mariadb_root_password: "{{ vault_mariadb_root_password }}"
-
-# Search databases
+mariadb_root_password: '{{ vault_mariadb_root_password }}'
 elasticsearch_enabled: true
 kibana_enabled: true
-
-#==============================================================================
-# STORAGE ROLE CONFIGURATION
-#==============================================================================
-
-# Storage services
 storage_filesystems_enabled: true
 storage_sync_enabled: true
 storage_cloud_enabled: true
-
-# File systems
 samba_enabled: true
-samba_share_name: "homelab"
-samba_username: "{{ username }}"
-samba_password: "{{ vault_samba_password }}"
-
-# Sync services
+samba_share_name: homelab
+samba_username: '{{ username }}'
+samba_password: '{{ vault_samba_password }}'
 syncthing_enabled: true
-syncthing_api_key: "{{ vault_syncthing_api_key }}"
-
-# Cloud storage
+syncthing_api_key: '{{ vault_syncthing_api_key }}'
 nextcloud_enabled: true
-nextcloud_admin_user: "admin"
-nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
-
-#==============================================================================
-# MEDIA ROLE CONFIGURATION
-#==============================================================================
-
-# Media services
+nextcloud_admin_user: admin
+nextcloud_admin_password: '{{ vault_nextcloud_admin_password }}'
 media_arr_services_enabled: true
 media_downloaders_enabled: true
 media_players_enabled: true
-
-# ARR Services
 sonarr_enabled: true
 radarr_enabled: true
 prowlarr_enabled: true
 bazarr_enabled: true
 lidarr_enabled: true
 readarr_enabled: true
-
-# Downloaders
 qbittorrent_enabled: true
 sabnzbd_enabled: true
-
-# Players
 plex_enabled: true
 jellyfin_enabled: true
 emby_enabled: true
-
-# Media management
 tautulli_enabled: true
 overseerr_enabled: true
 komga_enabled: true
 audiobookshelf_enabled: true
 calibre_web_enabled: true
 immich_enabled: true
-
-# Media processing
 tdarr_enabled: true
-
-#==============================================================================
-# AUTOMATION ROLE CONFIGURATION
-#==============================================================================
-
-# Automation services
 automation_container_management_enabled: true
 automation_scheduling_enabled: true
 automation_home_automation_enabled: true
-
-# Container management
 portainer_enabled: true
 watchtower_enabled: true
-
-# Scheduling
 cron_enabled: true
-
-# Home automation
 homeassistant_enabled: true
 nodered_enabled: true
 mosquitto_enabled: true
-
-#==============================================================================
-# UTILITIES ROLE CONFIGURATION
-#==============================================================================
-
-# Utility services
 utilities_container_management_enabled: true
 utilities_dashboards_enabled: true
 utilities_media_processing_enabled: true
-
-# Dashboards
 homepage_enabled: true
 grafana_enabled: true
-
-# Media processing
-tdarr_enabled: true
-
-#==============================================================================
-# LOGGING ROLE CONFIGURATION
-#==============================================================================
-
-# Logging services
 loki_enabled: true
 promtail_enabled: true
 prometheus_enabled: true
 alertmanager_enabled: true
 telegraf_enabled: true
 influxdb_enabled: true
-
-#==============================================================================
-# CERTIFICATE MANAGEMENT CONFIGURATION
-#==============================================================================
-
-# Certificate services
 certbot_enabled: true
 certificate_monitoring_enabled: true
 certificate_automation_enabled: true
-
-#==============================================================================
-# PAPERLESS-NGX ROLE CONFIGURATION
-#==============================================================================
-
-# Paperless-ngx specific settings
-paperless_ngx_admin_user: "admin"
-paperless_ngx_admin_password: "{{ vault_paperless_ngx_admin_password }}"
-paperless_ngx_secret_key: "{{ vault_paperless_ngx_secret_key }}"
-
-#==============================================================================
-# FING ROLE CONFIGURATION
-#==============================================================================
-
-# Fing configuration
-fing_enabled: true
-fing_license_key: "{{ vault_fing_license_key }}"
-fing_email: "{{ vault_fing_email }}" 
+paperless_ngx_admin_user: admin
+paperless_ngx_admin_password: '{{ vault_paperless_ngx_admin_password }}'
+paperless_ngx_secret_key: '{{ vault_paperless_ngx_secret_key }}'
+fing_license_key: '{{ vault_fing_license_key }}'
+fing_email: '{{ vault_fing_email }}'
+testapp_enabled: true
+enabled_services:
+- testapp
+- testservice
+testservice_enabled: true

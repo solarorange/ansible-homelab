@@ -1,0 +1,212 @@
+# Pezzo Log Aggregation Configuration
+# Centralized log collection for Pezzo services
+
+# Global configuration
+global:
+  log_level: "info"
+  log_format: "json"
+  timestamp_format: "RFC3339"
+
+# Input plugins
+inputs:
+  # Docker container logs
+  - name: "docker_logs"
+    type: "docker"
+    containers:
+      - "pezzo-server"
+      - "pezzo-console"
+      - "pezzo-proxy"
+      - "pezzo-postgres"
+      - "pezzo-redis"
+      - "pezzo-clickhouse"
+      - "pezzo-supertokens"
+      - "pezzo-local-kms"
+    follow: true
+    tail: 100
+    multiline:
+      enabled: true
+      pattern: "^\\d{4}-\\d{2}-\\d{2}"
+      negate: false
+      match: "after"
+
+  # File-based logs
+  - name: "file_logs"
+    type: "file"
+    paths:
+      - "{{ logs_dir }}/pezzo/server/*.log"
+      - "{{ logs_dir }}/pezzo/console/*.log"
+      - "{{ logs_dir }}/pezzo/proxy/*.log"
+      - "{{ logs_dir }}/pezzo/postgres/*.log"
+      - "{{ logs_dir }}/pezzo/redis/*.log"
+      - "{{ logs_dir }}/pezzo/clickhouse/*.log"
+      - "{{ logs_dir }}/pezzo/supertokens/*.log"
+      - "{{ logs_dir }}/pezzo/local-kms/*.log"
+    exclude_files:
+      - "*.tmp"
+      - "*.lock"
+      - "*.old"
+    multiline:
+      enabled: true
+      pattern: "^\\d{4}-\\d{2}-\\d{2}"
+      negate: false
+      match: "after"
+
+  # System logs
+  - name: "system_logs"
+    type: "systemd"
+    units:
+      - "pezzo"
+      - "docker"
+    follow: true
+    include_metadata: true
+
+# Processing plugins
+processors:
+  # Parse JSON logs
+  - name: "parse_json"
+    type: "json"
+    source: "message"
+    target: "parsed"
+    drop_original: false
+
+  # Add service labels
+  - name: "add_labels"
+    type: "labels"
+    labels:
+      service: "pezzo"
+      environment: "production"
+      version: "{{ pezzo_version | default('latest') }}"
+
+  # Extract log level
+  - name: "extract_level"
+    type: "regex"
+    source: "message"
+    pattern: "(?i)(error|warn|warning|info|debug|trace)"
+    target: "log_level"
+    default: "info"
+
+  # Extract request IDs
+  - name: "extract_request_id"
+    type: "regex"
+    source: "message"
+    pattern: "request_id=([a-f0-9-]+)"
+    target: "request_id"
+
+  # Extract user information
+  - name: "extract_user"
+    type: "regex"
+    source: "message"
+    pattern: "user_id=([a-f0-9-]+)"
+    target: "user_id"
+
+  # Extract API endpoints
+  - name: "extract_endpoint"
+    type: "regex"
+    source: "message"
+    pattern: "(GET|POST|PUT|DELETE|PATCH)\\s+([^\\s]+)"
+    target: "http_method"
+    target2: "http_endpoint"
+
+# Output plugins
+outputs:
+  # Loki output
+  - name: "loki"
+    type: "loki"
+    url: "http://loki:3100"
+    labels:
+      service: "pezzo"
+      environment: "production"
+    batch_size: 1000
+    batch_wait: 1s
+    timeout: 10s
+
+  # Elasticsearch output (if available)
+  - name: "elasticsearch"
+    type: "elasticsearch"
+    url: "http://elasticsearch:9200"
+    index: "pezzo-logs-%Y.%m.%d"
+    username: "{{ elasticsearch_username | default('') }}"
+    password: "{{ elasticsearch_password | default('') }}"
+    batch_size: 1000
+    batch_wait: 1s
+    timeout: 10s
+
+  # File output for backup
+  - name: "file_backup"
+    type: "file"
+    path: "{{ logs_dir }}/pezzo/aggregated/aggregated.log"
+    format: "json"
+    rotation:
+      max_size: "100MB"
+      max_files: 10
+      max_age: "7d"
+
+# Filtering
+filters:
+  # Drop debug logs in production
+  - name: "drop_debug"
+    type: "drop"
+    condition: "log_level == 'debug'"
+    when: "{{ pezzo_log_level | default('info') }} != 'debug'"
+
+  # Drop health check logs
+  - name: "drop_health_checks"
+    type: "drop"
+    condition: "message contains '/health' or message contains '/healthz'"
+
+  # Keep only error and warning logs for long-term storage
+  - name: "keep_important"
+    type: "keep"
+    condition: "log_level in ['error', 'warn', 'warning']"
+    output: "long_term_storage"
+
+# Routing
+routing:
+  # Route error logs to alerting
+  - name: "error_alerts"
+    condition: "log_level == 'error'"
+    outputs: ["alerting"]
+
+  # Route API logs to analytics
+  - name: "api_analytics"
+    condition: "http_endpoint is not null"
+    outputs: ["analytics"]
+
+  # Route authentication logs to security
+  - name: "auth_security"
+    condition: "message contains 'auth' or message contains 'login' or message contains 'logout'"
+    outputs: ["security"]
+
+# Monitoring
+monitoring:
+  enabled: true
+  metrics:
+    - name: "log_volume"
+      type: "counter"
+      description: "Number of log entries processed"
+      
+    - name: "log_errors"
+      type: "counter"
+      description: "Number of error log entries"
+      
+    - name: "processing_duration"
+      type: "histogram"
+      description: "Log processing duration"
+      
+    - name: "dropped_logs"
+      type: "counter"
+      description: "Number of dropped log entries"
+
+# Retention
+retention:
+  # Keep all logs for 7 days
+  default: "7d"
+  
+  # Keep error logs for 30 days
+  error: "30d"
+  
+  # Keep security logs for 90 days
+  security: "90d"
+  
+  # Keep analytics logs for 365 days
+  analytics: "365d" 

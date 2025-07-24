@@ -1,0 +1,35 @@
+# n8n Telegraf Configuration
+# Telegraf configuration for n8n monitoring
+
+[[inputs.http]]
+  urls = ["http://n8n-app:{{ n8n_port }}/metrics"]
+  name_override = "n8n"
+  data_format = "prometheus"
+  interval = "30s"
+  timeout = "10s"
+
+[[inputs.postgresql]]
+  address = "n8n-postgres:5432"
+  database = "{{ n8n_database_name }}"
+  username = "{{ n8n_database_user }}"
+  password = "{{ vault_n8n_postgres_password }}"
+  interval = "60s"
+  name_override = "n8n_postgres"
+
+[[inputs.docker]]
+  endpoint = "unix:///var/run/docker.sock"
+  gather_services = false
+  container_names = ["n8n-app", "n8n-postgres"]
+  name_override = "n8n_containers"
+
+[[outputs.influxdb]]
+  urls = ["http://influxdb:8086"]
+  database = "homelab"
+  username = "{{ vault_influxdb_admin_username | default('admin') }}"
+  password = "{{ vault_influxdb_admin_password }}"
+  name_override = "n8n_influxdb"
+
+[[outputs.prometheus_client]]
+  listen = ":9273"
+  path = "/metrics"
+  name_override = "n8n_prometheus" 

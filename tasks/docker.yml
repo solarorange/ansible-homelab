@@ -32,6 +32,11 @@
         state: absent
       register: docker_removal
       ignore_errors: true
+      
+    - name: Handle Docker removal errors
+      ansible.builtin.debug:
+        msg: "Docker removal completed with warnings: {{ docker_removal.stderr | default('None') }}"
+      when: docker_removal is failed
 
     - name: Install Docker dependencies (Debian/Ubuntu)
       ansible.builtin.package:

@@ -1,0 +1,254 @@
+---
+# Vaultwarden Configuration
+# Production-ready defaults for Vaultwarden password manager deployment
+
+# Service Configuration
+vaultwarden_enabled: true
+vaultwarden_version: "latest"
+vaultwarden_network_name: "vaultwarden"
+vaultwarden_network_external: true
+
+# Container Configuration
+vaultwarden_container_restart_policy: "unless-stopped"
+vaultwarden_container_network_mode: "bridge"
+
+# Port Configuration
+vaultwarden_port: 80
+
+# Domain Configuration
+vaultwarden_subdomain: "vault"
+
+# Authentication Configuration
+vaultwarden_auth_enabled: true
+vaultwarden_auth_method: "authentik"  # Options: authentik, basic, none
+vaultwarden_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+
+# Database Configuration (SQLite by default, can be PostgreSQL)
+vaultwarden_database_type: "sqlite"  # Options: sqlite, postgresql
+vaultwarden_database_host: "vaultwarden-postgres"
+vaultwarden_database_port: 5432
+vaultwarden_database_name: "vaultwarden"
+vaultwarden_database_user: "postgres"
+vaultwarden_database_password: "{{ vault_vaultwarden_postgres_password | default('') }}"
+
+# Service Components
+vaultwarden_components:
+  app:
+    enabled: true
+    image: "vaultwarden/server:latest"
+    container_name: "vaultwarden"
+    port: 80
+    volumes:
+      - "{{ docker_dir }}/vaultwarden:/data"
+      - "{{ logs_dir }}/vaultwarden:/logs"
+    environment:
+      - DOMAIN={{ vaultwarden_domain }}
+      - SIGNUPS_ALLOWED=false
+      - INVITATION_ORG_NAME=Homelab
+      - WEBSOCKET_ENABLED=true
+      - WEBSOCKET_ADDRESS=0.0.0.0
+      - WEBSOCKET_PORT=3012
+      - ADMIN_TOKEN={{ vaultwarden_admin_token }}
+      - DISABLE_ICON_DOWNLOAD=false
+      - ICON_CACHE_TTL=2592000
+      - ICON_CACHE_NEGTTL=259200
+      - ICON_CACHE_SIZE=104857600
+      - DATA_FOLDER=/data
+      - DATABASE_URL={{ vaultwarden_database_url }}
+      - ROCKET_ADDRESS=0.0.0.0
+      - ROCKET_PORT=80
+      - ROCKET_WORKERS=10
+      - ROCKET_LOG=critical
+      - ROCKET_TLS={{ 'true' if vaultwarden_ssl_enabled else 'false' }}
+      - ROCKET_TLS_CERTS=/data/certs
+      - ROCKET_TLS_KEY=/data/certs/key.pem
+      - SMTP_HOST={{ vaultwarden_smtp_host }}
+      - SMTP_FROM={{ vaultwarden_smtp_from }}
+      - SMTP_PORT={{ vaultwarden_smtp_port }}
+      - SMTP_SSL={{ vaultwarden_smtp_ssl }}
+      - SMTP_USERNAME={{ vaultwarden_smtp_username }}
+      - SMTP_PASSWORD={{ vaultwarden_smtp_password }}
+      - SMTP_TIMEOUT=15
+      - SMTP_ACCEPT_INVALID_HOSTNAMES=false
+      - SMTP_ACCEPT_INVALID_CERTS=false
+      - SMTP_STARTTLS=true
+      - SMTP_AUTH_MECHANISM=Login
+      - BACKUP_FREQUENCY={{ vaultwarden_backup_frequency | default('7') }}
+      - BACKUP_DAYS={{ vaultwarden_backup_days | default('7') }}
+      - BACKUP_DAYS_ATTACHMENTS={{ vaultwarden_backup_days_attachments | default('7') }}
+      - BACKUP_DAYS_SEND={{ vaultwarden_backup_days_send | default('7') }}
+      - BACKUP_DAYS_ORG_KEYS={{ vaultwarden_backup_days_org_keys | default('7') }}
+      - BACKUP_DAYS_USERS={{ vaultwarden_backup_days_users | default('7') }}
+      - BACKUP_DAYS_CIPHERS={{ vaultwarden_backup_days_ciphers | default('7') }}
+      - BACKUP_DAYS_FOLDERS={{ vaultwarden_backup_days_folders | default('7') }}
+      - BACKUP_DAYS_SENDS={{ vaultwarden_backup_days_sends | default('7') }}
+      - BACKUP_DAYS_ATTACHMENTS_DELETE={{ vaultwarden_backup_days_attachments_delete | default('7') }}
+      - BACKUP_DAYS_SEND_DELETE={{ vaultwarden_backup_days_send_delete | default('7') }}
+      - BACKUP_DAYS_ORG_KEYS_DELETE={{ vaultwarden_backup_days_org_keys_delete | default('7') }}
+      - BACKUP_DAYS_USERS_DELETE={{ vaultwarden_backup_days_users_delete | default('7') }}
+      - BACKUP_DAYS_CIPHERS_DELETE={{ vaultwarden_backup_days_ciphers_delete | default('7') }}
+      - BACKUP_DAYS_FOLDERS_DELETE={{ vaultwarden_backup_days_folders_delete | default('7') }}
+      - BACKUP_DAYS_SENDS_DELETE={{ vaultwarden_backup_days_sends_delete | default('7') }}
+      - BACKUP_DAYS_ATTACHMENTS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_attachments_delete_attempts | default('7') }}
+      - BACKUP_DAYS_SEND_DELETE_ATTEMPTS={{ vaultwarden_backup_days_send_delete_attempts | default('7') }}
+      - BACKUP_DAYS_ORG_KEYS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_org_keys_delete_attempts | default('7') }}
+      - BACKUP_DAYS_USERS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_users_delete_attempts | default('7') }}
+      - BACKUP_DAYS_CIPHERS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_ciphers_delete_attempts | default('7') }}
+      - BACKUP_DAYS_FOLDERS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_folders_delete_attempts | default('7') }}
+      - BACKUP_DAYS_SENDS_DELETE_ATTEMPTS={{ vaultwarden_backup_days_sends_delete_attempts | default('7') }}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/alive"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    depends_on: []
+    resources:
+      limits:
+        cpus: '1'
+        memory: 1G
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+
+  postgres:
+    enabled: false  # Disabled by default, using SQLite
+    image: "postgres:15-alpine"
+    container_name: "vaultwarden-postgres"
+    volumes:
+      - "{{ docker_dir }}/vaultwarden/postgres:/var/lib/postgresql/data"
+      - "{{ logs_dir }}/vaultwarden/postgres:/logs"
+    environment:
+      - POSTGRES_USER={{ vaultwarden_database_user }}
+      - POSTGRES_PASSWORD={{ vaultwarden_database_password }}
+      - POSTGRES_DB={{ vaultwarden_database_name }}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ vaultwarden_database_user }}"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 1G
+      reservations:
+        cpus: '0.1'
+        memory: 256M
+
+# Monitoring Integration
+vaultwarden_monitoring_enabled: true
+vaultwarden_metrics_enabled: true
+vaultwarden_health_check_enabled: true
+vaultwarden_health_check_interval: 30
+
+# Security Configuration
+vaultwarden_security_headers: true
+vaultwarden_rate_limiting: true
+vaultwarden_rate_limit_requests: 100
+vaultwarden_rate_limit_window: 60
+vaultwarden_cors_enabled: false
+vaultwarden_cors_origins: []
+vaultwarden_allow_anonymous_access: false
+vaultwarden_ssl_enabled: true
+
+# Backup Configuration
+vaultwarden_backup_enabled: true
+vaultwarden_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+vaultwarden_backup_retention: 7  # Keep backups for 7 days
+vaultwarden_backup_compression: true
+vaultwarden_backup_include_database: true
+vaultwarden_backup_include_config: true
+vaultwarden_backup_dir: "{{ backup_dir }}/vaultwarden"
+vaultwarden_backup_retention_days: 7
+vaultwarden_backup_log_file: "{{ logs_dir }}/vaultwarden/backup/backup.log"
+vaultwarden_backup_max_log_size: "10M"
+vaultwarden_backup_notifications_enabled: true
+
+# Logging Configuration
+vaultwarden_log_level: "info"  # Options: debug, info, warn, error
+vaultwarden_log_format: "json"
+vaultwarden_log_retention: 30  # Days
+vaultwarden_log_rotation: true
+vaultwarden_health_check_log_file: "{{ logs_dir }}/vaultwarden/health/health.log"
+vaultwarden_health_check_max_log_size: "10M"
+vaultwarden_health_check_retention_days: 7
+vaultwarden_health_check_timeout: 30
+
+# Resource Limits
+vaultwarden_memory_limit: "2g"
+vaultwarden_cpu_limit: "2.0"
+vaultwarden_storage_limit: "100g"
+
+# Traefik Configuration
+vaultwarden_traefik_enabled: true
+vaultwarden_traefik_network: "{{ traefik_network | default('homelab') }}"
+vaultwarden_traefik_middleware: "secure-headers,compress"
+vaultwarden_traefik_auth_middleware: "authentik@docker"
+vaultwarden_traefik_ssl_enabled: true
+vaultwarden_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+
+# Homepage Integration
+vaultwarden_homepage_enabled: true
+vaultwarden_homepage_category: "Security"
+vaultwarden_homepage_description: "Password Manager & Vault"
+vaultwarden_homepage_icon: "vaultwarden.png"
+vaultwarden_homepage_widget_enabled: true
+
+# Telegraf Integration
+vaultwarden_telegraf_enabled: true
+vaultwarden_telegraf_metrics: true
+vaultwarden_telegraf_logs: true
+
+# Prometheus Integration
+vaultwarden_prometheus_enabled: true
+vaultwarden_prometheus_metrics: true
+vaultwarden_prometheus_scrape_interval: 30
+
+# Grafana Integration
+vaultwarden_grafana_enabled: true
+vaultwarden_grafana_dashboard: true
+vaultwarden_grafana_datasource: "prometheus"
+
+# Loki Integration
+vaultwarden_loki_enabled: true
+vaultwarden_loki_logs: true
+
+# Alerting Configuration
+vaultwarden_alerting_enabled: true
+vaultwarden_alerting_provider: "alertmanager"
+vaultwarden_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+
+# CrowdSec Integration
+vaultwarden_crowdsec_enabled: true
+vaultwarden_crowdsec_collections:
+  - "crowdsecurity/nginx"
+  - "crowdsecurity/http-cve"
+
+# Fail2ban Integration
+vaultwarden_fail2ban_enabled: true
+vaultwarden_fail2ban_jail: "vaultwarden"
+vaultwarden_fail2ban_max_retry: 5
+vaultwarden_fail2ban_bantime: 3600
+
+# Service Dependencies
+vaultwarden_dependencies:
+  - "docker"
+  - "traefik"
+  - "monitoring_infrastructure"
+
+# Health Check Configuration
+vaultwarden_health_check_url: "/alive"
+vaultwarden_health_check_timeout: 10
+vaultwarden_health_check_retries: 3
+
+# Service configuration directories
+vaultwarden_config_dir: "{{ docker_dir }}/vaultwarden"
+vaultwarden_data_dir: "{{ docker_dir }}/vaultwarden"
+vaultwarden_postgres_config_dir: "{{ docker_dir }}/vaultwarden/postgres"
+
+# Service container names
+vaultwarden_app_container_name: "vaultwarden"
+vaultwarden_postgres_container_name: "vaultwarden-postgres"
+
+# Service ports
+vaultwarden_app_port: 80
+vaultwarden_websocket_port: 3012 

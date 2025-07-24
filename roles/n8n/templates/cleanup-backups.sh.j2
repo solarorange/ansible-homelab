@@ -1,0 +1,67 @@
+#!/bin/bash
+# n8n Backup Cleanup Script
+# Clean up old backup files based on retention policy
+
+set -euo pipefail
+
+# Configuration
+BACKUP_DIR="{{ n8n_backup_dir }}"
+RETENTION_DAYS="{{ n8n_backup_retention_days | default(7) }}"
+LOG_FILE="{{ n8n_backup_log_file }}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+log "${GREEN}Starting n8n backup cleanup...${NC}"
+
+# Count files before cleanup
+FILES_BEFORE=$(find "$BACKUP_DIR" -name "*.json" -o -name "*.sql*" -o -name "*.tar.gz" | wc -l)
+
+# Clean up old backup files
+log "Removing backup files older than $RETENTION_DAYS days..."
+
+# Remove old workflow backups
+find "$BACKUP_DIR" -name "workflows_*.json" -mtime +$RETENTION_DAYS -delete
+WORKFLOW_DELETED=$?
+
+# Remove old database backups
+find "$BACKUP_DIR" -name "database_*.sql*" -mtime +$RETENTION_DAYS -delete
+DB_DELETED=$?
+
+# Remove old configuration backups
+find "$BACKUP_DIR" -name "config_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+CONFIG_DELETED=$?
+
+# Remove old manifest files
+find "$BACKUP_DIR" -name "manifest_*.json" -mtime +$RETENTION_DAYS -delete
+MANIFEST_DELETED=$?
+
+# Count files after cleanup
+FILES_AFTER=$(find "$BACKUP_DIR" -name "*.json" -o -name "*.sql*" -o -name "*.tar.gz" | wc -l)
+FILES_REMOVED=$((FILES_BEFORE - FILES_AFTER))
+
+# Calculate disk space freed
+DISK_SPACE_FREED=$(du -sh "$BACKUP_DIR" | cut -f1)
+
+log "Backup cleanup completed:"
+log "  - Files before: $FILES_BEFORE"
+log "  - Files after: $FILES_AFTER"
+log "  - Files removed: $FILES_REMOVED"
+log "  - Current backup size: $DISK_SPACE_FREED"
+
+if [[ $FILES_REMOVED -gt 0 ]]; then
+    log "${GREEN}Successfully removed $FILES_REMOVED old backup files${NC}"
+else
+    log "${YELLOW}No old backup files found to remove${NC}"
+fi
+
+log "${GREEN}n8n backup cleanup completed successfully${NC}"
+exit 0 

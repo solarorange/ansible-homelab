@@ -1,0 +1,385 @@
+---
+# ErsatzTV Monitoring Configuration
+# Configure monitoring integration for ErsatzTV
+
+- name: Create ErsatzTV monitoring configuration
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ ersatztv_config_dir }}/monitoring.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ ersatztv_config_dir }}/prometheus.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_prometheus_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV Grafana dashboard
+  ansible.builtin.template:
+    src: grafana-dashboard.json.j2
+    dest: "{{ grafana_dashboards_dir }}/ersatztv-dashboard.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV Grafana datasource
+  ansible.builtin.template:
+    src: grafana-datasource.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/datasources/ersatztv.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV Loki configuration
+  ansible.builtin.template:
+    src: loki-config.yml.j2
+    dest: "{{ loki_config_dir }}/ersatztv.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV Telegraf configuration
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: "{{ telegraf_config_dir }}/ersatztv.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV health check configuration
+  ansible.builtin.template:
+    src: healthcheck.yml.j2
+    dest: "{{ ersatztv_config_dir }}/healthcheck.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_healthcheck_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV performance monitoring script
+  ansible.builtin.template:
+    src: performance-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/performance-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV metrics collection script
+  ansible.builtin.template:
+    src: metrics-collector.sh.j2
+    dest: "{{ ersatztv_config_dir }}/metrics-collector.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_prometheus_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV log monitoring script
+  ansible.builtin.template:
+    src: log-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/log-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV resource monitoring script
+  ansible.builtin.template:
+    src: resource-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/resource-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV transcoding monitoring script
+  ansible.builtin.template:
+    src: transcoding-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/transcoding-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_transcode_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV streaming monitoring script
+  ansible.builtin.template:
+    src: streaming-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/streaming-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_channels_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV channel monitoring script
+  ansible.builtin.template:
+    src: channel-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/channel-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_channels_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV collection monitoring script
+  ansible.builtin.template:
+    src: collection-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/collection-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_channels_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV media monitoring script
+  ansible.builtin.template:
+    src: media-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/media-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV database monitoring script
+  ansible.builtin.template:
+    src: database-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/database-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV API monitoring script
+  ansible.builtin.template:
+    src: api-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/api-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV hardware monitoring script
+  ansible.builtin.template:
+    src: hardware-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/hardware-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_hardware_acceleration != "none"
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV integration monitoring script
+  ansible.builtin.template:
+    src: integration-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/integration-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_plex_integration or ersatztv_jellyfin_integration or ersatztv_emby_integration
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV subtitle monitoring script
+  ansible.builtin.template:
+    src: subtitle-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/subtitle-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_subtitles_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV music monitoring script
+  ansible.builtin.template:
+    src: music-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/music-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV filler monitoring script
+  ansible.builtin.template:
+    src: filler-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/filler-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_filler_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV cache monitoring script
+  ansible.builtin.template:
+    src: cache-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/cache-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV network monitoring script
+  ansible.builtin.template:
+    src: network-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/network-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV disk monitoring script
+  ansible.builtin.template:
+    src: disk-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/disk-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV memory monitoring script
+  ansible.builtin.template:
+    src: memory-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/memory-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV CPU monitoring script
+  ansible.builtin.template:
+    src: cpu-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/cpu-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV temperature monitoring script
+  ansible.builtin.template:
+    src: temperature-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/temperature-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV uptime monitoring script
+  ansible.builtin.template:
+    src: uptime-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/uptime-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV error monitoring script
+  ansible.builtin.template:
+    src: error-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/error-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV warning monitoring script
+  ansible.builtin.template:
+    src: warning-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/warning-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV info monitoring script
+  ansible.builtin.template:
+    src: info-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/info-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV debug monitoring script
+  ansible.builtin.template:
+    src: debug-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/debug-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  when: ersatztv_log_level == "DEBUG"
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV monitoring cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Monitoring"
+    minute: "*/5"
+    job: "{{ ersatztv_config_dir }}/performance-monitor.sh >> {{ ersatztv_logs_dir }}/monitoring.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_performance_monitoring
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV metrics cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Metrics Collection"
+    minute: "*/1"
+    job: "{{ ersatztv_config_dir }}/metrics-collector.sh >> {{ ersatztv_logs_dir }}/metrics.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_prometheus_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Create ErsatzTV log monitoring cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Log Monitoring"
+    minute: "*/2"
+    job: "{{ ersatztv_config_dir }}/log-monitor.sh >> {{ ersatztv_logs_dir }}/log-monitoring.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_monitoring_enabled
+  tags: [ersatztv, monitoring]
+
+- name: Display ErsatzTV monitoring configuration
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Monitoring Configuration:
+      - Monitoring Enabled: {{ ersatztv_monitoring_enabled }}
+      - Prometheus Enabled: {{ ersatztv_prometheus_enabled }}
+      - Health Check Enabled: {{ ersatztv_healthcheck_enabled }}
+      - Performance Monitoring: {{ ersatztv_performance_monitoring }}
+      - Log Level: {{ ersatztv_log_level }}
+      - Metrics Port: {{ ersatztv_prometheus_port }}
+      - Metrics Path: {{ ersatztv_prometheus_path }}
+      - Health Check Interval: {{ ersatztv_healthcheck_interval }}
+      - Health Check Timeout: {{ ersatztv_healthcheck_timeout }}
+      - Health Check Retries: {{ ersatztv_healthcheck_retries }}
+  tags: [ersatztv, monitoring] 

@@ -84,6 +84,7 @@ subdomains:
   dash: "dash"
   files: "files"
   watchtower: "updates"
+  dumbassets: "assets"
 
 #==============================================================================
 # AUTHENTICATION AND SECURITY
@@ -126,7 +127,7 @@ influxdb_admin_password: "{{ vault_influxdb_admin_password }}"
 influxdb_org: "homelab"
 influxdb_bucket: "metrics"
 influxdb_token: "{{ vault_influxdb_token }}"
-influxdb_username: "{{ lookup('env', 'INFLUXDB_USERNAME') | default('admin') }}"
+influxdb_username: "{{ vault_influxdb_username }}"
 influxdb_password: "{{ vault_influxdb_admin_password }}"
 influxdb_retention: "{{ lookup('env', 'INFLUXDB_RETENTION') | default('30d') }}"
 
@@ -170,6 +171,7 @@ enabled_services:
   - tautulli
   - komga
   - audiobookshelf
+  - ersatztv
   
   # File services
   - nextcloud
@@ -180,6 +182,9 @@ enabled_services:
   - gitlab
   - harbor
   - code_server
+  
+  # AI and Development
+  - pezzo
   
   # Storage and files
   - minio
@@ -750,7 +755,7 @@ admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@' + domain) }}"
 smtp_host: "{{ lookup('env', 'SMTP_HOST') | default('smtp.gmail.com') }}"
 smtp_port: "{{ lookup('env', 'SMTP_PORT') | default(587) }}"
 smtp_username: "{{ lookup('env', 'SMTP_USERNAME') | default('your-email@gmail.com') }}"
-smtp_password: "{{ lookup('env', 'SMTP_PASSWORD') | default('your-app-specific-password') }}"
+smtp_password: "{{ vault_smtp_password }}"
 
 # Slack Integration
 slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('') }}"
@@ -952,9 +957,9 @@ pihole_rev_server_cidr: ""                    # Your network CIDR
 
 # Database configuration
 vault_postgresql_user: "{{ lookup('env', 'POSTGRESQL_USER') | default('homelab') }}"
-vault_postgresql_password: "{{ lookup('env', 'POSTGRESQL_PASSWORD') | default('') }}"
-vault_mariadb_root_password: "{{ lookup('env', 'MARIADB_ROOT_PASSWORD') | default('') }}"
-vault_redis_password: "{{ lookup('env', 'REDIS_PASSWORD') | default('') }}"
+vault_postgresql_password: "{{ vault_postgresql_password }}"
+vault_mariadb_root_password: "{{ vault_mariadb_root_password }}"
+vault_redis_password: "{{ vault_redis_password }}"
 
 # Media service API keys
 vault_sonarr_api_key: "{{ lookup('env', 'SONARR_API_KEY') | default('') }}"

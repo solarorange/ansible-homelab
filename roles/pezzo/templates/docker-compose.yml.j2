@@ -1,0 +1,363 @@
+version: '3.8'
+
+networks:
+  {{ pezzo_network_name }}:
+    external: {{ pezzo_network_external | lower }}
+
+services:
+  # Pezzo Server
+  {% if pezzo_components.server.enabled | default(true) %}
+  pezzo-server:
+    image: "{{ pezzo_components.server.image }}"
+    container_name: "{{ pezzo_components.server.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.server.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.server.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      - "traefik.enable={{ 'true' if pezzo_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.pezzo-server.rule=Host(`api.{{ pezzo_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.pezzo-server.entrypoints=websecure"
+      - "traefik.http.routers.pezzo-server.tls.certresolver={{ pezzo_traefik_ssl_resolver }}"
+      - "traefik.http.services.pezzo-server.loadbalancer.server.port={{ pezzo_server_port }}"
+      - "traefik.http.routers.pezzo-server.middlewares={{ pezzo_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port={{ pezzo_server_port }}"
+      - "pezzo.prometheus.path=/metrics"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.server.healthcheck.test }}
+      interval: "{{ pezzo_components.server.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.server.healthcheck.timeout }}"
+      retries: {{ pezzo_components.server.healthcheck.retries }}
+    depends_on:
+      {% for dependency in pezzo_components.server.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.server.resources.limits.cpus }}'
+          memory: {{ pezzo_components.server.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.server.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.server.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo Console
+  {% if pezzo_components.console.enabled | default(true) %}
+  pezzo-console:
+    image: "{{ pezzo_components.console.image }}"
+    container_name: "{{ pezzo_components.console.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.console.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.console.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      - "traefik.enable={{ 'true' if pezzo_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.pezzo-console.rule=Host(`{{ pezzo_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.pezzo-console.entrypoints=websecure"
+      - "traefik.http.routers.pezzo-console.tls.certresolver={{ pezzo_traefik_ssl_resolver }}"
+      - "traefik.http.services.pezzo-console.loadbalancer.server.port={{ pezzo_console_port }}"
+      - "traefik.http.routers.pezzo-console.middlewares={{ pezzo_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port={{ pezzo_console_port }}"
+      - "pezzo.prometheus.path=/metrics"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.console.healthcheck.test }}
+      interval: "{{ pezzo_components.console.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.console.healthcheck.timeout }}"
+      retries: {{ pezzo_components.console.healthcheck.retries }}
+    depends_on:
+      {% for dependency in pezzo_components.console.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.console.resources.limits.cpus }}'
+          memory: {{ pezzo_components.console.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.console.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.console.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo Proxy
+  {% if pezzo_components.proxy.enabled | default(true) %}
+  pezzo-proxy:
+    image: "{{ pezzo_components.proxy.image }}"
+    container_name: "{{ pezzo_components.proxy.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.proxy.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.proxy.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      - "traefik.enable={{ 'true' if pezzo_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.pezzo-proxy.rule=Host(`proxy.{{ pezzo_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.pezzo-proxy.entrypoints=websecure"
+      - "traefik.http.routers.pezzo-proxy.tls.certresolver={{ pezzo_traefik_ssl_resolver }}"
+      - "traefik.http.services.pezzo-proxy.loadbalancer.server.port={{ pezzo_proxy_port }}"
+      - "traefik.http.routers.pezzo-proxy.middlewares={{ pezzo_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port={{ pezzo_proxy_port }}"
+      - "pezzo.prometheus.path=/metrics"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.proxy.healthcheck.test }}
+      interval: "{{ pezzo_components.proxy.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.proxy.healthcheck.timeout }}"
+      retries: {{ pezzo_components.proxy.healthcheck.retries }}
+    depends_on:
+      {% for dependency in pezzo_components.proxy.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.proxy.resources.limits.cpus }}'
+          memory: {{ pezzo_components.proxy.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.proxy.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.proxy.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo PostgreSQL Database
+  {% if pezzo_components.postgres.enabled | default(true) %}
+  pezzo-postgres:
+    image: "{{ pezzo_components.postgres.image }}"
+    container_name: "{{ pezzo_components.postgres.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.postgres.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.postgres.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port=5432"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.postgres.healthcheck.test }}
+      interval: "{{ pezzo_components.postgres.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.postgres.healthcheck.timeout }}"
+      retries: {{ pezzo_components.postgres.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.postgres.resources.limits.cpus }}'
+          memory: {{ pezzo_components.postgres.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.postgres.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.postgres.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo Redis
+  {% if pezzo_components.redis.enabled | default(true) %}
+  pezzo-redis:
+    image: "{{ pezzo_components.redis.image }}"
+    container_name: "{{ pezzo_components.redis.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.redis.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.redis.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port=6379"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.redis.healthcheck.test }}
+      interval: "{{ pezzo_components.redis.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.redis.healthcheck.timeout }}"
+      retries: {{ pezzo_components.redis.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.redis.resources.limits.cpus }}'
+          memory: {{ pezzo_components.redis.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.redis.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.redis.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo ClickHouse
+  {% if pezzo_components.clickhouse.enabled | default(true) %}
+  pezzo-clickhouse:
+    image: "{{ pezzo_components.clickhouse.image }}"
+    container_name: "{{ pezzo_components.clickhouse.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.clickhouse.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.clickhouse.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port=8123"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.clickhouse.healthcheck.test }}
+      interval: "{{ pezzo_components.clickhouse.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.clickhouse.healthcheck.timeout }}"
+      retries: {{ pezzo_components.clickhouse.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.clickhouse.resources.limits.cpus }}'
+          memory: {{ pezzo_components.clickhouse.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.clickhouse.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.clickhouse.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo SuperTokens
+  {% if pezzo_components.supertokens.enabled | default(true) %}
+  pezzo-supertokens:
+    image: "{{ pezzo_components.supertokens.image }}"
+    container_name: "{{ pezzo_components.supertokens.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.supertokens.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.supertokens.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port=3567"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.supertokens.healthcheck.test }}
+      interval: "{{ pezzo_components.supertokens.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.supertokens.healthcheck.timeout }}"
+      retries: {{ pezzo_components.supertokens.healthcheck.retries }}
+    depends_on:
+      {% for dependency in pezzo_components.supertokens.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.supertokens.resources.limits.cpus }}'
+          memory: {{ pezzo_components.supertokens.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.supertokens.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.supertokens.resources.reservations.memory }}
+  {% endif %}
+
+  # Pezzo Local KMS
+  {% if pezzo_components.local-kms.enabled | default(true) %}
+  pezzo-local-kms:
+    image: "{{ pezzo_components.local-kms.image }}"
+    container_name: "{{ pezzo_components.local-kms.container_name }}"
+    restart: "{{ pezzo_container_restart_policy }}"
+    networks:
+      - "{{ pezzo_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in pezzo_components.local-kms.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in pezzo_components.local-kms.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "pezzo.prometheus.scrape=true"
+      - "pezzo.prometheus.port=9981"
+      # Loki scraping label
+      - "pezzo.loki.scrape=true"
+    healthcheck:
+      test: {{ pezzo_components.local-kms.healthcheck.test }}
+      interval: "{{ pezzo_components.local-kms.healthcheck.interval }}"
+      timeout: "{{ pezzo_components.local-kms.healthcheck.timeout }}"
+      retries: {{ pezzo_components.local-kms.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ pezzo_components.local-kms.resources.limits.cpus }}'
+          memory: {{ pezzo_components.local-kms.resources.limits.memory }}
+        reservations:
+          cpus: '{{ pezzo_components.local-kms.resources.reservations.cpus }}'
+          memory: {{ pezzo_components.local-kms.resources.reservations.memory }}
+  {% endif %} 

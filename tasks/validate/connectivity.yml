@@ -1,0 +1,77 @@
+---
+# Connectivity Validation
+# Validates service connectivity and network communication
+
+- name: Validate service connectivity
+  block:
+    - name: Check service port accessibility
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ item.port }}"
+        timeout: 30
+        delay: 5
+      loop: "{{ service_ports }}"
+      register: port_checks
+      when: service_ports is defined
+
+    - name: Display port check results
+      ansible.builtin.debug:
+        var: port_checks
+
+    - name: Test service API endpoints
+      ansible.builtin.uri:
+        url: "{{ item }}"
+        method: GET
+        status_code: [200, 201, 202, 401, 403]
+        timeout: 10
+        validate_certs: false
+      loop: "{{ service_api_endpoints | default([]) }}"
+      register: api_checks
+      when: service_api_endpoints is defined
+
+    - name: Display API check results
+      ansible.builtin.debug:
+        var: api_checks
+
+    - name: Test inter-service communication
+      ansible.builtin.shell: |
+        for service in {{ enabled_services | join(' ') }}; do
+          if docker ps --format "{{.Names}}" | grep -q "$service"; then
+            echo "Testing connectivity for: $service"
+            docker exec "$service" ping -c 1 google.com || echo "No internet access for $service"
+          fi
+        done
+      register: inter_service_connectivity
+      changed_when: false
+
+    - name: Display inter-service connectivity results
+      ansible.builtin.debug:
+        var: inter_service_connectivity.stdout_lines
+
+    - name: Check DNS resolution
+      ansible.builtin.shell: |
+        for domain in {{ subdomains | default([]) | map('regex_replace', '^(.+)$', '\\1.{{ domain }}') | list | join(' ') }}; do
+          echo "Testing DNS resolution for: $domain"
+          nslookup "$domain" || echo "DNS resolution failed for $domain"
+        done
+      register: dns_resolution
+      changed_when: false
+
+    - name: Display DNS resolution results
+      ansible.builtin.debug:
+        var: dns_resolution.stdout_lines
+
+    - name: Test SSL certificate validity
+      ansible.builtin.shell: |
+        for domain in {{ subdomains | default([]) | map('regex_replace', '^(.+)$', '\\1.{{ domain }}') | list | join(' ') }}; do
+          echo "Testing SSL for: $domain"
+          openssl s_client -connect "$domain:443" -servername "$domain" < /dev/null 2>/dev/null | openssl x509 -noout -dates || echo "SSL test failed for $domain"
+        done
+      register: ssl_validation
+      changed_when: false
+
+    - name: Display SSL validation results
+      ansible.builtin.debug:
+        var: ssl_validation.stdout_lines
+
+  tags: [validation, connectivity] 

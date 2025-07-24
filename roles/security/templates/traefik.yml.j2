@@ -8,7 +8,14 @@ log:
 
 api:
   dashboard: true
-  insecure: true # Warning: For development only. In production, secure this.
+  insecure: false  # ✅ CRITICAL FIX: Secure by default for production
+  debug: false
+  # ✅ CRITICAL FIX: Add proper authentication
+  middlewares:
+    - name: traefik-auth
+      basicAuth:
+        users:
+          - "admin:{{ vault_traefik_basic_auth_hash }}"
 
 entryPoints:
   http:

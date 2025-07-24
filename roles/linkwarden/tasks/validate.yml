@@ -1,0 +1,17 @@
+---
+# Linkwarden Configuration Validation
+# Validates Linkwarden configuration before deployment
+
+- name: Validate Linkwarden configuration
+  ansible.builtin.assert:
+    that:
+      - linkwarden_enabled is defined
+      - linkwarden_subdomain is defined
+      - linkwarden_port is defined
+      - linkwarden_database_type is defined
+      - linkwarden_database_host is defined
+      - linkwarden_database_name is defined
+      - linkwarden_database_user is defined
+      - linkwarden_database_password is defined
+    fail_msg: "Linkwarden configuration validation failed. Check defaults/main.yml"
+  tags: [linkwarden, validation] 

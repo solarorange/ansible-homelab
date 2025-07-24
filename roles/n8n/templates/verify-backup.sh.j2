@@ -1,0 +1,136 @@
+#!/bin/bash
+# n8n Backup Verification Script
+# Verify backup integrity and completeness
+
+set -euo pipefail
+
+# Configuration
+BACKUP_DIR="{{ n8n_backup_dir }}"
+LOG_FILE="{{ n8n_backup_log_file }}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "${RED}ERROR: $1${NC}"
+    exit 1
+}
+
+# Check if backup timestamp is provided
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $0 <backup_timestamp>"
+    echo "Available backups:"
+    ls -1 "$BACKUP_DIR"/manifest_*.json 2>/dev/null | sed 's/.*manifest_\(.*\)\.json/\1/' || echo "No backups found"
+    exit 1
+fi
+
+BACKUP_TIMESTAMP="$1"
+BACKUP_MANIFEST="$BACKUP_DIR/manifest_${BACKUP_TIMESTAMP}.json"
+
+# Check if backup exists
+if [[ ! -f "$BACKUP_MANIFEST" ]]; then
+    error_exit "Backup manifest not found: $BACKUP_MANIFEST"
+fi
+
+log "${GREEN}Verifying n8n backup: $BACKUP_TIMESTAMP${NC}"
+
+# Read manifest
+if ! command -v jq &> /dev/null; then
+    error_exit "jq is required for backup verification"
+fi
+
+# Verify manifest structure
+if ! jq empty "$BACKUP_MANIFEST" 2>/dev/null; then
+    error_exit "Invalid JSON in backup manifest"
+fi
+
+log "✓ Backup manifest is valid JSON"
+
+# Check backup components
+WORKFLOW_BACKUP="$BACKUP_DIR/workflows_${BACKUP_TIMESTAMP}.json"
+DB_BACKUP="$BACKUP_DIR/database_${BACKUP_TIMESTAMP}.sql"
+DB_BACKUP_GZ="$BACKUP_DIR/database_${BACKUP_TIMESTAMP}.sql.gz"
+CONFIG_BACKUP="$BACKUP_DIR/config_${BACKUP_TIMESTAMP}.tar.gz"
+
+# Verify workflow backup
+if [[ -f "$WORKFLOW_BACKUP" ]]; then
+    if jq empty "$WORKFLOW_BACKUP" 2>/dev/null; then
+        log "✓ Workflow backup is valid JSON"
+    else
+        log "${YELLOW}⚠ Warning: Workflow backup is not valid JSON${NC}"
+    fi
+else
+    log "${YELLOW}⚠ Warning: Workflow backup not found${NC}"
+fi
+
+# Verify database backup
+if [[ -f "$DB_BACKUP" ]]; then
+    if head -n 1 "$DB_BACKUP" | grep -q "PostgreSQL database dump"; then
+        log "✓ Database backup is valid PostgreSQL dump"
+    else
+        log "${YELLOW}⚠ Warning: Database backup may not be valid${NC}"
+    fi
+elif [[ -f "$DB_BACKUP_GZ" ]]; then
+    if gunzip -c "$DB_BACKUP_GZ" | head -n 1 | grep -q "PostgreSQL database dump"; then
+        log "✓ Compressed database backup is valid PostgreSQL dump"
+    else
+        log "${YELLOW}⚠ Warning: Compressed database backup may not be valid${NC}"
+    fi
+else
+    log "${YELLOW}⚠ Warning: Database backup not found${NC}"
+fi
+
+# Verify configuration backup
+if [[ -f "$CONFIG_BACKUP" ]]; then
+    if tar -tzf "$CONFIG_BACKUP" >/dev/null 2>&1; then
+        log "✓ Configuration backup is valid tar.gz archive"
+    else
+        log "${YELLOW}⚠ Warning: Configuration backup may be corrupted${NC}"
+    fi
+else
+    log "${YELLOW}⚠ Warning: Configuration backup not found${NC}"
+fi
+
+# Check file sizes
+log "Backup file sizes:"
+if [[ -f "$WORKFLOW_BACKUP" ]]; then
+    WORKFLOW_SIZE=$(du -h "$WORKFLOW_BACKUP" | cut -f1)
+    log "  - Workflows: $WORKFLOW_SIZE"
+fi
+
+if [[ -f "$DB_BACKUP" ]]; then
+    DB_SIZE=$(du -h "$DB_BACKUP" | cut -f1)
+    log "  - Database: $DB_SIZE"
+elif [[ -f "$DB_BACKUP_GZ" ]]; then
+    DB_SIZE=$(du -h "$DB_BACKUP_GZ" | cut -f1)
+    log "  - Database (compressed): $DB_SIZE"
+fi
+
+if [[ -f "$CONFIG_BACKUP" ]]; then
+    CONFIG_SIZE=$(du -h "$CONFIG_BACKUP" | cut -f1)
+    log "  - Configuration: $CONFIG_SIZE"
+fi
+
+# Check backup age
+BACKUP_DATE=$(jq -r '.date' "$BACKUP_MANIFEST" 2>/dev/null || echo "")
+if [[ -n "$BACKUP_DATE" ]]; then
+    log "✓ Backup created: $BACKUP_DATE"
+else
+    log "${YELLOW}⚠ Warning: Could not determine backup date${NC}"
+fi
+
+# Overall verification result
+log "${GREEN}n8n backup verification completed${NC}"
+log "Backup timestamp: $BACKUP_TIMESTAMP"
+log "Manifest: $BACKUP_MANIFEST"
+
+exit 0 

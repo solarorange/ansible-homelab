@@ -1,0 +1,130 @@
+---
+# Configure Immich Monitoring
+# Production-ready monitoring tasks for Immich
+
+- name: Configure Immich monitoring
+  block:
+    - name: Generate Immich Prometheus configuration
+      ansible.builtin.template:
+        src: prometheus.yml.j2
+        dest: "{{ immich_config_dir }}/prometheus.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_prometheus_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Generate Immich Grafana dashboard
+      ansible.builtin.template:
+        src: grafana-dashboard.json.j2
+        dest: "{{ immich_config_dir }}/grafana-dashboard.json"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_grafana_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Generate Immich Telegraf configuration
+      ansible.builtin.template:
+        src: telegraf.conf.j2
+        dest: "{{ immich_config_dir }}/telegraf.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_telegraf_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Generate Immich Loki configuration
+      ansible.builtin.template:
+        src: loki-config.yml.j2
+        dest: "{{ immich_config_dir }}/loki-config.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_loki_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Create Immich monitoring health check script
+      ansible.builtin.template:
+        src: health-check.sh.j2
+        dest: "{{ immich_config_dir }}/health-check.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, monitoring]
+
+    - name: Create Immich monitoring cron job
+      ansible.builtin.cron:
+        name: "Immich Health Check"
+        minute: "*/5"
+        job: "{{ immich_config_dir }}/health-check.sh >> {{ logs_dir }}/immich/health/health.log 2>&1"
+        user: "{{ ansible_user }}"
+      tags: [immich, monitoring]
+
+    - name: Configure Immich log aggregation
+      ansible.builtin.template:
+        src: log-aggregation.conf.j2
+        dest: "{{ immich_config_dir }}/log-aggregation.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, monitoring]
+
+    - name: Create Immich metrics collection script
+      ansible.builtin.template:
+        src: collect-metrics.sh.j2
+        dest: "{{ immich_config_dir }}/collect-metrics.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, monitoring]
+
+    - name: Setup Immich metrics collection cron
+      ansible.builtin.cron:
+        name: "Immich Metrics Collection"
+        minute: "*/1"
+        job: "{{ immich_config_dir }}/collect-metrics.sh >> {{ logs_dir }}/immich/metrics/metrics.log 2>&1"
+        user: "{{ ansible_user }}"
+      tags: [immich, monitoring]
+
+    - name: Create Immich monitoring directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - "{{ logs_dir }}/immich/metrics"
+        - "{{ logs_dir }}/immich/alerts"
+        - "{{ logs_dir }}/immich/dashboards"
+      tags: [immich, monitoring]
+
+    - name: Generate Immich AlertManager configuration
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ immich_config_dir }}/alertmanager.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_alerting_enabled | default(true)
+      tags: [immich, monitoring]
+
+    - name: Create Immich monitoring systemd service
+      ansible.builtin.template:
+        src: immich-monitoring.service.j2
+        dest: /etc/systemd/system/immich-monitoring.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, monitoring]
+
+    - name: Enable and start Immich monitoring service
+      ansible.builtin.systemd:
+        name: immich-monitoring
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: [immich, monitoring]
+
+  tags: [immich, monitoring, always] 

@@ -98,7 +98,7 @@
   block:
     - name: PostgreSQL performance test
       ansible.builtin.shell: |
-        PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c "
+        PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c "
         SELECT 
           schemaname,
           tablename,
@@ -122,7 +122,7 @@
     - name: Test database connections
       ansible.builtin.shell: |
         for i in {1..50}; do
-          PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c "SELECT 1;" &
+          PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c "SELECT 1;" &
         done
         wait
       register: db_connection_test

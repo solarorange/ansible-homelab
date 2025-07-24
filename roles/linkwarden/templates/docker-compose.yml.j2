@@ -1,0 +1,99 @@
+version: '3.8'
+
+networks:
+  {{ linkwarden_network_name }}:
+    external: {{ linkwarden_network_external | lower }}
+
+services:
+  # Linkwarden App
+  {% if linkwarden_components.app.enabled | default(true) %}
+  linkwarden-app:
+    image: "{{ linkwarden_components.app.image }}"
+    container_name: "{{ linkwarden_components.app.container_name }}"
+    restart: "{{ linkwarden_container_restart_policy }}"
+    networks:
+      - "{{ linkwarden_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in linkwarden_components.app.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in linkwarden_components.app.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ linkwarden_port }}:{{ linkwarden_port }}"
+    labels:
+      - "traefik.enable={{ 'true' if linkwarden_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.linkwarden.rule=Host(`{{ linkwarden_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.linkwarden.entrypoints=websecure"
+      - "traefik.http.routers.linkwarden.tls.certresolver={{ linkwarden_traefik_ssl_resolver }}"
+      - "traefik.http.services.linkwarden.loadbalancer.server.port={{ linkwarden_port }}"
+      - "traefik.http.routers.linkwarden.middlewares={{ linkwarden_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "linkwarden.prometheus.scrape=true"
+      - "linkwarden.prometheus.port={{ linkwarden_port }}"
+      - "linkwarden.prometheus.path=/metrics"
+      # Loki scraping label
+      - "linkwarden.loki.scrape=true"
+    healthcheck:
+      test: {{ linkwarden_components.app.healthcheck.test }}
+      interval: "{{ linkwarden_components.app.healthcheck.interval }}"
+      timeout: "{{ linkwarden_components.app.healthcheck.timeout }}"
+      retries: {{ linkwarden_components.app.healthcheck.retries }}
+    depends_on:
+      {% for dependency in linkwarden_components.app.depends_on %}
+      - {{ dependency }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ linkwarden_components.app.resources.limits.cpus }}'
+          memory: {{ linkwarden_components.app.resources.limits.memory }}
+        reservations:
+          cpus: '{{ linkwarden_components.app.resources.reservations.cpus }}'
+          memory: {{ linkwarden_components.app.resources.reservations.memory }}
+  {% endif %}
+
+  # Linkwarden PostgreSQL Database
+  {% if linkwarden_components.postgres.enabled | default(true) %}
+  linkwarden-postgres:
+    image: "{{ linkwarden_components.postgres.image }}"
+    container_name: "{{ linkwarden_components.postgres.container_name }}"
+    restart: "{{ linkwarden_container_restart_policy }}"
+    networks:
+      - "{{ linkwarden_network_name }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in linkwarden_components.postgres.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in linkwarden_components.postgres.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    labels:
+      # Prometheus scraping labels
+      - "linkwarden.prometheus.scrape=true"
+      - "linkwarden.prometheus.port=5432"
+      # Loki scraping label
+      - "linkwarden.loki.scrape=true"
+    healthcheck:
+      test: {{ linkwarden_components.postgres.healthcheck.test }}
+      interval: "{{ linkwarden_components.postgres.healthcheck.interval }}"
+      timeout: "{{ linkwarden_components.postgres.healthcheck.timeout }}"
+      retries: {{ linkwarden_components.postgres.healthcheck.retries }}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ linkwarden_components.postgres.resources.limits.cpus }}'
+          memory: {{ linkwarden_components.postgres.resources.limits.memory }}
+        reservations:
+          cpus: '{{ linkwarden_components.postgres.resources.reservations.cpus }}'
+          memory: {{ linkwarden_components.postgres.resources.reservations.memory }}
+  {% endif %} 

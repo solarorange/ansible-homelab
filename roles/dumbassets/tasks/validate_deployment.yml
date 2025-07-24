@@ -1,0 +1,123 @@
+---
+# DumbAssets Deployment Validation Tasks
+# Post-deployment health checks and validation
+
+- name: Wait for DumbAssets service to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ dumbassets_port }}"
+    state: started
+    timeout: "{{ dumbassets_validation_timeout | default(300) }}"
+    delay: 10
+  register: dumbassets_service_ready
+  tags: [dumbassets, validation, health]
+
+- name: Verify DumbAssets container is running
+  community.docker.docker_container_info:
+    name: "{{ dumbassets_container_name }}"
+  register: dumbassets_container_info
+  tags: [dumbassets, validation, container]
+
+- name: Check DumbAssets container health status
+  ansible.builtin.assert:
+    that:
+      - dumbassets_container_info.exists
+      - dumbassets_container_info.container.State.Status == "running"
+      - dumbassets_container_info.container.State.Health.Status == "healthy"
+    fail_msg: "DumbAssets container is not running or healthy"
+  tags: [dumbassets, validation, container]
+
+- name: Verify DumbAssets web interface accessibility
+  ansible.builtin.uri:
+    url: "http://localhost:{{ dumbassets_port }}"
+    status_code: [200, 302, 401, 403]
+    timeout: 30
+  register: dumbassets_web_check
+  tags: [dumbassets, validation, web]
+
+- name: Verify DumbAssets API endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ dumbassets_port }}/api/health"
+    status_code: [200, 401, 403]
+    timeout: 30
+  register: dumbassets_api_check
+  tags: [dumbassets, validation, api]
+
+- name: Check DumbAssets logs for errors
+  ansible.builtin.shell: |
+    docker logs {{ dumbassets_container_name }} --tail 50 | grep -i error
+  register: dumbassets_log_check
+  failed_when: false
+  tags: [dumbassets, validation, logs]
+
+- name: Verify DumbAssets data directory permissions
+  ansible.builtin.stat:
+    path: "{{ dumbassets_data_dir }}"
+  register: dumbassets_data_stat
+  tags: [dumbassets, validation, permissions]
+
+- name: Check DumbAssets data directory ownership
+  ansible.builtin.assert:
+    that:
+      - dumbassets_data_stat.stat.exists
+      - dumbassets_data_stat.stat.isdir
+      - dumbassets_data_stat.stat.pw_name == username | default('homelab')
+    fail_msg: "DumbAssets data directory has incorrect permissions or ownership"
+  tags: [dumbassets, validation, permissions]
+
+- name: Verify DumbAssets network connectivity
+  ansible.builtin.wait_for:
+    host: "{{ dumbassets_subdomain }}.{{ domain }}"
+    port: 443
+    state: started
+    timeout: 60
+  register: dumbassets_network_check
+  tags: [dumbassets, validation, network]
+
+- name: Test DumbAssets external accessibility
+  ansible.builtin.uri:
+    url: "https://{{ dumbassets_subdomain }}.{{ domain }}"
+    status_code: [200, 302, 401, 403]
+    timeout: 30
+  register: dumbassets_external_check
+  tags: [dumbassets, validation, external]
+
+- name: Verify DumbAssets monitoring integration
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/targets"
+    status_code: 200
+    timeout: 30
+  register: dumbassets_monitoring_check
+  tags: [dumbassets, validation, monitoring]
+
+- name: Check DumbAssets backup configuration
+  ansible.builtin.stat:
+    path: "{{ dumbassets_docker_dir }}/scripts/backup.sh"
+  register: dumbassets_backup_check
+  tags: [dumbassets, validation, backup]
+
+- name: Verify DumbAssets homepage integration
+  ansible.builtin.stat:
+    path: "{{ docker_config_root }}/homepage/services/dumbassets.yml"
+  register: dumbassets_homepage_check
+  tags: [dumbassets, validation, homepage]
+
+- name: Display DumbAssets deployment validation summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Deployment Validation Summary:
+      - Service Ready: {{ dumbassets_service_ready.state }}
+      - Container Running: {{ dumbassets_container_info.exists }}
+      - Web Interface: {{ dumbassets_web_check.status }}
+      - API Endpoint: {{ dumbassets_api_check.status }}
+      - Data Directory: {{ dumbassets_data_stat.stat.exists }}
+      - Network Connectivity: {{ dumbassets_network_check.state }}
+      - External Access: {{ dumbassets_external_check.status }}
+      - Monitoring Integration: {{ dumbassets_monitoring_check.status }}
+      - Backup Configuration: {{ dumbassets_backup_check.stat.exists }}
+      - Homepage Integration: {{ dumbassets_homepage_check.stat.exists }}
+      - Access URLs:
+        - Local: http://localhost:{{ dumbassets_port }}
+        - External: https://{{ dumbassets_subdomain }}.{{ domain }}
+      - PIN Protection: {{ dumbassets_pin | length >= 4 }}
+  tags: [dumbassets, validation, summary] 

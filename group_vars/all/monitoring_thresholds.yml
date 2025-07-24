@@ -1,36 +1,66 @@
-# Monitoring Thresholds Configuration
-# Comprehensive monitoring thresholds for homelab services
+# Enhanced Monitoring Thresholds Configuration
+# Comprehensive monitoring thresholds for homelab services with production-ready granular controls
 
 monitoring_thresholds:
   enabled: true
   
-  # System resource thresholds
+  # Enhanced system resource thresholds
   system:
-    # CPU thresholds
+    # CPU thresholds with granular controls
     cpu:
       warning: 80
       critical: 90
       load_average:
         warning: 2.0
         critical: 5.0
+      per_core:
+        warning: 85
+        critical: 95
+      iowait:
+        warning: 20
+        critical: 50
+      steal:
+        warning: 10
+        critical: 25
     
-    # Memory thresholds
+    # Enhanced memory thresholds
     memory:
       warning: 85
       critical: 95
       swap:
         warning: 50
         critical: 80
+      cache:
+        warning: 90
+        critical: 95
+      buffers:
+        warning: 80
+        critical: 90
+      slab:
+        warning: 85
+        critical: 95
     
-    # Disk thresholds
+    # Enhanced disk thresholds
     disk:
       warning: 80
       critical: 90
       inode:
         warning: 85
         critical: 95
+      read_time:
+        warning: 100
+        critical: 500
+      write_time:
+        warning: 100
+        critical: 500
+      queue_depth:
+        warning: 10
+        critical: 50
+      io_utilization:
+        warning: 80
+        critical: 95
     
-    # Network thresholds
+    # Enhanced network thresholds
     network:
       bandwidth:
         warning: 80
@@ -41,50 +71,117 @@ monitoring_thresholds:
       latency:
         warning: 100
         critical: 500
+      packet_loss:
+        warning: 1
+        critical: 5
+      connection_count:
+        warning: 1000
+        critical: 5000
+      tcp_retransmit:
+        warning: 5
+        critical: 20
 
-  # Container thresholds
+  # Enhanced container thresholds
   containers:
-    # CPU usage per container
+    # CPU usage per container with granular controls
     cpu:
       warning: 70
       critical: 85
+      throttling:
+        warning: 5
+        critical: 20
+      user_time:
+        warning: 80
+        critical: 95
+      system_time:
+        warning: 20
+        critical: 40
     
-    # Memory usage per container
+    # Enhanced memory usage per container
     memory:
       warning: 80
       critical: 90
+      rss:
+        warning: 85
+        critical: 95
+      cache:
+        warning: 90
+        critical: 98
+      swap:
+        warning: 50
+        critical: 80
+      oom_kills:
+        warning: 1
+        critical: 5
+        time_window: "1h"
     
-    # Disk usage per container
+    # Enhanced disk usage per container
     disk:
       warning: 75
       critical: 85
+      read_bytes:
+        warning: 1000000000  # 1GB
+        critical: 5000000000  # 5GB
+      write_bytes:
+        warning: 1000000000  # 1GB
+        critical: 5000000000  # 5GB
+      read_ops:
+        warning: 1000
+        critical: 5000
+      write_ops:
+        warning: 1000
+        critical: 5000
     
-    # Container restart rate
+    # Enhanced container restart rate
     restarts:
       warning: 3
       critical: 10
       time_window: "1h"
+      exponential_backoff:
+        warning: 5
+        critical: 15
+        time_window: "6h"
     
-    # Container health status
+    # Enhanced container health status
     health:
       unhealthy_threshold: 1
       time_window: "5m"
+      startup_time:
+        warning: 60
+        critical: 300
+      graceful_shutdown:
+        warning: 30
+        critical: 120
 
-  # Service-specific thresholds
+  # Enhanced service-specific thresholds
   services:
-    # Web services (nginx, apache, traefik)
+    # Enhanced web services (nginx, apache, traefik)
     web:
       response_time:
         warning: 1000
         critical: 3000
+        p95: 2000
+        p99: 5000
       error_rate:
         warning: 5
         critical: 10
+        time_window: "5m"
       availability:
         warning: 99.5
         critical: 99.0
+      request_rate:
+        warning: 1000
+        critical: 5000
+        time_window: "1m"
+      connection_count:
+        warning: 500
+        critical: 2000
+      ssl_cert_expiry:
+        warning: 30
+        critical: 7
+        unit: "days"
     
-    # Database services (postgresql, mysql, redis)
+    # Enhanced database services (postgresql, mysql, redis)
     database:
       connection_pool:
         warning: 80
@@ -92,6 +189,7 @@ monitoring_thresholds:
       query_time:
         warning: 1000
         critical: 5000
+        slow_query_threshold: 1000
       slow_queries:
         warning: 10
         critical: 50
@@ -99,8 +197,21 @@ monitoring_thresholds:
       replication_lag:
         warning: 30
         critical: 60
+      active_connections:
+        warning: 80
+        critical: 95
+      deadlocks:
+        warning: 1
+        critical: 5
+        time_window: "1h"
+      cache_hit_ratio:
+        warning: 90
+        critical: 80
+      index_usage:
+        warning: 70
+        critical: 50
     
-    # Media services (plex, jellyfin, emby)
+    # Enhanced media services (plex, jellyfin, emby)
     media:
       transcoding_queue:
         warning: 5
@@ -111,8 +222,19 @@ monitoring_thresholds:
       library_scan:
         warning: 300
         critical: 600
+      transcoding_performance:
+        warning: 0.8
+        critical: 0.5
+        unit: "fps"
+      bandwidth_usage:
+        warning: 80
+        critical: 95
+        unit: "Mbps"
+      storage_usage:
+        warning: 85
+        critical: 95
     
-    # Download services (sonarr, radarr, sabnzbd)
+    # Enhanced download services (sonarr, radarr, sabnzbd)
     download:
       queue_size:
         warning: 50
@@ -120,12 +242,23 @@ monitoring_thresholds:
       download_speed:
         warning: 10
         critical: 5
+        unit: "MB/s"
       failed_downloads:
         warning: 5
         critical: 15
         time_window: "1h"
+      success_rate:
+        warning: 90
+        critical: 80
+      indexer_response_time:
+        warning: 5
+        critical: 15
+      disk_space_remaining:
+        warning: 10
+        critical: 5
+        unit: "GB"
     
-    # Storage services (nextcloud, samba)
+    # Enhanced storage services (nextcloud, samba)
     storage:
       sync_status:
         warning: 5
@@ -137,8 +270,19 @@ monitoring_thresholds:
       quota_usage:
         warning: 80
         critical: 90
+      sync_conflicts:
+        warning: 3
+        critical: 10
+        time_window: "1h"
+      version_control:
+        warning: 1000
+        critical: 5000
+        unit: "versions"
+      encryption_status:
+        warning: 0
+        critical: 1
     
-    # Monitoring services (prometheus, grafana)
+    # Enhanced monitoring services (prometheus, grafana)
     monitoring:
       scrape_interval:
         warning: 30
@@ -149,8 +293,21 @@ monitoring_thresholds:
       query_time:
         warning: 5
         critical: 15
+      target_health:
+        warning: 95
+        critical: 90
+      rule_evaluation:
+        warning: 5
+        critical: 15
+      alert_queue:
+        warning: 10
+        critical: 50
+      retention_period:
+        warning: 7
+        critical: 3
+        unit: "days"
     
-    # Security services (authentik, fail2ban)
+    # Enhanced security services (authentik, fail2ban)
     security:
       failed_logins:
         warning: 10
@@ -164,26 +321,53 @@ monitoring_thresholds:
         warning: 5
         critical: 15
         time_window: "10m"
+      brute_force_attempts:
+        warning: 10
+        critical: 50
+        time_window: "10m"
+      session_count:
+        warning: 100
+        critical: 500
+      api_rate_limit:
+        warning: 80
+        critical: 95
+        time_window: "1m"
 
-  # Application-specific thresholds
+  # Enhanced application-specific thresholds
   applications:
-    # Traefik
+    # Enhanced Traefik
     traefik:
       request_rate:
         warning: 1000
         critical: 5000
+        time_window: "1m"
       error_rate:
         warning: 5
         critical: 15
+        time_window: "5m"
       response_time:
         warning: 500
         critical: 2000
+        p95: 1000
+        p99: 3000
+      backend_health:
+        warning: 95
+        critical: 90
+      certificate_expiry:
+        warning: 30
+        critical: 7
+        unit: "days"
+      middleware_errors:
+        warning: 1
+        critical: 10
+        time_window: "5m"
     
-    # Grafana
+    # Enhanced Grafana
     grafana:
       dashboard_load_time:
         warning: 3
         critical: 10
+        unit: "seconds"
       user_sessions:
         warning: 50
         critical: 100
@@ -191,32 +375,71 @@ monitoring_thresholds:
         warning: 100
         critical: 500
         time_window: "1m"
-    
-    # Prometheus
-    prometheus:
-      scrape_duration:
-        warning: 10
-        critical: 30
-      storage_retention:
-        warning: 7
-        critical: 3
-      rule_evaluation:
+      alert_evaluation:
         warning: 5
         critical: 15
-    
-    # Loki
-    loki:
-      query_time:
-        warning: 5
-        critical: 15
-      ingestion_rate:
-        warning: 1000
-        critical: 5000
+        unit: "seconds"
+      plugin_errors:
+        warning: 1
+        critical: 10
+        time_window: "1h"
       storage_usage:
         warning: 80
         critical: 90
     
-    # AlertManager
+    # Enhanced Prometheus
+    prometheus:
+      scrape_duration:
+        warning: 10
+        critical: 30
+        unit: "seconds"
+      storage_retention:
+        warning: 7
+        critical: 3
+        unit: "days"
+      rule_evaluation:
+        warning: 5
+        critical: 15
+        unit: "seconds"
+      target_scrape_failures:
+        warning: 5
+        critical: 20
+        time_window: "5m"
+      storage_compaction:
+        warning: 60
+        critical: 300
+        unit: "seconds"
+      query_timeout:
+        warning: 30
+        critical: 60
+        unit: "seconds"
+    
+    # Enhanced Loki
+    loki:
+      query_time:
+        warning: 5
+        critical: 15
+        unit: "seconds"
+      ingestion_rate:
+        warning: 1000
+        critical: 5000
+        unit: "lines/sec"
+      storage_usage:
+        warning: 80
+        critical: 90
+      compaction_duration:
+        warning: 300
+        critical: 900
+        unit: "seconds"
+      query_queue_length:
+        warning: 10
+        critical: 50
+      index_operations:
+        warning: 100
+        critical: 500
+        time_window: "1m"
+    
+    # Enhanced AlertManager
     alertmanager:
       notification_queue:
         warning: 10
@@ -224,8 +447,20 @@ monitoring_thresholds:
       notification_time:
         warning: 30
         critical: 60
+        unit: "seconds"
+      silence_count:
+        warning: 10
+        critical: 50
+      group_wait_time:
+        warning: 30
+        critical: 120
+        unit: "seconds"
+      repeat_interval:
+        warning: 240
+        critical: 1440
+        unit: "minutes"
     
-    # Jellyfin/Plex
+    # Enhanced Jellyfin/Plex
     media_server:
       active_streams:
         warning: 5
@@ -236,8 +471,23 @@ monitoring_thresholds:
       library_scan_time:
         warning: 300
         critical: 600
+        unit: "seconds"
+      bandwidth_usage:
+        warning: 80
+        critical: 95
+        unit: "Mbps"
+      storage_usage:
+        warning: 85
+        critical: 95
+      user_sessions:
+        warning: 20
+        critical: 50
+      transcoding_performance:
+        warning: 0.8
+        critical: 0.5
+        unit: "fps"
     
-    # Sonarr/Radarr
+    # Enhanced Sonarr/Radarr
     arr_services:
       queue_size:
         warning: 20
@@ -245,12 +495,27 @@ monitoring_thresholds:
       api_response_time:
         warning: 2
         critical: 10
+        unit: "seconds"
       failed_grabs:
         warning: 3
         critical: 10
         time_window: "1h"
+      indexer_health:
+        warning: 90
+        critical: 80
+      download_client_health:
+        warning: 90
+        critical: 80
+      disk_space_remaining:
+        warning: 10
+        critical: 5
+        unit: "GB"
+      library_scan_duration:
+        warning: 300
+        critical: 600
+        unit: "seconds"
     
-    # SABnzbd
+    # Enhanced SABnzbd
     sabnzbd:
       download_queue:
         warning: 10
@@ -258,16 +523,30 @@ monitoring_thresholds:
       download_speed:
         warning: 10
         critical: 5
+        unit: "MB/s"
       failed_downloads:
         warning: 2
         critical: 8
         time_window: "1h"
+      post_processing_queue:
+        warning: 5
+        critical: 15
+      server_health:
+        warning: 90
+        critical: 80
+      disk_io_usage:
+        warning: 80
+        critical: 95
+      cache_usage:
+        warning: 85
+        critical: 95
     
-    # Nextcloud
+    # Enhanced Nextcloud
     nextcloud:
       sync_conflicts:
         warning: 5
         critical: 15
+        time_window: "1h"
       file_operations:
         warning: 50
         critical: 200
@@ -275,8 +554,22 @@ monitoring_thresholds:
       storage_quota:
         warning: 80
         critical: 90
+      user_sessions:
+        warning: 50
+        critical: 100
+      app_updates:
+        warning: 7
+        critical: 30
+        unit: "days"
+      database_performance:
+        warning: 1000
+        critical: 5000
+        unit: "ms"
+      encryption_status:
+        warning: 0
+        critical: 1
     
-    # Authentik
+    # Enhanced Authentik
     authentik:
       failed_logins:
         warning: 5
@@ -288,42 +581,88 @@ monitoring_thresholds:
       api_response_time:
         warning: 1
         critical: 5
+        unit: "seconds"
+      outpost_health:
+        warning: 90
+        critical: 80
+      provider_health:
+        warning: 90
+        critical: 80
+      flow_execution_time:
+        warning: 5
+        critical: 15
+        unit: "seconds"
+      policy_evaluation:
+        warning: 1
+        critical: 5
+        unit: "seconds"
 
-  # Network thresholds
+  # Enhanced network thresholds
   network:
-    # Internet connectivity
+    # Enhanced Internet connectivity
     internet:
       latency:
         warning: 50
         critical: 200
+        unit: "ms"
       packet_loss:
         warning: 1
         critical: 5
+        unit: "percent"
       bandwidth:
         warning: 80
         critical: 90
+        unit: "percent"
+      dns_resolution:
+        warning: 100
+        critical: 500
+        unit: "ms"
+      connection_stability:
+        warning: 95
+        critical: 90
+        unit: "percent"
     
-    # Local network
+    # Enhanced Local network
     local:
       latency:
         warning: 10
         critical: 50
+        unit: "ms"
       packet_loss:
         warning: 0.1
         critical: 1.0
+        unit: "percent"
+      bandwidth_utilization:
+        warning: 80
+        critical: 90
+        unit: "percent"
+      switch_port_errors:
+        warning: 10
+        critical: 50
+        time_window: "1h"
     
-    # DNS resolution
+    # Enhanced DNS resolution
     dns:
       response_time:
         warning: 100
         critical: 500
+        unit: "ms"
       failure_rate:
         warning: 5
         critical: 15
+        unit: "percent"
+      cache_hit_ratio:
+        warning: 80
+        critical: 60
+        unit: "percent"
+      nxdomain_queries:
+        warning: 10
+        critical: 50
+        time_window: "1h"
 
-  # Security thresholds
+  # Enhanced security thresholds
   security:
-    # Authentication
+    # Enhanced Authentication
     authentication:
       failed_logins:
         warning: 5
@@ -333,8 +672,16 @@ monitoring_thresholds:
         warning: 10
         critical: 50
         time_window: "10m"
+      session_timeout:
+        warning: 3600
+        critical: 1800
+        unit: "seconds"
+      password_expiry:
+        warning: 7
+        critical: 3
+        unit: "days"
     
-    # Network security
+    # Enhanced Network security
     network_security:
       blocked_ips:
         warning: 5
@@ -344,8 +691,16 @@ monitoring_thresholds:
         warning: 10
         critical: 50
         time_window: "5m"
+      port_scan_attempts:
+        warning: 5
+        critical: 20
+        time_window: "1h"
+      ddos_attempts:
+        warning: 100
+        critical: 500
+        time_window: "1m"
     
-    # Container security
+    # Enhanced Container security
     container_security:
       privileged_containers:
         warning: 0
@@ -356,10 +711,18 @@ monitoring_thresholds:
       security_vulnerabilities:
         warning: 5
         critical: 15
+      image_age:
+        warning: 30
+        critical: 90
+        unit: "days"
+      runtime_security_events:
+        warning: 1
+        critical: 10
+        time_window: "1h"
 
-  # Backup thresholds
+  # Enhanced backup thresholds
   backup:
-    # Backup status
+    # Enhanced Backup status
     status:
       failed_backups:
         warning: 1
@@ -369,8 +732,15 @@ monitoring_thresholds:
         warning: 24
         critical: 48
         unit: "hours"
+      backup_size_change:
+        warning: 50
+        critical: 100
+        unit: "percent"
+      backup_integrity:
+        warning: 0
+        critical: 1
     
-    # Backup performance
+    # Enhanced Backup performance
     performance:
       backup_duration:
         warning: 3600
@@ -380,8 +750,15 @@ monitoring_thresholds:
         warning: 100
         critical: 500
         unit: "GB"
+      compression_ratio:
+        warning: 2.0
+        critical: 1.5
+      transfer_speed:
+        warning: 10
+        critical: 5
+        unit: "MB/s"
     
-    # Backup verification
+    # Enhanced Backup verification
     verification:
       restore_test_failures:
         warning: 1
@@ -390,16 +767,26 @@ monitoring_thresholds:
       backup_integrity:
         warning: 0
         critical: 1
+      checksum_validation:
+        warning: 0
+        critical: 1
+      encryption_status:
+        warning: 0
+        critical: 1
 
-  # SSL/TLS thresholds
+  # Enhanced SSL/TLS thresholds
   ssl:
-    # Certificate expiration
+    # Enhanced Certificate expiration
     expiration:
       warning: 30
       critical: 7
       unit: "days"
+      auto_renewal:
+        warning: 7
+        critical: 3
+        unit: "days"
     
-    # Certificate validation
+    # Enhanced Certificate validation
     validation:
       invalid_certificates:
         warning: 0
@@ -408,62 +795,104 @@ monitoring_thresholds:
         warning: 1
         critical: 5
         time_window: "1h"
+      ocsp_stapling:
+        warning: 0
+        critical: 1
+      hsts_compliance:
+        warning: 0
+        critical: 1
 
-  # Performance thresholds
+  # Enhanced Performance thresholds
   performance:
-    # Response times
+    # Enhanced Response times
     response_time:
       web_services:
         warning: 1000
         critical: 3000
+        unit: "ms"
+        p95: 2000
+        p99: 5000
       api_services:
         warning: 500
         critical: 2000
+        unit: "ms"
+        p95: 1000
+        p99: 3000
       database_queries:
         warning: 100
         critical: 1000
+        unit: "ms"
+        p95: 500
+        p99: 2000
     
-    # Throughput
+    # Enhanced Throughput
     throughput:
       requests_per_second:
         warning: 100
         critical: 500
+        time_window: "1m"
       transactions_per_second:
         warning: 50
         critical: 200
+        time_window: "1m"
+      concurrent_connections:
+        warning: 100
+        critical: 500
+      queue_depth:
+        warning: 10
+        critical: 50
     
-    # Error rates
+    # Enhanced Error rates
     error_rate:
       http_errors:
         warning: 5
         critical: 15
+        time_window: "5m"
       application_errors:
         warning: 2
         critical: 10
+        time_window: "5m"
       database_errors:
         warning: 1
         critical: 5
+        time_window: "5m"
+      timeout_errors:
+        warning: 1
+        critical: 10
+        time_window: "5m"
 
-  # Alert timing
+  # Enhanced Alert timing
   alert_timing:
-    # How long to wait before alerting
+    # Enhanced timing controls
     evaluation_interval: "30s"
     group_wait: "30s"
     group_interval: "5m"
     repeat_interval: "4h"
     
-    # Alert grouping
+    # Enhanced Alert grouping
     group_by:
       - alertname
       - service
       - instance
+      - severity
     
-    # Rate limiting
+    # Enhanced Rate limiting
     rate_limit:
       max_alerts_per_minute: 10
       max_alerts_per_hour: 100
+      max_alerts_per_day: 1000
+    
+    # Enhanced Escalation
+    escalation:
+      initial_delay: "5m"
+      escalation_delay: "15m"
+      max_escalations: 3
+      escalation_contacts:
+        - "admin"
+        - "oncall"
+        - "emergency"
 
-  # Threshold overrides
+  # Enhanced Threshold overrides
   overrides:
     # Environment-specific overrides
     production:
@@ -474,6 +903,18 @@ monitoring_thresholds:
         memory:
           warning: 80
           critical: 90
+        disk:
+          warning: 75
+          critical: 85
+      services:
+        web:
+          response_time:
+            warning: 500
+            critical: 2000
+        database:
+          query_time:
+            warning: 500
+            critical: 2000
     
     development:
       system:
@@ -483,15 +924,62 @@ monitoring_thresholds:
         memory:
           warning: 90
           critical: 95
+        disk:
+          warning: 90
+          critical: 95
+      services:
+        web:
+          response_time:
+            warning: 2000
+            critical: 5000
+        database:
+          query_time:
+            warning: 2000
+            critical: 5000
     
-    # Service-specific overrides
+    # Enhanced Service-specific overrides
     high_priority_services:
       - traefik
       - authentik
       - prometheus
       - grafana
+      - postgresql
+      - redis
       
     low_priority_services:
       - media_processing
       - backup_services
-      - maintenance_tasks 
+      - maintenance_tasks
+      - development_tools
+    
+    # Enhanced Time-based overrides
+    time_based:
+      business_hours:
+        start: "09:00"
+        end: "17:00"
+        timezone: "America/New_York"
+        thresholds:
+          system:
+            cpu:
+              warning: 60
+              critical: 80
+          services:
+            web:
+              response_time:
+                warning: 500
+                critical: 1500
+      
+      maintenance_window:
+        start: "02:00"
+        end: "04:00"
+        timezone: "America/New_York"
+        thresholds:
+          system:
+            cpu:
+              warning: 90
+              critical: 95
+          services:
+            backup:
+              performance:
+                warning: 7200
+                critical: 14400 

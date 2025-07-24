@@ -653,4 +653,38 @@
     widget:
       type: watchtower
       url: http://watchtower:8080
+{% endif %}
+
+{% if 'dumbassets' in enabled_services %}
+- DumbAssets:
+    icon: database.png
+    href: https://{{ dumbassets_subdomain | default('assets') }}.{{ domain }}
+    description: Asset Tracking
+    widget:
+      type: dumbassets
+      url: http://dumbassets:3000/api/stats
+      key: dumbassets_stats
+{% endif %}
+
+{% if 'linkwarden' in enabled_services %}
+- Linkwarden:
+    icon: linkwarden.png
+    href: https://{{ linkwarden_subdomain | default('linkwarden') }}.{{ domain }}
+    description: Bookmark Management
+    widget:
+      type: linkwarden
+      url: http://linkwarden-app:3000
+      key: {{ vault_homepage_api_keys.linkwarden | default('') }}
+{% endif %}
+
+{% if 'reconya' in enabled_services %}
+- Reconya:
+    icon: reconya.png
+    href: https://{{ reconya_subdomain | default('reconya') }}.{{ domain }}
+    description: Network Reconnaissance & Asset Discovery
+    widget:
+      type: reconya
+      url: http://reconya-backend:3008/api/devices
+      key: devices_count
+      units: devices
 {% endif %} 

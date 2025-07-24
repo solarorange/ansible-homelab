@@ -1,0 +1,115 @@
+#!/bin/bash
+# Pezzo Health Check Script
+# Monitors the health of all Pezzo services
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/health"
+DOMAIN="{{ domain }}"
+PEZZO_SUBDOMAIN="{{ pezzo_subdomain }}"
+HEALTH_LOG="$LOGS_DIR/health.log"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$HEALTH_LOG"
+}
+
+# Function to check Docker container health
+check_container_health() {
+    local container_name="$1"
+    local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "unknown")
+    
+    if [ "$health_status" = "healthy" ]; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check service endpoint
+check_endpoint() {
+    local url="$1"
+    local timeout="${2:-10}"
+    
+    if curl -f -s --max-time "$timeout" "$url" > /dev/null 2>&1; then
+        echo "online"
+    else
+        echo "offline"
+    fi
+}
+
+# Function to check database connectivity
+check_database() {
+    local container_name="pezzo-postgres"
+    
+    if docker exec "$container_name" pg_isready -U {{ pezzo_database_user }} > /dev/null 2>&1; then
+        echo "connected"
+    else
+        echo "disconnected"
+    fi
+}
+
+# Function to check Redis connectivity
+check_redis() {
+    local container_name="pezzo-redis"
+    
+    if docker exec "$container_name" redis-cli ping | grep -q "PONG"; then
+        echo "connected"
+    else
+        echo "disconnected"
+    fi
+}
+
+# Function to check ClickHouse connectivity
+check_clickhouse() {
+    local container_name="pezzo-clickhouse"
+    
+    if docker exec "$container_name" clickhouse-client --query "SELECT 1" > /dev/null 2>&1; then
+        echo "connected"
+    else
+        echo "disconnected"
+    fi
+}
+
+# Main health check function
+main_health_check() {
+    log "Starting Pezzo health check"
+    
+    # Check container health
+    local server_health=$(check_container_health "pezzo-server")
+    local console_health=$(check_container_health "pezzo-console")
+    local postgres_health=$(check_container_health "pezzo-postgres")
+    local redis_health=$(check_container_health "pezzo-redis")
+    local clickhouse_health=$(check_container_health "pezzo-clickhouse")
+    
+    # Check service endpoints
+    local api_status=$(check_endpoint "https://$PEZZO_SUBDOMAIN.$DOMAIN/api/healthz")
+    local console_status=$(check_endpoint "https://$PEZZO_SUBDOMAIN.$DOMAIN")
+    
+    # Check database connectivity
+    local db_status=$(check_database)
+    local redis_status=$(check_redis)
+    local clickhouse_status=$(check_clickhouse)
+    
+    # Log results
+    log "Container Health - Server: $server_health, Console: $console_health, PostgreSQL: $postgres_health, Redis: $redis_health, ClickHouse: $clickhouse_health"
+    log "Service Status - API: $api_status, Console: $console_status"
+    log "Database Status - PostgreSQL: $db_status, Redis: $redis_status, ClickHouse: $clickhouse_status"
+    
+    # Determine overall health
+    if [ "$server_health" = "healthy" ] && [ "$console_health" = "healthy" ] && [ "$api_status" = "online" ] && [ "$console_status" = "online" ]; then
+        log "Overall health: HEALTHY"
+        exit 0
+    else
+        log "Overall health: UNHEALTHY"
+        exit 1
+    fi
+}
+
+# Execute main health check
+main_health_check "$@" 

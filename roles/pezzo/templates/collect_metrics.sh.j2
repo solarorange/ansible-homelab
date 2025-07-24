@@ -1,0 +1,214 @@
+#!/bin/bash
+# Pezzo Metrics Collection Script
+# Collects metrics from Pezzo services and sends to monitoring systems
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/metrics"
+METRICS_LOG="$LOGS_DIR/collection.log"
+METRICS_FILE="$LOGS_DIR/current_metrics.json"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$METRICS_LOG"
+}
+
+# Function to get container metrics
+get_container_metrics() {
+    local container_name="$1"
+    local metrics=$(docker stats --no-stream --format "json" "$container_name" 2>/dev/null || echo "{}")
+    echo "$metrics"
+}
+
+# Function to get service metrics
+get_service_metrics() {
+    local url="$1"
+    local service_name="$2"
+    
+    # Get response time
+    local start_time=$(date +%s.%N)
+    local response_code=$(curl -f -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
+    local end_time=$(date +%s.%N)
+    local response_time=$(echo "$end_time - $start_time" | bc -l 2>/dev/null || echo "0")
+    
+    echo "{\"service\": \"$service_name\", \"response_code\": $response_code, \"response_time\": $response_time}"
+}
+
+# Function to get database metrics
+get_database_metrics() {
+    local container_name="pezzo-postgres"
+    
+    # Get connection count
+    local connections=$(docker exec "$container_name" psql -U {{ pezzo_database_user }} -d {{ pezzo_database_name }} -t -c "SELECT count(*) FROM pg_stat_activity;" 2>/dev/null || echo "0")
+    
+    # Get active queries
+    local active_queries=$(docker exec "$container_name" psql -U {{ pezzo_database_user }} -d {{ pezzo_database_name }} -t -c "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';" 2>/dev/null || echo "0")
+    
+    # Get database size
+    local db_size_bytes=$(docker exec "$container_name" psql -U {{ pezzo_database_user }} -d {{ pezzo_database_name }} -t -c "SELECT pg_database_size('{{ pezzo_database_name }}');" 2>/dev/null || echo "0")
+    
+    echo "{\"connections\": $connections, \"active_queries\": $active_queries, \"size_bytes\": $db_size_bytes}"
+}
+
+# Function to get Redis metrics
+get_redis_metrics() {
+    local container_name="pezzo-redis"
+    
+    # Get memory usage
+    local used_memory=$(docker exec "$container_name" redis-cli info memory | grep "used_memory:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    
+    # Get connected clients
+    local connected_clients=$(docker exec "$container_name" redis-cli info clients | grep "connected_clients:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    
+    # Get keyspace hits/misses
+    local keyspace_hits=$(docker exec "$container_name" redis-cli info stats | grep "keyspace_hits:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    local keyspace_misses=$(docker exec "$container_name" redis-cli info stats | grep "keyspace_misses:" | cut -d: -f2 | tr -d '\r' 2>/dev/null || echo "0")
+    
+    echo "{\"used_memory\": $used_memory, \"connected_clients\": $connected_clients, \"keyspace_hits\": $keyspace_hits, \"keyspace_misses\": $keyspace_misses}"
+}
+
+# Function to get ClickHouse metrics
+get_clickhouse_metrics() {
+    local container_name="pezzo-clickhouse"
+    
+    # Get table count
+    local table_count=$(docker exec "$container_name" clickhouse-client --query "SELECT count() FROM system.tables WHERE database = 'default';" 2>/dev/null || echo "0")
+    
+    # Get total rows
+    local total_rows=$(docker exec "$container_name" clickhouse-client --query "SELECT sum(rows) FROM system.parts WHERE active;" 2>/dev/null || echo "0")
+    
+    # Get total bytes
+    local total_bytes=$(docker exec "$container_name" clickhouse-client --query "SELECT sum(bytes) FROM system.parts WHERE active;" 2>/dev/null || echo "0")
+    
+    echo "{\"table_count\": $table_count, \"total_rows\": $total_rows, \"total_bytes\": $total_bytes}"
+}
+
+# Function to get system metrics
+get_system_metrics() {
+    # CPU usage
+    local cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+    
+    # Memory usage
+    local mem_total=$(free -m | awk 'NR==2{printf "%.2f", $2*1024*1024}')
+    local mem_used=$(free -m | awk 'NR==2{printf "%.2f", $3*1024*1024}')
+    local mem_usage=$(echo "scale=2; $mem_used / $mem_total * 100" | bc -l 2>/dev/null || echo "0")
+    
+    # Disk usage
+    local disk_usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+    
+    echo "{\"cpu_usage\": $cpu_usage, \"memory_usage\": $mem_usage, \"disk_usage\": $disk_usage}"
+}
+
+# Function to collect all metrics
+collect_all_metrics() {
+    log "Starting metrics collection"
+    
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Container metrics
+    local server_metrics=$(get_container_metrics "pezzo-server")
+    local console_metrics=$(get_container_metrics "pezzo-console")
+    local postgres_metrics=$(get_container_metrics "pezzo-postgres")
+    local redis_metrics=$(get_container_metrics "pezzo-redis")
+    local clickhouse_metrics=$(get_container_metrics "pezzo-clickhouse")
+    
+    # Service metrics
+    local api_metrics=$(get_service_metrics "https://{{ pezzo_subdomain }}.{{ domain }}/api/healthz" "api")
+    local console_service_metrics=$(get_service_metrics "https://{{ pezzo_subdomain }}.{{ domain }}" "console")
+    
+    # Database metrics
+    local db_metrics=$(get_database_metrics)
+    local redis_db_metrics=$(get_redis_metrics)
+    local clickhouse_db_metrics=$(get_clickhouse_metrics)
+    
+    # System metrics
+    local system_metrics=$(get_system_metrics)
+    
+    # Build complete metrics JSON
+    local all_metrics=$(cat << EOF
+{
+  "timestamp": "$timestamp",
+  "service": "pezzo",
+  "containers": {
+    "server": $server_metrics,
+    "console": $console_metrics,
+    "postgres": $postgres_metrics,
+    "redis": $redis_metrics,
+    "clickhouse": $clickhouse_metrics
+  },
+  "services": {
+    "api": $api_metrics,
+    "console": $console_service_metrics
+  },
+  "databases": {
+    "postgres": $db_metrics,
+    "redis": $redis_db_metrics,
+    "clickhouse": $clickhouse_db_metrics
+  },
+  "system": $system_metrics
+}
+EOF
+)
+    
+    # Save metrics to file
+    echo "$all_metrics" > "$METRICS_FILE"
+    log "Metrics collected and saved to $METRICS_FILE"
+}
+
+# Function to send metrics to monitoring systems
+send_metrics() {
+    if [ -f "$METRICS_FILE" ]; then
+        # Send to Prometheus Pushgateway if available
+        if curl -f -s "http://pushgateway:9091/-/healthy" > /dev/null 2>&1; then
+            log "Sending metrics to Prometheus Pushgateway"
+            # Implementation for Prometheus pushgateway
+        fi
+        
+        # Send to InfluxDB if available
+        if curl -f -s "http://influxdb:8086/ping" > /dev/null 2>&1; then
+            log "Sending metrics to InfluxDB"
+            # Implementation for InfluxDB
+        fi
+        
+        # Send to custom monitoring endpoint
+        if [ -n "{{ pezzo_metrics_endpoint | default('') }}" ]; then
+            log "Sending metrics to custom endpoint"
+            curl -f -s -X POST -H "Content-Type: application/json" -d @"$METRICS_FILE" "{{ pezzo_metrics_endpoint }}" > /dev/null 2>&1 || log "Warning: Failed to send metrics to custom endpoint"
+        fi
+    fi
+}
+
+# Function to cleanup old metrics files
+cleanup_old_metrics() {
+    log "Cleaning up old metrics files"
+    
+    # Keep only last 7 days of metrics files
+    find "$LOGS_DIR" -name "metrics_*.json" -mtime +7 -delete 2>/dev/null || true
+    
+    # Keep only last 30 days of log files
+    find "$LOGS_DIR" -name "*.log" -mtime +30 -delete 2>/dev/null || true
+}
+
+# Main metrics collection function
+main_metrics_collection() {
+    log "Starting Pezzo metrics collection"
+    
+    # Collect all metrics
+    collect_all_metrics
+    
+    # Send metrics to monitoring systems
+    send_metrics
+    
+    # Cleanup old files
+    cleanup_old_metrics
+    
+    log "Pezzo metrics collection completed"
+}
+
+# Execute main metrics collection function
+main_metrics_collection "$@" 

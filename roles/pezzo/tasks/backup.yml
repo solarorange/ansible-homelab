@@ -1,0 +1,178 @@
+---
+# Pezzo Backup Tasks
+# Configure automated backup functionality for Pezzo services
+
+- name: Create Pezzo backup configuration directory
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}/backup"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup configuration
+  ansible.builtin.template:
+    src: backup_config.yml.j2
+    dest: "{{ pezzo_config_dir }}/backup/backup_config.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Create Pezzo database backup script
+  ansible.builtin.template:
+    src: backup_database.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup/backup_database.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_backup_include_database | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo configuration backup script
+  ansible.builtin.template:
+    src: backup_config.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup/backup_config.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_backup_include_config | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo full backup script
+  ansible.builtin.template:
+    src: backup_full.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_full.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup verification script
+  ansible.builtin.template:
+    src: backup_verify.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_verify.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup restoration script
+  ansible.builtin.template:
+    src: backup_restore.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_restore.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Setup Pezzo backup cron job
+  ansible.builtin.cron:
+    name: "Pezzo Full Backup"
+    minute: "{{ pezzo_backup_schedule.split(' ')[0] | default('0') }}"
+    hour: "{{ pezzo_backup_schedule.split(' ')[1] | default('3') }}"
+    day: "{{ pezzo_backup_schedule.split(' ')[2] | default('*') }}"
+    month: "{{ pezzo_backup_schedule.split(' ')[3] | default('*') }}"
+    weekday: "{{ pezzo_backup_schedule.split(' ')[4] | default('*') }}"
+    job: "{{ pezzo_config_dir }}/backup_full.sh >> {{ pezzo_backup_log_file }} 2>&1"
+    user: "{{ username }}"
+  when: pezzo_backup_enabled | default(true)
+  tags: [pezzo, backup]
+
+- name: Setup Pezzo backup verification cron job
+  ansible.builtin.cron:
+    name: "Pezzo Backup Verification"
+    minute: "30"
+    hour: "4"
+    job: "{{ pezzo_config_dir }}/backup_verify.sh >> {{ logs_dir }}/pezzo/backup/verification.log 2>&1"
+    user: "{{ username }}"
+  when: pezzo_backup_enabled | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup log directory
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/pezzo/backup"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup retention cleanup script
+  ansible.builtin.template:
+    src: backup_cleanup.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_cleanup.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Setup Pezzo backup cleanup cron job
+  ansible.builtin.cron:
+    name: "Pezzo Backup Cleanup"
+    minute: "0"
+    hour: "5"
+    job: "{{ pezzo_config_dir }}/backup_cleanup.sh >> {{ logs_dir }}/pezzo/backup/cleanup.log 2>&1"
+    user: "{{ username }}"
+  when: pezzo_backup_enabled | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup notification script
+  ansible.builtin.template:
+    src: backup_notify.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_notify.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_backup_notifications_enabled | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup monitoring script
+  ansible.builtin.template:
+    src: backup_monitor.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup_monitor.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Setup Pezzo backup monitoring cron job
+  ansible.builtin.cron:
+    name: "Pezzo Backup Monitoring"
+    minute: "*/30"
+    job: "{{ pezzo_config_dir }}/backup_monitor.sh >> {{ logs_dir }}/pezzo/backup/monitoring.log 2>&1"
+    user: "{{ username }}"
+  when: pezzo_backup_enabled | default(true)
+  tags: [pezzo, backup]
+
+- name: Create Pezzo backup documentation
+  ansible.builtin.template:
+    src: backup_readme.md.j2
+    dest: "{{ pezzo_backup_dir }}/README.md"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, backup]
+
+- name: Display Pezzo backup configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Backup Configuration Complete:
+      - Backup Enabled: {{ pezzo_backup_enabled | default(true) }}
+      - Backup Schedule: {{ pezzo_backup_schedule | default('0 3 * * *') }}
+      - Backup Retention: {{ pezzo_backup_retention | default(7) }} days
+      - Include Database: {{ pezzo_backup_include_database | default(true) }}
+      - Include Config: {{ pezzo_backup_include_config | default(true) }}
+      - Compression: {{ pezzo_backup_compression | default(true) }}
+      - Notifications: {{ pezzo_backup_notifications_enabled | default(true) }}
+      - Full Backup: {{ pezzo_config_dir }}/backup_full.sh
+      - Database Backup: {{ pezzo_config_dir }}/backup/backup_database.sh
+      - Config Backup: {{ pezzo_config_dir }}/backup/backup_config.sh
+      - Verification: {{ pezzo_config_dir }}/backup_verify.sh
+      - Restoration: {{ pezzo_config_dir }}/backup_restore.sh
+      - Cleanup: {{ pezzo_config_dir }}/backup_cleanup.sh
+      - Monitoring: {{ pezzo_config_dir }}/backup_monitor.sh
+      - Backup Directory: {{ pezzo_backup_dir }}
+      - Log File: {{ pezzo_backup_log_file }}
+  tags: [pezzo, backup] 

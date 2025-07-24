@@ -1,0 +1,801 @@
+---
+# Immich Configuration
+# Production-ready defaults for Immich photo management deployment
+
+# Service Configuration
+immich_enabled: true
+immich_version: "latest"
+immich_network_name: "immich"
+immich_network_external: true
+
+# Container Configuration
+immich_container_restart_policy: "unless-stopped"
+immich_container_network_mode: "bridge"
+
+# Port Configuration
+immich_ports:
+  server: 3001
+  web: 3000
+  machine_learning: 3003
+
+# Domain Configuration
+immich_subdomain: "immich"
+
+# Authentication Configuration
+immich_auth_enabled: true
+immich_auth_method: "authentik"  # Options: authentik, basic, none
+immich_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+
+# Database Configuration
+immich_database_type: "postgresql"
+immich_database_host: "immich-postgres"
+immich_database_port: 5432
+immich_database_name: "immich"
+immich_database_user: "postgres"
+immich_database_password: "{{ vault_immich_postgres_password | default('') }}"
+
+# Redis Configuration
+immich_redis_host: "immich-redis"
+immich_redis_port: 6379
+immich_redis_password: "{{ vault_immich_redis_password | default('') }}"
+immich_redis_db: 0
+
+# Photo Storage Configuration
+immich_photo_directory: "{{ immich_photo_dir | default(data_dir + '/media/photos') }}"
+immich_max_upload_size_mb: "{{ immich_max_upload_size | default(100) }}"
+immich_backup_retention_days: "{{ immich_backup_retention | default(30) }}"
+
+# Service Components
+immich_components:
+  server:
+    enabled: true
+    image: "ghcr.io/immich-app/immich-server:latest"
+    container_name: "immich-server"
+    port: 3001
+    volumes:
+      - "{{ docker_dir }}/immich/server:/config"
+      - "{{ immich_photo_directory }}:/photos"
+      - "{{ logs_dir }}/immich/server:/logs"
+    environment:
+      - DB_HOSTNAME={{ immich_database_host }}
+      - DB_USERNAME={{ immich_database_user }}
+      - DB_PASSWORD={{ immich_database_password }}
+      - DB_DATABASE_NAME={{ immich_database_name }}
+      - REDIS_HOSTNAME={{ immich_redis_host }}
+      - REDIS_PORT={{ immich_redis_port }}
+      - REDIS_DBINDEX={{ immich_redis_db }}
+      - REDIS_PASSWORD={{ immich_redis_password }}
+      - JWT_SECRET={{ vault_immich_jwt_secret | default('') }}
+      - NODE_ENV=production
+      - DISABLE_REVERSE_GEOCODING={{ not immich_reverse_geocoding | default(true) | bool | lower }}
+      - REVERSE_GEOCODING_PRECISION=3
+      - ENABLE_MAPBOX={{ immich_mapbox_enabled | default(false) | lower }}
+      - MAPBOX_ACCESS_KEY={{ vault_immich_mapbox_key | default('') }}
+      - ENABLE_OAUTH={{ immich_oauth_enabled | default(false) | lower }}
+      - OAUTH_AUTO_LAUNCH=false
+      - OAUTH_BUTTON_TEXT=Login with OAuth
+      - OAUTH_CLIENT_ID={{ vault_immich_oauth_client_id | default('') }}
+      - OAUTH_CLIENT_SECRET={{ vault_immich_oauth_client_secret | default('') }}
+      - OAUTH_SCOPES=openid profile email
+      - OAUTH_STORE_REDIRECT_URL=false
+      - OAUTH_ISSUER_URL={{ vault_immich_oauth_issuer_url | default('') }}
+      - OAUTH_ATTRIBUTE_MAPPING_EMAIL=email
+      - OAUTH_ATTRIBUTE_MAPPING_DISPLAY_NAME=name
+      - OAUTH_ATTRIBUTE_MAPPING_ID=sub
+      - OAUTH_ATTRIBUTE_MAPPING_FIRST_NAME=given_name
+      - OAUTH_ATTRIBUTE_MAPPING_LAST_NAME=family_name
+      - ENABLE_WEBHOOKS={{ immich_webhook_enabled | default(false) | lower }}
+      - WEBHOOK_URL={{ vault_immich_webhook_url | default('') }}
+      - WEBHOOK_TIMEOUT=30
+      - WEBHOOK_EVENTS=all
+      - ENABLE_SMTP={{ immich_email_enabled | default(false) | lower }}
+      - SMTP_HOST={{ immich_smtp_host | default('') }}
+      - SMTP_PORT={{ immich_smtp_port | default(587) }}
+      - SMTP_USERNAME={{ vault_immich_smtp_username | default('') }}
+      - SMTP_PASSWORD={{ vault_immich_smtp_password | default('') }}
+      - SMTP_FROM={{ immich_smtp_from | default('') }}
+      - SMTP_REPLY_TO={{ immich_smtp_from | default('') }}
+      - SMTP_SECURE=false
+      - SMTP_IGNORE_TLS=false
+      - SMTP_REQUIRE_TLS=false
+      - SMTP_VERIFY_SSL=false
+      - ENABLE_PUSH={{ immich_push_enabled | default(false) | lower }}
+      - PUSH_ACCESS_TOKEN={{ vault_immich_push_token | default('') }}
+      - PUSH_APP_ID={{ vault_immich_push_app_id | default('') }}
+      - PUSH_APP_SECRET={{ vault_immich_push_app_secret | default('') }}
+      - PUSH_APP_KEY=
+      - PUSH_APP_CLUSTER=
+      - ENABLE_MAIL=false
+      - MAIL_SERVER=
+      - MAIL_PORT=587
+      - MAIL_USERNAME=
+      - MAIL_PASSWORD=
+      - MAIL_FROM=
+      - MAIL_REPLY_TO=
+      - MAIL_SECURE=false
+      - MAIL_IGNORE_TLS=false
+      - MAIL_REQUIRE_TLS=false
+      - MAIL_VERIFY_SSL=false
+      - ENABLE_TELEGRAM={{ immich_telegram_enabled | default(false) | lower }}
+      - TELEGRAM_BOT_TOKEN={{ vault_immich_telegram_bot_token | default('') }}
+      - TELEGRAM_CHAT_ID={{ vault_immich_telegram_chat_id | default('') }}
+      - ENABLE_DISCORD={{ immich_discord_enabled | default(false) | lower }}
+      - DISCORD_WEBHOOK_URL={{ vault_immich_discord_webhook | default('') }}
+      - ENABLE_SLACK={{ immich_slack_enabled | default(false) | lower }}
+      - SLACK_WEBHOOK_URL={{ vault_immich_slack_webhook | default('') }}
+      - ENABLE_MATRIX=false
+      - MATRIX_HOMESERVER_URL=
+      - MATRIX_ACCESS_TOKEN=
+      - MATRIX_ROOM_ID=
+      - ENABLE_IRC=false
+      - IRC_SERVER=
+      - IRC_PORT=6667
+      - IRC_NICKNAME=
+      - IRC_CHANNEL=
+      - IRC_PASSWORD=
+      - ENABLE_ROCKET_CHAT=false
+      - ROCKET_CHAT_WEBHOOK_URL=
+      - ENABLE_GOTIFY=false
+      - GOTIFY_URL=
+      - GOTIFY_APP_TOKEN=
+      - ENABLE_NTFY=false
+      - NTFY_TOPIC=
+      - NTFY_SERVER=
+      - NTFY_USERNAME=
+      - NTFY_PASSWORD=
+      - NTFY_ACCESS_TOKEN=
+      - ENABLE_PUSHOVER=false
+      - PUSHOVER_USER_KEY=
+      - PUSHOVER_APP_TOKEN=
+      - ENABLE_PUSH_BULLET=false
+      - PUSH_BULLET_ACCESS_TOKEN=
+      - ENABLE_JOIN=false
+      - JOIN_API_KEY=
+      - JOIN_DEVICE_ID=
+      - ENABLE_LINE=false
+      - LINE_ACCESS_TOKEN=
+      - ENABLE_SIGNAL=false
+      - SIGNAL_NUMBER=
+      - SIGNAL_RECIPIENTS=
+      - ENABLE_THREEMA=false
+      - THREEMA_GATEWAY_ID=
+      - THREEMA_GATEWAY_SECRET=
+      - THREEMA_RECIPIENT_ID=
+      - ENABLE_ZULIP=false
+      - ZULIP_BOT_EMAIL=
+      - ZULIP_BOT_KEY=
+      - ZULIP_SITE=
+      - ENABLE_NEXMO=false
+      - NEXMO_API_KEY=
+      - NEXMO_API_SECRET=
+      - NEXMO_FROM=
+      - NEXMO_TO=
+      - ENABLE_TWILIO=false
+      - TWILIO_ACCOUNT_SID=
+      - TWILIO_AUTH_TOKEN=
+      - TWILIO_FROM=
+      - TWILIO_TO=
+      - ENABLE_VONAGE=false
+      - VONAGE_API_KEY=
+      - VONAGE_API_SECRET=
+      - VONAGE_FROM=
+      - VONAGE_TO=
+      - ENABLE_ALIYUN_SMS=false
+      - ALIYUN_SMS_ACCESS_KEY_ID=
+      - ALIYUN_SMS_ACCESS_KEY_SECRET=
+      - ALIYUN_SMS_SIGN_NAME=
+      - ALIYUN_SMS_TEMPLATE_CODE=
+      - ALIYUN_SMS_PHONE_NUMBERS=
+      - ENABLE_TENCENT_SMS=false
+      - TENCENT_SMS_SECRET_ID=
+      - TENCENT_SMS_SECRET_KEY=
+      - TENCENT_SMS_SDK_APP_ID=
+      - TENCENT_SMS_SIGN_NAME=
+      - TENCENT_SMS_TEMPLATE_ID=
+      - TENCENT_SMS_PHONE_NUMBERS=
+      - ENABLE_BAIDU_SMS=false
+      - BAIDU_SMS_ACCESS_KEY_ID=
+      - BAIDU_SMS_SECRET_ACCESS_KEY=
+      - BAIDU_SMS_SIGN_NAME=
+      - BAIDU_SMS_TEMPLATE_CODE=
+      - BAIDU_SMS_PHONE_NUMBERS=
+      - ENABLE_HUAWEI_SMS=false
+      - HUAWEI_SMS_APP_KEY=
+      - HUAWEI_SMS_APP_SECRET=
+      - HUAWEI_SMS_SIGN_NAME=
+      - HUAWEI_SMS_TEMPLATE_CODE=
+      - HUAWEI_SMS_PHONE_NUMBERS=
+      - ENABLE_OPPO_SMS=false
+      - OPPO_SMS_ACCESS_KEY_ID=
+      - OPPO_SMS_ACCESS_KEY_SECRET=
+      - OPPO_SMS_SIGN_NAME=
+      - OPPO_SMS_TEMPLATE_CODE=
+      - OPPO_SMS_PHONE_NUMBERS=
+      - ENABLE_VOLCENGINE_SMS=false
+      - VOLCENGINE_SMS_ACCESS_KEY_ID=
+      - VOLCENGINE_SMS_SECRET_ACCESS_KEY=
+      - VOLCENGINE_SMS_SIGN_NAME=
+      - VOLCENGINE_SMS_TEMPLATE_CODE=
+      - VOLCENGINE_SMS_PHONE_NUMBERS=
+      - ENABLE_AMAZON_SNS=false
+      - AMAZON_SNS_ACCESS_KEY_ID=
+      - AMAZON_SNS_SECRET_ACCESS_KEY=
+      - AMAZON_SNS_REGION=
+      - AMAZON_SNS_TOPIC_ARN=
+      - ENABLE_GOOGLE_CHAT=false
+      - GOOGLE_CHAT_WEBHOOK_URL=
+      - ENABLE_MICROSOFT_TEAMS=false
+      - MICROSOFT_TEAMS_WEBHOOK_URL=
+      - ENABLE_FEISHU=false
+      - FEISHU_WEBHOOK_URL=
+      - ENABLE_DINGTALK=false
+      - DINGTALK_WEBHOOK_URL=
+      - ENABLE_WECOM=false
+      - WECOM_WEBHOOK_URL=
+      - ENABLE_LARK=false
+      - LARK_WEBHOOK_URL=
+      - ENABLE_BARK=false
+      - BARK_PUSH_URL=
+      - ENABLE_GO_CQHTTP=false
+      - GO_CQHTTP_URL=
+      - GO_CQHTTP_QQ=
+      - ENABLE_SERVER_CHAN=false
+      - SERVER_CHAN_SEND_KEY=
+      - ENABLE_PUSH_DEER=false
+      - PUSH_DEER_PUSH_KEY=
+      - ENABLE_CHANIFY=false
+      - CHANIFY_URL=
+      - ENABLE_WPPUSHER=false
+      - WPPUSHER_APP_TOKEN=
+      - WPPUSHER_TOPIC=
+      - ENABLE_LEANCLOUD=false
+      - LEANCLOUD_APP_ID=
+      - LEANCLOUD_APP_KEY=
+      - LEANCLOUD_MASTER_KEY=
+      - LEANCLOUD_HOOK_NAME=
+      - ENABLE_WEBPUSH=false
+      - WEBPUSH_VAPID_PUBLIC_KEY=
+      - WEBPUSH_VAPID_PRIVATE_KEY=
+      - WEBPUSH_SUBJECT=
+      - ENABLE_ALIYUN_PUSH=false
+      - ALIYUN_PUSH_ACCESS_KEY_ID=
+      - ALIYUN_PUSH_ACCESS_KEY_SECRET=
+      - ALIYUN_PUSH_APP_KEY=
+      - ALIYUN_PUSH_TARGET=
+      - ALIYUN_PUSH_TARGET_VALUE=
+      - ENABLE_HUAWEI_PUSH=false
+      - HUAWEI_PUSH_APP_ID=
+      - HUAWEI_PUSH_APP_SECRET=
+      - HUAWEI_PUSH_TOKEN=
+      - ENABLE_XIAOMI_PUSH=false
+      - XIAOMI_PUSH_APP_SECRET=
+      - XIAOMI_PUSH_PACKAGE_NAME=
+      - XIAOMI_PUSH_RESTRICTED_PACKAGE_NAME=
+      - ENABLE_OPPO_PUSH=false
+      - OPPO_PUSH_MASTER_SECRET=
+      - OPPO_PUSH_APP_KEY=
+      - OPPO_PUSH_APP_SECRET=
+      - OPPO_PUSH_CHANNEL_ID=
+      - ENABLE_VIVO_PUSH=false
+      - VIVO_PUSH_APP_ID=
+      - VIVO_PUSH_APP_KEY=
+      - VIVO_PUSH_APP_SECRET=
+      - ENABLE_MEIZU_PUSH=false
+      - MEIZU_PUSH_APP_ID=
+      - MEIZU_PUSH_APP_KEY=
+      - MEIZU_PUSH_APP_SECRET=
+      - ENABLE_APNS=false
+      - APNS_KEY_ID=
+      - APNS_TEAM_ID=
+      - APNS_PRIVATE_KEY=
+      - APNS_BUNDLE_ID=
+      - APNS_TOPIC=
+      - APNS_PUSH_TYPE=
+      - ENABLE_FCM=false
+      - FCM_SERVER_KEY=
+      - FCM_TOPIC=
+      - ENABLE_BAIDU_PUSH=false
+      - BAIDU_PUSH_API_KEY=
+      - BAIDU_PUSH_SECRET_KEY=
+      - BAIDU_PUSH_CHANNEL_ID=
+      - ENABLE_JPUSH=false
+      - JPUSH_APP_KEY=
+      - JPUSH_MASTER_SECRET=
+      - JPUSH_CHANNEL_ID=
+      - ENABLE_GETUI=false
+      - GETUI_APP_ID=
+      - GETUI_APP_KEY=
+      - GETUI_MASTER_SECRET=
+      - GETUI_CHANNEL_ID=
+      - ENABLE_IGE_PUSH=false
+      - IGE_PUSH_APP_ID=
+      - IGE_PUSH_APP_KEY=
+      - IGE_PUSH_MASTER_SECRET=
+      - IGE_PUSH_CHANNEL_ID=
+      - ENABLE_UMENG_PUSH=false
+      - UMENG_PUSH_APP_KEY=
+      - UMENG_PUSH_APP_MASTER_SECRET=
+      - UMENG_PUSH_CHANNEL_ID=
+      - ENABLE_GOOGLE_FCM=false
+      - GOOGLE_FCM_SERVER_KEY=
+      - GOOGLE_FCM_TOPIC=
+      - ENABLE_AMAZON_SNS_PUSH=false
+      - AMAZON_SNS_PUSH_ACCESS_KEY_ID=
+      - AMAZON_SNS_PUSH_SECRET_ACCESS_KEY=
+      - AMAZON_SNS_PUSH_REGION=
+      - AMAZON_SNS_PUSH_PLATFORM_APPLICATION_ARN=
+      - ENABLE_MICROSOFT_PUSH=false
+      - MICROSOFT_PUSH_CLIENT_ID=
+      - MICROSOFT_PUSH_CLIENT_SECRET=
+      - MICROSOFT_PUSH_TENANT_ID=
+      - MICROSOFT_PUSH_TOPIC=
+      - ENABLE_APPLE_PUSH=false
+      - APPLE_PUSH_KEY_ID=
+      - APPLE_PUSH_TEAM_ID=
+      - APPLE_PUSH_PRIVATE_KEY=
+      - APPLE_PUSH_BUNDLE_ID=
+      - APPLE_PUSH_TOPIC=
+      - APPLE_PUSH_PUSH_TYPE=
+      - ENABLE_GOOGLE_PUSH=false
+      - GOOGLE_PUSH_SERVER_KEY=
+      - GOOGLE_PUSH_TOPIC=
+      - ENABLE_BAIDU_PUSH_SMS=false
+      - BAIDU_PUSH_SMS_ACCESS_KEY_ID=
+      - BAIDU_PUSH_SMS_SECRET_ACCESS_KEY=
+      - BAIDU_PUSH_SMS_SIGN_NAME=
+      - BAIDU_PUSH_SMS_TEMPLATE_CODE=
+      - BAIDU_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_HUAWEI_PUSH_SMS=false
+      - HUAWEI_PUSH_SMS_APP_KEY=
+      - HUAWEI_PUSH_SMS_APP_SECRET=
+      - HUAWEI_PUSH_SMS_SIGN_NAME=
+      - HUAWEI_PUSH_SMS_TEMPLATE_CODE=
+      - HUAWEI_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_XIAOMI_PUSH_SMS=false
+      - XIAOMI_PUSH_SMS_APP_SECRET=
+      - XIAOMI_PUSH_SMS_PACKAGE_NAME=
+      - XIAOMI_PUSH_SMS_RESTRICTED_PACKAGE_NAME=
+      - XIAOMI_PUSH_SMS_SIGN_NAME=
+      - XIAOMI_PUSH_SMS_TEMPLATE_CODE=
+      - XIAOMI_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_OPPO_PUSH_SMS=false
+      - OPPO_PUSH_SMS_MASTER_SECRET=
+      - OPPO_PUSH_SMS_APP_KEY=
+      - OPPO_PUSH_SMS_APP_SECRET=
+      - OPPO_PUSH_SMS_CHANNEL_ID=
+      - OPPO_PUSH_SMS_SIGN_NAME=
+      - OPPO_PUSH_SMS_TEMPLATE_CODE=
+      - OPPO_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_VIVO_PUSH_SMS=false
+      - VIVO_PUSH_SMS_APP_ID=
+      - VIVO_PUSH_SMS_APP_KEY=
+      - VIVO_PUSH_SMS_APP_SECRET=
+      - VIVO_PUSH_SMS_SIGN_NAME=
+      - VIVO_PUSH_SMS_TEMPLATE_CODE=
+      - VIVO_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_MEIZU_PUSH_SMS=false
+      - MEIZU_PUSH_SMS_APP_ID=
+      - MEIZU_PUSH_SMS_APP_KEY=
+      - MEIZU_PUSH_SMS_APP_SECRET=
+      - MEIZU_PUSH_SMS_SIGN_NAME=
+      - MEIZU_PUSH_SMS_TEMPLATE_CODE=
+      - MEIZU_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_APNS_SMS=false
+      - APNS_SMS_KEY_ID=
+      - APNS_SMS_TEAM_ID=
+      - APNS_SMS_PRIVATE_KEY=
+      - APNS_SMS_BUNDLE_ID=
+      - APNS_SMS_TOPIC=
+      - APNS_SMS_PUSH_TYPE=
+      - APNS_SMS_SIGN_NAME=
+      - APNS_SMS_TEMPLATE_CODE=
+      - APNS_SMS_PHONE_NUMBERS=
+      - ENABLE_FCM_SMS=false
+      - FCM_SMS_SERVER_KEY=
+      - FCM_SMS_TOPIC=
+      - FCM_SMS_SIGN_NAME=
+      - FCM_SMS_TEMPLATE_CODE=
+      - FCM_SMS_PHONE_NUMBERS=
+      - ENABLE_BAIDU_PUSH_SMS_PUSH=false
+      - BAIDU_PUSH_SMS_PUSH_API_KEY=
+      - BAIDU_PUSH_SMS_PUSH_SECRET_KEY=
+      - BAIDU_PUSH_SMS_PUSH_CHANNEL_ID=
+      - BAIDU_PUSH_SMS_PUSH_SIGN_NAME=
+      - BAIDU_PUSH_SMS_PUSH_TEMPLATE_CODE=
+      - BAIDU_PUSH_SMS_PUSH_PHONE_NUMBERS=
+      - ENABLE_JPUSH_SMS=false
+      - JPUSH_SMS_APP_KEY=
+      - JPUSH_SMS_MASTER_SECRET=
+      - JPUSH_SMS_CHANNEL_ID=
+      - JPUSH_SMS_SIGN_NAME=
+      - JPUSH_SMS_TEMPLATE_CODE=
+      - JPUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_GETUI_SMS=false
+      - GETUI_SMS_APP_ID=
+      - GETUI_SMS_APP_KEY=
+      - GETUI_SMS_MASTER_SECRET=
+      - GETUI_SMS_CHANNEL_ID=
+      - GETUI_SMS_SIGN_NAME=
+      - GETUI_SMS_TEMPLATE_CODE=
+      - GETUI_SMS_PHONE_NUMBERS=
+      - ENABLE_IGE_PUSH_SMS=false
+      - IGE_PUSH_SMS_APP_ID=
+      - IGE_PUSH_SMS_APP_KEY=
+      - IGE_PUSH_SMS_MASTER_SECRET=
+      - IGE_PUSH_SMS_CHANNEL_ID=
+      - IGE_PUSH_SMS_SIGN_NAME=
+      - IGE_PUSH_SMS_TEMPLATE_CODE=
+      - IGE_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_UMENG_PUSH_SMS=false
+      - UMENG_PUSH_SMS_APP_KEY=
+      - UMENG_PUSH_SMS_APP_MASTER_SECRET=
+      - UMENG_PUSH_SMS_CHANNEL_ID=
+      - UMENG_PUSH_SMS_SIGN_NAME=
+      - UMENG_PUSH_SMS_TEMPLATE_CODE=
+      - UMENG_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_GOOGLE_FCM_SMS=false
+      - GOOGLE_FCM_SMS_SERVER_KEY=
+      - GOOGLE_FCM_SMS_TOPIC=
+      - GOOGLE_FCM_SMS_SIGN_NAME=
+      - GOOGLE_FCM_SMS_TEMPLATE_CODE=
+      - GOOGLE_FCM_SMS_PHONE_NUMBERS=
+      - ENABLE_AMAZON_SNS_PUSH_SMS=false
+      - AMAZON_SNS_PUSH_SMS_ACCESS_KEY_ID=
+      - AMAZON_SNS_PUSH_SMS_SECRET_ACCESS_KEY=
+      - AMAZON_SNS_PUSH_SMS_REGION=
+      - AMAZON_SNS_PUSH_SMS_PLATFORM_APPLICATION_ARN=
+      - AMAZON_SNS_PUSH_SMS_SIGN_NAME=
+      - AMAZON_SNS_PUSH_SMS_TEMPLATE_CODE=
+      - AMAZON_SNS_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_MICROSOFT_PUSH_SMS=false
+      - MICROSOFT_PUSH_SMS_CLIENT_ID=
+      - MICROSOFT_PUSH_SMS_CLIENT_SECRET=
+      - MICROSOFT_PUSH_SMS_TENANT_ID=
+      - MICROSOFT_PUSH_SMS_TOPIC=
+      - MICROSOFT_PUSH_SMS_SIGN_NAME=
+      - MICROSOFT_PUSH_SMS_TEMPLATE_CODE=
+      - MICROSOFT_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_APPLE_PUSH_SMS=false
+      - APPLE_PUSH_SMS_KEY_ID=
+      - APPLE_PUSH_SMS_TEAM_ID=
+      - APPLE_PUSH_SMS_PRIVATE_KEY=
+      - APPLE_PUSH_SMS_BUNDLE_ID=
+      - APPLE_PUSH_SMS_TOPIC=
+      - APPLE_PUSH_SMS_PUSH_TYPE=
+      - APPLE_PUSH_SMS_SIGN_NAME=
+      - APPLE_PUSH_SMS_TEMPLATE_CODE=
+      - APPLE_PUSH_SMS_PHONE_NUMBERS=
+      - ENABLE_GOOGLE_PUSH_SMS=false
+      - GOOGLE_PUSH_SMS_SERVER_KEY=
+      - GOOGLE_PUSH_SMS_TOPIC=
+      - GOOGLE_PUSH_SMS_SIGN_NAME=
+      - GOOGLE_PUSH_SMS_TEMPLATE_CODE=
+      - GOOGLE_PUSH_SMS_PHONE_NUMBERS=
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    depends_on:
+      - immich-postgres
+      - immich-redis
+    resources:
+      limits:
+        cpus: '1'
+        memory: 2G
+      reservations:
+        cpus: '0.25'
+        memory: 512M
+
+  web:
+    enabled: true
+    image: "ghcr.io/immich-app/immich-web:latest"
+    container_name: "immich-web"
+    port: 3000
+    volumes:
+      - "{{ docker_dir }}/immich/web:/config"
+      - "{{ logs_dir }}/immich/web:/logs"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    depends_on:
+      - immich-server
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 512M
+      reservations:
+        cpus: '0.1'
+        memory: 256M
+
+  postgres:
+    enabled: true
+    image: "postgres:14-alpine"
+    container_name: "immich-postgres"
+    volumes:
+      - "{{ docker_dir }}/immich/postgres:/var/lib/postgresql/data"
+      - "{{ logs_dir }}/immich/postgres:/logs"
+    environment:
+      - POSTGRES_USER={{ immich_database_user }}
+      - POSTGRES_PASSWORD={{ immich_database_password }}
+      - POSTGRES_DB={{ immich_database_name }}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ immich_database_user }}"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 1G
+      reservations:
+        cpus: '0.1'
+        memory: 256M
+
+  redis:
+    enabled: true
+    image: "redis:alpine"
+    container_name: "immich-redis"
+    command: "redis-server --requirepass {{ immich_redis_password }}"
+    volumes:
+      - "{{ docker_dir }}/immich/redis:/data"
+      - "{{ logs_dir }}/immich/redis:/logs"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "{{ immich_redis_password }}", "ping"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    resources:
+      limits:
+        cpus: '0.25'
+        memory: 512M
+      reservations:
+        cpus: '0.05'
+        memory: 128M
+
+  machine_learning:
+    enabled: "{{ immich_ml_enabled | default(true) }}"
+    image: "ghcr.io/immich-app/immich-machine-learning:latest"
+    container_name: "immich-machine-learning"
+    port: 3003
+    volumes:
+      - "{{ docker_dir }}/immich/ml:/config"
+      - "{{ logs_dir }}/immich/ml:/logs"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+    depends_on:
+      - immich-server
+    resources:
+      limits:
+        cpus: '2'
+        memory: 4G
+      reservations:
+        cpus: '0.5'
+        memory: 1G
+
+# Monitoring Integration
+immich_monitoring_enabled: true
+immich_metrics_enabled: true
+immich_health_check_enabled: true
+immich_health_check_interval: 30
+
+# Security Configuration
+immich_security_headers: true
+immich_rate_limiting: true
+immich_rate_limit_requests: 100
+immich_rate_limit_window: 60
+immich_cors_enabled: false
+immich_cors_origins: []
+immich_allow_anonymous_access: false
+
+# Backup Configuration
+immich_backup_enabled: true
+immich_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+immich_backup_retention: 7  # Keep backups for 7 days
+immich_backup_compression: true
+immich_backup_include_photos: true
+immich_backup_include_database: true
+immich_backup_include_config: true
+immich_backup_dir: "{{ backup_dir }}/immich"
+immich_backup_retention_days: 7
+immich_backup_compression: true
+immich_backup_log_file: "{{ logs_dir }}/immich/backup/backup.log"
+immich_backup_max_log_size: "10M"
+immich_backup_notifications_enabled: true
+
+# Logging Configuration
+immich_log_level: "info"  # Options: debug, info, warn, error
+immich_log_format: "json"
+immich_log_retention: 30  # Days
+immich_log_rotation: true
+immich_health_check_log_file: "{{ logs_dir }}/immich/health/health.log"
+immich_health_check_max_log_size: "10M"
+immich_health_check_retention_days: 7
+immich_health_check_timeout: 30
+
+# Resource Limits
+immich_memory_limit: "8g"
+immich_cpu_limit: "4.0"
+immich_storage_limit: "500g"
+
+# Traefik Configuration
+immich_traefik_enabled: true
+immich_traefik_network: "{{ traefik_network | default('homelab') }}"
+immich_traefik_middleware: "secure-headers,compress"
+immich_traefik_auth_middleware: "authentik@docker"
+immich_traefik_ssl_enabled: true
+immich_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+
+# Homepage Integration
+immich_homepage_enabled: true
+immich_homepage_category: "Media"
+immich_homepage_description: "Photo Management & Sharing"
+immich_homepage_icon: "immich.png"
+immich_homepage_widget_enabled: true
+
+# Telegraf Integration
+immich_telegraf_enabled: true
+immich_telegraf_metrics: true
+immich_telegraf_logs: true
+
+# Prometheus Integration
+immich_prometheus_enabled: true
+immich_prometheus_metrics: true
+immich_prometheus_scrape_interval: 30
+
+# Grafana Integration
+immich_grafana_enabled: true
+immich_grafana_dashboard: true
+immich_grafana_datasource: "prometheus"
+
+# Loki Integration
+immich_loki_enabled: true
+immich_loki_logs: true
+
+# Alerting Configuration
+immich_alerting_enabled: true
+immich_alerting_provider: "alertmanager"
+immich_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+
+# CrowdSec Integration
+immich_crowdsec_enabled: true
+immich_crowdsec_collections:
+  - "crowdsecurity/nginx"
+  - "crowdsecurity/http-cve"
+
+# Fail2ban Integration
+immich_fail2ban_enabled: true
+immich_fail2ban_jail: "immich"
+immich_fail2ban_max_retry: 5
+immich_fail2ban_bantime: 3600
+
+# Service Dependencies
+immich_dependencies:
+  - "docker"
+  - "traefik"
+  - "monitoring_infrastructure"
+
+# Health Check Configuration
+immich_health_check_url: "/api/health"
+immich_health_check_timeout: 10
+immich_health_check_retries: 3
+
+# API Configuration
+immich_api_enabled: true
+immich_api_version: "v1"
+immich_api_rate_limit: 1000
+immich_api_rate_limit_window: 3600
+
+# Webhook Configuration
+immich_webhooks_enabled: true
+immich_webhook_events:
+  - "photo_uploaded"
+  - "photo_deleted"
+  - "album_created"
+  - "album_updated"
+  - "album_deleted"
+  - "user_registered"
+  - "user_deleted"
+
+# Notification Configuration
+immich_notifications_enabled: true
+immich_notification_channels:
+  - "email"
+  - "webhook"
+  - "slack"
+  - "discord"
+
+# Email Configuration
+immich_email_enabled: false
+immich_smtp_host: "{{ smtp_host | default('localhost') }}"
+immich_smtp_port: "{{ smtp_port | default(587) }}"
+immich_smtp_username: "{{ vault_smtp_username | default('') }}"
+immich_smtp_password: "{{ vault_smtp_password | default('') }}"
+immich_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+
+# Slack Configuration
+immich_slack_enabled: false
+immich_slack_webhook: "{{ vault_slack_webhook | default('') }}"
+immich_slack_channel: "{{ slack_channel | default('#alerts') }}"
+
+# Discord Configuration
+immich_discord_enabled: false
+immich_discord_webhook: "{{ vault_discord_webhook | default('') }}"
+immich_discord_channel: "{{ discord_channel | default('alerts') }}"
+
+# Custom Configuration
+immich_custom_config: {}
+immich_environment_variables: {}
+immich_volume_mounts: []
+immich_extra_labels: {}
+
+# Maintenance Configuration
+immich_maintenance_enabled: true
+immich_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM on Sunday
+immich_maintenance_window: 3600  # 1 hour
+immich_maintenance_tasks:
+  - "cleanup_orphaned_photos"
+  - "optimize_database"
+  - "cleanup_temp_files"
+  - "update_search_index"
+  - "regenerate_thumbnails"
+
+# Performance Configuration
+immich_performance_mode: "production"
+immich_cache_enabled: true
+immich_cache_size: "1g"
+immich_cache_ttl: 3600
+
+# Development Configuration
+immich_debug_enabled: false
+immich_debug_port: 5678
+immich_debug_host: "0.0.0.0"
+
+# Update Configuration
+immich_update_enabled: true
+immich_update_schedule: "0 4 * * 0"  # Weekly at 4 AM on Sunday
+immich_update_backup_before: true
+immich_update_rollback_on_failure: true
+
+# Watchtower Configuration
+immich_watchtower_enabled: false
+immich_watchtower_image: "containrrr/watchtower:latest"
+immich_watchtower_container_name: "immich-watchtower"
+immich_watchtower_schedule: "0 4 * * 0"
+immich_watchtower_cleanup: true
+immich_watchtower_include_restarting: true
+immich_watchtower_include_stopped: false
+immich_watchtower_revive_stopped: false
+immich_watchtower_remove_volumes: false
+immich_watchtower_no_pull: false
+immich_watchtower_no_startup_message: false
+immich_watchtower_http_api_token: "{{ vault_watchtower_token | default('') }}"
+
+# Service configuration directories
+immich_config_dir: "{{ docker_dir }}/immich"
+immich_server_config_dir: "{{ docker_dir }}/immich/server"
+immich_web_config_dir: "{{ docker_dir }}/immich/web"
+immich_postgres_config_dir: "{{ docker_dir }}/immich/postgres"
+immich_redis_config_dir: "{{ docker_dir }}/immich/redis"
+immich_ml_config_dir: "{{ docker_dir }}/immich/ml"
+
+# Service container names
+immich_server_container_name: "immich-server"
+immich_web_container_name: "immich-web"
+immich_postgres_container_name: "immich-postgres"
+immich_redis_container_name: "immich-redis"
+immich_ml_container_name: "immich-machine-learning"
+
+# Service ports
+immich_server_port: 3001
+immich_web_port: 3000
+immich_ml_port: 3003 

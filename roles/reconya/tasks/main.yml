@@ -1,0 +1,48 @@
+---
+# Reconya Deployment
+# Production-ready Ansible tasks for Reconya network reconnaissance deployment
+
+- name: Include Reconya deployment tasks
+  block:
+    - name: Validate Reconya configuration
+      ansible.builtin.include_tasks: validate.yml
+      tags: [reconya, validation]
+
+    - name: Setup Reconya prerequisites
+      ansible.builtin.include_tasks: prerequisites.yml
+      tags: [reconya, setup]
+
+    - name: Deploy Reconya services
+      ansible.builtin.include_tasks: deploy.yml
+      tags: [reconya, deploy]
+
+    - name: Configure Reconya monitoring
+      ansible.builtin.include_tasks: monitoring.yml
+      when: reconya_monitoring_enabled | default(true)
+      tags: [reconya, monitoring]
+
+    - name: Configure Reconya security
+      ansible.builtin.include_tasks: security.yml
+      tags: [reconya, security]
+
+    - name: Configure Reconya backup
+      ansible.builtin.include_tasks: backup.yml
+      when: reconya_backup_enabled | default(true)
+      tags: [reconya, backup]
+
+    - name: Configure Reconya homepage integration
+      ansible.builtin.include_tasks: homepage.yml
+      when: reconya_homepage_enabled | default(true)
+      tags: [reconya, homepage]
+
+    - name: Configure Reconya alerts
+      ansible.builtin.include_tasks: alerts.yml
+      when: reconya_alerting_enabled | default(true)
+      tags: [reconya, alerts]
+
+    - name: Validate Reconya deployment
+      ansible.builtin.include_tasks: validate_deployment.yml
+      tags: [reconya, validation]
+
+  when: reconya_enabled | default(true)
+  tags: [reconya, always] 

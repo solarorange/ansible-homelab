@@ -1,0 +1,485 @@
+---
+# ErsatzTV Security Configuration
+# Configure security hardening and access control for ErsatzTV
+
+- name: Create ErsatzTV security configuration
+  ansible.builtin.template:
+    src: security.yml.j2
+    dest: "{{ ersatztv_config_dir }}/security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV firewall rules
+  ansible.builtin.template:
+    src: firewall.rules.j2
+    dest: "/etc/ufw/applications.d/ersatztv"
+    owner: root
+    group: root
+    mode: '0644'
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV fail2ban configuration
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "/etc/fail2ban/jail.d/ersatztv.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV fail2ban filter
+  ansible.builtin.template:
+    src: fail2ban-filter.conf.j2
+    dest: "/etc/fail2ban/filter.d/ersatztv.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV fail2ban action
+  ansible.builtin.template:
+    src: fail2ban-action.conf.j2
+    dest: "/etc/fail2ban/action.d/ersatztv.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV CrowdSec configuration
+  ansible.builtin.template:
+    src: crowdsec.yaml.j2
+    dest: "{{ crowdsec_config_dir }}/ersatztv.yaml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV access control configuration
+  ansible.builtin.template:
+    src: access-control.yml.j2
+    dest: "{{ ersatztv_config_dir }}/access-control.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_auth_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV rate limiting configuration
+  ansible.builtin.template:
+    src: rate-limiting.yml.j2
+    dest: "{{ ersatztv_config_dir }}/rate-limiting.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_rate_limiting_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV CORS configuration
+  ansible.builtin.template:
+    src: cors.yml.j2
+    dest: "{{ ersatztv_config_dir }}/cors.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_cors_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security headers configuration
+  ansible.builtin.template:
+    src: security-headers.yml.j2
+    dest: "{{ ersatztv_config_dir }}/security-headers.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_security_headers_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV SSL/TLS configuration
+  ansible.builtin.template:
+    src: ssl.yml.j2
+    dest: "{{ ersatztv_config_dir }}/ssl.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_traefik_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV authentication configuration
+  ansible.builtin.template:
+    src: auth.yml.j2
+    dest: "{{ ersatztv_config_dir }}/auth.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_auth_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV API security configuration
+  ansible.builtin.template:
+    src: api-security.yml.j2
+    dest: "{{ ersatztv_config_dir }}/api-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV network security configuration
+  ansible.builtin.template:
+    src: network-security.yml.j2
+    dest: "{{ ersatztv_config_dir }}/network-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV container security configuration
+  ansible.builtin.template:
+    src: container-security.yml.j2
+    dest: "{{ ersatztv_config_dir }}/container-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV file permissions script
+  ansible.builtin.template:
+    src: secure-permissions.sh.j2
+    dest: "{{ ersatztv_config_dir }}/secure-permissions.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security audit script
+  ansible.builtin.template:
+    src: security-audit.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-audit.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV vulnerability scan script
+  ansible.builtin.template:
+    src: vulnerability-scan.sh.j2
+    dest: "{{ ersatztv_config_dir }}/vulnerability-scan.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security monitoring script
+  ansible.builtin.template:
+    src: security-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV access log monitoring script
+  ansible.builtin.template:
+    src: access-log-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/access-log-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV intrusion detection script
+  ansible.builtin.template:
+    src: intrusion-detection.sh.j2
+    dest: "{{ ersatztv_config_dir }}/intrusion-detection.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV threat detection script
+  ansible.builtin.template:
+    src: threat-detection.sh.j2
+    dest: "{{ ersatztv_config_dir }}/threat-detection.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV malware scan script
+  ansible.builtin.template:
+    src: malware-scan.sh.j2
+    dest: "{{ ersatztv_config_dir }}/malware-scan.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV encryption script
+  ansible.builtin.template:
+    src: encryption.sh.j2
+    dest: "{{ ersatztv_config_dir }}/encryption.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV key management script
+  ansible.builtin.template:
+    src: key-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/key-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV certificate management script
+  ansible.builtin.template:
+    src: certificate-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/certificate-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV password policy script
+  ansible.builtin.template:
+    src: password-policy.sh.j2
+    dest: "{{ ersatztv_config_dir }}/password-policy.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV session management script
+  ansible.builtin.template:
+    src: session-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/session-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV user management script
+  ansible.builtin.template:
+    src: user-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/user-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV role management script
+  ansible.builtin.template:
+    src: role-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/role-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV permission management script
+  ansible.builtin.template:
+    src: permission-management.sh.j2
+    dest: "{{ ersatztv_config_dir }}/permission-management.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV audit log script
+  ansible.builtin.template:
+    src: audit-log.sh.j2
+    dest: "{{ ersatztv_config_dir }}/audit-log.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV compliance check script
+  ansible.builtin.template:
+    src: compliance-check.sh.j2
+    dest: "{{ ersatztv_config_dir }}/compliance-check.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security policy script
+  ansible.builtin.template:
+    src: security-policy.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-policy.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV incident response script
+  ansible.builtin.template:
+    src: incident-response.sh.j2
+    dest: "{{ ersatztv_config_dir }}/incident-response.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV forensics script
+  ansible.builtin.template:
+    src: forensics.sh.j2
+    dest: "{{ ersatztv_config_dir }}/forensics.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security backup script
+  ansible.builtin.template:
+    src: security-backup.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security restore script
+  ansible.builtin.template:
+    src: security-restore.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security update script
+  ansible.builtin.template:
+    src: security-update.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-update.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security patch script
+  ansible.builtin.template:
+    src: security-patch.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-patch.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security hardening script
+  ansible.builtin.template:
+    src: security-hardening.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-hardening.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security lockdown script
+  ansible.builtin.template:
+    src: security-lockdown.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-lockdown.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security unlock script
+  ansible.builtin.template:
+    src: security-unlock.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-unlock.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security status script
+  ansible.builtin.template:
+    src: security-status.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-status.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security report script
+  ansible.builtin.template:
+    src: security-report.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-report.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security help script
+  ansible.builtin.template:
+    src: security-help.sh.j2
+    dest: "{{ ersatztv_config_dir }}/security-help.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, security]
+
+- name: Set secure file permissions
+  ansible.builtin.shell: "{{ ersatztv_config_dir }}/secure-permissions.sh"
+  args:
+    chdir: "{{ ersatztv_config_dir }}"
+  tags: [ersatztv, security]
+
+- name: Enable fail2ban for ErsatzTV
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+    enabled: yes
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Enable CrowdSec for ErsatzTV
+  ansible.builtin.service:
+    name: crowdsec
+    state: restarted
+    enabled: yes
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Security Audit"
+    hour: "2"
+    minute: "0"
+    job: "{{ ersatztv_config_dir }}/security-audit.sh >> {{ ersatztv_logs_dir }}/security.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Create ErsatzTV security monitoring cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Security Monitoring"
+    minute: "*/10"
+    job: "{{ ersatztv_config_dir }}/security-monitor.sh >> {{ ersatztv_logs_dir }}/security-monitoring.log 2>&1"
+    user: "{{ username }}"
+  when: ersatztv_security_enabled
+  tags: [ersatztv, security]
+
+- name: Display ErsatzTV security configuration
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Security Configuration:
+      - Security Enabled: {{ ersatztv_security_enabled }}
+      - Authentication Enabled: {{ ersatztv_auth_enabled }}
+      - Auth Method: {{ ersatztv_auth_method }}
+      - Traefik Enabled: {{ ersatztv_traefik_enabled }}
+      - SSL Resolver: {{ ersatztv_traefik_ssl_resolver }}
+      - Security Headers: {{ ersatztv_security_headers_enabled }}
+      - CORS Enabled: {{ ersatztv_cors_enabled }}
+      - Rate Limiting: {{ ersatztv_rate_limiting_enabled }}
+      - Rate Limit Requests: {{ ersatztv_rate_limit_requests }}
+      - Rate Limit Window: {{ ersatztv_rate_limit_window }}
+  tags: [ersatztv, security] 

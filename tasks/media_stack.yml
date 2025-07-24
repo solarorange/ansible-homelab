@@ -462,13 +462,13 @@
                 - TZ={{ timezone }}
                 - DB_HOSTNAME=immich-postgres
                 - DB_USERNAME=postgres
-                - DB_PASSWORD=postgres
+                - DB_PASSWORD={{ vault_media_database_password }}
                 - DB_DATABASE_NAME=immich
                 - REDIS_HOSTNAME=immich-redis
                 - REDIS_PORT=6379
                 - REDIS_DBINDEX=0
-                - REDIS_PASSWORD=redis
-                - JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters
+                - REDIS_PASSWORD={{ vault_redis_password }}
+                - JWT_SECRET={{ vault_media_jwt_secret }}
                 - NODE_ENV=production
               volumes:
                 - {{ docker_dir }}/immich/server:/config
@@ -531,7 +531,7 @@
               container_name: immich-postgres
               environment:
                 - POSTGRES_USER=postgres
-                - POSTGRES_PASSWORD=postgres
+                - POSTGRES_PASSWORD={{ vault_media_database_password }}
                 - POSTGRES_DB=immich
               volumes:
                 - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
@@ -548,7 +548,7 @@
             immich-redis:
               image: redis:alpine
               container_name: immich-redis
-              command: redis-server --requirepass redis
+              command: redis-server --requirepass {{ vault_redis_password }}
               volumes:
                 - {{ docker_dir }}/immich/redis:/data
                 - {{ logs_dir }}/immich/redis:/logs
@@ -639,9 +639,23 @@
               # Start services
               docker-compose up -d
               
-              # Wait for services to be healthy
+              # Wait for services to be healthy with proper timeout
               log "Waiting for services to be healthy..."
-              sleep 30
+              timeout=60
+              counter=0
+              while [ $counter -lt $timeout ]; do
+                  if docker-compose ps | grep -q "healthy"; then
+                      log "Services are healthy!"
+                      break
+                  fi
+                  log "Waiting for services to be healthy... (${counter}/${timeout}s)"
+                  sleep 2
+                  counter=$((counter + 2))
+              done
+              
+              if [ $counter -ge $timeout ]; then
+                  log "WARNING: Timeout waiting for services to be healthy"
+              fi
               
               # Verify services
               if ! docker-compose ps | grep -q "healthy"; then
@@ -679,7 +693,19 @@
               for service in $(docker-compose config --services); do
                   log "Restarting $service..."
                   docker-compose restart "$service"
-                  sleep 10
+                  
+                  # Wait for service to be ready with timeout
+                  timeout=30
+                  counter=0
+                  while [ $counter -lt $timeout ]; do
+                      if docker-compose ps "$service" | grep -q "Up"; then
+                          log "$service is running"
+                          break
+                      fi
+                      log "Waiting for $service to be ready... (${counter}/${timeout}s)"
+                      sleep 2
+                      counter=$((counter + 2))
+                  done
                   
                   # Verify service health
                   if ! docker-compose ps "$service" | grep -q "healthy"; then

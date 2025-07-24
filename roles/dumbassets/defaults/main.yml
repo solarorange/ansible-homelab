@@ -1,0 +1,89 @@
+---
+# DumbAssets Role Defaults
+# Asset tracking and management service configuration
+
+# Service Configuration
+dumbassets_enabled: "{{ lookup('env', 'DUMBASSETS_ENABLED') | default('true') | bool }}"
+dumbassets_container_name: "{{ lookup('env', 'DUMBASSETS_CONTAINER_NAME') | default('dumbassets') }}"
+dumbassets_image: "{{ lookup('env', 'DUMBASSETS_IMAGE') | default('dumbwareio/dumbassets:latest') }}"
+dumbassets_port: "{{ lookup('env', 'DUMBASSETS_PORT') | default(3004) | int }}"
+dumbassets_restart_policy: "{{ lookup('env', 'DUMBASSETS_RESTART_POLICY') | default('unless-stopped') }}"
+
+# Network Configuration
+dumbassets_network: "{{ lookup('env', 'DUMBASSETS_NETWORK') | default('homelab') }}"
+dumbassets_subdomain: "{{ subdomains.dumbassets | default('assets') }}"
+dumbassets_external_port: "{{ lookup('env', 'DUMBASSETS_EXTERNAL_PORT') | default(3004) | int }}"
+
+# Directory Configuration
+dumbassets_docker_dir: "{{ lookup('env', 'DUMBASSETS_DOCKER_DIR') | default(docker_root + '/dumbassets') }}"
+dumbassets_config_dir: "{{ lookup('env', 'DUMBASSETS_CONFIG_DIR') | default(dumbassets_docker_dir + '/config') }}"
+dumbassets_data_dir: "{{ lookup('env', 'DUMBASSETS_DATA_DIR') | default(docker_data_root + '/dumbassets') }}"
+dumbassets_backup_dir: "{{ lookup('env', 'DUMBASSETS_BACKUP_DIR') | default(backup_dir + '/dumbassets') }}"
+dumbassets_logs_dir: "{{ lookup('env', 'DUMBASSETS_LOGS_DIR') | default(docker_logs_root + '/dumbassets') }}"
+
+# Application Configuration
+dumbassets_site_title: "{{ lookup('env', 'DUMBASSETS_SITE_TITLE') | default('Asset Tracker') }}"
+dumbassets_base_url: "https://{{ dumbassets_subdomain }}.{{ domain }}"
+dumbassets_pin: "{{ lookup('env', 'DUMBASSETS_PIN') | default('1234') }}"
+dumbassets_allowed_origins: "{{ lookup('env', 'DUMBASSETS_ALLOWED_ORIGINS') | default('*') }}"
+dumbassets_demo_mode: "{{ lookup('env', 'DUMBASSETS_DEMO_MODE') | default('false') | bool }}"
+dumbassets_node_env: "{{ lookup('env', 'DUMBASSETS_NODE_ENV') | default('production') }}"
+dumbassets_debug: "{{ lookup('env', 'DUMBASSETS_DEBUG') | default('false') | bool }}"
+
+# Currency Configuration
+dumbassets_currency_code: "{{ lookup('env', 'DUMBASSETS_CURRENCY_CODE') | default('USD') }}"
+dumbassets_currency_locale: "{{ lookup('env', 'DUMBASSETS_CURRENCY_LOCALE') | default('en-US') }}"
+
+# Notification Configuration
+dumbassets_apprise_url: "{{ lookup('env', 'DUMBASSETS_APPRISE_URL') | default('') }}"
+dumbassets_notifications_enabled: "{{ lookup('env', 'DUMBASSETS_APPRISE_URL') | default('') | length > 0 }}"
+
+# Monitoring Configuration
+dumbassets_monitoring_enabled: "{{ lookup('env', 'DUMBASSETS_MONITORING_ENABLED') | default('true') | bool }}"
+dumbassets_health_check_enabled: "{{ lookup('env', 'DUMBASSETS_HEALTH_CHECK_ENABLED') | default('true') | bool }}"
+dumbassets_metrics_enabled: "{{ lookup('env', 'DUMBASSETS_METRICS_ENABLED') | default('true') | bool }}"
+dumbassets_logging_enabled: "{{ lookup('env', 'DUMBASSETS_LOGGING_ENABLED') | default('true') | bool }}"
+
+# Security Configuration
+dumbassets_security_enabled: "{{ lookup('env', 'DUMBASSETS_SECURITY_ENABLED') | default('true') | bool }}"
+dumbassets_firewall_enabled: "{{ lookup('env', 'DUMBASSETS_FIREWALL_ENABLED') | default('true') | bool }}"
+dumbassets_ssl_enabled: "{{ lookup('env', 'DUMBASSETS_SSL_ENABLED') | default('true') | bool }}"
+dumbassets_auth_enabled: "{{ lookup('env', 'DUMBASSETS_AUTH_ENABLED') | default('true') | bool }}"
+
+# Backup Configuration
+dumbassets_backup_enabled: "{{ lookup('env', 'DUMBASSETS_BACKUP_ENABLED') | default('true') | bool }}"
+dumbassets_backup_retention_days: "{{ lookup('env', 'DUMBASSETS_BACKUP_RETENTION_DAYS') | default(30) | int }}"
+dumbassets_backup_compression: "{{ lookup('env', 'DUMBASSETS_BACKUP_COMPRESSION') | default('true') | bool }}"
+dumbassets_backup_encryption: "{{ lookup('env', 'DUMBASSETS_BACKUP_ENCRYPTION') | default('false') | bool }}"
+
+# Homepage Integration
+dumbassets_homepage_enabled: true
+dumbassets_homepage_group: "{{ lookup('env', 'DUMBASSETS_HOMEPAGE_GROUP') | default('Utilities') }}"
+dumbassets_homepage_icon: "{{ lookup('env', 'DUMBASSETS_HOMEPAGE_ICON') | default('database') }}"
+dumbassets_homepage_description: "{{ lookup('env', 'DUMBASSETS_HOMEPAGE_DESCRIPTION') | default('Asset tracking and management system') }}"
+
+# Alerting Configuration
+dumbassets_alerting_enabled: "{{ lookup('env', 'DUMBASSETS_ALERTING_ENABLED') | default('true') | bool }}"
+dumbassets_alerting_critical: "{{ lookup('env', 'DUMBASSETS_ALERTING_CRITICAL') | default('true') | bool }}"
+dumbassets_alerting_warning: "{{ lookup('env', 'DUMBASSETS_ALERTING_WARNING') | default('true') | bool }}"
+dumbassets_alerting_info: "{{ lookup('env', 'DUMBASSETS_ALERTING_INFO') | default('true') | bool }}"
+
+# Resource Limits
+dumbassets_cpu_shares: "{{ lookup('env', 'DUMBASSETS_CPU_SHARES') | default(resource_limits.cpu_shares | default(1024)) | int }}"
+dumbassets_memory_limit: "{{ lookup('env', 'DUMBASSETS_MEMORY_LIMIT') | default(resource_limits.memory_limit | default('512M')) }}"
+dumbassets_memory_swap: "{{ lookup('env', 'DUMBASSETS_MEMORY_SWAP') | default(resource_limits.memory_swap | default('1G')) }}"
+dumbassets_memory_reservation: "{{ lookup('env', 'DUMBASSETS_MEMORY_RESERVATION') | default(resource_limits.memory_reservation | default('256M')) }}"
+dumbassets_cpus: "{{ lookup('env', 'DUMBASSETS_CPUS') | default(resource_limits.cpus | default(1)) | float }}"
+
+# Timezone Configuration
+dumbassets_timezone: "{{ lookup('env', 'DUMBASSETS_TIMEZONE') | default(timezone | default('America/New_York')) }}"
+
+# Validation Configuration
+dumbassets_validation_enabled: "{{ lookup('env', 'DUMBASSETS_VALIDATION_ENABLED') | default('true') | bool }}"
+dumbassets_validation_timeout: "{{ lookup('env', 'DUMBASSETS_VALIDATION_TIMEOUT') | default(300) | int }}"
+dumbassets_validation_retries: "{{ lookup('env', 'DUMBASSETS_VALIDATION_RETRIES') | default(3) | int }}"
+
+# Dependencies
+dumbassets_dependencies:
+  - traefik
+  - monitoring_stack 

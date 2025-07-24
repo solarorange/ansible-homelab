@@ -1,0 +1,70 @@
+version: '3.8'
+
+networks:
+  {{ reconya_network_name }}:
+    external: {{ reconya_network_external | lower }}
+
+services:
+  # Reconya Backend Service
+  {% if reconya_components.backend.enabled | default(true) %}
+  reconya-backend:
+    image: "{{ reconya_components.backend.image }}"
+    container_name: "{{ reconya_components.backend.container_name }}"
+    restart: "{{ reconya_container_restart_policy }}"
+    network_mode: "{{ reconya_container_network_mode }}"
+    environment:
+      - PUID={{ PUID | default(1000) }}
+      - PGID={{ PGID | default(1000) }}
+      - TZ={{ timezone }}
+      {% for key, value in reconya_components.backend.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    volumes:
+      {% for volume in reconya_components.backend.volumes %}
+      - "{{ volume }}"
+      {% endfor %}
+    ports:
+      - "{{ reconya_port }}:{{ reconya_port }}"
+    labels:
+      - "traefik.enable={{ 'true' if reconya_traefik_enabled else 'false' }}"
+      - "traefik.http.routers.reconya.rule=Host(`{{ reconya_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.reconya.entrypoints=websecure"
+      - "traefik.http.routers.reconya.tls.certresolver={{ reconya_traefik_ssl_resolver }}"
+      - "traefik.http.services.reconya.loadbalancer.server.port={{ reconya_port }}"
+      - "traefik.http.routers.reconya.middlewares={{ reconya_traefik_auth_middleware }}"
+      # Prometheus scraping labels
+      - "reconya.prometheus.scrape=true"
+      - "reconya.prometheus.port={{ reconya_port }}"
+      - "reconya.prometheus.path=/metrics"
+      # Loki scraping label
+      - "reconya.loki.scrape=true"
+      # Security labels
+      - "reconya.security.enabled=true"
+      - "reconya.security.rate_limit={{ reconya_rate_limit_requests | default(100) }}"
+      # Monitoring labels
+      - "reconya.monitoring.enabled=true"
+      - "reconya.monitoring.health_check=true"
+    healthcheck:
+      test: {{ reconya_components.backend.healthcheck.test }}
+      interval: "{{ reconya_components.backend.healthcheck.interval }}"
+      timeout: "{{ reconya_components.backend.healthcheck.timeout }}"
+      retries: {{ reconya_components.backend.healthcheck.retries }}
+    cap_add:
+      {% for capability in reconya_components.backend.capabilities %}
+      - {{ capability }}
+      {% endfor %}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{ reconya_components.backend.resources.limits.cpus }}'
+          memory: {{ reconya_components.backend.resources.limits.memory }}
+        reservations:
+          cpus: '{{ reconya_components.backend.resources.reservations.cpus }}'
+          memory: {{ reconya_components.backend.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/tmp
+  {% endif %} 

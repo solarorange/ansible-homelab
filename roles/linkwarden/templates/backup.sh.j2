@@ -1,0 +1,63 @@
+#!/bin/bash
+# Linkwarden Backup Script
+# Production-ready backup script for Linkwarden
+
+set -euo pipefail
+
+# Configuration
+BACKUP_DIR="{{ linkwarden_backup_dir }}"
+LOG_FILE="{{ linkwarden_backup_log_file }}"
+RETENTION_DAYS="{{ linkwarden_backup_retention_days }}"
+COMPRESSION="{{ linkwarden_backup_compression }}"
+DOCKER_DIR="{{ linkwarden_config_dir }}"
+DATA_DIR="{{ linkwarden_app_config_dir }}"
+DB_CONTAINER="{{ linkwarden_postgres_container_name }}"
+APP_CONTAINER="{{ linkwarden_app_container_name }}"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+trap 'log "ERROR: Backup failed with exit code $?"; exit 1' ERR
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+# Start backup
+log "Starting Linkwarden backup..."
+
+# Stop application to ensure data consistency
+log "Stopping Linkwarden application..."
+docker stop "$APP_CONTAINER" || true
+
+# Backup database
+log "Backing up PostgreSQL database..."
+docker exec "$DB_CONTAINER" pg_dump -U {{ linkwarden_database_user }} {{ linkwarden_database_name }} > "$BACKUP_DIR/linkwarden_db_$(date +%Y%m%d_%H%M%S).sql"
+
+# Backup application data
+log "Backing up application data..."
+tar -czf "$BACKUP_DIR/linkwarden_data_$(date +%Y%m%d_%H%M%S).tar.gz" -C "$DATA_DIR" .
+
+# Backup configuration
+log "Backing up configuration..."
+tar -czf "$BACKUP_DIR/linkwarden_config_$(date +%Y%m%d_%H%M%S).tar.gz" -C "$DOCKER_DIR" docker-compose.yml
+
+# Restart application
+log "Restarting Linkwarden application..."
+docker start "$APP_CONTAINER"
+
+# Cleanup old backups
+log "Cleaning up backups older than $RETENTION_DAYS days..."
+find "$BACKUP_DIR" -name "linkwarden_*" -type f -mtime +$RETENTION_DAYS -delete
+
+# Verify backup
+log "Verifying backup..."
+if [ -f "$BACKUP_DIR/linkwarden_db_$(date +%Y%m%d_%H%M%S).sql" ] && [ -f "$BACKUP_DIR/linkwarden_data_$(date +%Y%m%d_%H%M%S).tar.gz" ]; then
+    log "Backup completed successfully"
+    exit 0
+else
+    log "ERROR: Backup verification failed"
+    exit 1
+fi 

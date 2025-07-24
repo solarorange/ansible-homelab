@@ -1,0 +1,158 @@
+---
+# Resource Monitoring and Alerting
+# Monitors system resources and alerts on high usage
+
+- name: Gather system resource information
+  ansible.builtin.setup:
+    gather_subset: hardware,network
+  tags: [monitoring, resources]
+
+- name: Check current system resources
+  ansible.builtin.shell: |
+    echo "=== System Resources ==="
+    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)%"
+    echo "Memory Usage: $(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')%"
+    echo "Disk Usage: $(df -h / | tail -1 | awk '{print $5}' | sed 's/%//')%"
+    echo "Load Average: $(uptime | awk -F'load average:' '{print $2}')"
+    echo "Active Connections: $(netstat -an | grep ESTABLISHED | wc -l)"
+  register: system_resources
+  changed_when: false
+  tags: [monitoring, resources]
+
+- name: Parse resource usage
+  ansible.builtin.set_fact:
+    cpu_usage: "{{ system_resources.stdout_lines[1] | regex_search('CPU Usage: (\\d+)%') | regex_replace('CPU Usage: (\\d+)%', '\\1') | int }}"
+    memory_usage: "{{ system_resources.stdout_lines[2] | regex_search('Memory Usage: (\\d+\\.\\d+)%') | regex_replace('Memory Usage: (\\d+\\.\\d+)%', '\\1') | float }}"
+    disk_usage: "{{ system_resources.stdout_lines[3] | regex_search('Disk Usage: (\\d+)%') | regex_replace('Disk Usage: (\\d+)%', '\\1') | int }}"
+  tags: [monitoring, resources]
+
+- name: Define resource thresholds
+  ansible.builtin.set_fact:
+    resource_thresholds:
+      cpu_warning: 70
+      cpu_critical: 85
+      memory_warning: 75
+      memory_critical: 90
+      disk_warning: 80
+      disk_critical: 90
+  tags: [monitoring, resources]
+
+- name: Check CPU usage
+  ansible.builtin.assert:
+    that:
+      - cpu_usage < resource_thresholds.cpu_critical
+    fail_msg: |
+      CRITICAL: CPU usage is {{ cpu_usage }}% (threshold: {{ resource_thresholds.cpu_critical }}%)
+      - Current load: {{ system_resources.stdout_lines[4] | regex_search('Load Average: (.+)') | regex_replace('Load Average: (.+)', '\\1') }}
+      - Consider scaling or optimizing services
+  tags: [monitoring, resources, critical]
+
+- name: Check memory usage
+  ansible.builtin.assert:
+    that:
+      - memory_usage < resource_thresholds.memory_critical
+    fail_msg: |
+      CRITICAL: Memory usage is {{ memory_usage }}% (threshold: {{ resource_thresholds.memory_critical }}%)
+      - Available memory: {{ ansible_memfree_mb }}MB
+      - Total memory: {{ ansible_memtotal_mb }}MB
+      - Consider adding more RAM or optimizing memory usage
+  tags: [monitoring, resources, critical]
+
+- name: Check disk usage
+  ansible.builtin.assert:
+    that:
+      - disk_usage < resource_thresholds.disk_critical
+    fail_msg: |
+      CRITICAL: Disk usage is {{ disk_usage }}% (threshold: {{ resource_thresholds.disk_critical }}%)
+      - Available space: {{ ansible_diskspace_available }}GB
+      - Consider cleanup or expanding storage
+  tags: [monitoring, resources, critical]
+
+- name: Send resource warning notifications
+  ansible.builtin.uri:
+    url: "{{ notification_webhook_url }}"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "alert_type": "resource_warning",
+        "host": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "cpu_usage": {{ cpu_usage }},
+        "memory_usage": {{ memory_usage }},
+        "disk_usage": {{ disk_usage }},
+        "load_average": "{{ system_resources.stdout_lines[4] | regex_search('Load Average: (.+)') | regex_replace('Load Average: (.+)', '\\1') }}",
+        "active_connections": {{ system_resources.stdout_lines[5] | regex_search('Active Connections: (\\d+)') | regex_replace('Active Connections: (\\d+)', '\\1') | int }}
+      }
+  when: 
+    - notification_webhook_url is defined
+    - (cpu_usage >= resource_thresholds.cpu_warning or 
+       memory_usage >= resource_thresholds.memory_warning or 
+       disk_usage >= resource_thresholds.disk_warning)
+  tags: [monitoring, resources, notifications]
+
+- name: Monitor Docker container resources
+  ansible.builtin.shell: |
+    docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+  register: docker_stats
+  changed_when: false
+  tags: [monitoring, resources, docker]
+
+- name: Parse Docker container usage
+  ansible.builtin.set_fact:
+    container_stats: "{{ docker_stats.stdout_lines[1:] | map('split', '\t') | list }}"
+  tags: [monitoring, resources, docker]
+
+- name: Check for high resource containers
+  ansible.builtin.set_fact:
+    high_resource_containers: "{{ container_stats | selectattr('1', 'regex', '^[7-9][0-9]') | list }}"
+  tags: [monitoring, resources, docker]
+
+- name: Alert on high resource containers
+  ansible.builtin.uri:
+    url: "{{ notification_webhook_url }}"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "alert_type": "container_resource_warning",
+        "host": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "containers": [
+          {% for container in high_resource_containers %}
+          {
+            "name": "{{ container[0] }}",
+            "cpu_usage": "{{ container[1] }}",
+            "memory_usage": "{{ container[2] }}",
+            "memory_percent": "{{ container[3] }}"
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]
+      }
+  when: 
+    - notification_webhook_url is defined
+    - high_resource_containers | length > 0
+  tags: [monitoring, resources, docker, notifications]
+
+- name: Create resource monitoring report
+  ansible.builtin.template:
+    src: templates/resource_monitoring_report.j2
+    dest: "{{ logs_dir }}/resource_monitoring_report.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  vars:
+    report_timestamp: "{{ ansible_date_time.iso8601 }}"
+    system_info: "{{ ansible_system }} {{ ansible_distribution }} {{ ansible_distribution_version }}"
+  tags: [monitoring, resources]
+
+- name: Display resource summary
+  ansible.builtin.debug:
+    msg: |
+      Resource Monitoring Summary:
+      - CPU Usage: {{ cpu_usage }}% ({{ 'WARNING' if cpu_usage >= resource_thresholds.cpu_warning else 'OK' }})
+      - Memory Usage: {{ memory_usage }}% ({{ 'WARNING' if memory_usage >= resource_thresholds.memory_warning else 'OK' }})
+      - Disk Usage: {{ disk_usage }}% ({{ 'WARNING' if disk_usage >= resource_thresholds.disk_warning else 'OK' }})
+      - Active Containers: {{ container_stats | length }}
+      - High Resource Containers: {{ high_resource_containers | length }}
+  tags: [monitoring, resources] 

@@ -1,0 +1,138 @@
+---
+# n8n Alerting Configuration
+# Configure alerting and notifications for n8n
+
+- name: Create n8n Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/n8n.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Create n8n Prometheus alert rules
+  ansible.builtin.template:
+    src: prometheus-alerts.yml.j2
+    dest: "{{ prometheus_config_dir }}/n8n/alerts.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Create n8n notification templates
+  ansible.builtin.template:
+    src: notification-templates.yml.j2
+    dest: "{{ alertmanager_config_dir }}/n8n/templates.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Create n8n webhook configuration
+  ansible.builtin.template:
+    src: webhook.yml.j2
+    dest: "{{ n8n_config_dir }}/webhook.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Create n8n email notification configuration
+  ansible.builtin.template:
+    src: email-notifications.yml.j2
+    dest: "{{ n8n_config_dir }}/email-notifications.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true) and n8n_smtp_host | default('') != ''
+  tags: [n8n, alerts]
+
+- name: Create n8n Slack notification configuration
+  ansible.builtin.template:
+    src: slack-notifications.yml.j2
+    dest: "{{ n8n_config_dir }}/slack-notifications.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true) and vault_slack_webhook | default('') != ''
+  tags: [n8n, alerts]
+
+- name: Create n8n Discord notification configuration
+  ansible.builtin.template:
+    src: discord-notifications.yml.j2
+    dest: "{{ n8n_config_dir }}/discord-notifications.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true) and vault_discord_webhook | default('') != ''
+  tags: [n8n, alerts]
+
+- name: Create n8n Telegram notification configuration
+  ansible.builtin.template:
+    src: telegram-notifications.yml.j2
+    dest: "{{ n8n_config_dir }}/telegram-notifications.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true) and vault_telegram_bot_token | default('') != ''
+  tags: [n8n, alerts]
+
+- name: Restart alerting services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  loop:
+    - alertmanager
+    - prometheus
+  ignore_errors: true
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Test n8n alert configuration
+  ansible.builtin.uri:
+    url: "http://localhost:9093/api/v1/status"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: alertmanager_status
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Verify n8n alert rules are loaded
+  ansible.builtin.uri:
+    url: "http://localhost:9090/api/v1/rules"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: prometheus_rules
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Create n8n alert test script
+  ansible.builtin.template:
+    src: test-alerts.sh.j2
+    dest: "{{ n8n_config_dir }}/test-alerts.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_alerting_enabled | default(true)
+  tags: [n8n, alerts]
+
+- name: Display n8n alerting status
+  ansible.builtin.debug:
+    msg: |
+      n8n Alerting Status:
+      - Alerting Enabled: {{ n8n_alerting_enabled | default(true) }}
+      - Alertmanager: {{ alertmanager_status.status | default('Unknown') }}
+      - Prometheus Rules: {{ prometheus_rules.status | default('Unknown') }}
+      - Email Notifications: {{ 'Enabled' if n8n_smtp_host | default('') != '' else 'Disabled' }}
+      - Slack Notifications: {{ 'Enabled' if vault_slack_webhook | default('') != '' else 'Disabled' }}
+      - Discord Notifications: {{ 'Enabled' if vault_discord_webhook | default('') != '' else 'Disabled' }}
+      - Telegram Notifications: {{ 'Enabled' if vault_telegram_bot_token | default('') != '' else 'Disabled' }}
+  tags: [n8n, alerts] 
