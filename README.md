@@ -57,6 +57,13 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
    - 🔐 **Authentication**: `https://auth.yourdomain.com`
    - 📊 **Monitoring**: `https://grafana.yourdomain.com`
 
+4. **🚀 Add new services** (optional):
+   ```bash
+   # Add new services to your homelab
+   ./scripts/add_service.sh
+   ```
+   > **💡 Pro Tip**: Use the Service Integration Wizard to add new services in minutes! See [Service Integration Wizard Guide](docs/SERVICE_INTEGRATION_WIZARD.md)
+
 ## 🏗️ **Complete Service Stack (25+ Services)**
 
 ### 🔐 **Security & Authentication**
@@ -178,7 +185,7 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 - **Zero-Downtime Updates** - Seamless service updates
 
 ### 🔄 **Automated Operations**
-- **Service Integration Wizard** - Easy service addition
+- **🚀 Service Integration Wizard** - **Add new services in minutes!** See [Service Integration Wizard Guide](docs/SERVICE_INTEGRATION_WIZARD.md)
 - **Comprehensive Variable Coverage** - 100% automatic configuration
 - **Automated Secret Rotation** - Secure credential management
 - **Enhanced Health Monitoring** - Continuous service validation
@@ -203,19 +210,69 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 
 ## 📊 **System Requirements**
 
-### **Minimum Requirements**
-- **OS**: Ubuntu 20.04+ / Debian 11+ / CentOS 8+
-- **CPU**: 4 cores
-- **RAM**: 8GB
-- **Storage**: 100GB
-- **Network**: Static IP address
-
-### **Recommended Requirements**
+### **🚀 Full Stack Requirements (Recommended)**
 - **OS**: Ubuntu 22.04 LTS
-- **CPU**: 8+ cores
-- **RAM**: 16GB+
-- **Storage**: 500GB+ SSD
+- **CPU**: 12+ cores (Intel i7/AMD Ryzen 7 or better)
+- **RAM**: 32GB+
+- **Storage**: 1TB NVMe SSD (system) + 8TB+ HDD (media/data)
+- **Network**: Gigabit connection with static IP
+- **Architecture**: x86_64
+
+### **⚡ Performance Requirements (High-End)**
+- **OS**: Ubuntu 22.04 LTS
+- **CPU**: 16+ cores (Intel i9/AMD Ryzen 9 or better)
+- **RAM**: 64GB+
+- **Storage**: 2TB NVMe SSD + 16TB+ HDD
+- **Network**: 2.5GbE or 10GbE
+- **Architecture**: x86_64
+
+### **💡 Minimum Requirements (Basic Setup)**
+- **OS**: Ubuntu 20.04+ / Debian 11+ / CentOS 8+
+- **CPU**: 8 cores
+- **RAM**: 16GB
+- **Storage**: 500GB SSD + 2TB HDD
 - **Network**: Gigabit connection
+- **Architecture**: x86_64
+
+### **🖥️ Proxmox VM Configuration**
+If running as a Proxmox VM:
+```yaml
+# VM Settings
+vm_memory: 32768       # 32GB RAM
+vm_cores: 12           # 12 CPU cores
+vm_disk: 1000          # 1TB system disk
+vm_network: "virtio,bridge=vmbr0"
+vm_storage: "local-lvm"
+
+# Host Requirements
+host_memory: 64GB+     # 32GB for VM + 32GB for Proxmox
+host_cores: 16+        # 12 for VM + 4 for Proxmox
+host_storage: 2TB SSD + 16TB HDD
+```
+
+### **💾 Storage Breakdown**
+- **System/Containers**: 500GB-1TB SSD
+- **Media Library**: 4-16TB HDD (movies, TV, music, photos)
+- **Backups**: 2-4TB HDD
+- **Total**: 8-24TB depending on media collection
+
+### **🔧 Resource Allocation**
+- **Critical Services**: 1GB RAM, 1 CPU core each (Traefik, Authentik, Databases)
+- **Media Services**: 2-4GB RAM, 2-4 CPU cores each (Jellyfin, Transcoding)
+- **ARR Services**: 512MB-1GB RAM, 0.5-1 CPU core each (Sonarr, Radarr, etc.)
+- **Background Services**: 256MB RAM, 0.25 CPU core each (Monitoring, Backup)
+
+### **⚡ Performance Considerations**
+- **Media Transcoding**: Requires 4+ CPU cores for smooth 4K streaming
+- **AI/ML Services**: Pezzo and Immich benefit from 8+ CPU cores
+- **Database Performance**: PostgreSQL and ClickHouse need 4GB+ RAM
+- **Monitoring Stack**: Prometheus, Grafana, Loki need 2GB+ RAM combined
+
+### **🌐 Network Requirements**
+- **Bandwidth**: 100Mbps minimum, 1Gbps recommended
+- **Ports**: 80, 443, 22 (SSH), 53 (DNS), 3000-9000 (services)
+- **DNS**: Domain name with DNS control (Cloudflare recommended)
+- **SSL**: Automatic SSL/TLS via Let's Encrypt
 
 ## 🚀 **Deployment Options**
 
@@ -324,11 +381,25 @@ Each service can be customized through:
 
 ## 🛠️ **Advanced Features**
 
-### **Service Integration Wizard**
+### **🚀 Service Integration Wizard**
+**Add new services to your homelab in minutes with zero manual configuration!**
+
 ```bash
-# Add new services easily
-./scripts/service_wizard.py
+# Interactive mode (recommended)
+./scripts/add_service.sh
+
+# Non-interactive mode
+python3 scripts/service_wizard.py --service-name "jellyfin" --repository-url "https://github.com/jellyfin/jellyfin"
 ```
+
+**✨ Features:**
+- **Complete Role Generation** - Creates full Ansible role structure
+- **Full Stack Integration** - Traefik, monitoring, security, backup, homepage
+- **Smart Analysis** - Analyzes repositories for configuration details
+- **Validation & Safety** - Port conflict detection and error checking
+- **Consistent Patterns** - Follows your established conventions
+
+**📖 Documentation:** [Service Integration Wizard Guide](docs/SERVICE_INTEGRATION_WIZARD.md)
 
 ### **Security Audit**
 ```bash
@@ -359,6 +430,8 @@ python3 scripts/check_port_conflicts.py
 ### 🔧 **Configuration & Management**
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - Detailed system design
 - **[Service Configuration](docs/SERVICES.md)** - Individual service setup
+- **[🚀 Service Integration Wizard](docs/SERVICE_INTEGRATION_WIZARD.md)** - **Add new services easily**
+- **[Service Wizard Quick Reference](docs/SERVICE_WIZARD_QUICK_REFERENCE.md)** - Command reference and tips
 - **[Security Guide](docs/SECURITY.md)** - Security best practices
 - **[Monitoring Setup](docs/MONITORING.md)** - Monitoring configuration
 
@@ -432,9 +505,38 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 1. **Read the [Enhanced Setup Guide](ENHANCED_SETUP_README.md)**
 2. **Check the [Deployment Checklist](DEPLOYMENT_CHECKLIST.md)**
 3. **Follow the setup instructions**
-4. **Join our community for support**
+4. **🚀 Try the [Service Integration Wizard](docs/SERVICE_INTEGRATION_WIZARD.md) to add new services**
+5. **Join our community for support**
 
 **Happy Homelabbing! 🏠✨**
+
+---
+
+## 🚀 **Want to Add More Services?**
+
+**The Service Integration Wizard makes it easy to add new services to your homelab:**
+
+```bash
+# Add a media service like Jellyfin
+./scripts/add_service.sh
+
+# Add a database like PostgreSQL
+python3 scripts/service_wizard.py --service-name "postgres" --repository-url "https://github.com/docker-library/postgres"
+
+# Add a utility like Portainer
+./scripts/add_service.sh
+```
+
+**✨ The wizard will:**
+- ✅ Generate complete Ansible role structure
+- ✅ Integrate with Traefik, monitoring, security, backup
+- ✅ Detect port conflicts and validate configuration
+- ✅ Follow your established patterns and conventions
+- ✅ Provide clear next steps for deployment
+
+**📖 Learn more:** 
+- [Service Integration Wizard Guide](docs/SERVICE_INTEGRATION_WIZARD.md) - Complete documentation
+- [Quick Reference](docs/SERVICE_WIZARD_QUICK_REFERENCE.md) - Command reference and tips
 
 ---
 
