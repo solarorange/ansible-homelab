@@ -447,6 +447,43 @@ Each service can be customized through:
 
 ## 🛠️ **Advanced Features**
 
+### **🔄 Version Management System - Complete Fallback Protection**
+**Enterprise-grade version management with multiple rollback options!**
+
+#### **🎯 Multi-Level Fallback Strategy**
+- **Git Tags** - Clean, tagged releases (recommended)
+- **Version Backups** - Complete state snapshots
+- **Git Commits** - Fine-grained history
+- **Emergency Backups** - Last resort recovery
+
+#### **🚀 Version Management Commands**
+```bash
+# Check current version
+python3 scripts/version_manager.py info
+
+# Create version backup
+python3 scripts/version_manager.py backup
+
+# List rollback options
+./scripts/version_rollback.sh --list
+
+# Rollback to previous version
+./scripts/version_rollback.sh tag:v2.0.0
+./scripts/version_rollback.sh backup:backups/versions/v2.0.0_20241219_143022
+./scripts/version_rollback.sh commit:06f4db6
+
+# Emergency backup
+./scripts/version_rollback.sh --backup
+```
+
+#### **🛡️ Safety Features**
+- **Automatic backup before rollback** - Never lose your current state
+- **Confirmation prompts** - Prevent accidental rollbacks
+- **Validation** - Ensure rollback success
+- **Multiple fallback options** - Always have a recovery path
+
+**📖 Documentation:** [Version Management Guide](docs/VERSION_MANAGEMENT.md) - Complete version management documentation
+
 ### **🚀 Service Integration Wizard - The Ultimate Homelab Feature!**
 **The most powerful feature of this platform - add ANY service to your homelab with complete automation!**
 
@@ -701,6 +738,48 @@ python3 scripts/service_wizard.py --service-name "postgres" --repository-url "ht
 - **[Best Practices](docs/SERVICE_INTEGRATION_BEST_PRACTICES.md)** - Advanced usage patterns
 
 **🎯 This is what makes this homelab platform truly special - the ability to add ANY service with complete automation!**
+
+---
+
+## 🔄 **Version Management - Complete Fallback Protection**
+
+**🛡️ Enterprise-grade version management with multiple rollback options!**
+
+### **🎯 Multi-Level Fallback Strategy**
+- **Git Tags** - Clean, tagged releases (recommended)
+- **Version Backups** - Complete state snapshots  
+- **Git Commits** - Fine-grained history
+- **Emergency Backups** - Last resort recovery
+
+### **🚀 Quick Version Management**
+```bash
+# Check current version
+python3 scripts/version_manager.py info
+
+# Create version backup
+python3 scripts/version_manager.py backup
+
+# List rollback options
+./scripts/version_rollback.sh --list
+
+# Rollback to previous version
+./scripts/version_rollback.sh tag:v2.0.0
+./scripts/version_rollback.sh backup:backups/versions/v2.0.0_20241219_143022
+./scripts/version_rollback.sh commit:06f4db6
+
+# Emergency backup
+./scripts/version_rollback.sh --backup
+```
+
+### **🛡️ Safety Features**
+- **Automatic backup before rollback** - Never lose your current state
+- **Confirmation prompts** - Prevent accidental rollbacks
+- **Validation** - Ensure rollback success
+- **Multiple fallback options** - Always have a recovery path
+
+**📖 Documentation:** [Version Management Guide](docs/VERSION_MANAGEMENT.md) - Complete version management documentation
+
+**🎯 This version management system ensures you can always recover from any issues and maintain a stable, production-ready homelab!**
 
 ---
 
