@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  jellyfin:
+    image: {{ jellyfin_image }}
+    container_name: {{ jellyfin_container_name }}
+    restart: {{ jellyfin_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in jellyfin_environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in jellyfin_volumes %}
+      - {{ volume }}
+      {% endfor %}
+    
+    # Ports
+    ports:
+      - "{{ jellyfin_external_port }}:{{ jellyfin_internal_port }}"
+    
+    # Networks
+    networks:
+      {% for network in jellyfin_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if jellyfin_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.jellyfin.rule=Host(`{{ jellyfin_domain }}`)"
+      - "traefik.http.routers.jellyfin.entrypoints=https"
+      - "traefik.http.routers.jellyfin.tls=true"
+      - "traefik.http.routers.jellyfin.tls.certresolver=cloudflare"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port={{ jellyfin_internal_port }}"
+      {% if jellyfin_traefik_middleware is defined %}
+      - "traefik.http.routers.jellyfin.middlewares={{ jellyfin_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if jellyfin_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ jellyfin_internal_port }}/ || exit 1"]
+      interval: {{ jellyfin_healthcheck_interval }}
+      timeout: {{ jellyfin_healthcheck_timeout }}
+      retries: {{ jellyfin_healthcheck_retries }}
+      start_period: {{ jellyfin_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    {% if jellyfin_security_enabled | default(true) %}
+    security_opt:
+      - no-new-privileges:{{ jellyfin_no_new_privileges | default(true) }}
+    {% endif %}
+    
+    # Read-only root filesystem
+    read_only: {{ jellyfin_read_only | default(false) }}
+    tmpfs:
+      - /tmp
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: {{ jellyfin_memory_limit }}
+          cpus: '{{ jellyfin_cpu_limit }}'
+        reservations:
+          memory: {{ jellyfin_memory_reservation }}
+          cpus: '{{ jellyfin_cpu_reservation }}'
+    
+    # Dependencies
+    {% if jellyfin_dependencies is defined %}
+    depends_on:
+      {% for dependency in jellyfin_dependencies %}
+      {{ dependency }}:
+        condition: service_healthy
+      {% endfor %}
+    {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  homelab:
+    external: true
+  default:
+    driver: bridge

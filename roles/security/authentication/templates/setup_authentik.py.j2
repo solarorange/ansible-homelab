@@ -12,9 +12,8 @@ import json
 from urllib.parse import urljoin
 
 # Configuration
-AUTHENTIK_URL = os.getenv('AUTHENTIK_URL', 'http://localhost:9000')
-ADMIN_PASSWORD = os.getenv('AUTHENTIK_ADMIN_PASSWORD')
-DOMAIN = os.getenv('DOMAIN')
+AUTHENTIK_URL = os.getenv('AUTHENTIK_URL', 'http://{{ ansible_default_ipv4.address }}:9000')
+ADMIN_password: "{{ vault_security_admin_password | password_hash("bcrypt") }}"DOMAIN')
 
 if not all([AUTHENTIK_URL, ADMIN_PASSWORD, DOMAIN]):
     print("Error: Missing required environment variables")
@@ -210,9 +209,7 @@ class AuthentikAPI:
             print(f"Created user: {username}")
             
             # Set password
-            password_data = {'password': password}
-            password_response = self.session.post(
-                f"{self.base_url}/api/v3/core/users/{user_pk}/set_password/",
+            password: "{{ vault_security_admin_password | password_hash("bcrypt") }}"{self.base_url}/api/v3/core/users/{user_pk}/set_password/",
                 json=password_data
             )
             

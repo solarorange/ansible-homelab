@@ -53,7 +53,7 @@
 
 - name: Wait for Overseerr to be ready
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/status"
+    url: "http://{{ ansible_default_ipv4.address }}:5055/api/v1/status"
     method: GET
     status_code: 200
     timeout: 30
@@ -65,7 +65,7 @@
 
 - name: Configure Overseerr services
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/settings/services"
+    url: "http://{{ ansible_default_ipv4.address }}:5055/api/v1/settings/services"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -78,7 +78,7 @@
 
 - name: Configure Overseerr notifications
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/settings/notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/notifications"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -91,7 +91,7 @@
 
 - name: Configure Overseerr users
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/user"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/user"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -104,7 +104,7 @@
 
 - name: Configure Overseerr permissions
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/settings/permissions"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/permissions"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -117,7 +117,7 @@
 
 - name: Configure Overseerr webhooks
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/settings/webhooks"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/webhooks"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -130,7 +130,7 @@
 
 - name: Verify Overseerr configuration
   ansible.builtin.uri:
-    url: "http://localhost:5055/api/v1/status"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
     method: GET
     status_code: 200
     register: overseerr_verify

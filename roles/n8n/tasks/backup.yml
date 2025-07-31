@@ -31,7 +31,7 @@
     month: "{{ n8n_backup_schedule.split()[3] | default('*') }}"
     weekday: "{{ n8n_backup_schedule.split()[4] | default('*') }}"
     job: "{{ n8n_config_dir }}/backup.sh >> {{ n8n_backup_log_file }} 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_n8n_user }}"
   when: n8n_backup_enabled | default(true)
   tags: [n8n, backup]
 
@@ -51,7 +51,7 @@
     hour: "4"
     minute: "0"
     job: "{{ n8n_config_dir }}/cleanup-backups.sh >> {{ n8n_backup_log_file }} 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_n8n_user }}"
   when: n8n_backup_enabled | default(true)
   tags: [n8n, backup]
 

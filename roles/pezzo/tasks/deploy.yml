@@ -35,7 +35,7 @@
 
 - name: Wait for Pezzo services to start
   ansible.builtin.wait_for:
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ item }}"
     delay: 10
     timeout: 300
@@ -68,7 +68,7 @@
 
 - name: Verify Pezzo health endpoints
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ item.port }}{{ item.path }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}{{ item.path }}"
     method: GET
     status_code: 200
     timeout: 30

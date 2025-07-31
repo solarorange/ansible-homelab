@@ -8,7 +8,7 @@ scrape_configs:
 {% if media_enable_sabnzbd %}
   - job_name: 'sabnzbd'
     static_configs:
-      - targets: ['localhost:{{ media_sabnzbd_port }}']
+      - targets: ['{{ ansible_default_ipv4.address }}:{{ media_sabnzbd_port }}']
     metrics_path: '/api?mode=diskspace&apikey={{ media_sabnzbd_api_key | default('') }}'
     scrape_interval: 30s
     scrape_timeout: 10s
@@ -18,7 +18,7 @@ scrape_configs:
 {% if media_enable_qbittorrent %}
   - job_name: 'qbittorrent'
     static_configs:
-      - targets: ['localhost:{{ media_qbittorrent_port }}']
+      - targets: ['{{ ansible_default_ipv4.address }}:{{ media_qbittorrent_port }}']
     metrics_path: '/api/v2/sync/maindata'
     scrape_interval: 30s
     scrape_timeout: 10s
@@ -148,23 +148,7 @@ scrape_configs:
   - job_name: 'tautulli'
     static_configs:
       - targets: ['localhost:{{ media_tautulli_port }}']
-    metrics_path: '/api/v2?apikey={{ media_tautulli_api_key | default('') }}&cmd=get_activity'
-    scrape_interval: 30s
-    scrape_timeout: 10s
-    honor_labels: true
-    scheme: http
-{% endif %}
-{% endif %}
-
-# Alerting rules for media services
-groups:
-  - name: media_stack_alerts
-    rules:
-      # Service availability alerts
-{% if media_enable_downloaders %}
-{% if media_enable_sabnzbd %}
-      - alert: SABnzbdDown
-        expr: up{job="sabnzbd"} == 0
+    metrics_path: '/api/v2?apikey={{ media_tautulli_api_key: "{{ vault_media_api_token | default("") }}"sabnzbd"} == 0
         for: 1m
         labels:
           severity: critical

@@ -1,0 +1,165 @@
+---
+# Prowlarr Configuration Tasks
+
+- name: Create Prowlarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/prowlarr/config"
+    - "{{ docker_dir }}/prowlarr/data"
+    - "{{ docker_dir }}/prowlarr/scripts"
+    - "{{ logs_dir }}/prowlarr"
+
+- name: Create Prowlarr config.xml
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/prowlarr/config/config.xml"
+    content: |
+      <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+      <Config>
+        <LogLevel>info</LogLevel>
+        <Port>9696</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <ApiKey>{{ prowlarr_api_key }}</ApiKey>
+        <AuthenticationMethod>none</AuthenticationMethod>
+        <BackupFolder>{{ docker_dir }}/prowlarr/backup</BackupFolder>
+        <BackupInterval>7</BackupInterval>
+        <BackupRetention>28</BackupRetention>
+        <BindAddress>*</BindAddress>
+        <LaunchBrowser>False</LaunchBrowser>
+        <UpdateAutomatically>True</UpdateAutomatically>
+        <UpdateMechanism>BuiltIn</UpdateMechanism>
+        <Branch>main</Branch>
+        <AnalyticsEnabled>True</AnalyticsEnabled>
+        <InstanceName>Prowlarr</InstanceName>
+        <PostgresUser>{{ postgres_user }}</PostgresUser>
+        <PostgresPassword>{{ postgres_password }}</PostgresPassword>
+        <PostgresPort>5432</PostgresPort>
+        <PostgresMainDb>{{ postgres_db }}</PostgresMainDb>
+        <PostgresHost>postgresql</PostgresHost>
+      </Config>
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Prowlarr management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/prowlarr/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Prowlarr Management Script
+      
+      function show_help {
+          echo "Prowlarr Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Prowlarr status"
+          echo "  logs      - View Prowlarr logs"
+          echo "  restart   - Restart Prowlarr"
+          echo "  backup    - Backup Prowlarr data"
+          echo "  restore   - Restore Prowlarr data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Prowlarr data..."
+          tar -czf "{{ docker_dir }}/prowlarr/backup/prowlarr_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/prowlarr" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Prowlarr data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/prowlarr"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep prowlarr
+              ;;
+          logs)
+              docker logs -f prowlarr
+              ;;
+          restart)
+              docker restart prowlarr
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Prowlarr healthcheck script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/prowlarr/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Prowlarr is running
+      if ! docker ps | grep -q prowlarr; then
+          echo "Prowlarr is not running"
+          exit 1
+      fi
+      
+      # Check if Prowlarr is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9696/health | grep -q "ok"; then
+          echo "Prowlarr is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Prowlarr logrotate configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/prowlarr/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/prowlarr/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Prowlarr log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Prowlarr logs"
+    job: "logrotate {{ docker_dir }}/prowlarr/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Prowlarr backup cron job
+  ansible.builtin.cron:
+    name: "Backup Prowlarr data"
+    job: "{{ docker_dir }}/prowlarr/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

@@ -4,7 +4,7 @@
 
 - name: Validate Homepage service status
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -59,14 +59,14 @@
     timeout: 30
   register: homepage_api_validation
   loop:
-    - "http://localhost:{{ homepage_port }}/api/services"
-    - "http://localhost:{{ homepage_port }}/api/bookmarks"
-    - "http://localhost:{{ homepage_port }}/api/widgets"
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/bookmarks"
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/widgets"
   tags: [homepage, automation, validate]
 
 - name: Validate Homepage monitoring integration
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/metrics"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/metrics"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: 30
@@ -75,7 +75,7 @@
 
 - name: Validate Homepage authentication integration
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/auth/status"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/auth/status"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: 30

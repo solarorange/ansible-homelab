@@ -3,17 +3,12 @@
 
 TAUTULLI_CONTAINER="tautulli"
 TAUTULLI_PORT={{ tautulli_port }}
-TAUTULLI_API_KEY="${TAUTULLI_API_KEY:-{{ tautulli_api_key | default('') }}}"
-
-# Check if Tautulli container is running
-if ! docker ps -f name=$TAUTULLI_CONTAINER -f status=running | grep -q $TAUTULLI_CONTAINER; then
-  echo "Tautulli container is not running"
+TAUTULLI_api_key: "{{ vault_utilities_api_token | default("") }}"Tautulli container is not running"
   exit 1
 fi
 
 # Check if Tautulli API is responsive
-if ! curl -s -f "http://localhost:$TAUTULLI_PORT/api/v2?apikey=$TAUTULLI_API_KEY&cmd=get_server_info" | grep -q 'response'; then
-  echo "Tautulli API is not responding on port $TAUTULLI_PORT"
+if ! curl -s -f "http://{{ ansible_default_ipv4.address }}:$TAUTULLI_PORT/api/v2?apikey=$TAUTULLI_api_key: "{{ vault_utilities_api_token | default("") }}"Tautulli API is not responding on port $TAUTULLI_PORT"
   exit 1
 fi
 

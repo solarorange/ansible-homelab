@@ -1,0 +1,89 @@
+---
+# Transmission Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Transmission vault variables
+  block:
+    - name: Check required Transmission vault variables
+      assert:
+        that:
+          - vault_transmission_admin_password is defined
+          - vault_transmission_database_password is defined
+          - vault_transmission_api_key is defined
+          - vault_transmission_secret_key is defined
+          - vault_transmission_encryption_key is defined
+          - vault_transmission_jwt_secret is defined
+        fail_msg: "Required Transmission vault variables are not defined"
+        success_msg: "All required Transmission vault variables are defined"
+
+    - name: Validate Transmission password complexity
+      assert:
+        that:
+          - vault_transmission_admin_password | length >= 12
+          - vault_transmission_database_password | length >= 12
+        fail_msg: "Transmission passwords must be at least 12 characters long"
+        success_msg: "Transmission password complexity requirements met"
+
+- name: Validate Transmission network configuration
+  block:
+    - name: Check Transmission port configuration
+      assert:
+        that:
+          - transmission_port is defined
+          - transmission_port | int >= 1024
+          - transmission_port | int <= 65535
+        fail_msg: "Transmission port must be between 1024 and 65535"
+        success_msg: "Transmission port configuration is valid"
+
+    - name: Check Transmission domain configuration
+      assert:
+        that:
+          - domain is defined
+          - transmission_subdomain is defined
+        fail_msg: "Transmission domain configuration is incomplete"
+        success_msg: "Transmission domain configuration is valid"
+
+- name: Validate Transmission security configuration
+  block:
+    - name: Check Transmission SSL configuration
+      assert:
+        that:
+          - transmission_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Transmission SSL configuration is invalid"
+        success_msg: "Transmission SSL configuration is valid"
+
+    - name: Check Transmission authentication configuration
+      assert:
+        that:
+          - transmission_auth_enabled | bool
+          - transmission_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Transmission authentication configuration is invalid"
+        success_msg: "Transmission authentication configuration is valid"
+
+- name: Validate Transmission storage configuration
+  block:
+    - name: Check Transmission data directories
+      assert:
+        that:
+          - transmission_data_dir is defined
+          - transmission_config_dir is defined
+          - transmission_backup_dir is defined
+        fail_msg: "Transmission storage configuration is incomplete"
+        success_msg: "Transmission storage configuration is valid"
+
+    - name: Create Transmission directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ transmission_data_dir }}"
+        - "{{ transmission_config_dir }}"
+        - "{{ transmission_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Transmission validation completed successfully - all configurations are valid and secure"

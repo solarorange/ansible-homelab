@@ -11,7 +11,7 @@ if ! docker ps -f name=$TDARR_CONTAINER -f status=running | grep -q $TDARR_CONTA
 fi
 
 # Check if Tdarr API is responsive
-if ! curl -s -f http://localhost:$TDARR_PORT/api/v2/status > /dev/null; then
+if ! curl -s -f http://{{ ansible_default_ipv4.address }}:$TDARR_PORT/api/v2/status > /dev/null; then
   echo "Tdarr API is not responding on port $TDARR_PORT"
   exit 1
 fi

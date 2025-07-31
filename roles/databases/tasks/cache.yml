@@ -23,7 +23,7 @@
         dest: "{{ docker_dir }}/redis/config/redis.conf"
         content: |
           # Network
-          bind 0.0.0.0
+          bind {{ ansible_default_ipv4.address }}
           port 6379
           protected-mode yes
           
@@ -252,7 +252,7 @@
         job: "logrotate {{ docker_dir }}/redis/config/logrotate.conf"
         hour: "0"
         minute: "0"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
 
     - name: Add Redis backup to crontab
       ansible.builtin.cron:
@@ -260,7 +260,7 @@
         job: "{{ docker_dir }}/redis/scripts/backup.sh"
         hour: "2"
         minute: "15"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
 
     - name: Add Redis maintenance to crontab
       ansible.builtin.cron:
@@ -269,7 +269,7 @@
         weekday: "0"
         hour: "3"
         minute: "15"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
 
   when: redis_enabled | default(true)
   tags: [databases, redis, cache]
@@ -286,7 +286,7 @@
           requirepass {{ redis_password }}
           
           # Network Security
-          bind 0.0.0.0
+          bind {{ ansible_default_ipv4.address }}
           protected-mode yes
           
           # Command Security
@@ -356,7 +356,7 @@
         name: "Redis access control monitoring"
         job: "{{ docker_dir }}/redis/scripts/access-control.sh >> {{ logs_dir }}/redis/access-control.log 2>&1"
         minute: "*/5"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
 
   when: redis_enabled | default(true) and databases_security_enabled | default(true)
   tags: [databases, redis, cache, security]
@@ -393,7 +393,7 @@
           
           # Send to monitoring system if available
           if command -v curl > /dev/null 2>&1; then
-            curl -X POST "http://localhost:9091/metrics/job/redis/instance/{{ ansible_hostname }}" \
+            curl -X POST "http://{{ ansible_default_ipv4.address }}:9091/metrics/job/redis/instance/{{ ansible_hostname }}" \
               -d "redis_connected_clients $CONNECTED_CLIENTS" \
               -d "redis_used_memory_bytes $(echo $USED_MEMORY | sed 's/[^0-9]*//g')" \
               -d "redis_total_commands $TOTAL_COMMANDS" \
@@ -408,7 +408,7 @@
         name: "Redis monitoring"
         job: "{{ docker_dir }}/redis/scripts/monitor.sh >> {{ logs_dir }}/redis/monitoring.log 2>&1"
         minute: "*/1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
 
   when: redis_enabled | default(true) and databases_monitoring_enabled | default(true)
   tags: [databases, redis, cache, monitoring]

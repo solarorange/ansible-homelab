@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""
+Security Hardening Script
+Find and replace hardcoded values across the entire codebase
+"""
+
+import os
+import re
+import json
+import logging
+from pathlib import Path
+from typing import List, Dict, Tuple
+import argparse
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+class SecurityHardening:
+    def __init__(self, root_path: str):
+        self.root_path = Path(root_path)
+        self.hardcoded_patterns = {
+            'password': [
+                r'password\s*=\s*["\'][^"\']*["\']',
+                r'password\s*:\s*["\'][^"\']*["\']',
+                r'PASSWORD\s*=\s*["\'][^"\']*["\']',
+                r'PASSWORD\s*:\s*["\'][^"\']*["\']',
+            ],
+            'localhost': [
+                r'localhost',
+                r'127\.0\.0\.1',
+                r'0\.0\.0\.0',
+            ],
+            'admin': [
+                r'admin@[^"\s]+',
+                r'admin\s*:\s*["\'][^"\']*["\']',
+                r'ADMIN\s*=\s*["\'][^"\']*["\']',
+            ],
+            'changeme': [
+                r'changeme',
+                r'CHANGEME',
+                r'change_me',
+                r'CHANGE_ME',
+            ],
+            'admin123': [
+                r'admin123',
+                r'ADMIN123',
+                r'password123',
+                r'PASSWORD123',
+            ],
+            'your_secure_password': [
+                r'your_secure_password',
+                r'YOUR_SECURE_PASSWORD',
+                r'your_password',
+                r'YOUR_PASSWORD',
+            ],
+            '192.168': [
+                r'192\.168\.\d+\.\d+',
+                r'10\.\d+\.\d+\.\d+',
+                r'172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+',
+            ],
+            'default_credentials': [
+                r'root\s*:\s*["\'][^"\']*["\']',
+                r'user\s*:\s*["\'][^"\']*["\']',
+                r'default\s*:\s*["\'][^"\']*["\']',
+            ]
+        }
+        
+        self.exclude_patterns = [
+            r'\.git/',
+            r'\.vscode/',
+            r'node_modules/',
+            r'__pycache__/',
+            r'\.pyc$',
+            r'\.log$',
+            r'\.tmp$',
+            r'\.bak$',
+            r'\.swp$',
+            r'\.swo$',
+        ]
+        
+        self.file_extensions = [
+            '.yml', '.yaml', '.json', '.py', '.sh', '.bash',
+            '.conf', '.config', '.ini', '.env', '.template'
+        ]
+
+    def should_exclude_file(self, file_path: Path) -> bool:
+        """Check if file should be excluded from scanning"""
+        file_str = str(file_path)
+        
+        # Check exclude patterns
+        for pattern in self.exclude_patterns:
+            if re.search(pattern, file_str):
+                return True
+        
+        # Check file extension
+        if file_path.suffix not in self.file_extensions:
+            return True
+        
+        return False
+
+    def scan_file(self, file_path: Path) -> Dict[str, List[Dict]]:
+        """Scan a single file for hardcoded values"""
+        results = {}
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                lines = content.split('\n')
+                
+                for category, patterns in self.hardcoded_patterns.items():
+                    category_results = []
+                    
+                    for pattern in patterns:
+                        matches = re.finditer(pattern, content, re.IGNORECASE)
+                        
+                        for match in matches:
+                            line_num = content[:match.start()].count('\n') + 1
+                            line_content = lines[line_num - 1] if line_num <= len(lines) else ''
+                            
+                            category_results.append({
+                                'pattern': pattern,
+                                'match': match.group(),
+                                'line': line_num,
+                                'line_content': line_content.strip(),
+                                'start': match.start(),
+                                'end': match.end()
+                            })
+                    
+                    if category_results:
+                        results[category] = category_results
+                        
+        except Exception as e:
+            logger.error(f"Error scanning file {file_path}: {e}")
+        
+        return results
+
+    def scan_directory(self) -> Dict[str, Dict[str, List[Dict]]]:
+        """Scan entire directory for hardcoded values"""
+        results = {}
+        
+        logger.info(f"Scanning directory: {self.root_path}")
+        
+        for file_path in self.root_path.rglob('*'):
+            if file_path.is_file() and not self.should_exclude_file(file_path):
+                file_results = self.scan_file(file_path)
+                if file_results:
+                    results[str(file_path)] = file_results
+        
+        return results
+
+    def generate_report(self, scan_results: Dict[str, Dict[str, List[Dict]]]) -> str:
+        """Generate a comprehensive report of findings"""
+        report = []
+        report.append("# Security Hardening Scan Report")
+        report.append(f"Generated: {Path().cwd()}")
+        report.append("")
+        
+        total_files = len(scan_results)
+        total_issues = sum(len(issues) for file_issues in scan_results.values() 
+                          for issues in file_issues.values())
+        
+        report.append(f"## Summary")
+        report.append(f"- Files scanned: {total_files}")
+        report.append(f"- Total issues found: {total_issues}")
+        report.append("")
+        
+        # Group by category
+        category_summary = {}
+        for file_path, file_issues in scan_results.items():
+            for category, issues in file_issues.items():
+                if category not in category_summary:
+                    category_summary[category] = []
+                category_summary[category].extend([
+                    {
+                        'file': file_path,
+                        'issue': issue
+                    } for issue in issues
+                ])
+        
+        report.append("## Issues by Category")
+        for category, issues in category_summary.items():
+            report.append(f"### {category.title()} ({len(issues)} issues)")
+            report.append("")
+            
+            for item in issues:
+                report.append(f"**File:** {item['file']}")
+                report.append(f"**Line:** {item['issue']['line']}")
+                report.append(f"**Match:** `{item['issue']['match']}`")
+                report.append(f"**Line Content:** `{item['issue']['line_content']}`")
+                report.append("")
+        
+        return "\n".join(report)
+
+    def suggest_fixes(self, scan_results: Dict[str, Dict[str, List[Dict]]]) -> str:
+        """Generate suggestions for fixing hardcoded values"""
+        suggestions = []
+        suggestions.append("# Security Hardening Fix Suggestions")
+        suggestions.append("")
+        
+        for file_path, file_issues in scan_results.items():
+            suggestions.append(f"## {file_path}")
+            suggestions.append("")
+            
+            for category, issues in file_issues.items():
+                suggestions.append(f"### {category.title()} Issues")
+                suggestions.append("")
+                
+                for issue in issues:
+                    suggestions.append(f"**Line {issue['line']}:**")
+                    suggestions.append(f"Current: `{issue['line_content']}`")
+                    
+                    # Generate suggestion based on category
+                    if category == 'password':
+                        suggestions.append("Suggested: Use vault variable")
+                        suggestions.append("Example: `password: \"{{ vault_service_password }}\"`")
+                    elif category == 'localhost':
+                        suggestions.append("Suggested: Use dynamic host")
+                        suggestions.append("Example: `host: \"{{ ansible_default_ipv4.address }}\"`")
+                    elif category == 'admin':
+                        suggestions.append("Suggested: Use dynamic admin")
+                        suggestions.append("Example: `admin: \"{{ admin_email | default('admin@' + domain) }}\"`")
+                    elif category == 'changeme':
+                        suggestions.append("Suggested: Use vault variable")
+                        suggestions.append("Example: `secret: \"{{ vault_service_secret }}\"`")
+                    elif category == 'admin123':
+                        suggestions.append("Suggested: Use vault variable")
+                        suggestions.append("Example: `password: \"{{ vault_service_password }}\"`")
+                    elif category == 'your_secure_password':
+                        suggestions.append("Suggested: Use vault variable")
+                        suggestions.append("Example: `password: \"{{ vault_service_password }}\"`")
+                    elif category == '192.168':
+                        suggestions.append("Suggested: Use dynamic IP")
+                        suggestions.append("Example: `ip: \"{{ ansible_default_ipv4.address }}\"`")
+                    elif category == 'default_credentials':
+                        suggestions.append("Suggested: Use vault variables")
+                        suggestions.append("Example: `user: \"{{ vault_service_user }}\"`")
+                    
+                    suggestions.append("")
+        
+        return "\n".join(suggestions)
+
+    def create_vault_variables(self, scan_results: Dict[str, Dict[str, List[Dict]]]) -> str:
+        """Generate vault variable definitions based on findings"""
+        vault_vars = []
+        vault_vars.append("# Generated Vault Variables")
+        vault_vars.append("# Add these to group_vars/all/vault.yml")
+        vault_vars.append("")
+        
+        # Collect unique service names
+        services = set()
+        for file_path in scan_results.keys():
+            # Extract service name from file path
+            if 'roles/' in file_path:
+                service_match = re.search(r'roles/([^/]+)/', file_path)
+                if service_match:
+                    services.add(service_match.group(1))
+        
+        for service in sorted(services):
+            vault_vars.append(f"# {service.title()} Variables")
+            vault_vars.append(f"vault_{service}_admin_password: \"{{ vault_{service}_admin_password | password_hash('bcrypt') }}\"")
+            vault_vars.append(f"vault_{service}_database_password: \"{{ vault_{service}_database_password | password_hash('bcrypt') }}\"")
+            vault_vars.append(f"vault_{service}_api_token: \"{{ vault_{service}_api_token | default('') }}\"")
+            vault_vars.append(f"vault_{service}_secret_key: \"{{ vault_{service}_secret_key | default('') }}\"")
+            vault_vars.append(f"vault_{service}_encryption_key: \"{{ vault_{service}_encryption_key | default('') }}\"")
+            vault_vars.append(f"vault_{service}_jwt_secret: \"{{ vault_{service}_jwt_secret | default('') }}\"")
+            vault_vars.append(f"vault_{service}_redis_password: \"{{ vault_{service}_redis_password | password_hash('bcrypt') }}\"")
+            vault_vars.append(f"vault_{service}_smtp_password: \"{{ vault_{service}_smtp_password | default('') }}\"")
+            vault_vars.append("")
+        
+        return "\n".join(vault_vars)
+
+def main():
+    parser = argparse.ArgumentParser(description='Security Hardening Scanner')
+    parser.add_argument('--path', default='.', help='Path to scan (default: current directory)')
+    parser.add_argument('--report', action='store_true', help='Generate detailed report')
+    parser.add_argument('--suggestions', action='store_true', help='Generate fix suggestions')
+    parser.add_argument('--vault-vars', action='store_true', help='Generate vault variables')
+    parser.add_argument('--output', help='Output file for results')
+    
+    args = parser.parse_args()
+    
+    scanner = SecurityHardening(args.path)
+    
+    logger.info("Starting security hardening scan...")
+    scan_results = scanner.scan_directory()
+    
+    if not scan_results:
+        logger.info("No hardcoded values found!")
+        return
+    
+    logger.info(f"Found issues in {len(scan_results)} files")
+    
+    # Generate outputs
+    outputs = []
+    
+    if args.report:
+        report = scanner.generate_report(scan_results)
+        outputs.append(("Security Scan Report", report))
+    
+    if args.suggestions:
+        suggestions = scanner.suggest_fixes(scan_results)
+        outputs.append(("Fix Suggestions", suggestions))
+    
+    if args.vault_vars:
+        vault_vars = scanner.create_vault_variables(scan_results)
+        outputs.append(("Vault Variables", vault_vars))
+    
+    # Output results
+    if args.output:
+        with open(args.output, 'w') as f:
+            for title, content in outputs:
+                f.write(f"\n{'='*50}\n")
+                f.write(f"{title}\n")
+                f.write(f"{'='*50}\n")
+                f.write(content)
+                f.write("\n")
+        logger.info(f"Results written to {args.output}")
+    else:
+        for title, content in outputs:
+            print(f"\n{'='*50}")
+            print(f"{title}")
+            print(f"{'='*50}")
+            print(content)
+            print()
+
+if __name__ == "__main__":
+    main() 

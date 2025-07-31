@@ -4,7 +4,7 @@
 
 - name: Validate Authentik service status
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -66,17 +66,17 @@
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
   register: authentik_api_validation
   loop:
-    - "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
-    - "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
-    - "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
-    - "http://localhost:{{ security_authentik.port }}/api/v3/policies/user/"
-    - "http://localhost:{{ security_authentik.port }}/api/v3/core/tokens/"
+    - "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/users/"
+    - "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/groups/"
+    - "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
+    - "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/policies/user/"
+    - "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/tokens/"
   when: security_authentik.automation_enabled | default(true)
   tags: [authentik, automation, validate]
 
 - name: Validate Authentik users
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/users/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -86,7 +86,7 @@
 
 - name: Validate Authentik groups
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/groups/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -96,7 +96,7 @@
 
 - name: Validate Authentik applications
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -106,7 +106,7 @@
 
 - name: Validate Authentik policies
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/policies/user/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/policies/user/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -116,7 +116,7 @@
 
 - name: Validate Authentik monitoring integration
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/metrics"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/metrics"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -126,7 +126,7 @@
 
 - name: Validate Authentik health endpoint
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/health"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -164,7 +164,7 @@
 
 - name: Validate Authentik database connection
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"

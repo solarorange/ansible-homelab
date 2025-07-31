@@ -84,7 +84,7 @@
 
 - name: Wait for Grafana API to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -96,14 +96,14 @@
 
 - name: Configure Grafana initial admin credentials
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/admin/users/1/password"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users/1/password"
     method: PUT
     headers:
       Content-Type: application/json
       Authorization: "Basic {{ ('admin:admin' | b64encode) }}"
     body_format: json
     body:
-      password: "{{ grafana_admin_password }}"
+      password: "{{ vault_grafana_password }}"
     status_code: [200, 400]
     timeout: 30
   register: grafana_admin_password_set
@@ -159,7 +159,7 @@
 
 - name: Validate Grafana data sources
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
     method: GET
     headers:
       Authorization: "Bearer {{ grafana_api_key | default('') }}"
@@ -170,7 +170,7 @@
 
 - name: Validate Grafana dashboards
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/search"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
     method: GET
     headers:
       Authorization: "Bearer {{ grafana_api_key | default('') }}"
@@ -181,7 +181,7 @@
 
 - name: Validate Grafana alerting
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/v1/provisioning/alert-rules"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/alert-rules"
     method: GET
     headers:
       Authorization: "Bearer {{ grafana_api_key | default('') }}"
@@ -230,7 +230,7 @@
 
 - name: Wait for Grafana to be ready after restart
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: 200
     timeout: 30

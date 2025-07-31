@@ -379,7 +379,7 @@
       fi
       
       # Check if Jellyfin is responding
-      if ! curl -s http://localhost:8096 | grep -q "Jellyfin"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8096 | grep -q "Jellyfin"; then
           echo "Jellyfin is not responding"
           exit 1
       fi
@@ -412,7 +412,7 @@
     job: "logrotate {{ docker_dir }}/jellyfin/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_jellyfin_user }}"
 
 - name: Add Jellyfin backup cron job
   ansible.builtin.cron:
@@ -420,4 +420,4 @@
     job: "{{ docker_dir }}/jellyfin/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_jellyfin_user }}" 

@@ -12,49 +12,49 @@ self_healing:
     traefik:
       failure_threshold: 2
       restart_command: "docker restart traefik"
-      health_check: "http://localhost:8080/api/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:8080/api/health"
       timeout: 30
     
     authentik:
       failure_threshold: 2
       restart_command: "docker restart authentik_server"
-      health_check: "http://localhost:9000/if/user/"
+      health_check: "http://{{ ansible_default_ipv4.address }}:9000/if/user/"
       timeout: 60
     
     grafana:
       failure_threshold: 2
       restart_command: "docker restart grafana"
-      health_check: "http://localhost:3000/api/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/api/health"
       timeout: 30
     
     prometheus:
       failure_threshold: 2
       restart_command: "docker restart prometheus"
-      health_check: "http://localhost:9090/-/healthy"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
       timeout: 30
     
     sonarr:
       failure_threshold: 2
       restart_command: "docker restart sonarr"
-      health_check: "http://localhost:8989/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
       timeout: 60
     
     radarr:
       failure_threshold: 2
       restart_command: "docker restart radarr"
-      health_check: "http://localhost:7878/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
       timeout: 60
     
     jellyfin:
       failure_threshold: 2
       restart_command: "docker restart jellyfin"
-      health_check: "http://localhost:8096/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
       timeout: 60
     
     nextcloud:
       failure_threshold: 2
       restart_command: "docker restart nextcloud"
-      health_check: "http://localhost:8080/status.php"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/status.php"
       timeout: 60
 
   # Resource cleanup rules
@@ -127,7 +127,7 @@ self_healing:
       timeout: 30
     
     crowdsec_failure:
-      check_command: "curl -f http://localhost:6060/v1/decisions"
+      check_command: "curl -f http://{{ ansible_default_ipv4.address }}:/v1/decisions"
       failure_threshold: 2
       recovery_actions:
         - "docker restart crowdsec"

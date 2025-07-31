@@ -1,6 +1,6 @@
 #!/bin/bash
 # Media stack metrics collection script
-PUSH_URL="{{ metrics_push_url | default('http://localhost:9091/metrics/job/media-stack') }}"
+PUSH_URL="{{ metrics_push_url | default('http://{{ ansible_default_ipv4.address }}:9091/metrics/job/media-stack') }}"
 declare -A services=(
 {% for service in media_services %}
   [{{ service.name }}]="{{ service.metrics_url }}"

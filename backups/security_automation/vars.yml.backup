@@ -1,0 +1,1006 @@
+---
+# Enhanced Watchtower Configuration Variables
+# Production-ready setup with comprehensive service definitions
+
+#==============================================================================
+# BASIC SYSTEM CONFIGURATION
+#==============================================================================
+
+# User and system settings
+username: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
+puid: "{{ lookup('env', 'HOMELAB_PUID') | default('1000') }}"
+pgid: "{{ lookup('env', 'HOMELAB_PGID') | default('1000') }}"
+ip_address: "{{ lookup('env', 'HOMELAB_IP_ADDRESS') | default('192.168.1.100') }}"
+timezone: "{{ lookup('env', 'HOMELAB_TIMEZONE') | default('America/New_York') }}"
+
+# Plex server configuration
+plex_server_ip: "{{ lookup('env', 'PLEX_SERVER_IP') | default('192.168.1.41') }}"           # IP address of your existing Plex server
+
+# Directory structure
+docker_dir: "/home/{{ username }}/docker"
+data_dir: "/home/{{ username }}/data"
+config_dir: "/home/{{ username }}/config"
+backup_dir: "/home/{{ username }}/backups"
+logs_dir: "/home/{{ username }}/logs"
+
+#==============================================================================
+# DOMAIN AND DNS CONFIGURATION
+#==============================================================================
+
+domain: "{{ lookup('env', 'HOMELAB_DOMAIN') | default('yourdomain.com') }}"                  # Your domain name
+cloudflare_enabled: "{{ lookup('env', 'CLOUDFLARE_ENABLED') | default('false') | bool }}"
+cloudflare_email: "{{ lookup('env', 'CLOUDFLARE_EMAIL') | default('') }}"
+cloudflare_api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') | default('') }}"
+
+# Subdomain configuration (customize as needed)
+subdomains:
+  # Infrastructure
+  traefik: "traefik"
+  authentik: "auth"
+  portainer: "portainer"
+  
+  # Monitoring
+  grafana: "grafana"
+  prometheus: "prometheus"
+  loki: "loki"
+  promtail: "logs"
+  alertmanager: "alerts"
+  
+  # Media
+  sonarr: "sonarr"
+  radarr: "radarr"
+  prowlarr: "prowlarr"
+  bazarr: "bazarr"
+  overseerr: "overseerr"
+  jellyfin: "jellyfin"
+  tautulli: "tautulli"
+  
+  # Development
+  gitlab: "git"
+  harbor: "registry"
+  code: "code"
+  
+  # Storage
+  nextcloud: "cloud"
+  minio: "s3"
+  paperless: "docs"
+  immich: "photos"
+  
+  # Automation
+  homeassistant: "hass"
+  nodered: "flows"
+  n8n: "n8n"
+  
+  # Security
+  vault: "vault"
+  vaultwarden: "passwords"
+  wireguard: "vpn"
+  
+  # Network
+  pihole: "dns"
+  nginx_proxy_manager: "proxy"
+  
+  # Utilities
+  dash: "dash"
+  files: "files"
+  watchtower: "updates"
+  dumbassets: "assets"
+  romm: "romm"
+
+#==============================================================================
+# AUTHENTICATION AND SECURITY
+#==============================================================================
+
+# Traefik authentication (generate with: htpasswd -nb user password)
+traefik_basic_auth_hash: "{{ vault_traefik_basic_auth_hash }}"
+
+# Authentik configuration (replaces Authelia for better features)
+authentik_secret_key: "{{ vault_authentik_secret_key }}"     # 64 character random string
+authentik_postgres_password: "{{ vault_authentik_postgres_password }}" # Database password
+authentik_admin_email: "{{ vault_authentik_admin_email }}"
+authentik_admin_password: "{{ vault_authentik_admin_password }}"
+
+# Application passwords
+wireguard_password: "{{ vault_wireguard_password | default('') }}"
+codeserver_password: "{{ vault_codeserver_password | default('') }}"
+gitlab_root_password: "{{ vault_gitlab_root_password | default('') }}"
+
+# Vault configuration
+vault_root_token: "{{ vault_root_token | default('') }}"
+vault_unseal_key: "{{ vault_unseal_key | default('') }}"
+
+#==============================================================================
+# MONITORING CONFIGURATION
+#==============================================================================
+
+# Enable/disable monitoring components
+monitoring_enabled: true
+influxdb_enabled: true
+telegraf_enabled: true
+prometheus_enabled: true
+grafana_enabled: true
+loki_enabled: true
+alertmanager_enabled: true
+
+# InfluxDB configuration
+influxdb_admin_user: "admin"
+influxdb_admin_password: "{{ vault_influxdb_admin_password }}"
+influxdb_org: "homelab"
+influxdb_bucket: "metrics"
+influxdb_token: "{{ vault_influxdb_token }}"
+influxdb_username: "{{ vault_influxdb_username }}"
+influxdb_password: "{{ vault_influxdb_admin_password }}"
+influxdb_retention: "{{ lookup('env', 'INFLUXDB_RETENTION') | default('30d') }}"
+
+# Grafana configuration
+grafana_admin_user: "admin"
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+grafana_secret_key: "{{ vault_grafana_secret_key }}"
+
+# Telegram notifications (optional)
+telegram_bot_token: "{{ vault_telegram_bot_token }}"
+telegram_chat_id: "{{ vault_telegram_chat_id }}"
+
+#==============================================================================
+# SERVICE ENABLEMENT
+#==============================================================================
+
+# Control which services to deploy
+enabled_services:
+  # Core infrastructure (always enabled)
+  - traefik
+  - authentik
+  - portainer
+  
+  # Monitoring stack
+  - grafana
+  - prometheus
+  - influxdb
+  - telegraf
+  - loki
+  - promtail
+  - alertmanager
+  - blackbox_exporter
+  
+  # Media services (following TRASH guides)
+  - sonarr
+  - radarr
+  - prowlarr
+  - bazarr
+  - overseerr
+  - jellyfin
+  - tautulli
+  - komga
+  - audiobookshelf
+  - ersatztv
+  
+  # File services
+  - nextcloud
+  - samba
+  - syncthing
+  
+  # Development tools
+  - gitlab
+  - harbor
+  - code_server
+  
+  # AI and Development
+  - pezzo
+  
+  # Storage and files
+  - minio
+  - paperless
+  - bookstack
+  - immich
+  - filebrowser
+  
+  # Automation and smart home
+  - homeassistant
+  - mosquitto
+  - zigbee2mqtt
+  - nodered
+  - n8n
+  
+  # Security services
+  - vault
+  - crowdsec
+  - fail2ban
+  - wireguard
+  
+  # Network services
+  - pihole
+  - nginx_proxy_manager
+  
+  # Backup solutions
+  - kopia
+  - duplicati
+  
+  # Utilities
+  - watchtower
+  - dashdot
+  - guacamole
+  - heimdall
+  - homarr
+  - requestrr
+  - unmanic
+  - vaultwarden
+
+#==============================================================================
+# FEATURE TOGGLES
+#==============================================================================
+
+# Main feature categories
+media_enabled: true
+automation_enabled: true
+backup_enabled: true
+development_enabled: true
+security_enhanced: true
+
+# Deployment options
+verify_deployment: true
+reboot_after_deployment: true
+ssl_enabled: true
+monitoring_external: true
+
+#==============================================================================
+# NETWORK CONFIGURATION
+#==============================================================================
+
+# Docker networks
+docker_networks:
+  - name: homelab
+    driver: bridge
+    ipam_config:
+      - subnet: "172.20.0.0/16"
+        gateway: "172.20.0.1"
+  
+  - name: monitoring
+    driver: bridge
+    internal: true
+    ipam_config:
+      - subnet: "172.21.0.0/16"
+        gateway: "172.21.0.1"
+  
+  - name: media
+    driver: bridge
+    ipam_config:
+      - subnet: "172.22.0.0/16"
+        gateway: "172.22.0.1"
+
+# Traefik configuration
+traefik_pilot_token: ""  # Optional Traefik Pilot token
+traefik_log_level: "INFO"
+traefik_access_logs: true
+
+#==============================================================================
+# STORAGE CONFIGURATION
+#==============================================================================
+
+# Media directories structure (following TRASH guides)
+media_directories:
+  - "{{ data_dir }}/media"
+  - "{{ data_dir }}/media/movies"
+  - "{{ data_dir }}/media/tv"
+  - "{{ data_dir }}/media/anime"
+  - "{{ data_dir }}/media/music"
+  - "{{ data_dir }}/media/books"
+  - "{{ data_dir }}/media/audiobooks"
+  - "{{ data_dir }}/media/podcasts"
+  - "{{ data_dir }}/torrents"
+  - "{{ data_dir }}/torrents/movies"
+  - "{{ data_dir }}/torrents/tv"
+  - "{{ data_dir }}/torrents/anime"
+  - "{{ data_dir }}/usenet"
+  - "{{ data_dir }}/usenet/incomplete"
+  - "{{ data_dir }}/usenet/complete"
+
+# Database configuration
+postgres_password: "{{ vault_postgresql_password }}"
+redis_password: "{{ vault_redis_password }}"
+mysql_root_password: "{{ vault_mariadb_root_password }}"
+
+#==============================================================================
+# SYSTEM PACKAGES
+#==============================================================================
+
+# Essential system packages
+essential_packages:
+  - curl
+  - wget
+  - git
+  - unzip
+  - htop
+  - iotop
+  - nload
+  - ncdu
+  - tree
+  - vim
+  - nano
+  - jq
+  - yq
+  - rsync
+  - cron
+  - logrotate
+  - fail2ban
+  - ufw
+  - net-tools
+  - dnsutils
+
+# Python packages
+pip_packages:
+  - docker
+  - docker-compose
+  - requests
+  - pyyaml
+  - jinja2
+  - passlib
+  - bcrypt
+  - github3.py
+  - influxdb-client
+  - prometheus-client
+
+# Docker packages
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+#==============================================================================
+# RESOURCE LIMITS
+#==============================================================================
+
+# Container resource limits (prevents system overload)
+resource_limits:
+  small:
+    memory: "256m"
+    cpus: "0.5"
+  medium:
+    memory: "512m"
+    cpus: "1.0"
+  large:
+    memory: "1g"
+    cpus: "2.0"
+  xlarge:
+    memory: "2g"
+    cpus: "4.0"
+
+#==============================================================================
+# BACKUP CONFIGURATION
+#==============================================================================
+
+# Backup settings
+backup_retention_days: 30
+backup_schedule: "0 2 * * *"  # 2 AM daily (system-wide)
+backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# Services to include in backups
+backup_include:
+  - docker_volumes
+  - config_files
+  - application_data
+  - databases
+
+#==============================================================================
+# STAGGERED BACKUP SCHEDULING
+#==============================================================================
+
+# Backup priority levels and timing
+backup_priority_levels:
+  critical:
+    description: "Essential services that must backup first"
+    time_slot: "1:00 AM"
+    services:
+      - authentik
+      - traefik
+      - vault
+      - databases
+      - system_configs
+  
+  high:
+    description: "Important services with moderate data"
+    time_slot: "2:00 AM"
+    services:
+      - homeassistant
+      - zigbee2mqtt
+      - mosquitto
+      - monitoring_infrastructure
+  
+  media_core:
+    description: "Core media management services"
+    time_slot: "3:00 AM"
+    services:
+      - sonarr
+      - radarr
+      - lidarr
+      - readarr
+      - prowlarr
+      - bazarr
+  
+  media_download:
+    description: "Download and processing services"
+    time_slot: "4:00 AM"
+    services:
+      - qbittorrent
+      - sabnzbd
+      - tdarr
+      - komga
+      - audiobookshelf
+  
+  media_playback:
+    description: "Media playback and streaming services"
+    time_slot: "5:00 AM"
+    services:
+      - jellyfin
+      - emby
+      - tautulli
+      - overseerr
+  
+  file_services:
+    description: "File storage and sharing services"
+    time_slot: "6:00 AM"
+    services:
+      - nextcloud
+      - samba
+      - syncthing
+      - paperless_ngx
+      - immich
+  
+  utilities:
+    description: "Utility and monitoring services"
+    time_slot: "7:00 AM"
+    services:
+      - portainer
+      - grafana
+      - prometheus
+      - loki
+      - alertmanager
+      - pihole
+
+# Staggered backup schedules (in cron format)
+backup_schedules:
+  # Critical services (1:00 AM)
+  authentik: "0 1 * * *"
+  traefik: "5 1 * * *"
+  vault: "10 1 * * *"
+  postgresql: "15 1 * * *"
+  mariadb: "20 1 * * *"
+  redis: "25 1 * * *"
+  
+  # High priority services (2:00 AM)
+  homeassistant: "0 2 * * *"
+  zigbee2mqtt: "5 2 * * *"
+  mosquitto: "10 2 * * *"
+  influxdb: "15 2 * * *"
+  telegraf: "20 2 * * *"
+  
+  # Media core services (3:00 AM)
+  sonarr: "0 3 * * *"
+  radarr: "5 3 * * *"
+  lidarr: "10 3 * * *"
+  readarr: "15 3 * * *"
+  prowlarr: "20 3 * * *"
+  bazarr: "25 3 * * *"
+  
+  # Media download services (4:00 AM)
+  qbittorrent: "0 4 * * *"
+  sabnzbd: "5 4 * * *"
+  tdarr: "10 4 * * *"
+  komga: "15 4 * * *"
+  audiobookshelf: "20 4 * * *"
+  
+  # Media playback services (5:00 AM)
+  jellyfin: "0 5 * * *"
+  emby: "5 5 * * *"
+  tautulli: "10 5 * * *"
+  overseerr: "15 5 * * *"
+  
+  # File services (6:00 AM)
+  nextcloud: "0 6 * * *"
+  samba: "5 6 * * *"
+  syncthing: "10 6 * * *"
+  paperless_ngx: "15 6 * * *"
+  immich: "20 6 * * *"
+  
+  # Utility services (7:00 AM)
+  portainer: "0 7 * * *"
+  grafana: "5 7 * * *"
+  prometheus: "10 7 * * *"
+  loki: "15 7 * * *"
+  alertmanager: "20 7 * * *"
+  pihole: "25 7 * * *"
+
+# Weekend backup schedule (more time for large backups)
+weekend_backup_schedules:
+  # Saturday - Extended backup window
+  saturday_start: "2:00 AM"
+  saturday_end: "10:00 AM"
+  
+  # Sunday - System maintenance and verification
+  sunday_start: "2:00 AM"
+  sunday_end: "8:00 AM"
+
+# Backup dependencies (services that should backup before others)
+backup_dependencies:
+  sonarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  radarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  lidarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  readarr:
+    depends_on: ["postgresql", "qbittorrent"]
+  jellyfin:
+    depends_on: ["postgresql", "sonarr", "radarr"]
+  emby:
+    depends_on: ["postgresql", "sonarr", "radarr"]
+  nextcloud:
+    depends_on: ["postgresql", "redis"]
+  paperless_ngx:
+    depends_on: ["postgresql", "redis"]
+
+# Backup resource limits
+backup_resource_limits:
+  max_concurrent_backups: 3
+  max_backup_duration_minutes: 120
+  max_backup_size_gb: 50
+  backup_timeout_minutes: 30
+
+# Backup monitoring and alerting
+backup_monitoring:
+  enabled: true
+  check_interval_minutes: 30
+  alert_on_failure: true
+  alert_on_timeout: true
+  alert_on_size_exceeded: true
+
+#==============================================================================
+# VERIFICATION URLS
+#==============================================================================
+
+# URLs to check after deployment
+verification_urls:
+  - "traefik"
+  - "grafana"
+  - "portainer"
+  - "authentik"
+  - "homeassistant"
+
+#==============================================================================
+# CUSTOM CONFIGURATIONS
+#==============================================================================
+
+# Add your custom configurations here
+# custom_domain_mapping: {}
+# custom_ports: {}
+# custom_environment_vars: {}
+
+#==============================================================================
+# HOME AUTOMATION CONFIGURATION
+#==============================================================================
+
+# Home Assistant configuration
+homeassistant_admin_user: "admin"
+homeassistant_admin_password: "{{ vault_homeassistant_admin_password }}"
+homeassistant_trusted_proxies:
+  - "{{ ansible_default_ipv4.address }}"
+  - "192.168.1.0/24"
+
+# MQTT configuration
+mosquitto_admin_user: "admin"
+mosquitto_admin_password: "{{ vault_mosquitto_admin_password }}"
+mosquitto_allow_anonymous: false
+mosquitto_max_connections: 100
+mosquitto_max_queued_messages: 1000
+mosquitto_max_packet_size: 0
+
+# Zigbee2MQTT configuration
+zigbee2mqtt_mqtt_user: "zigbee2mqtt"
+zigbee2mqtt_mqtt_password: "{{ vault_zigbee2mqtt_mqtt_password }}"
+zigbee2mqtt_serial_port: "/dev/ttyACM0"
+zigbee2mqtt_pan_id: 6754
+zigbee2mqtt_channel: 11
+
+#==============================================================================
+# FILE SERVICES CONFIGURATION
+#==============================================================================
+
+# Nextcloud configuration
+nextcloud_admin_user: "admin"
+nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
+nextcloud_db_password: "{{ vault_nextcloud_db_password }}"
+nextcloud_db_root_password: "{{ vault_nextcloud_db_root_password }}"
+nextcloud_trusted_domains:
+  - "{{ domain }}"
+  - "nextcloud.{{ domain }}"
+  - "{{ ip_address }}"
+
+# Samba configuration
+samba_workgroup: "WORKGROUP"
+samba_server_string: "Samba Server"
+samba_security: "user"
+samba_map_to_guest: "bad user"
+samba_shares:
+  - name: "media"
+    path: "/data/media"
+    browseable: "yes"
+    read_only: "no"
+    guest_ok: "yes"
+  - name: "documents"
+    path: "/data/documents"
+    browseable: "yes"
+    read_only: "no"
+    guest_ok: "yes"
+  - name: "backups"
+    path: "/data/backups"
+    browseable: "yes"
+    read_only: "no"
+    guest_ok: "yes"
+
+# Syncthing configuration
+syncthing_gui_user: "admin"
+syncthing_gui_password: "{{ vault_syncthing_gui_password }}"
+syncthing_gui_apikey: "{{ vault_syncthing_apikey }}"
+syncthing_folders:
+  - id: "documents"
+    path: "/data/documents"
+    label: "Documents"
+    type: "sendreceive"
+  - id: "photos"
+    path: "/data/photos"
+    label: "Photos"
+    type: "sendreceive"
+  - id: "backups"
+    path: "/data/backups"
+    label: "Backups"
+    type: "sendreceive"
+
+#==============================================================================
+# BACKUP CONFIGURATION
+#==============================================================================
+
+# Backup retention settings
+backup_retention_days: 30
+backup_compression: true
+backup_encryption: true
+backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# Backup schedules (in cron format)
+backup_schedules:
+  homeassistant: "0 2 * * *"
+  mosquitto: "15 2 * * *"
+  zigbee2mqtt: "30 2 * * *"
+  nextcloud: "0 3 * * *"
+  samba: "15 3 * * *"
+  syncthing: "30 3 * * *"
+
+# Homepage Dashboard Configuration
+homepage_title: "Homelab Dashboard"
+homepage_description: "Enhanced Homelab Infrastructure Dashboard"
+homepage_theme: "dark"
+homepage_layout: "default"
+homepage_language: "en"
+homepage_units: "metric"
+homepage_timezone: "America/New_York"
+homepage_background: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop"
+homepage_favicon: "https://raw.githubusercontent.com/gethomepage/homepage/main/public/favicon.ico"
+homepage_icons: "https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons"
+homepage_port: 3000
+homepage_puid: 1000
+homepage_pgid: 1000
+homepage_network: "homelab"
+
+# Homepage Widgets
+homepage_widgets:
+  - resources
+  - search
+  - weather
+  - calendar
+  - system
+  - kubernetes
+  - docker
+  - pihole
+  - traefik
+  - authentik
+  - portainer
+  - grafana
+  - prometheus
+  - influxdb
+  - loki
+  - homeassistant
+  - zigbee2mqtt
+  - nodered
+  - n8n
+  - jellyfin
+  - sonarr
+  - radarr
+  - lidarr
+  - readarr
+  - prowlarr
+  - bazarr
+  - tautulli
+  - overseerr
+  - nextcloud
+  - vaultwarden
+  - gitlab
+  - harbor
+  - minio
+  - paperless
+  - bookstack
+  - immich
+  - filebrowser
+  - kopia
+  - duplicati
+  - uptime_kuma
+  - dashdot
+  - code_server
+  - guacamole
+  - heimdall
+  - homarr
+  - requestrr
+  - unmanic
+
+# Add homepage to enabled services
+enabled_services:
+  - homepage
+  # ... existing services ...
+
+# Monitoring Configuration
+monitoring_enabled: true
+monitoring_data_dir: "/opt/monitoring"
+monitoring_email: "{{ lookup('env', 'MONITORING_EMAIL') | default('monitoring@' + domain) }}"
+admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@' + domain) }}"
+
+# SMTP Configuration
+smtp_host: "{{ lookup('env', 'SMTP_HOST') | default('smtp.gmail.com') }}"
+smtp_port: "{{ lookup('env', 'SMTP_PORT') | default(587) }}"
+smtp_username: "{{ lookup('env', 'SMTP_USERNAME') | default('your-email@gmail.com') }}"
+smtp_password: "{{ vault_smtp_password }}"
+
+# Slack Integration
+slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('') }}"
+slack_channel: "{{ lookup('env', 'SLACK_CHANNEL') | default('#alerts') }}"
+
+# Prometheus Configuration
+prometheus_enabled: true
+prometheus_version: "2.45.0"
+prometheus_retention: "{{ lookup('env', 'PROMETHEUS_RETENTION') | default('15d') }}"
+prometheus_storage_path: "{{ monitoring_data_dir }}/prometheus"
+
+# Grafana Configuration
+grafana_enabled: true
+grafana_version: "10.0.3"
+grafana_domain: "{{ lookup('env', 'GRAFANA_DOMAIN') | default('grafana.' + domain) }}"
+
+# AlertManager Configuration
+alertmanager_enabled: true
+alertmanager_version: "0.26.0"
+alertmanager_config_path: "{{ monitoring_data_dir }}/alertmanager"
+
+# Loki Configuration
+loki_enabled: true
+loki_version: "2.8.2"
+loki_retention: "{{ lookup('env', 'LOKI_RETENTION') | default('168h') }}"
+
+# Telegraf Configuration
+telegraf_enabled: true
+telegraf_version: "1.28.1"
+telegraf_config_path: "{{ monitoring_data_dir }}/telegraf"
+
+# Blackbox Exporter Configuration
+blackbox_enabled: true
+blackbox_version: "0.23.0"
+blackbox_config_path: "{{ monitoring_data_dir }}/blackbox"
+
+# Backup Configuration
+backup_enabled: true
+backup_path: "{{ lookup('env', 'BACKUP_PATH') | default('/mnt/backup') }}"
+backup_retention: "{{ lookup('env', 'BACKUP_RETENTION') | default('30d') }}"
+backup_schedule: "{{ lookup('env', 'BACKUP_SCHEDULE') | default('0 2 * * *') }}"
+
+# Backup Size Thresholds
+system_backup_size: "{{ lookup('env', 'SYSTEM_BACKUP_SIZE') | default('10G') }}"
+docker_backup_size: "{{ lookup('env', 'DOCKER_BACKUP_SIZE') | default('20G') }}"
+config_backup_size: "{{ lookup('env', 'CONFIG_BACKUP_SIZE') | default('5G') }}"
+media_backup_size: "{{ lookup('env', 'MEDIA_BACKUP_SIZE') | default('100G') }}"
+
+# Health Check Configuration
+healthcheck_enabled: true
+healthcheck_interval: "{{ lookup('env', 'HEALTHCHECK_INTERVAL') | default('30s') }}"
+healthcheck_timeout: "{{ lookup('env', 'HEALTHCHECK_TIMEOUT') | default('5s') }}"
+
+# Resource Thresholds
+cpu_warning_threshold: "{{ lookup('env', 'CPU_WARNING_THRESHOLD') | default(80) }}"
+cpu_critical_threshold: "{{ lookup('env', 'CPU_CRITICAL_THRESHOLD') | default(90) }}"
+memory_warning_threshold: "{{ lookup('env', 'MEMORY_WARNING_THRESHOLD') | default(80) }}"
+memory_critical_threshold: "{{ lookup('env', 'MEMORY_CRITICAL_THRESHOLD') | default(90) }}"
+disk_warning_threshold: "{{ lookup('env', 'DISK_WARNING_THRESHOLD') | default(80) }}"
+disk_critical_threshold: "{{ lookup('env', 'DISK_CRITICAL_THRESHOLD') | default(90) }}"
+
+# Service Dependencies
+enabled_services:
+  - influxdb
+  - telegraf
+  - prometheus
+  - grafana
+  - loki
+  - promtail
+  - alertmanager
+  - blackbox_exporter
+  - backup
+  - healthcheck
+
+# Docker Configuration
+docker_data_root: "{{ lookup('env', 'DOCKER_DATA_ROOT') | default('/var/lib/docker') }}"
+docker_storage_driver: "{{ lookup('env', 'DOCKER_STORAGE_DRIVER') | default('overlay2') }}"
+
+# Security Configuration
+security_enabled: true
+fail2ban_enabled: true
+crowdsec_enabled: true
+wireguard_enabled: true
+
+# Network Configuration
+network_enabled: true
+pihole_enabled: true
+nginx_proxy_manager_enabled: true
+
+# Media Stack Configuration
+media_enabled: true
+media_services:
+  - sabnzbd
+  - qbittorrent
+  - sonarr
+  - radarr
+  - lidarr
+  - readarr
+  - prowlarr
+  - bazarr
+  - jellyfin
+  - emby
+  - tdarr
+  - overseerr
+  - tautulli
+  - immich
+  - calibre-web
+  - audiobookshelf
+  - komga
+
+# File Services Configuration
+file_services_enabled: true
+file_services:
+  - nextcloud
+  - samba
+  - syncthing
+
+# Development & Storage Configuration
+development_enabled: true
+development_services:
+  - gitlab
+  - harbor
+  - minio
+  - paperless
+  - bookstack
+  - immich
+  - filebrowser
+
+# Automation & Smart Home Configuration
+automation_enabled: true
+automation_services:
+  - mosquitto
+  - zigbee2mqtt
+  - home_assistant
+  - nodered
+  - n8n
+
+# Utility Services Configuration
+utilities_enabled: true
+utility_services:
+  - portainer
+  - watchtower
+  - dashdot
+  - code_server
+  - guacamole
+  - heimdall
+  - homarr
+  - requestrr
+  - unmanic
+  - vaultwarden
+
+#==============================================================================
+# ERROR HANDLING AND RECOVERY
+#==============================================================================
+
+# Error handling configuration
+ansible_backup_dir: "/var/backups/ansible"
+ansible_log_dir: "/var/log/ansible/errors"
+notification_webhook_url: ""  # Optional: Add your webhook URL for notifications
+
+# Critical services that should be prioritized during recovery
+critical_services:
+  - docker
+  - traefik
+  - monitoring_infrastructure
+  - authentik
+  - vault
+
+# Service-specific error handling
+service_recovery_timeout: 300  # Timeout in seconds for service recovery
+max_recovery_attempts: 3       # Maximum number of recovery attempts per service
+
+# Backup retention
+backup_retention_days: 7       # Number of days to keep backups
+max_backup_size_gb: 10         # Maximum backup size in GB
+
+# Emergency mode settings
+emergency_mode_enabled: false  # Enable emergency mode for critical failures
+emergency_contact: ""         # Emergency contact information
+
+#==============================================================================
+# NETWORK SERVICES CONFIGURATION
+#==============================================================================
+
+# Pi-hole Configuration
+pihole_web_password: "{{ vault_pihole_admin_password }}"  # Web interface password
+pihole_domain: "pihole.{{ domain }}"          # Pi-hole web interface domain
+pihole_upstream_dns:
+  - "1.1.1.1"  # Cloudflare DNS
+  - "1.0.0.1"  # Cloudflare DNS backup
+pihole_rev_server: false                      # Enable reverse DNS
+pihole_rev_server_domain: ""                  # Your local domain
+pihole_rev_server_target: ""                  # Your DNS server
+pihole_rev_server_cidr: ""                    # Your network CIDR
+
+#==============================================================================
+# VARIABLE DEFINITIONS
+#==============================================================================
+
+# Database configuration
+vault_postgresql_user: "{{ lookup('env', 'POSTGRESQL_USER') | default('homelab') }}"
+vault_postgresql_password: "{{ vault_postgresql_password }}"
+vault_mariadb_root_password: "{{ vault_mariadb_root_password }}"
+vault_redis_password: "{{ vault_redis_password }}"
+
+# Media service API keys
+vault_sonarr_api_key: "{{ lookup('env', 'SONARR_API_KEY') | default('') }}"
+vault_radarr_api_key: "{{ lookup('env', 'RADARR_API_KEY') | default('') }}"
+vault_prowlarr_api_key: "{{ lookup('env', 'PROWLARR_API_KEY') | default('') }}"
+vault_bazarr_api_key: "{{ lookup('env', 'BAZARR_API_KEY') | default('') }}"
+vault_lidarr_api_key: "{{ lookup('env', 'LIDARR_API_KEY') | default('') }}"
+vault_readarr_api_key: "{{ lookup('env', 'READARR_API_KEY') | default('') }}"
+vault_sabnzbd_api_key: "{{ lookup('env', 'SABNZBD_API_KEY') | default('') }}"
+
+# Notification webhooks
+vault_slack_webhook: "{{ lookup('env', 'SLACK_WEBHOOK') | default('') }}"
+vault_discord_webhook: "{{ lookup('env', 'DISCORD_WEBHOOK') | default('') }}"
+vault_telegram_bot_token: "{{ lookup('env', 'TELEGRAM_BOT_TOKEN') | default('') }}"
+vault_telegram_chat_id: "{{ lookup('env', 'TELEGRAM_CHAT_ID') | default('') }}"
+vault_pagerduty_routing_key: "{{ lookup('env', 'PAGERDUTY_ROUTING_KEY') | default('') }}"
+
+# Service configuration
+media_dir: "{{ data_dir }}/media"
+downloads_dir: "{{ data_dir }}/downloads"
+config_dir: "{{ docker_dir }}/config"
+backup_retention_days: "{{ lookup('env', 'BACKUP_RETENTION_DAYS') | default('7') | int }}"
+backup_compression: "{{ lookup('env', 'BACKUP_COMPRESSION') | default('true') | bool }}"
+backup_encryption: "{{ lookup('env', 'BACKUP_ENCRYPTION') | default('false') | bool }}"
+
+# Network configuration
+traefik_network: "{{ lookup('env', 'TRAEFIK_NETWORK') | default('homelab') }}"
+ssl_enabled: "{{ lookup('env', 'SSL_ENABLED') | default('true') | bool }}"
+ssl_email: "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + domain) }}"
+
+# Monitoring configuration
+monitoring_retention_days: "{{ lookup('env', 'MONITORING_RETENTION_DAYS') | default('30') | int }}"
+alerting_enabled: "{{ lookup('env', 'ALERTING_ENABLED') | default('true') | bool }}"
+
+# Security configuration
+security_enhanced: "{{ lookup('env', 'SECURITY_ENHANCED') | default('true') | bool }}"
+fail2ban_enabled: "{{ lookup('env', 'FAIL2BAN_ENABLED') | default('true') | bool }}"
+crowdsec_enabled: "{{ lookup('env', 'CROWDSEC_ENABLED') | default('true') | bool }}"
+
+# System configuration
+system_updates_enabled: "{{ lookup('env', 'SYSTEM_UPDATES_ENABLED') | default('true') | bool }}"
+docker_restart_needed: "{{ lookup('env', 'DOCKER_RESTART_NEEDED') | default('false') | bool }}"
+log_retention_days: "{{ lookup('env', 'LOG_RETENTION_DAYS') | default('30') | int }}"

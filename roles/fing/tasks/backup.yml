@@ -51,7 +51,7 @@
     month: "{{ fing_backup_schedule.split(' ')[3] }}"
     weekday: "{{ fing_backup_schedule.split(' ')[4] }}"
     job: "{{ docker_dir }}/fing/backup.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
 
 - name: Create Fing backup verification cron
   ansible.builtin.cron:
@@ -62,7 +62,7 @@
     month: "{{ fing_backup_schedule.split(' ')[3] }}"
     weekday: "{{ fing_backup_schedule.split(' ')[4] }}"
     job: "{{ docker_dir }}/fing/backup-verify.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
 
 - name: Create Fing backup cleanup cron
   ansible.builtin.cron:
@@ -71,14 +71,14 @@
     hour: "4"
     day: "1"
     job: "{{ docker_dir }}/fing/backup-cleanup.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
 
 - name: Create Fing backup monitoring cron
   ansible.builtin.cron:
     name: "Fing backup monitoring"
     minute: "*/30"
     job: "{{ docker_dir }}/fing/backup-monitor.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
 
 - name: Display Fing backup configuration summary
   ansible.builtin.debug:

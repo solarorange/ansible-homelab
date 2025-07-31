@@ -1,0 +1,283 @@
+---
+# Service Validation Tasks
+# Comprehensive validation of all deployed services
+
+- name: Validate service configurations
+  block:
+    - name: Check Docker Compose files syntax
+      ansible.builtin.shell: "docker-compose -f {{ docker_dir }}/{{ item }}/docker-compose.yml config"
+      loop: "{{ enabled_services }}"
+      register: compose_validation
+      changed_when: false
+      tags: [validation, compose]
+
+    - name: Report compose validation failures
+      ansible.builtin.fail:
+        msg: "Docker Compose validation failed for {{ item.item }}: {{ item.stderr }}"
+      loop: "{{ compose_validation.results }}"
+      when: item.rc != 0
+      tags: [validation, compose]
+
+    - name: Validate environment variables
+      ansible.builtin.template:
+        src: templates/validate_env.sh.j2
+        dest: "{{ docker_dir }}/validate_env.sh"
+        mode: '0755'
+      tags: [validation, env]
+
+    - name: Run environment validation
+      ansible.builtin.shell: "{{ docker_dir }}/validate_env.sh"
+      register: env_validation
+      changed_when: false
+      tags: [validation, env]
+
+    - name: Report environment validation failures
+      ansible.builtin.fail:
+        msg: "Environment validation failed: {{ env_validation.stderr }}"
+      when: env_validation.rc != 0
+      tags: [validation, env]
+
+  tags: [validation, config]
+
+- name: Validate service connectivity
+  block:
+    - name: Check service ports
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ item.port }}"
+        timeout: 30
+        delay: 5
+      loop: "{{ service_ports | default([]) }}"
+      register: port_validation
+      tags: [validation, connectivity]
+
+    - name: Report port validation failures
+      ansible.builtin.fail:
+        msg: "Port validation failed for {{ item.item.port }}: {{ item.msg }}"
+      loop: "{{ port_validation.results }}"
+      when: item is failed
+      tags: [validation, connectivity]
+
+    - name: Test service endpoints
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}{{ item.endpoint | default('/health') }}"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      loop: "{{ service_endpoints | default([]) }}"
+      register: endpoint_validation
+      tags: [validation, endpoints]
+
+    - name: Report endpoint validation failures
+      ansible.builtin.fail:
+        msg: "Endpoint validation failed for {{ item.item.url }}: {{ item.msg }}"
+      loop: "{{ endpoint_validation.results }}"
+      when: item is failed
+      tags: [validation, endpoints]
+
+  tags: [validation, connectivity]
+
+- name: Validate database connections
+  block:
+    - name: Test PostgreSQL connection
+      ansible.builtin.shell: |
+        PGPASSWORD={{ vault_postgresql_password }} psql -h {{ ansible_default_ipv4.address }} -U {{ vault_postgresql_user }} -d homelab -c "SELECT version();"
+      register: postgres_validation
+      changed_when: false
+      tags: [validation, database]
+
+    - name: Report PostgreSQL validation failures
+      ansible.builtin.fail:
+        msg: "PostgreSQL validation failed: {{ postgres_validation.stderr }}"
+      when: postgres_validation.rc != 0
+      tags: [validation, database]
+
+    - name: Test Redis connection
+      ansible.builtin.shell: |
+        redis-cli -h localhost -p 6379 -a {{ vault_redis_password }} ping
+      register: redis_validation
+      changed_when: false
+      tags: [validation, database]
+
+    - name: Report Redis validation failures
+      ansible.builtin.fail:
+        msg: "Redis validation failed: {{ redis_validation.stderr }}"
+      when: redis_validation.rc != 0
+      tags: [validation, database]
+
+  when: "'postgresql' in enabled_services or 'redis' in enabled_services"
+  tags: [validation, database]
+
+- name: Validate monitoring stack
+  block:
+    - name: Check Prometheus targets
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: prometheus_targets
+      tags: [validation, monitoring]
+
+    - name: Validate Prometheus targets
+      ansible.builtin.fail:
+        msg: "Prometheus has unhealthy targets"
+      when: 
+        - prometheus_targets.json.targets | selectattr('health', 'equalto', 'up') | list | length < prometheus_targets.json.targets | length
+      tags: [validation, monitoring]
+
+    - name: Check Grafana datasources
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/datasources"
+        method: GET
+        status_code: 200
+        timeout: 10
+        headers:
+          Authorization: "Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}"
+      register: grafana_datasources
+      tags: [validation, monitoring]
+
+    - name: Validate Grafana datasources
+      ansible.builtin.fail:
+        msg: "Grafana has no configured datasources"
+      when: grafana_datasources.json | length == 0
+      tags: [validation, monitoring]
+
+  when: "'prometheus' in enabled_services and 'grafana' in enabled_services"
+  tags: [validation, monitoring]
+
+- name: Validate security configuration
+  block:
+    - name: Check Traefik configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: traefik_routers
+      tags: [validation, security]
+
+    - name: Validate Traefik routers
+      ansible.builtin.fail:
+        msg: "Traefik has no configured routers"
+      when: traefik_routers.json | length == 0
+      tags: [validation, security]
+
+    - name: Check Authentik configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
+        method: GET
+        status_code: [200, 302]
+        timeout: 10
+      register: authentik_validation
+      tags: [validation, security]
+
+    - name: Report Authentik validation failures
+      ansible.builtin.fail:
+        msg: "Authentik validation failed: {{ authentik_validation.msg }}"
+      when: authentik_validation is failed
+      tags: [validation, security]
+
+    - name: Check firewall rules
+      ansible.builtin.shell: "ufw status"
+      register: firewall_status
+      changed_when: false
+      tags: [validation, security]
+
+    - name: Validate firewall status
+      ansible.builtin.fail:
+        msg: "Firewall is not active"
+      when: "'Status: active' not in firewall_status.stdout"
+      tags: [validation, security]
+
+  when: "'traefik' in enabled_services and 'authentik' in enabled_services"
+  tags: [validation, security]
+
+- name: Validate backup configuration
+  block:
+    - name: Check backup directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ backup_dir }}"
+        - "{{ backup_dir }}/databases"
+        - "{{ backup_dir }}/configs"
+        - "{{ backup_dir }}/media"
+      tags: [validation, backup]
+
+    - name: Test backup script permissions
+      ansible.builtin.shell: "test -x {{ docker_dir }}/backup/backup.sh"
+      register: backup_script_test
+      changed_when: false
+      tags: [validation, backup]
+
+    - name: Report backup script validation failures
+      ansible.builtin.fail:
+        msg: "Backup script is not executable"
+      when: backup_script_test.rc != 0
+      tags: [validation, backup]
+
+    - name: Test backup script execution
+      ansible.builtin.shell: "{{ docker_dir }}/backup/backup.sh --test"
+      register: backup_test
+      changed_when: false
+      tags: [validation, backup]
+
+    - name: Report backup test failures
+      ansible.builtin.fail:
+        msg: "Backup test failed: {{ backup_test.stderr }}"
+      when: backup_test.rc != 0
+      tags: [validation, backup]
+
+  when: backup_enabled | default(false)
+  tags: [validation, backup]
+
+- name: Generate validation report
+  block:
+    - name: Create validation summary
+      ansible.builtin.set_fact:
+        validation_summary:
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          host: "{{ ansible_hostname }}"
+          services_checked: "{{ enabled_services | length }}"
+          compose_validation: "{{ compose_validation.results | selectattr('rc', 'equalto', 0) | list | length }}/{{ compose_validation.results | length }}"
+          port_validation: "{{ port_validation.results | selectattr('rc', 'equalto', 0) | list | length }}/{{ port_validation.results | length }}"
+          endpoint_validation: "{{ endpoint_validation.results | selectattr('status', 'equalto', 200) | list | length }}/{{ endpoint_validation.results | length }}"
+          database_validation: "{{ 'PASS' if (postgres_validation.rc == 0 and redis_validation.rc == 0) else 'FAIL' }}"
+          monitoring_validation: "{{ 'PASS' if (prometheus_targets.status == 200 and grafana_datasources.status == 200) else 'FAIL' }}"
+          security_validation: "{{ 'PASS' if (traefik_routers.status == 200 and authentik_validation.status in [200, 302]) else 'FAIL' }}"
+          backup_validation: "{{ 'PASS' if backup_test.rc == 0 else 'FAIL' }}"
+
+    - name: Display validation summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          SERVICE VALIDATION SUMMARY
+          ========================================
+          
+          Timestamp: {{ validation_summary.timestamp }}
+          Host: {{ validation_summary.host }}
+          Services Checked: {{ validation_summary.services_checked }}
+          
+          Configuration Validation:
+          - Docker Compose: {{ validation_summary.compose_validation }}
+          - Port Connectivity: {{ validation_summary.port_validation }}
+          - Endpoint Health: {{ validation_summary.endpoint_validation }}
+          
+          Service Validation:
+          - Database: {{ validation_summary.database_validation }}
+          - Monitoring: {{ validation_summary.monitoring_validation }}
+          - Security: {{ validation_summary.security_validation }}
+          - Backup: {{ validation_summary.backup_validation }}
+          
+          ========================================
+      tags: [validation, summary]
+
+    - name: Save validation report
+      ansible.builtin.template:
+        src: templates/validation_report.yml.j2
+        dest: "{{ logs_dir }}/validation_report_{{ ansible_date_time.epoch }}.yml"
+      tags: [validation, report]
+
+  tags: [validation, summary] 

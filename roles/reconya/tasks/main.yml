@@ -1,48 +1,39 @@
 ---
-# Reconya Deployment
-# Production-ready Ansible tasks for Reconya network reconnaissance deployment
+# Reconya Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Reconya validation tasks
+  include_tasks: validate.yml
+  when: reconya_validation_enabled | default(true)
 
 - name: Include Reconya deployment tasks
-  block:
-    - name: Validate Reconya configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [reconya, validation]
+  include_tasks: deploy.yml
+  when: reconya_deploy_enabled | default(true)
 
-    - name: Setup Reconya prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [reconya, setup]
+- name: Include Reconya configuration tasks
+  include_tasks: configure.yml
+  when: reconya_deploy_enabled | default(true)
 
-    - name: Deploy Reconya services
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [reconya, deploy]
+- name: Include Reconya security tasks
+  include_tasks: security.yml
+  when: reconya_deploy_enabled | default(true)
 
-    - name: Configure Reconya monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: reconya_monitoring_enabled | default(true)
-      tags: [reconya, monitoring]
+- name: Include Reconya monitoring tasks
+  include_tasks: monitoring.yml
+  when: reconya_monitoring_enabled | default(true)
 
-    - name: Configure Reconya security
-      ansible.builtin.include_tasks: security.yml
-      tags: [reconya, security]
+- name: Include Reconya backup tasks
+  include_tasks: backup.yml
+  when: reconya_backup_enabled | default(true)
 
-    - name: Configure Reconya backup
-      ansible.builtin.include_tasks: backup.yml
-      when: reconya_backup_enabled | default(true)
-      tags: [reconya, backup]
+- name: Include Reconya automation tasks
+  include_tasks: automation.yml
+  when: reconya_automation_enabled | default(true)
 
-    - name: Configure Reconya homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: reconya_homepage_enabled | default(true)
-      tags: [reconya, homepage]
+- name: Include Reconya integration tasks
+  include_tasks: integration.yml
+  when: reconya_discovery_enabled | default(true)
 
-    - name: Configure Reconya alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: reconya_alerting_enabled | default(true)
-      tags: [reconya, alerts]
-
-    - name: Validate Reconya deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [reconya, validation]
-
-  when: reconya_enabled | default(true)
-  tags: [reconya, always] 
+- name: Include Reconya health check tasks
+  include_tasks: health_check.yml
+  when: reconya_health_check_enabled | default(true)

@@ -26,7 +26,7 @@
         smtp_smarthost: '{{ smtp_host | default("smtp.gmail.com") }}:{{ smtp_port | default(587) }}'
         smtp_from: '{{ monitoring_email | default("monitoring@" + domain) }}'
         smtp_auth_username: '{{ smtp_username | default("") }}'
-        smtp_auth_password: '{{ smtp_password | default("") }}'
+        smtp_auth_password: "{{ vault_alertmanager_password }}"") }}'
         smtp_require_tls: true
       
       route:
@@ -405,7 +405,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:9093/-/healthy
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/-/healthy
           echo ""
           ;;
         logs)
@@ -415,17 +415,17 @@
           docker restart alertmanager
           ;;
         reload)
-          curl -X POST http://localhost:9093/-/reload
+          curl -X POST http://{{ ansible_default_ipv4.address }}:9093/-/reload
           ;;
         alerts)
-          curl -s http://localhost:9093/api/v2/alerts | jq '.'
+          curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/alerts | jq '.'
           ;;
         silences)
-          curl -s http://localhost:9093/api/v2/silences | jq '.'
+          curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/silences | jq '.'
           ;;
         test)
           echo "Testing notification channels..."
-          curl -X POST http://localhost:9093/api/v2/alerts \
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v2/alerts \
             -H "Content-Type: application/json" \
             -d '[{"labels":{"alertname":"TestAlert","severity":"warning"},"annotations":{"summary":"Test Alert","description":"This is a test alert"},"startsAt":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"}]'
           ;;
@@ -446,19 +446,19 @@
       # Enhanced AlertManager Health Check Script
       
       # Check if AlertManager is responding
-      if ! curl -s http://localhost:9093/-/healthy > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
         echo "AlertManager is not responding"
         exit 1
       fi
       
       # Check if we can access the API
-      if ! curl -s http://localhost:9093/api/v2/status > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/status > /dev/null; then
         echo "AlertManager API is not responding"
         exit 1
       fi
       
       # Check if configuration is valid
-      if ! curl -s http://localhost:9093/api/v2/status | jq -e '.config' > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/status | jq -e '.config' > /dev/null; then
         echo "AlertManager configuration is invalid"
         exit 1
       fi
@@ -492,4 +492,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_alertmanager_user }}" 

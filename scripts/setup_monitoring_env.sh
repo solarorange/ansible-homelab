@@ -18,7 +18,7 @@ prompt_with_default() {
 
 # Email Configuration
 MONITORING_EMAIL=$(prompt_with_default "MONITORING_EMAIL" "monitoring@zorg.media" "Enter monitoring email address")
-ADMIN_EMAIL=$(prompt_with_default "ADMIN_EMAIL" "admin@zorg.media" "Enter admin email address")
+ADMIN_EMAIL=$(prompt_with_default "ADMIN_EMAIL" "{{ admin_email | default("admin@" + domain) }}" "Enter admin email address")
 
 # SMTP Configuration
 SMTP_HOST=$(prompt_with_default "SMTP_HOST" "smtp.zorg.media" "Enter SMTP host")

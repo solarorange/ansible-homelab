@@ -57,7 +57,7 @@
         state: present
         driver: bridge
         ipam_config:
-          - subnet: "{{ databases_network_subnet | default('172.20.0.0/16') }}"
+          - subnet: "{{ databases_network_subnet | default('{{ ansible_default_ipv4.address }}/16') }}"
 
     - name: Create traefik network if not exists
       community.docker.docker_network:
@@ -65,7 +65,7 @@
         state: present
         driver: bridge
         ipam_config:
-          - subnet: "{{ databases_traefik_network_subnet | default('172.18.0.0/16') }}"
+          - subnet: "{{ databases_traefik_network_subnet | default('{{ ansible_default_ipv4.address }}/16') }}"
 
   tags: [databases, prerequisites, docker]
 
@@ -206,7 +206,7 @@
           scrape_configs:
             - job_name: 'prometheus'
               static_configs:
-                - targets: ['localhost:9090']
+                - targets: ['{{ ansible_default_ipv4.address }}:9090']
         owner: "{{ username }}"
         group: "{{ username }}"
         mode: "0644"

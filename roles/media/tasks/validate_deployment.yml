@@ -14,7 +14,7 @@
 
     - name: Verify downloader service connectivity
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
         method: GET
         status_code: 200
       loop: "{{ media_downloaders | dict2items }}"
@@ -24,7 +24,7 @@
 
     - name: Verify ARR service connectivity
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
         method: GET
         status_code: 200
       loop: "{{ media_arr_services | dict2items }}"
@@ -34,7 +34,7 @@
 
     - name: Verify media player connectivity
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
         method: GET
         status_code: 200
       loop: "{{ media_players | dict2items }}"
@@ -44,7 +44,7 @@
 
     - name: Verify media stack monitoring integration
       ansible.builtin.uri:
-        url: "http://localhost:{{ prometheus_port | default(9090) }}/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ prometheus_port | default(9090) }}/api/v1/targets"
         method: GET
         status_code: 200
       register: monitoring_check
@@ -85,7 +85,7 @@
 
     - name: Verify media stack log aggregation
       ansible.builtin.uri:
-        url: "http://localhost:{{ loki_port | default(3100) }}/ready"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ loki_port | default(3100) }}/ready"
         method: GET
         status_code: 200
       register: log_check
@@ -94,7 +94,7 @@
 
     - name: Verify media stack metrics collection
       ansible.builtin.uri:
-        url: "http://localhost:{{ prometheus_port | default(9090) }}/api/v1/query?query=up"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ prometheus_port | default(9090) }}/api/v1/query?query=up"
         method: GET
         status_code: 200
       register: metrics_check

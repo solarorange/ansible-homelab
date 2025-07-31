@@ -6,5 +6,5 @@ if [ -z "$1" ]; then
 fi
 SNAPSHOT_NAME="$1"
 REPO_NAME="backup_repo"
-docker exec {{ elasticsearch_container_name }} curl -s -k -XPOST "https://localhost:{{ elasticsearch_web_port }}/_snapshot/$REPO_NAME/$SNAPSHOT_NAME/_restore" -u elastic:{{ elasticsearch_elastic_password }}
+docker exec {{ elasticsearch_container_name }} curl -s -k -XPOST "https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_snapshot/$REPO_NAME/$SNAPSHOT_NAME/_restore" -u elastic:{{ elasticsearch_elastic_password }}
 echo "Restore triggered for snapshot: $SNAPSHOT_NAME" 

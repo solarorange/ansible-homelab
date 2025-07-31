@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""
+Validation Script for Hardcoded Values
+Checks for remaining hardcoded values after replacement
+"""
+
+import re
+import os
+from pathlib import Path
+
+def validate_no_hardcoded_values():
+    """Validate that no hardcoded values remain"""
+    root_dir = Path(".")
+    
+    # Patterns to check for
+    patterns = {
+        'password': r'password.*=.*["\'][^"\']+["\']',
+        'localhost': r'localhost',
+        '127.0.0.1': r'127\.0\.0\.1',
+        'admin@': r'admin@[^"\s]+',
+        'changeme': r'changeme',
+        'admin123': r'admin123',
+        'your_secure_password': r'your_secure_password',
+    }
+    
+    issues_found = {}
+    
+    for yaml_file in root_dir.rglob("*.yml"):
+        if "vault.yml" in str(yaml_file):
+            continue
+            
+        try:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            for pattern_name, pattern in patterns.items():
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                if matches:
+                    if pattern_name not in issues_found:
+                        issues_found[pattern_name] = []
+                    issues_found[pattern_name].append({
+                        'file': str(yaml_file),
+                        'matches': len(matches)
+                    })
+                    
+        except Exception as e:
+            print(f"Error reading {yaml_file}: {e}")
+    
+    if issues_found:
+        print("❌ Hardcoded values found:")
+        for pattern_name, files in issues_found.items():
+            print(f"   {pattern_name}: {len(files)} files")
+            for file_info in files:
+                print(f"     - {file_info['file']}: {file_info['matches']} matches")
+        return False
+    else:
+        print("✅ No hardcoded values found!")
+        return True
+
+if __name__ == "__main__":
+    validate_no_hardcoded_values()

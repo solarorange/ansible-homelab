@@ -59,7 +59,7 @@
     env:
       discovery.type: "{{ elasticsearch_discovery_type }}"
       ES_JAVA_OPTS: "-Xms{{ elasticsearch_heap_size }} -Xmx{{ elasticsearch_heap_size }}"
-      ELASTIC_PASSWORD: "{{ elasticsearch_elastic_password }}"
+      ELASTIC_password: "{{ vault_databases_database_password }}"
       xpack.security.enabled: "{{ elasticsearch_xpack_security_enabled | lower }}"
       xpack.security.transport.ssl.enabled: "{{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}"
       xpack.security.http.ssl.enabled: "{{ elasticsearch_xpack_security_http_ssl_enabled | lower }}"
@@ -70,7 +70,7 @@
       - "{{ docker_dir }}/elasticsearch/backup:/usr/share/elasticsearch/backup"
       - "{{ logs_dir }}/elasticsearch:/usr/share/elasticsearch/logs"
     healthcheck:
-      test: ["CMD", "curl", "-s", "-k", "https://localhost:{{ elasticsearch_web_port }}/_cluster/health"]
+      test: ["CMD", "curl", "-s", "-k", "https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_cluster/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -79,7 +79,7 @@
   register: elasticsearch_container
 
 - name: Validate Elasticsearch is running
-  ansible.builtin.command: docker exec {{ elasticsearch_container_name }} curl -s -k https://localhost:{{ elasticsearch_web_port }}/_cluster/health
+  ansible.builtin.command: docker exec {{ elasticsearch_container_name }} curl -s -k https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_cluster/health
   register: elasticsearch_health_result
   changed_when: false
   failed_when: elasticsearch_health_result.rc != 0
@@ -90,7 +90,7 @@
     job: "{{ docker_dir }}/elasticsearch/scripts/backup.sh >> {{ logs_dir }}/elasticsearch/backup.log 2>&1"
     minute: "0"
     hour: "4"
-    user: "{{ username }}"
+    user: "{{ vault_databases_user }}"
     state: present
 
 - name: Integrate Elasticsearch with homepage

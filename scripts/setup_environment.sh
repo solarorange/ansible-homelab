@@ -143,13 +143,13 @@ configure_network_settings() {
     print_header "Network Configuration"
     
     # Get gateway IP
-    GATEWAY_IP=$(get_user_input "Enter your gateway IP address" "validate_ip" "192.168.1.1")
+    GATEWAY_IP=$(get_user_input "Enter your gateway IP address" "validate_ip" "{{ ansible_default_ipv4.address }}")
     
     # Get DNS servers
     DNS_SERVERS=$(get_user_input "Enter DNS servers (comma-separated)" "" "1.1.1.1,8.8.8.8")
     
     # Get internal subnet
-    INTERNAL_SUBNET=$(get_user_input "Enter internal subnet (e.g., 192.168.1.0/24)" "" "192.168.1.0/24")
+    INTERNAL_SUBNET=$(get_user_input "Enter internal subnet (e.g., {{ ansible_default_ipv4.address }}/24)" "" "{{ ansible_default_ipv4.address }}/24")
     
     print_status "Network configuration completed!"
 }
@@ -200,7 +200,7 @@ configure_optional_services() {
         SMTP_HOST=""
         SMTP_PORT=""
         SMTP_USERNAME=""
-        SMTP_PASSWORD=""
+        SMTP_password: "{{ vault_service_password }}"
         SMTP_FROM_ADDRESS=""
     fi
     
@@ -360,12 +360,12 @@ create_vault_template() {
 # Copy this to group_vars/all/vault.yml and encrypt with ansible-vault
 
 # Database Passwords
-vault_postgresql_password: "{{ lookup('env', 'POSTGRESQL_PASSWORD') }}"
-vault_redis_password: "{{ lookup('env', 'REDIS_PASSWORD') }}"
+vault_postgresql_password: "{{ vault_service_password }}"env', 'POSTGRESQL_PASSWORD') }}"
+vault_redis_password: "{{ vault_service_password }}"env', 'REDIS_PASSWORD') }}"
 
 # Service Admin Passwords
-vault_grafana_admin_password: "{{ lookup('env', 'GRAFANA_ADMIN_PASSWORD') }}"
-vault_authentik_admin_password: "{{ lookup('env', 'AUTHENTIK_ADMIN_PASSWORD') }}"
+vault_grafana_admin_password: "{{ vault_service_password }}"env', 'GRAFANA_ADMIN_PASSWORD') }}"
+vault_authentik_admin_password: "{{ vault_service_password }}"env', 'AUTHENTIK_ADMIN_PASSWORD') }}"
 
 # Service Secret Keys
 vault_authentik_secret_key: "{{ lookup('env', 'AUTHENTIK_SECRET_KEY') }}"
@@ -380,7 +380,7 @@ vault_traefik_pilot_token: "{{ lookup('env', 'TRAEFIK_PILOT_TOKEN', default='') 
 
 # Optional: SMTP Configuration
 vault_smtp_username: "{{ lookup('env', 'SMTP_USERNAME', default='') }}"
-vault_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD', default='') }}"
+vault_smtp_password: "{{ vault_service_password }}"env', 'SMTP_PASSWORD', default='') }}"
 vault_smtp_host: "{{ lookup('env', 'SMTP_HOST', default='') }}"
 vault_smtp_port: "{{ lookup('env', 'SMTP_PORT', default='587') }}"
 vault_smtp_from_address: "{{ lookup('env', 'SMTP_FROM_ADDRESS', default='') }}"

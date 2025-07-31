@@ -4,7 +4,7 @@
 
 - name: Wait for Pezzo services to be fully ready
   ansible.builtin.wait_for:
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ item }}"
     delay: 30
     timeout: 600
@@ -41,7 +41,7 @@
 
 - name: Test Pezzo API endpoints
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ item.port }}{{ item.path }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}{{ item.path }}"
     method: GET
     status_code: 200
     timeout: 30
@@ -104,7 +104,7 @@
 
 - name: Test Pezzo SuperTokens connectivity
   ansible.builtin.uri:
-    url: "http://127.0.0.1:3567/hello"
+    url: "http://{{ ansible_default_ipv4.address }}:3567/hello"
     method: GET
     status_code: 200
     timeout: 30
@@ -121,7 +121,7 @@
 
 - name: Test Pezzo Local KMS connectivity
   ansible.builtin.uri:
-    url: "http://127.0.0.1:9981/health"
+    url: "http://{{ ansible_default_ipv4.address }}:9981/health"
     method: GET
     status_code: 200
     timeout: 30

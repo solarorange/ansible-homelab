@@ -132,7 +132,7 @@
       case "$1" in
         status)
           docker ps -f name=sonarr
-          curl -s http://localhost:8989/api/v3/health
+          curl -s http://{{ ansible_default_ipv4.address }}:8989/api/v3/health
           ;;
         logs)
           docker logs sonarr --tail 100 -f
@@ -167,13 +167,13 @@
       fi
       
       # Check if Sonarr is responding
-      if ! curl -s -f http://localhost:8989/api/v3/health > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8989/api/v3/health > /dev/null; then
         echo "Sonarr is not responding"
         exit 1
       fi
       
       # Check Sonarr status
-      STATUS=$(curl -s http://localhost:8989/api/v3/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v3/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Sonarr status is $STATUS"
         exit 1
@@ -207,7 +207,7 @@
     job: "logrotate {{ docker_dir }}/sonarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_sonarr_user }}"
 
 - name: Add Sonarr backup to crontab
   ansible.builtin.cron:
@@ -215,4 +215,4 @@
     job: "{{ docker_dir }}/sonarr/scripts/manage.sh backup"
     minute: "{{ backup_schedules.sonarr.split(' ')[0] }}"
     hour: "{{ backup_schedules.sonarr.split(' ')[1] }}"
-    user: "{{ username }}" 
+    user: "{{ vault_sonarr_user }}" 

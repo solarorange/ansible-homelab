@@ -39,7 +39,7 @@
     hour: "{{ utilities_backup_schedule.split()[1] }}"
     minute: "{{ utilities_backup_schedule.split()[0] }}"
     job: "{{ utilities_config_dir }}/utilities-backup.sh"
-    user: "{{ username }}"
+    user: "{{ vault_utilities_user }}"
 
 - name: Schedule utilities stack backup verification
   ansible.builtin.cron:
@@ -47,7 +47,7 @@
     hour: "{{ (utilities_backup_schedule.split()[1] | int + 1) % 24 }}"
     minute: "{{ utilities_backup_schedule.split()[0] }}"
     job: "{{ utilities_config_dir }}/utilities-backup-verify.sh"
-    user: "{{ username }}"
+    user: "{{ vault_utilities_user }}"
 
 - name: Schedule utilities stack backup cleanup
   ansible.builtin.cron:
@@ -55,7 +55,7 @@
     hour: "5"
     minute: "0"
     job: "{{ utilities_config_dir }}/utilities-backup-cleanup.sh"
-    user: "{{ username }}"
+    user: "{{ vault_utilities_user }}"
 
 - name: Create utilities stack backup documentation
   ansible.builtin.template:

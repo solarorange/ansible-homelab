@@ -84,7 +84,7 @@
 
 - name: Wait for Grafana to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -98,10 +98,10 @@
   block:
     - name: Check dashboard API
       ansible.builtin.uri:
-        url: "http://localhost:{{ grafana_port }}/api/search"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
         method: GET
-        user: "{{ grafana_admin_user }}"
-        password: "{{ grafana_admin_password }}"
+        user: "{{ vault_grafana_user }}"
+        password: "{{ vault_grafana_password }}"
         force_basic_auth: true
         status_code: 200
         timeout: 30
@@ -129,10 +129,10 @@
   block:
     - name: Check alert rules API
       ansible.builtin.uri:
-        url: "http://localhost:{{ grafana_port }}/api/v1/provisioning/alert-rules"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/alert-rules"
         method: GET
-        user: "{{ grafana_admin_user }}"
-        password: "{{ grafana_admin_password }}"
+        user: "{{ vault_grafana_user }}"
+        password: "{{ vault_grafana_password }}"
         force_basic_auth: true
         status_code: 200
         timeout: 30
@@ -155,10 +155,10 @@
   block:
     - name: Check notification channels API
       ansible.builtin.uri:
-        url: "http://localhost:{{ grafana_port }}/api/v1/provisioning/notification-policies"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/notification-policies"
         method: GET
-        user: "{{ grafana_admin_user }}"
-        password: "{{ grafana_admin_password }}"
+        user: "{{ vault_grafana_user }}"
+        password: "{{ vault_grafana_password }}"
         force_basic_auth: true
         status_code: 200
         timeout: 30
@@ -221,9 +221,9 @@
       - Webhook: {{ 'Enabled' if grafana_webhook_url else 'Disabled' }}
       
       🔗 Access URLs:
-      - Grafana Dashboard: http://localhost:{{ grafana_port }}
-      - Alertmanager: http://localhost:9093
-      - Prometheus: http://localhost:9090
+      - Grafana Dashboard: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
+      - Alertmanager: http://{{ ansible_default_ipv4.address }}:
+      - Prometheus: http://{{ ansible_default_ipv4.address }}:
       
       📚 Documentation:
       - Dashboard Guide: {{ docker_dir }}/monitoring/grafana/docs/dashboard-documentation.md

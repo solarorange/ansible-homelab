@@ -19,7 +19,7 @@
 
     - name: Check Reconya service health
       ansible.builtin.uri:
-        url: "http://localhost:{{ reconya_port }}/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}/api/health"
         method: GET
         status_code: 200
         timeout: 30
@@ -40,7 +40,7 @@
   block:
     - name: Test Reconya API connectivity
       ansible.builtin.uri:
-        url: "http://localhost:{{ reconya_port }}/api/devices"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}/api/devices"
         method: GET
         status_code: [200, 401, 403]
         timeout: 30
@@ -113,6 +113,6 @@
       - "Traefik: {{ reconya_traefik_test.status | default('Not tested') }}"
       - "Monitoring: Configured"
       - "URL: https://{{ reconya_subdomain }}.{{ domain }}"
-      - "Local: http://localhost:{{ reconya_port }}"
+      - "Local: http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}"
 
   tags: [reconya, validation] 

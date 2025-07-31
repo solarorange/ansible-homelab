@@ -12,8 +12,7 @@
   address = "n8n-postgres:5432"
   database = "{{ n8n_database_name }}"
   username = "{{ n8n_database_user }}"
-  password = "{{ vault_n8n_postgres_password }}"
-  interval = "60s"
+  password: "{{ vault_n8n_admin_password | password_hash("bcrypt") }}"60s"
   name_override = "n8n_postgres"
 
 [[inputs.docker]]
@@ -26,8 +25,7 @@
   urls = ["http://influxdb:8086"]
   database = "homelab"
   username = "{{ vault_influxdb_admin_username | default('admin') }}"
-  password = "{{ vault_influxdb_admin_password }}"
-  name_override = "n8n_influxdb"
+  password: "{{ vault_n8n_admin_password | password_hash("bcrypt") }}"n8n_influxdb"
 
 [[outputs.prometheus_client]]
   listen = ":9273"

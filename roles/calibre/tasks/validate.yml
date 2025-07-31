@@ -1,0 +1,89 @@
+---
+# Calibre Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Calibre vault variables
+  block:
+    - name: Check required Calibre vault variables
+      assert:
+        that:
+          - vault_calibre_admin_password is defined
+          - vault_calibre_database_password is defined
+          - vault_calibre_api_key is defined
+          - vault_calibre_secret_key is defined
+          - vault_calibre_encryption_key is defined
+          - vault_calibre_jwt_secret is defined
+        fail_msg: "Required Calibre vault variables are not defined"
+        success_msg: "All required Calibre vault variables are defined"
+
+    - name: Validate Calibre password complexity
+      assert:
+        that:
+          - vault_calibre_admin_password | length >= 12
+          - vault_calibre_database_password | length >= 12
+        fail_msg: "Calibre passwords must be at least 12 characters long"
+        success_msg: "Calibre password complexity requirements met"
+
+- name: Validate Calibre network configuration
+  block:
+    - name: Check Calibre port configuration
+      assert:
+        that:
+          - calibre_port is defined
+          - calibre_port | int >= 1024
+          - calibre_port | int <= 65535
+        fail_msg: "Calibre port must be between 1024 and 65535"
+        success_msg: "Calibre port configuration is valid"
+
+    - name: Check Calibre domain configuration
+      assert:
+        that:
+          - domain is defined
+          - calibre_subdomain is defined
+        fail_msg: "Calibre domain configuration is incomplete"
+        success_msg: "Calibre domain configuration is valid"
+
+- name: Validate Calibre security configuration
+  block:
+    - name: Check Calibre SSL configuration
+      assert:
+        that:
+          - calibre_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Calibre SSL configuration is invalid"
+        success_msg: "Calibre SSL configuration is valid"
+
+    - name: Check Calibre authentication configuration
+      assert:
+        that:
+          - calibre_auth_enabled | bool
+          - calibre_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Calibre authentication configuration is invalid"
+        success_msg: "Calibre authentication configuration is valid"
+
+- name: Validate Calibre storage configuration
+  block:
+    - name: Check Calibre data directories
+      assert:
+        that:
+          - calibre_data_dir is defined
+          - calibre_config_dir is defined
+          - calibre_backup_dir is defined
+        fail_msg: "Calibre storage configuration is incomplete"
+        success_msg: "Calibre storage configuration is valid"
+
+    - name: Create Calibre directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ calibre_data_dir }}"
+        - "{{ calibre_config_dir }}"
+        - "{{ calibre_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Calibre validation completed successfully - all configurations are valid and secure"

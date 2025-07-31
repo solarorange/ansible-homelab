@@ -1,0 +1,89 @@
+---
+# Fail2Ban Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Fail2Ban vault variables
+  block:
+    - name: Check required Fail2Ban vault variables
+      assert:
+        that:
+          - vault_fail2ban_admin_password is defined
+          - vault_fail2ban_database_password is defined
+          - vault_fail2ban_api_key is defined
+          - vault_fail2ban_secret_key is defined
+          - vault_fail2ban_encryption_key is defined
+          - vault_fail2ban_jwt_secret is defined
+        fail_msg: "Required Fail2Ban vault variables are not defined"
+        success_msg: "All required Fail2Ban vault variables are defined"
+
+    - name: Validate Fail2Ban password complexity
+      assert:
+        that:
+          - vault_fail2ban_admin_password | length >= 12
+          - vault_fail2ban_database_password | length >= 12
+        fail_msg: "Fail2Ban passwords must be at least 12 characters long"
+        success_msg: "Fail2Ban password complexity requirements met"
+
+- name: Validate Fail2Ban network configuration
+  block:
+    - name: Check Fail2Ban port configuration
+      assert:
+        that:
+          - fail2ban_port is defined
+          - fail2ban_port | int >= 1024
+          - fail2ban_port | int <= 65535
+        fail_msg: "Fail2Ban port must be between 1024 and 65535"
+        success_msg: "Fail2Ban port configuration is valid"
+
+    - name: Check Fail2Ban domain configuration
+      assert:
+        that:
+          - domain is defined
+          - fail2ban_subdomain is defined
+        fail_msg: "Fail2Ban domain configuration is incomplete"
+        success_msg: "Fail2Ban domain configuration is valid"
+
+- name: Validate Fail2Ban security configuration
+  block:
+    - name: Check Fail2Ban SSL configuration
+      assert:
+        that:
+          - fail2ban_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Fail2Ban SSL configuration is invalid"
+        success_msg: "Fail2Ban SSL configuration is valid"
+
+    - name: Check Fail2Ban authentication configuration
+      assert:
+        that:
+          - fail2ban_auth_enabled | bool
+          - fail2ban_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Fail2Ban authentication configuration is invalid"
+        success_msg: "Fail2Ban authentication configuration is valid"
+
+- name: Validate Fail2Ban storage configuration
+  block:
+    - name: Check Fail2Ban data directories
+      assert:
+        that:
+          - fail2ban_data_dir is defined
+          - fail2ban_config_dir is defined
+          - fail2ban_backup_dir is defined
+        fail_msg: "Fail2Ban storage configuration is incomplete"
+        success_msg: "Fail2Ban storage configuration is valid"
+
+    - name: Create Fail2Ban directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ fail2ban_data_dir }}"
+        - "{{ fail2ban_config_dir }}"
+        - "{{ fail2ban_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Fail2Ban validation completed successfully - all configurations are valid and secure"

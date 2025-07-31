@@ -103,7 +103,7 @@
       fi
       
       # Check if Calibre-Web is responding
-      if ! curl -s http://localhost:8083 | grep -q "Calibre-Web"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8083 | grep -q "Calibre-Web"; then
           echo "Calibre-Web is not responding"
           exit 1
       fi
@@ -136,7 +136,7 @@
     job: "logrotate {{ docker_dir }}/calibre-web/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_calibre_user }}"
 
 - name: Add Calibre-Web backup cron job
   ansible.builtin.cron:
@@ -144,7 +144,7 @@
     job: "{{ docker_dir }}/calibre-web/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_calibre_user }}"
 
 - name: Create Calibre-Web basic configuration file
   ansible.builtin.copy:

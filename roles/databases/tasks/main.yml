@@ -1,59 +1,39 @@
 ---
-# Database Stack Deployment
-# Production-ready Ansible tasks for homelab database stack deployment
+# Databases Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Include Database Stack deployment tasks
-  block:
-    - name: Validate Database Stack configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [databases, validation]
+- name: Include Databases validation tasks
+  include_tasks: validate.yml
+  when: databases_validation_enabled | default(true)
 
-    - name: Setup Database Stack prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [databases, setup]
+- name: Include Databases deployment tasks
+  include_tasks: deploy.yml
+  when: databases_deploy_enabled | default(true)
 
-    - name: Deploy Database Stack relational databases
-      ansible.builtin.include_tasks: relational.yml
-      when: databases_relational_enabled | default(true)
-      tags: [databases, relational, deploy]
+- name: Include Databases configuration tasks
+  include_tasks: configure.yml
+  when: databases_deploy_enabled | default(true)
 
-    - name: Deploy Database Stack cache databases
-      ansible.builtin.include_tasks: cache.yml
-      when: databases_cache_enabled | default(true)
-      tags: [databases, cache, deploy]
+- name: Include Databases security tasks
+  include_tasks: security.yml
+  when: databases_deploy_enabled | default(true)
 
-    - name: Deploy Database Stack search databases
-      ansible.builtin.include_tasks: search.yml
-      when: databases_search_enabled | default(true)
-      tags: [databases, search, deploy]
+- name: Include Databases monitoring tasks
+  include_tasks: monitoring.yml
+  when: databases_monitoring_enabled | default(true)
 
-    - name: Configure Database Stack monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: databases_monitoring_enabled | default(true)
-      tags: [databases, monitoring]
+- name: Include Databases backup tasks
+  include_tasks: backup.yml
+  when: databases_backup_enabled | default(true)
 
-    - name: Configure Database Stack security
-      ansible.builtin.include_tasks: security.yml
-      tags: [databases, security]
+- name: Include Databases automation tasks
+  include_tasks: automation.yml
+  when: databases_automation_enabled | default(true)
 
-    - name: Configure Database Stack backup
-      ansible.builtin.include_tasks: backup.yml
-      when: databases_backup_enabled | default(true)
-      tags: [databases, backup]
+- name: Include Databases integration tasks
+  include_tasks: integration.yml
+  when: databases_discovery_enabled | default(true)
 
-    - name: Configure Database Stack homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: databases_homepage_enabled | default(true)
-      tags: [databases, homepage]
-
-    - name: Configure Database Stack alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: databases_alerting_enabled | default(true)
-      tags: [databases, alerts]
-
-    - name: Validate Database Stack deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [databases, validation]
-
-  when: databases_enabled | default(true)
-  tags: [databases, always] 
+- name: Include Databases health check tasks
+  include_tasks: health_check.yml
+  when: databases_health_check_enabled | default(true)

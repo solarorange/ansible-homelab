@@ -552,7 +552,7 @@
 
 - name: Run final validation
   ansible.builtin.command: "{{ config_dir }}/validate-homelab.sh"
-  become_user: "{{ username }}"
+  become_user: "{{ vault_service_user }}"
   register: validation_output
   changed_when: false
 
@@ -584,7 +584,7 @@
     - name: Clear bash history for security
       ansible.builtin.shell: |
         history -c && history -w
-      become_user: "{{ username }}"
+      become_user: "{{ vault_service_user }}"
       changed_when: false
 
     - name: Update system package database

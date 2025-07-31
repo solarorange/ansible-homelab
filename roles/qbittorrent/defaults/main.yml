@@ -1,0 +1,259 @@
+# Qbittorrent Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# QBITTORRENT SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+qbittorrent_service_name: "qbittorrent"
+qbittorrent_container_name: "{{ qbittorrent_service_name }}"
+qbittorrent_image: "linuxserver/qbittorrent:latest"
+qbittorrent_version: "latest"
+
+# Network Configuration
+qbittorrent_port: 8080
+qbittorrent_external_port: "{{ qbittorrent_port }}"
+qbittorrent_protocol: "http"
+qbittorrent_host: "{{ ansible_default_ipv4.address }}"
+qbittorrent_url: "{{ qbittorrent_protocol }}://{{ qbittorrent_host }}:{{ qbittorrent_port }}"
+
+# Domain Configuration
+qbittorrent_subdomain: "qbittorrent"
+qbittorrent_domain: "{{ qbittorrent_subdomain }}.{{ domain }}"
+qbittorrent_external_url: "https://{{ qbittorrent_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+qbittorrent_auth_enabled: true
+qbittorrent_auth_method: "authentik"  # Options: basic, authentik, none
+qbittorrent_admin_username: "admin"
+qbittorrent_admin_password: "{{ vault_qbittorrent_admin_password }}"
+
+# API Configuration
+qbittorrent_api_key: "{{ vault_qbittorrent_api_key }}"
+qbittorrent_api_token: "{{ vault_qbittorrent_api_token }}"
+
+# Encryption & Security
+qbittorrent_secret_key: "{{ vault_qbittorrent_secret_key }}"
+qbittorrent_encryption_key: "{{ vault_qbittorrent_encryption_key }}"
+qbittorrent_jwt_secret: "{{ vault_qbittorrent_jwt_secret }}"
+
+# SSL/TLS Configuration
+qbittorrent_ssl_enabled: true
+qbittorrent_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+qbittorrent_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+qbittorrent_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+qbittorrent_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+qbittorrent_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+qbittorrent_database_port: "{{ databases_postgresql_port | default(5432) }}"
+qbittorrent_database_name: "qbittorrent"
+qbittorrent_database_username: "qbittorrent"
+qbittorrent_database_password: "{{ vault_qbittorrent_database_password }}"
+
+# Redis Configuration (if using)
+qbittorrent_redis_enabled: false
+qbittorrent_redis_host: "{{ redis_host | default('redis') }}"
+qbittorrent_redis_port: "{{ redis_port | default(6379) }}"
+qbittorrent_redis_password: "{{ vault_qbittorrent_redis_password }}"
+qbittorrent_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+qbittorrent_data_dir: "{{ homelab_data_dir }}/qbittorrent"
+qbittorrent_config_dir: "{{ qbittorrent_data_dir }}/config"
+qbittorrent_backup_dir: "{{ qbittorrent_data_dir }}/backups"
+
+# Volume Mappings
+qbittorrent_volumes:
+  - "{{ qbittorrent_config_dir }}:/config"
+  - "{{ qbittorrent_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+qbittorrent_health_check_enabled: true
+qbittorrent_health_check_path: "/health"
+qbittorrent_health_check_interval: 30
+qbittorrent_health_check_timeout: 10
+qbittorrent_health_check_retries: 3
+
+# Monitoring Integration
+qbittorrent_monitoring_enabled: true
+qbittorrent_prometheus_enabled: true
+qbittorrent_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+qbittorrent_backup_enabled: true
+qbittorrent_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+qbittorrent_backup_retention_days: 30
+qbittorrent_backup_encryption_enabled: true
+qbittorrent_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+qbittorrent_smtp_enabled: false
+qbittorrent_smtp_host: "{{ smtp_host | default('') }}"
+qbittorrent_smtp_port: "{{ smtp_port | default(587) }}"
+qbittorrent_smtp_username: "{{ vault_smtp_username }}"
+qbittorrent_smtp_password: "{{ vault_qbittorrent_smtp_password }}"
+qbittorrent_smtp_from: "{{ qbittorrent_admin_email | default('admin@' + domain) }}"
+qbittorrent_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+qbittorrent_webhook_enabled: false
+qbittorrent_webhook_url: "{{ vault_webhook_url | default('') }}"
+qbittorrent_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+qbittorrent_discovery_enabled: true
+qbittorrent_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+qbittorrent_cpu_limit: "1.0"
+qbittorrent_memory_limit: "1g"
+qbittorrent_memory_reservation: "512m"
+
+# Performance Settings
+qbittorrent_scan_interval: 10
+qbittorrent_parallel_downloads: 3
+qbittorrent_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+qbittorrent_log_level: "info"  # Options: trace, debug, info, warn, error
+qbittorrent_log_rotation_enabled: true
+qbittorrent_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+qbittorrent_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+qbittorrent_rate_limit_enabled: true
+qbittorrent_rate_limit_requests: 100
+qbittorrent_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+qbittorrent_deploy_enabled: true
+qbittorrent_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+qbittorrent_restart_policy: "unless-stopped"
+qbittorrent_auto_update_enabled: true
+
+# Environment Variables
+qbittorrent_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  QBITTORRENT_API_KEY: "{{ qbittorrent_api_key }}"
+  QBITTORRENT_SECRET_KEY: "{{ qbittorrent_secret_key }}"
+  QBITTORRENT_ENCRYPTION_KEY: "{{ qbittorrent_encryption_key }}"
+  QBITTORRENT_JWT_SECRET: "{{ qbittorrent_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+qbittorrent_validation_enabled: true
+qbittorrent_validation_timeout: 300
+qbittorrent_validation_retries: 3
+
+# Testing Configuration
+qbittorrent_test_enabled: false
+qbittorrent_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+qbittorrent_compliance_enabled: true
+qbittorrent_audit_logging_enabled: true
+qbittorrent_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+qbittorrent_automation_enabled: true
+qbittorrent_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+qbittorrent_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+qbittorrent_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+qbittorrent_fallback_enabled: true
+qbittorrent_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

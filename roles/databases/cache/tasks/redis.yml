@@ -56,7 +56,7 @@
     published_ports:
       - "{{ redis_web_port }}:6379"
     env:
-      REDIS_PASSWORD: "{{ redis_password }}"
+      REDIS_password: "{{ vault_databases_database_password }}"
     command: "redis-server /usr/local/etc/redis/redis.conf --requirepass {{ redis_password }}"
     volumes:
       - "{{ docker_dir }}/redis/data:/data"
@@ -85,7 +85,7 @@
     job: "{{ docker_dir }}/redis/scripts/backup.sh >> {{ logs_dir }}/redis/backup.log 2>&1"
     minute: "0"
     hour: "3"
-    user: "{{ username }}"
+    user: "{{ vault_databases_user }}"
     state: present
 
 - name: Integrate Redis with homepage

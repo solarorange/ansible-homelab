@@ -1,232 +1,259 @@
----
-# n8n Configuration
-# Production-ready defaults for n8n workflow automation deployment
+# N8N Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Service Configuration
-n8n_enabled: true
-n8n_version: "{{ n8n_version | default('latest') }}"
-n8n_network_name: "n8n"
-n8n_network_external: true
+# =============================================================================
+# N8N SERVICE CONFIGURATION
+# =============================================================================
 
-# Container Configuration
-n8n_container_restart_policy: "unless-stopped"
-n8n_container_network_mode: "bridge"
+# Service Information
+n8n_service_name: "n8n"
+n8n_container_name: "{{ n8n_service_name }}"
+n8n_image: "n8nio/n8n:latest"
+n8n_version: "latest"
 
-# Port Configuration
+# Network Configuration
 n8n_port: 5678
+n8n_external_port: "{{ n8n_port }}"
+n8n_protocol: "http"
+n8n_host: "{{ ansible_default_ipv4.address }}"
+n8n_url: "{{ n8n_protocol }}://{{ n8n_host }}:{{ n8n_port }}"
 
 # Domain Configuration
 n8n_subdomain: "n8n"
+n8n_domain: "{{ n8n_subdomain }}.{{ domain }}"
+n8n_external_url: "https://{{ n8n_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 n8n_auth_enabled: true
-n8n_auth_method: "authentik"  # Options: authentik, basic, none
-n8n_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+n8n_auth_method: "authentik"  # Options: basic, authentik, none
+n8n_admin_username: "admin"
+n8n_admin_password: "{{ vault_n8n_admin_password }}"
 
-# Database Configuration
-n8n_database_type: "postgresql"
-n8n_database_host: "n8n-postgres"
-n8n_database_port: 5432
-n8n_database_name: "{{ n8n_database_name | default('n8n') }}"
-n8n_database_user: "{{ n8n_database_user | default('postgres') }}"
-n8n_database_password: "{{ vault_n8n_postgres_password | default('') }}"
+# API Configuration
+n8n_api_key: "{{ vault_n8n_api_key }}"
+n8n_api_token: "{{ vault_n8n_api_token }}"
 
-# Service Components
-n8n_components:
-  app:
-    enabled: true
-    image: "n8nio/n8n:latest"
-    container_name: "n8n-app"
-    port: 5678
-    volumes:
-      - "{{ docker_dir }}/n8n/app:/home/node/.n8n"
-      - "{{ logs_dir }}/n8n/app:/home/node/.n8n/logs"
-    environment:
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST={{ n8n_database_host }}
-      - DB_POSTGRESDB_PORT={{ n8n_database_port }}
-      - DB_POSTGRESDB_DATABASE={{ n8n_database_name }}
-      - DB_POSTGRESDB_USER={{ n8n_database_user }}
-      - DB_POSTGRESDB_PASSWORD={{ n8n_database_password }}
-      - N8N_BASIC_AUTH_ACTIVE={{ 'true' if n8n_auth_method == 'basic' else 'false' }}
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD={{ vault_n8n_admin_password | default('') }}
-      - N8N_HOST={{ n8n_subdomain }}.{{ domain }}
-      - N8N_PORT={{ n8n_port }}
-      - N8N_PROTOCOL=https
-      - N8N_USER_MANAGEMENT_DISABLED={{ 'true' if n8n_auth_method == 'authentik' else 'false' }}
-      - N8N_ENCRYPTION_KEY={{ vault_n8n_encryption_key | default('') }}
-      - N8N_LOG_LEVEL={{ n8n_log_level | default('info') }}
-      - N8N_DIAGNOSTICS_ENABLED={{ n8n_diagnostics_enabled | default(false) }}
-      - N8N_TEMPLATES_ENABLED={{ n8n_templates_enabled | default(true) }}
-      - N8N_ONBOARDING_FLOW_DISABLED={{ not n8n_onboarding_enabled | default(true) }}
-      - N8N_PERSONALIZATION_ENABLED={{ n8n_personalization_enabled | default(false) }}
-      - N8N_EMAIL_MODE=smtp
-      - N8N_SMTP_HOST={{ n8n_smtp_host | default('') }}
-      - N8N_SMTP_PORT={{ n8n_smtp_port | default(587) }}
-      - N8N_SMTP_USER={{ n8n_smtp_user | default('') }}
-      - N8N_SMTP_PASS={{ n8n_smtp_pass | default('') }}
-      - N8N_SMTP_SENDER={{ n8n_smtp_sender | default('') }}
-      - TZ={{ timezone }}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - n8n-postgres
-    resources:
-      limits:
-        cpus: '2'
-        memory: 2G
-      reservations:
-        cpus: '0.5'
-        memory: 512M
+# Encryption & Security
+n8n_secret_key: "{{ vault_n8n_secret_key }}"
+n8n_encryption_key: "{{ vault_n8n_encryption_key }}"
+n8n_jwt_secret: "{{ vault_n8n_jwt_secret }}"
 
-  postgres:
-    enabled: true
-    image: "postgres:15-alpine"
-    container_name: "n8n-postgres"
-    volumes:
-      - "{{ docker_dir }}/n8n/postgres:/var/lib/postgresql/data"
-      - "{{ logs_dir }}/n8n/postgres:/logs"
-    environment:
-      - POSTGRES_USER={{ n8n_database_user }}
-      - POSTGRES_PASSWORD={{ n8n_database_password }}
-      - POSTGRES_DB={{ n8n_database_name }}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {{ n8n_database_user }}"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 256M
+# SSL/TLS Configuration
+n8n_ssl_enabled: true
+n8n_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+n8n_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+n8n_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
 
-# Monitoring Integration
-n8n_monitoring_enabled: true
-n8n_metrics_enabled: true
-n8n_health_check_enabled: true
-n8n_health_check_interval: "{{ n8n_health_check_interval | default(30) }}"
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
 
-# Security Configuration
-n8n_security_headers: true
-n8n_rate_limiting: true
-n8n_rate_limit_requests: "{{ n8n_rate_limit_requests | default(100) }}"
-n8n_rate_limit_window: "{{ n8n_rate_limit_window | default(60) }}"
-n8n_cors_enabled: "{{ n8n_cors_enabled | default(false) }}"
-n8n_cors_origins: "{{ n8n_cors_origins | default([]) }}"
-n8n_allow_anonymous_access: "{{ n8n_allow_anonymous_access | default(false) }}"
+# Database Settings
+n8n_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+n8n_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+n8n_database_port: "{{ databases_postgresql_port | default(5432) }}"
+n8n_database_name: "n8n"
+n8n_database_username: "n8n"
+n8n_database_password: "{{ vault_n8n_database_password }}"
 
-# Backup Configuration
-n8n_backup_enabled: true
-n8n_backup_schedule: "{{ n8n_backup_schedule | default('0 3 * * *') }}"  # Daily at 3 AM
-n8n_backup_retention: "{{ n8n_backup_retention | default(7) }}"  # Keep backups for 7 days
-n8n_backup_compression: "{{ n8n_backup_compression | default(true) }}"
-n8n_backup_include_database: "{{ n8n_backup_include_database | default(true) }}"
-n8n_backup_include_config: "{{ n8n_backup_include_config | default(true) }}"
-n8n_backup_dir: "{{ backup_dir }}/n8n"
-n8n_backup_retention_days: "{{ n8n_backup_retention_days | default(7) }}"
-n8n_backup_log_file: "{{ logs_dir }}/n8n/backup/backup.log"
-n8n_backup_max_log_size: "{{ n8n_backup_max_log_size | default('10M') }}"
-n8n_backup_notifications_enabled: "{{ n8n_backup_notifications_enabled | default(true) }}"
+# Redis Configuration (if using)
+n8n_redis_enabled: false
+n8n_redis_host: "{{ redis_host | default('redis') }}"
+n8n_redis_port: "{{ redis_port | default(6379) }}"
+n8n_redis_password: "{{ vault_n8n_redis_password }}"
+n8n_redis_database: 0
 
-# Logging Configuration
-n8n_log_level: "{{ n8n_log_level | default('info') }}"  # Options: debug, info, warn, error
-n8n_log_format: "{{ n8n_log_format | default('json') }}"
-n8n_log_retention: "{{ n8n_log_retention | default(30) }}"  # Days
-n8n_log_rotation: true
-n8n_health_check_log_file: "{{ logs_dir }}/n8n/health/health.log"
-n8n_health_check_max_log_size: "{{ n8n_health_check_max_log_size | default('10M') }}"
-n8n_health_check_retention_days: "{{ n8n_health_check_retention_days | default(7) }}"
-n8n_health_check_timeout: "{{ n8n_health_check_timeout | default(30) }}"
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
 
-# Resource Limits
-n8n_memory_limit: "4g"
-n8n_cpu_limit: "2.0"
-n8n_storage_limit: "100g"
+# Data Directories
+n8n_data_dir: "{{ homelab_data_dir }}/n8n"
+n8n_config_dir: "{{ n8n_data_dir }}/config"
+n8n_backup_dir: "{{ n8n_data_dir }}/backups"
 
-# Traefik Configuration
-n8n_traefik_enabled: true
-n8n_traefik_network: "{{ traefik_network | default('homelab') }}"
-n8n_traefik_middleware: "secure-headers,compress"
-n8n_traefik_auth_middleware: "authentik@docker"
-n8n_traefik_ssl_enabled: true
-n8n_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Volume Mappings
+n8n_volumes:
+  - "{{ n8n_config_dir }}:/config"
+  - "{{ n8n_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
 
-# Homepage Integration
-n8n_homepage_enabled: true
-n8n_homepage_category: "{{ n8n_homepage_category | default('Automation') }}"
-n8n_homepage_description: "{{ n8n_homepage_description | default('Workflow Automation & Integration Platform') }}"
-n8n_homepage_icon: "n8n.png"
-n8n_homepage_widget_enabled: "{{ n8n_homepage_widget_enabled | default(true) }}"
-
-# Telegraf Integration
-n8n_telegraf_enabled: true
-n8n_telegraf_metrics: true
-n8n_telegraf_logs: true
-
-# Prometheus Integration
-n8n_prometheus_enabled: true
-n8n_prometheus_metrics: true
-n8n_prometheus_scrape_interval: "{{ n8n_prometheus_scrape_interval | default(30) }}"
-
-# Grafana Integration
-n8n_grafana_enabled: true
-n8n_grafana_dashboard: true
-n8n_grafana_datasource: "prometheus"
-
-# Loki Integration
-n8n_loki_enabled: true
-n8n_loki_logs: true
-
-# Alerting Configuration
-n8n_alerting_enabled: true
-n8n_alerting_provider: "{{ n8n_alerting_provider | default('alertmanager') }}"
-n8n_alerting_webhook: "{{ n8n_alerting_webhook | default('http://alertmanager:9093/api/v1/alerts') }}"
-
-# CrowdSec Integration
-n8n_crowdsec_enabled: true
-n8n_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
-
-# Fail2ban Integration
-n8n_fail2ban_enabled: true
-n8n_fail2ban_jail: "{{ n8n_fail2ban_jail | default('n8n') }}"
-n8n_fail2ban_max_retry: "{{ n8n_fail2ban_max_retry | default(5) }}"
-n8n_fail2ban_bantime: "{{ n8n_fail2ban_bantime | default(3600) }}"
-
-# Service Dependencies
-n8n_dependencies:
-  - "docker"
-  - "traefik"
-  - "monitoring_infrastructure"
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
 
 # Health Check Configuration
-n8n_health_check_url: "/healthz"
+n8n_health_check_enabled: true
+n8n_health_check_path: "/health"
+n8n_health_check_interval: 30
 n8n_health_check_timeout: 10
 n8n_health_check_retries: 3
 
-# Service configuration directories
-n8n_config_dir: "{{ docker_dir }}/n8n"
-n8n_app_config_dir: "{{ docker_dir }}/n8n/app"
-n8n_postgres_config_dir: "{{ docker_dir }}/n8n/postgres"
+# Monitoring Integration
+n8n_monitoring_enabled: true
+n8n_prometheus_enabled: true
+n8n_grafana_enabled: true
 
-# Service container names
-n8n_app_container_name: "n8n-app"
-n8n_postgres_container_name: "n8n-postgres"
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
-# Service ports
-n8n_app_port: 5678
+# Backup Configuration
+n8n_backup_enabled: true
+n8n_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+n8n_backup_retention_days: 30
+n8n_backup_encryption_enabled: true
+n8n_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Email Configuration (Optional)
-n8n_smtp_host: "{{ vault_n8n_smtp_host | default('') }}"
-n8n_smtp_port: "{{ vault_n8n_smtp_port | default(587) }}"
-n8n_smtp_user: "{{ vault_n8n_smtp_user | default('') }}"
-n8n_smtp_pass: "{{ vault_n8n_smtp_pass | default('') }}"
-n8n_smtp_sender: "{{ vault_n8n_smtp_sender | default('') }}" 
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+n8n_smtp_enabled: false
+n8n_smtp_host: "{{ smtp_host | default('') }}"
+n8n_smtp_port: "{{ smtp_port | default(587) }}"
+n8n_smtp_username: "{{ vault_smtp_username }}"
+n8n_smtp_password: "{{ vault_n8n_smtp_password }}"
+n8n_smtp_from: "{{ n8n_admin_email | default('admin@' + domain) }}"
+n8n_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+n8n_webhook_enabled: false
+n8n_webhook_url: "{{ vault_webhook_url | default('') }}"
+n8n_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+n8n_discovery_enabled: true
+n8n_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+n8n_cpu_limit: "1.0"
+n8n_memory_limit: "1g"
+n8n_memory_reservation: "512m"
+
+# Performance Settings
+n8n_scan_interval: 10
+n8n_parallel_downloads: 3
+n8n_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+n8n_log_level: "info"  # Options: trace, debug, info, warn, error
+n8n_log_rotation_enabled: true
+n8n_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+n8n_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+n8n_rate_limit_enabled: true
+n8n_rate_limit_requests: 100
+n8n_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+n8n_deploy_enabled: true
+n8n_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+n8n_restart_policy: "unless-stopped"
+n8n_auto_update_enabled: true
+
+# Environment Variables
+n8n_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  N8N_API_KEY: "{{ n8n_api_key }}"
+  N8N_SECRET_KEY: "{{ n8n_secret_key }}"
+  N8N_ENCRYPTION_KEY: "{{ n8n_encryption_key }}"
+  N8N_JWT_SECRET: "{{ n8n_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+n8n_validation_enabled: true
+n8n_validation_timeout: 300
+n8n_validation_retries: 3
+
+# Testing Configuration
+n8n_test_enabled: false
+n8n_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+n8n_compliance_enabled: true
+n8n_audit_logging_enabled: true
+n8n_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+n8n_automation_enabled: true
+n8n_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+n8n_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+n8n_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+n8n_fallback_enabled: true
+n8n_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

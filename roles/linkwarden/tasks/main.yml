@@ -1,48 +1,39 @@
 ---
-# Linkwarden Deployment
-# Production-ready Ansible tasks for Linkwarden bookmark management deployment
+# Linkwarden Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Linkwarden validation tasks
+  include_tasks: validate.yml
+  when: linkwarden_validation_enabled | default(true)
 
 - name: Include Linkwarden deployment tasks
-  block:
-    - name: Validate Linkwarden configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [linkwarden, validation]
+  include_tasks: deploy.yml
+  when: linkwarden_deploy_enabled | default(true)
 
-    - name: Setup Linkwarden prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [linkwarden, setup]
+- name: Include Linkwarden configuration tasks
+  include_tasks: configure.yml
+  when: linkwarden_deploy_enabled | default(true)
 
-    - name: Deploy Linkwarden services
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [linkwarden, deploy]
+- name: Include Linkwarden security tasks
+  include_tasks: security.yml
+  when: linkwarden_deploy_enabled | default(true)
 
-    - name: Configure Linkwarden monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: linkwarden_monitoring_enabled | default(true)
-      tags: [linkwarden, monitoring]
+- name: Include Linkwarden monitoring tasks
+  include_tasks: monitoring.yml
+  when: linkwarden_monitoring_enabled | default(true)
 
-    - name: Configure Linkwarden security
-      ansible.builtin.include_tasks: security.yml
-      tags: [linkwarden, security]
+- name: Include Linkwarden backup tasks
+  include_tasks: backup.yml
+  when: linkwarden_backup_enabled | default(true)
 
-    - name: Configure Linkwarden backup
-      ansible.builtin.include_tasks: backup.yml
-      when: linkwarden_backup_enabled | default(true)
-      tags: [linkwarden, backup]
+- name: Include Linkwarden automation tasks
+  include_tasks: automation.yml
+  when: linkwarden_automation_enabled | default(true)
 
-    - name: Configure Linkwarden homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: linkwarden_homepage_enabled | default(true)
-      tags: [linkwarden, homepage]
+- name: Include Linkwarden integration tasks
+  include_tasks: integration.yml
+  when: linkwarden_discovery_enabled | default(true)
 
-    - name: Configure Linkwarden alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: linkwarden_alerting_enabled | default(true)
-      tags: [linkwarden, alerts]
-
-    - name: Validate Linkwarden deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [linkwarden, validation]
-
-  when: linkwarden_enabled | default(true)
-  tags: [linkwarden, always] 
+- name: Include Linkwarden health check tasks
+  include_tasks: health_check.yml
+  when: linkwarden_health_check_enabled | default(true)

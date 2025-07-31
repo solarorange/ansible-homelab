@@ -1,52 +1,39 @@
 ---
-# Vaultwarden Deployment
-# Production-ready Ansible tasks for Vaultwarden password manager deployment
+# Vaultwarden Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Vaultwarden validation tasks
+  include_tasks: validate.yml
+  when: vaultwarden_validation_enabled | default(true)
 
 - name: Include Vaultwarden deployment tasks
-  block:
-    - name: Validate Vaultwarden configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [vaultwarden, validation]
+  include_tasks: deploy.yml
+  when: vaultwarden_deploy_enabled | default(true)
 
-    - name: Setup Vaultwarden prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [vaultwarden, setup]
+- name: Include Vaultwarden configuration tasks
+  include_tasks: configure.yml
+  when: vaultwarden_deploy_enabled | default(true)
 
-    - name: Configure Vaultwarden variables
-      ansible.builtin.include_tasks: configure.yml
-      tags: [vaultwarden, config]
+- name: Include Vaultwarden security tasks
+  include_tasks: security.yml
+  when: vaultwarden_deploy_enabled | default(true)
 
-    - name: Deploy Vaultwarden services
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [vaultwarden, deploy]
+- name: Include Vaultwarden monitoring tasks
+  include_tasks: monitoring.yml
+  when: vaultwarden_monitoring_enabled | default(true)
 
-    - name: Configure Vaultwarden monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: vaultwarden_monitoring_enabled | default(true)
-      tags: [vaultwarden, monitoring]
+- name: Include Vaultwarden backup tasks
+  include_tasks: backup.yml
+  when: vaultwarden_backup_enabled | default(true)
 
-    - name: Configure Vaultwarden security
-      ansible.builtin.include_tasks: security.yml
-      tags: [vaultwarden, security]
+- name: Include Vaultwarden automation tasks
+  include_tasks: automation.yml
+  when: vaultwarden_automation_enabled | default(true)
 
-    - name: Configure Vaultwarden backup
-      ansible.builtin.include_tasks: backup.yml
-      when: vaultwarden_backup_enabled | default(true)
-      tags: [vaultwarden, backup]
+- name: Include Vaultwarden integration tasks
+  include_tasks: integration.yml
+  when: vaultwarden_discovery_enabled | default(true)
 
-    - name: Configure Vaultwarden homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: vaultwarden_homepage_enabled | default(true)
-      tags: [vaultwarden, homepage]
-
-    - name: Configure Vaultwarden alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: vaultwarden_alerting_enabled | default(true)
-      tags: [vaultwarden, alerts]
-
-    - name: Validate Vaultwarden deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [vaultwarden, validation]
-
-  when: vaultwarden_enabled | default(true)
-  tags: [vaultwarden, always] 
+- name: Include Vaultwarden health check tasks
+  include_tasks: health_check.yml
+  when: vaultwarden_health_check_enabled | default(true)

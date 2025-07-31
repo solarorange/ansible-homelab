@@ -37,7 +37,7 @@ telegraf:
   inputs:
     - http_response:
         urls:
-          - "http://localhost:{{ ersatztv_port }}/api/health"
+          - "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health"
         response_timeout: "10s"
         method: "GET"
     - docker:
@@ -55,9 +55,9 @@ health_check:
   timeout: {{ ersatztv_health_check_timeout | default('30s') }}
   retries: {{ ersatztv_health_check_retries | default(3) }}
   endpoints:
-    - "http://localhost:{{ ersatztv_port }}/api/health"
-    - "http://localhost:{{ ersatztv_port }}/api/status"
-    - "http://localhost:{{ ersatztv_port }}/api/channels"
+    - "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health"
+    - "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/status"
+    - "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/channels"
 
 # Performance Monitoring
 performance:

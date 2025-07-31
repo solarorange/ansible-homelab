@@ -137,7 +137,7 @@
         name: "Paperless-ngx alert monitoring"
         minute: "*/5"
         job: "{{ docker_dir }}/paperless-ngx/alert-monitor.sh >> {{ logs_dir }}/paperless-ngx/alerts.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, alerts]
@@ -183,7 +183,7 @@
   block:
     - name: Test Alertmanager configuration
       ansible.builtin.uri:
-        url: "http://localhost:{{ alertmanager_port | default(9093) }}/api/v1/status"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port | default(9093) }}/api/v1/status"
         method: GET
         status_code: [200, 401, 403]
         timeout: 10

@@ -304,7 +304,7 @@
         name: "Collect database metrics"
         minute: "*/5"
         job: "{{ docker_dir }}/databases/scripts/collect-metrics.sh >> {{ logs_dir }}/databases/metrics.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
     - name: Create database performance monitoring script
@@ -320,7 +320,7 @@
         name: "Monitor database performance"
         minute: "*/10"
         job: "{{ docker_dir }}/databases/scripts/monitor-performance.sh >> {{ logs_dir }}/databases/performance.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
   when: databases_metrics_enabled | default(true)
@@ -362,7 +362,7 @@
   block:
     - name: Test Prometheus configuration
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/status/config"
+        url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/status/config"
         method: GET
         status_code: [200]
         timeout: 10
@@ -371,7 +371,7 @@
 
     - name: Test Grafana configuration
       ansible.builtin.uri:
-        url: "http://localhost:3000/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:3000/api/health"
         method: GET
         status_code: [200]
         timeout: 10
@@ -414,9 +414,9 @@
           - Enabled: {{ databases_alerting_enabled | default(true) }}
           
           Monitoring URLs:
-          - Prometheus: http://localhost:9090
-          - Grafana: http://localhost:3000
-          - AlertManager: http://localhost:9093
+          - Prometheus: http://{{ ansible_default_ipv4.address }}:
+          - Grafana: http://{{ ansible_default_ipv4.address }}:
+          - AlertManager: http://{{ ansible_default_ipv4.address }}:
 
   when: databases_monitoring_enabled | default(true)
   tags: [databases, monitoring, validation] 

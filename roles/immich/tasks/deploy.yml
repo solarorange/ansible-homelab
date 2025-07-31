@@ -62,7 +62,7 @@
 
     - name: Wait for Immich services to be ready
       ansible.builtin.wait_for:
-        host: "127.0.0.1"
+        host: "{{ ansible_default_ipv4.address }}"
         port: "{{ immich_ports.server }}"
         delay: 10
         timeout: 300
@@ -70,7 +70,7 @@
 
     - name: Check Immich service health
       ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ immich_ports.server }}/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.server }}/api/health"
         method: GET
         status_code: 200
         timeout: 30
@@ -82,14 +82,14 @@
 
     - name: Create Immich admin user
       ansible.builtin.uri:
-        url: "http://127.0.0.1:{{ immich_ports.server }}/api/auth/admin-sign-up"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.server }}/api/auth/admin-sign-up"
         method: POST
         headers:
           Content-Type: "application/json"
         body_format: json
         body:
           email: "{{ immich_admin_email }}"
-          password: "{{ vault_immich_admin_password }}"
+          password: "{{ vault_immich_password }}"
           firstName: "Admin"
           lastName: "User"
         status_code: [200, 201, 409]  # 409 if user already exists

@@ -1,708 +1,259 @@
----
-# Media Stack Configuration
-# Production-ready defaults for homelab media stack deployment
+# Media Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# WARNING: Manual overrides for ports, certificates, or service enablement (e.g., via extra-vars or direct variable assignment)
-# can cause port conflicts, security issues, or break automation/monitoring. Avoid manual overrides unless absolutely necessary.
-# Use group_vars or role defaults for configuration. If manual overrides are detected, the playbook will require explicit confirmation.
-# See documentation for details on risks and best practices.
+# =============================================================================
+# MEDIA SERVICE CONFIGURATION
+# =============================================================================
 
-# Service Configuration
-media_enabled: true
+# Service Information
+media_service_name: "media"
+media_container_name: "{{ media_service_name }}"
+media_image: "ghcr.io/media/media:latest"
 media_version: "latest"
-media_network_name: "media"
-media_network_external: true
 
-# Component Enablement
-media_downloaders_enabled: true
-media_arr_services_enabled: true
-media_players_enabled: true
-
-# Container Configuration
-media_container_restart_policy: "unless-stopped"
-media_container_network_mode: "bridge"
-
-# Port Configuration
-media_ports:
-  sabnzbd: 8080
-  qbittorrent: 8081
-  prowlarr: 9696
-  sonarr: 8989
-  radarr: 7878
-  lidarr: 8686
-  readarr: 8787
-  bazarr: 6767
-  pulsarr: 8088
-  jellyfin: 8096
-  immich_server: 3001
-  immich_web: 3000
-  immich_ml: 3003
+# Network Configuration
+media_port: 8080
+media_external_port: "{{ media_port }}"
+media_protocol: "http"
+media_host: "{{ ansible_default_ipv4.address }}"
+media_url: "{{ media_protocol }}://{{ media_host }}:{{ media_port }}"
 
 # Domain Configuration
-media_subdomains:
-  sabnzbd: "sabnzbd"
-  qbittorrent: "qbittorrent"
-  prowlarr: "prowlarr"
-  sonarr: "sonarr"
-  radarr: "radarr"
-  lidarr: "lidarr"
-  readarr: "readarr"
-  bazarr: "bazarr"
-  pulsarr: "pulsarr"
-  jellyfin: "jellyfin"
-  immich: "immich"
+media_subdomain: "media"
+media_domain: "{{ media_subdomain }}.{{ domain }}"
+media_external_url: "https://{{ media_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 media_auth_enabled: true
-media_auth_method: "authentik"  # Options: authentik, basic, none
-media_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+media_auth_method: "authentik"  # Options: basic, authentik, none
+media_admin_username: "admin"
+media_admin_password: "{{ vault_media_admin_password }}"
 
-# Database Configuration
-media_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
-media_database_host: "{{ postgresql_host | default('postgresql') }}"
-media_database_port: "{{ postgresql_port | default(5432) }}"
+# API Configuration
+media_api_key: "{{ vault_media_api_key }}"
+media_api_token: "{{ vault_media_api_token }}"
+
+# Encryption & Security
+media_secret_key: "{{ vault_media_secret_key }}"
+media_encryption_key: "{{ vault_media_encryption_key }}"
+media_jwt_secret: "{{ vault_media_jwt_secret }}"
+
+# SSL/TLS Configuration
+media_ssl_enabled: true
+media_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+media_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+media_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+media_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+media_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+media_database_port: "{{ databases_postgresql_port | default(5432) }}"
 media_database_name: "media"
-media_database_user: "media"
-media_database_password: "{{ vault_media_database_password | default('') }}"
+media_database_username: "media"
+media_database_password: "{{ vault_media_database_password }}"
 
-# Redis Configuration
+# Redis Configuration (if using)
+media_redis_enabled: false
 media_redis_host: "{{ redis_host | default('redis') }}"
 media_redis_port: "{{ redis_port | default(6379) }}"
-media_redis_password: "{{ vault_redis_password | default('') }}"
-media_redis_db: 0
+media_redis_password: "{{ vault_media_redis_password }}"
+media_redis_database: 0
 
-# Downloader Configuration
-media_downloaders:
-  sabnzbd:
-    enabled: true
-    image: "linuxserver/sabnzbd:latest"
-    container_name: "sabnzbd"
-    port: 8080
-    subdomain: "sabnzbd"
-    volumes:
-      - "{{ docker_dir }}/sabnzbd/config:/config"
-      - "{{ data_dir }}/downloads/usenet:/downloads"
-      - "{{ data_dir }}/downloads/usenet/incomplete:/incomplete-downloads"
-      - "{{ data_dir }}/downloads/usenet/complete:/complete-downloads"
-      - "{{ logs_dir }}/sabnzbd:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api?mode=version"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
 
-  qbittorrent:
-    enabled: true
-    image: "linuxserver/qbittorrent:latest"
-    container_name: "qbittorrent"
-    port: 8081
-    subdomain: "qbittorrent"
-    volumes:
-      - "{{ docker_dir }}/qbittorrent/config:/config"
-      - "{{ data_dir }}/downloads/torrents:/downloads"
-      - "{{ data_dir }}/downloads/torrents/incomplete:/incomplete-downloads"
-      - "{{ data_dir }}/downloads/torrents/complete:/complete-downloads"
-      - "{{ logs_dir }}/qbittorrent:/logs"
-    ports:
-      - "6881:6881"
-      - "6881:6881/udp"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/v2/app/version"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
+# Data Directories
+media_data_dir: "{{ homelab_data_dir }}/media"
+media_config_dir: "{{ media_data_dir }}/config"
+media_backup_dir: "{{ media_data_dir }}/backups"
 
-# ARR Services Configuration
-media_arr_services:
-  prowlarr:
-    enabled: true
-    image: "linuxserver/prowlarr:latest"
-    container_name: "prowlarr"
-    port: 9696
-    subdomain: "prowlarr"
-    volumes:
-      - "{{ docker_dir }}/prowlarr/config:/config"
-      - "{{ logs_dir }}/prowlarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9696/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '0.5'
-        memory: 512M
-      reservations:
-        cpus: '0.1'
-        memory: 256M
+# Volume Mappings
+media_volumes:
+  - "{{ media_config_dir }}:/config"
+  - "{{ media_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
 
-  sonarr:
-    enabled: true
-    image: "linuxserver/sonarr:latest"
-    container_name: "sonarr"
-    port: 8989
-    subdomain: "sonarr"
-    volumes:
-      - "{{ docker_dir }}/sonarr/config:/config"
-      - "{{ data_dir }}/media/tv:/tv"
-      - "{{ data_dir }}/downloads:/downloads"
-      - "{{ logs_dir }}/sonarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8989/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
 
-  radarr:
-    enabled: true
-    image: "linuxserver/radarr:latest"
-    container_name: "radarr"
-    port: 7878
-    subdomain: "radarr"
-    volumes:
-      - "{{ docker_dir }}/radarr/config:/config"
-      - "{{ data_dir }}/media/movies:/movies"
-      - "{{ data_dir }}/downloads:/downloads"
-      - "{{ logs_dir }}/radarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7878/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
-
-  lidarr:
-    enabled: true
-    image: "linuxserver/lidarr:latest"
-    container_name: "lidarr"
-    port: 8686
-    subdomain: "lidarr"
-    volumes:
-      - "{{ docker_dir }}/lidarr/config:/config"
-      - "{{ data_dir }}/media/music:/music"
-      - "{{ data_dir }}/downloads:/downloads"
-      - "{{ logs_dir }}/lidarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8686/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '0.5'
-        memory: 512M
-      reservations:
-        cpus: '0.1'
-        memory: 256M
-
-  readarr:
-    enabled: true
-    image: "linuxserver/readarr:latest"
-    container_name: "readarr"
-    port: 8787
-    subdomain: "readarr"
-    volumes:
-      - "{{ docker_dir }}/readarr/config:/config"
-      - "{{ data_dir }}/media/books:/books"
-      - "{{ data_dir }}/downloads:/downloads"
-      - "{{ logs_dir }}/readarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8787/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '0.5'
-        memory: 512M
-      reservations:
-        cpus: '0.1'
-        memory: 256M
-
-  bazarr:
-    enabled: true
-    image: "linuxserver/bazarr:latest"
-    container_name: "bazarr"
-    port: 6767
-    subdomain: "bazarr"
-    volumes:
-      - "{{ docker_dir }}/bazarr/config:/config"
-      - "{{ data_dir }}/media:/media"
-      - "{{ logs_dir }}/bazarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6767/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
-
-  pulsarr:
-    enabled: true
-    image: "jamcalli/pulsarr:latest"
-    container_name: "pulsarr"
-    port: 8088
-    subdomain: "pulsarr"
-    volumes:
-      - "{{ docker_dir }}/pulsarr/config:/config"
-      - "{{ docker_dir }}/pulsarr/data:/data"
-      - "{{ logs_dir }}/pulsarr:/logs"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - sonarr
-      - radarr
-      - lidarr
-      - readarr
-      - prowlarr
-      - bazarr
-    resources:
-      limits:
-        cpus: '0.5'
-        memory: 512M
-      reservations:
-        cpus: '0.1'
-        memory: 256M
-
-# Media Players Configuration
-media_players:
-  jellyfin:
-    enabled: true
-    image: "jellyfin/jellyfin:latest"
-    container_name: "jellyfin"
-    port: 8096
-    subdomain: "jellyfin"
-    volumes:
-      - "{{ docker_dir }}/jellyfin/config:/config"
-      - "{{ docker_dir }}/jellyfin/cache:/cache"
-      - "{{ docker_dir }}/jellyfin/metadata:/metadata"
-      - "{{ data_dir }}/media:/media"
-      - "{{ logs_dir }}/jellyfin:/logs"
-    ports:
-      - "8920:8920"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '2'
-        memory: 4G
-      reservations:
-        cpus: '0.5'
-        memory: 1G
-
-  immich:
-    enabled: true
-    image: "ghcr.io/immich-app/immich-server:latest"
-    container_name: "immich-server"
-    port: 3001
-    subdomain: "immich"
-    volumes:
-      - "{{ docker_dir }}/immich/server:/config"
-      - "{{ data_dir }}/media/photos:/photos"
-      - "{{ logs_dir }}/immich/server:/logs"
-    environment:
-      - DB_HOSTNAME=immich-postgres
-      - DB_USERNAME=postgres
-      - DB_PASSWORD={{ vault_media_database_password }}
-      - DB_DATABASE_NAME=immich
-      - REDIS_HOSTNAME=immich-redis
-      - REDIS_PORT=6379
-      - REDIS_DBINDEX=0
-      - REDIS_PASSWORD={{ vault_redis_password }}
-      - JWT_SECRET={{ vault_media_jwt_secret }}
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - immich-postgres
-      - immich-redis
-    resources:
-      limits:
-        cpus: '1'
-        memory: 2G
-      reservations:
-        cpus: '0.25'
-        memory: 512M
-
-# Immich Components
-media_immich_components:
-  immich_web:
-    enabled: true
-    image: "ghcr.io/immich-app/immich-web:latest"
-    container_name: "immich-web"
-    port: 3000
-    volumes:
-      - "{{ docker_dir }}/immich/web:/config"
-      - "{{ logs_dir }}/immich/web:/logs"
-    environment:
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - immich-server
-
-  immich_postgres:
-    enabled: true
-    image: "postgres:14-alpine"
-    container_name: "immich-postgres"
-    volumes:
-      - "{{ docker_dir }}/immich/postgres:/var/lib/postgresql/data"
-      - "{{ logs_dir }}/immich/immich-postgres:/logs"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD={{ vault_media_database_password }}
-      - POSTGRES_DB=immich
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-
-  immich_redis:
-    enabled: true
-    image: "redis:alpine"
-    container_name: "immich-redis"
-    command: "redis-server --requirepass redis"
-    volumes:
-      - "{{ docker_dir }}/immich/redis:/data"
-      - "{{ logs_dir }}/immich/redis:/logs"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-
-  immich_ml:
-    enabled: true
-    image: "ghcr.io/immich-app/immich-machine-learning:latest"
-    container_name: "immich-machine-learning"
-    port: 3003
-    volumes:
-      - "{{ docker_dir }}/immich/ml:/config"
-      - "{{ logs_dir }}/immich/ml:/logs"
-    environment:
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - immich-server
+# Health Check Configuration
+media_health_check_enabled: true
+media_health_check_path: "/health"
+media_health_check_interval: 30
+media_health_check_timeout: 10
+media_health_check_retries: 3
 
 # Monitoring Integration
 media_monitoring_enabled: true
-media_metrics_enabled: true
-media_health_check_enabled: true
-media_health_check_interval: 30
+media_prometheus_enabled: true
+media_grafana_enabled: true
 
-# Security Configuration
-media_security_headers: true
-media_rate_limiting: true
-media_rate_limit_requests: 100
-media_rate_limit_window: 60
-media_cors_enabled: false
-media_cors_origins: []
-media_allow_anonymous_access: false
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 media_backup_enabled: true
 media_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-media_backup_retention: 7  # Keep backups for 7 days
-media_backup_compression: true
-media_backup_include_media: true
-media_backup_include_database: true
-media_backup_include_config: true
-media_backup_dir: "{{ backup_dir }}/media"
-media_backup_retention_days: 7
-media_backup_compression: true
-media_backup_log_file: "{{ logs_dir }}/media/backup/backup.log"
-media_backup_max_log_size: "10M"
-media_backup_notifications_enabled: true
+media_backup_retention_days: 30
+media_backup_encryption_enabled: true
+media_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-media_log_level: "info"  # Options: debug, info, warn, error
-media_log_format: "json"
-media_log_retention: 30  # Days
-media_log_rotation: true
-media_health_check_log_file: "{{ logs_dir }}/media/health/health.log"
-media_health_check_max_log_size: "10M"
-media_health_check_retention_days: 7
-media_health_check_timeout: 30
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+media_smtp_enabled: false
+media_smtp_host: "{{ smtp_host | default('') }}"
+media_smtp_port: "{{ smtp_port | default(587) }}"
+media_smtp_username: "{{ vault_smtp_username }}"
+media_smtp_password: "{{ vault_media_smtp_password }}"
+media_smtp_from: "{{ media_admin_email | default('admin@' + domain) }}"
+media_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+media_webhook_enabled: false
+media_webhook_url: "{{ vault_webhook_url | default('') }}"
+media_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+media_discovery_enabled: true
+media_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-media_memory_limit: "8g"
-media_cpu_limit: "4.0"
-media_storage_limit: "500g"
+media_cpu_limit: "1.0"
+media_memory_limit: "1g"
+media_memory_reservation: "512m"
 
-# Traefik Configuration
-media_traefik_enabled: true
-media_traefik_network: "{{ traefik_network }}"
-media_traefik_middleware: "secure-headers,compress"
-media_traefik_auth_middleware: "authentik@docker"
-media_traefik_ssl_enabled: true
-media_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Performance Settings
+media_scan_interval: 10
+media_parallel_downloads: 3
+media_auto_download_enabled: true
 
-# Homepage Integration
-media_homepage_enabled: true
-media_homepage_category: "Media"
-media_homepage_description: "Media Management & Streaming"
-media_homepage_icon: "media.png"
-media_homepage_widget_enabled: true
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
 
-# Telegraf Integration
-media_telegraf_enabled: true
-media_telegraf_metrics: true
-media_telegraf_logs: true
+# Log Settings
+media_log_level: "info"  # Options: trace, debug, info, warn, error
+media_log_rotation_enabled: true
+media_log_retention_days: 30
 
-# Prometheus Integration
-media_prometheus_enabled: true
-media_prometheus_metrics: true
-media_prometheus_scrape_interval: 30
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Grafana Integration
-media_grafana_enabled: true
-media_grafana_dashboard: true
-media_grafana_datasource: "prometheus"
+# Security Headers
+media_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Loki Integration
-media_loki_enabled: true
-media_loki_logs: true
+# Rate Limiting
+media_rate_limit_enabled: true
+media_rate_limit_requests: 100
+media_rate_limit_window: 60
 
-# Alerting Configuration
-media_alerting_enabled: true
-media_alerting_provider: "alertmanager"
-media_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
 
-# CrowdSec Integration
-media_crowdsec_enabled: true
-media_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
+# Deployment Settings
+media_deploy_enabled: true
+media_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+media_restart_policy: "unless-stopped"
+media_auto_update_enabled: true
 
-# Fail2ban Integration
-media_fail2ban_enabled: true
-media_fail2ban_jail: "media-stack"
-media_fail2ban_max_retry: 5
-media_fail2ban_bantime: 3600
+# Environment Variables
+media_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  MEDIA_API_KEY: "{{ media_api_key }}"
+  MEDIA_SECRET_KEY: "{{ media_secret_key }}"
+  MEDIA_ENCRYPTION_KEY: "{{ media_encryption_key }}"
+  MEDIA_JWT_SECRET: "{{ media_jwt_secret }}"
 
-# Service Dependencies
-media_dependencies:
-  - "docker"
-  - "traefik"
-  - "monitoring_infrastructure"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Health Check Configuration
-media_health_check_url: "/health"
-media_health_check_timeout: 10
-media_health_check_retries: 3
+# Validation Settings
+media_validation_enabled: true
+media_validation_timeout: 300
+media_validation_retries: 3
 
-# API Configuration
-media_api_enabled: true
-media_api_version: "v1"
-media_api_rate_limit: 1000
-media_api_rate_limit_window: 3600
+# Testing Configuration
+media_test_enabled: false
+media_test_items: 3
 
-# Webhook Configuration
-media_webhooks_enabled: true
-media_webhook_events:
-  - "download_completed"
-  - "media_imported"
-  - "service_status_changed"
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
 
-# Notification Configuration
-media_notifications_enabled: true
-media_notification_channels:
-  - "email"
-  - "webhook"
-  - "slack"
-  - "discord"
+# Compliance Settings
+media_compliance_enabled: true
+media_audit_logging_enabled: true
+media_access_logging_enabled: true
 
-# Email Configuration
-media_email_enabled: false
-media_smtp_host: "{{ smtp_host | default('localhost') }}"
-media_smtp_port: "{{ smtp_port | default(587) }}"
-media_smtp_username: "{{ vault_smtp_username | default('') }}"
-media_smtp_password: "{{ vault_smtp_password | default('') }}"
-media_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
 
-# Slack Configuration
-media_slack_enabled: false
-media_slack_webhook: "{{ vault_slack_webhook | default('') }}"
-media_slack_channel: "{{ slack_channel | default('#alerts') }}"
+# Automation Scripts
+media_automation_enabled: true
+media_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
 
-# Discord Configuration
-media_discord_enabled: false
-media_discord_webhook: "{{ vault_discord_webhook | default('') }}"
-media_discord_channel: "{{ discord_channel | default('alerts') }}"
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
 
-# Custom Configuration
-media_custom_config: {}
-media_environment_variables: {}
-media_volume_mounts: []
-media_extra_labels: {}
+# Default Values
+media_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+media_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
 
-# Maintenance Configuration
-media_maintenance_enabled: true
-media_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM on Sunday
-media_maintenance_window: 3600  # 1 hour
-media_maintenance_tasks:
-  - "cleanup_old_downloads"
-  - "optimize_database"
-  - "cleanup_temp_files"
-  - "update_search_index"
-
-# Performance Configuration
-media_performance_mode: "production"
-media_cache_enabled: true
-media_cache_size: "1g"
-media_cache_ttl: 3600
-
-# Development Configuration
-media_debug_enabled: false
-media_debug_port: 5678
-media_debug_host: "0.0.0.0"
-
-# Update Configuration
-media_update_enabled: true
-media_update_schedule: "0 4 * * 0"  # Weekly at 4 AM on Sunday
-media_update_backup_before: true
-media_update_rollback_on_failure: true
-
-# Watchtower Configuration
-media_watchtower_enabled: false
-media_watchtower_image: "containrrr/watchtower:latest"
-media_watchtower_container_name: "media-watchtower"
-media_watchtower_schedule: "0 4 * * 0"
-media_watchtower_cleanup: true
-media_watchtower_include_restarting: true
-media_watchtower_include_stopped: false
-media_watchtower_revive_stopped: false
-media_watchtower_remove_volumes: false
-media_watchtower_no_pull: false
-media_watchtower_no_startup_message: false
-media_watchtower_http_api_token: "{{ vault_watchtower_token | default('') }}"
-
-# Service-specific configuration variables for templates
-media_enable_downloaders: true
-media_enable_sabnzbd: true
-media_enable_qbittorrent: true
-media_enable_arr_services: true
-media_enable_sonarr: true
-media_enable_radarr: true
-media_enable_lidarr: true
-media_enable_readarr: true
-media_enable_prowlarr: true
-media_enable_bazarr: true
-media_enable_pulsarr: true
-media_enable_overseerr: true
-media_enable_players: true
-media_enable_plex: true
-media_enable_jellyfin: true
-media_enable_immich: true
-
-# Service configuration directories
-media_sabnzbd_config_dir: "{{ docker_dir }}/sabnzbd/config"
-media_qbittorrent_config_dir: "{{ docker_dir }}/qbittorrent/config"
-media_sonarr_config_dir: "{{ docker_dir }}/sonarr/config"
-media_radarr_config_dir: "{{ docker_dir }}/radarr/config"
-media_lidarr_config_dir: "{{ docker_dir }}/lidarr/config"
-media_readarr_config_dir: "{{ docker_dir }}/readarr/config"
-media_prowlarr_config_dir: "{{ docker_dir }}/prowlarr/config"
-media_bazarr_config_dir: "{{ docker_dir }}/bazarr/config"
-media_pulsarr_config_dir: "{{ docker_dir }}/pulsarr/config"
-media_overseerr_config_dir: "{{ docker_dir }}/overseerr/config"
-media_plex_config_dir: "{{ docker_dir }}/plex/config"
-media_jellyfin_config_dir: "{{ docker_dir }}/jellyfin/config"
-media_immich_config_dir: "{{ docker_dir }}/immich/config"
-
-# Service container names
-media_sabnzbd_container_name: "sabnzbd"
-media_qbittorrent_container_name: "qbittorrent"
-media_sonarr_container_name: "sonarr"
-media_radarr_container_name: "radarr"
-media_lidarr_container_name: "lidarr"
-media_readarr_container_name: "readarr"
-media_prowlarr_container_name: "prowlarr"
-media_bazarr_container_name: "bazarr"
-media_pulsarr_container_name: "pulsarr"
-media_overseerr_container_name: "overseerr"
-media_plex_container_name: "plex"
-media_jellyfin_container_name: "jellyfin"
-media_immich_container_name: "immich"
-
-# Service ports
-media_sabnzbd_port: 8080
-media_qbittorrent_port: 8081
-media_sonarr_port: 8989
-media_radarr_port: 7878
-media_lidarr_port: 8686
-media_readarr_port: 8787
-media_prowlarr_port: 9696
-media_bazarr_port: 6767
-media_pulsarr_port: 8088
-media_overseerr_port: 5055
-media_plex_port: 32400
-media_jellyfin_port: 8096
-media_immich_port: 3001
-
-# Service API keys (should be in vault)
-media_sabnzbd_api_key: "{{ vault_sabnzbd_api_key | default('') }}"
-media_sonarr_api_key: "{{ vault_sonarr_api_key | default('') }}"
-media_radarr_api_key: "{{ vault_radarr_api_key | default('') }}"
-media_lidarr_api_key: "{{ vault_lidarr_api_key | default('') }}"
-media_readarr_api_key: "{{ vault_readarr_api_key | default('') }}"
-media_prowlarr_api_key: "{{ vault_prowlarr_api_key | default('') }}"
-media_bazarr_api_key: "{{ vault_bazarr_api_key | default('') }}"
-
-# Lidarr Additional Configuration
-media_lidarr_username: "{{ vault_lidarr_username }}"
-media_lidarr_password: "{{ vault_lidarr_password | default('') }}"
-media_lidarr_anonymous_id: "{{ vault_lidarr_anonymous_id | default('') }}"
-media_qbittorrent_username: "{{ vault_qbittorrent_username }}"
-media_qbittorrent_password: "{{ vault_qbittorrent_password | default('') }}"
-media_lastfm_username: "{{ vault_lastfm_username | default('') }}"
+# Fallback Configuration
+media_fallback_enabled: true
+media_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

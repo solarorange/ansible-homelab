@@ -194,11 +194,11 @@ main_health_check() {
     
     # Check specific services (simplified - would normally parse YAML)
     services=(
-        "traefik:http://localhost:8080/api/health:GET:200:10"
-        "grafana:http://localhost:3000/api/health:GET:200:10"
-        "prometheus:http://localhost:9090/-/healthy:GET:200:10"
-        "postgresql:localhost:5432:TCP:connected:5"
-        "redis:localhost:6379:TCP:connected:5"
+        "traefik:http://{{ ansible_default_ipv4.address }}:8080/api/health:GET:200:10"
+        "grafana:http://{{ ansible_default_ipv4.address }}:3000/api/health:GET:200:10"
+        "prometheus:http://{{ ansible_default_ipv4.address }}:/-/healthy:GET:200:10"
+        "postgresql:{{ ansible_default_ipv4.address }}::TCP:connected:5"
+        "redis:{{ ansible_default_ipv4.address }}::TCP:connected:5"
     )
     
     for service_config in "${services[@]}"; do

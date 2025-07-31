@@ -132,7 +132,7 @@
       case "$1" in
         status)
           docker ps -f name=readarr
-          curl -s http://localhost:8787/api/v1/health
+          curl -s http://{{ ansible_default_ipv4.address }}:8787/api/v1/health
           ;;
         logs)
           docker logs readarr --tail 100 -f
@@ -167,13 +167,13 @@
       fi
       
       # Check if Readarr is responding
-      if ! curl -s -f http://localhost:8787/api/v1/health > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8787/api/v1/health > /dev/null; then
         echo "Readarr is not responding"
         exit 1
       fi
       
       # Check Readarr status
-      STATUS=$(curl -s http://localhost:8787/api/v1/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Readarr status is $STATUS"
         exit 1
@@ -207,7 +207,7 @@
     job: "logrotate {{ docker_dir }}/readarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add Readarr backup to crontab
   ansible.builtin.cron:
@@ -215,4 +215,4 @@
     job: "{{ docker_dir }}/readarr/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

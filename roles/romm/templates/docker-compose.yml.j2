@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  romm:
+    image: {{ romm_image }}
+    container_name: {{ romm_container_name }}
+    restart: {{ romm_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in romm_environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in romm_volumes %}
+      - {{ volume }}
+      {% endfor %}
+    
+    # Ports
+    ports:
+      - "{{ romm_external_port }}:{{ romm_internal_port }}"
+    
+    # Networks
+    networks:
+      {% for network in romm_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if romm_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.romm.rule=Host(`{{ romm_domain }}`)"
+      - "traefik.http.routers.romm.entrypoints=https"
+      - "traefik.http.routers.romm.tls=true"
+      - "traefik.http.routers.romm.tls.certresolver=cloudflare"
+      - "traefik.http.services.romm.loadbalancer.server.port={{ romm_internal_port }}"
+      {% if romm_traefik_middleware is defined %}
+      - "traefik.http.routers.romm.middlewares={{ romm_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if romm_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ romm_internal_port }}/ || exit 1"]
+      interval: {{ romm_healthcheck_interval }}
+      timeout: {{ romm_healthcheck_timeout }}
+      retries: {{ romm_healthcheck_retries }}
+      start_period: {{ romm_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    {% if romm_security_enabled | default(true) %}
+    security_opt:
+      - no-new-privileges:{{ romm_no_new_privileges | default(true) }}
+    {% endif %}
+    
+    # Read-only root filesystem
+    read_only: {{ romm_read_only | default(false) }}
+    tmpfs:
+      - /tmp
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: {{ romm_memory_limit }}
+          cpus: '{{ romm_cpu_limit }}'
+        reservations:
+          memory: {{ romm_memory_reservation }}
+          cpus: '{{ romm_cpu_reservation }}'
+    
+    # Dependencies
+    {% if romm_dependencies is defined %}
+    depends_on:
+      {% for dependency in romm_dependencies %}
+      {{ dependency }}:
+        condition: service_healthy
+      {% endfor %}
+    {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  homelab:
+    external: true
+  default:
+    driver: bridge

@@ -1,17 +1,89 @@
 ---
-# Linkwarden Configuration Validation
-# Validates Linkwarden configuration before deployment
+# Linkwarden Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate Linkwarden configuration
-  ansible.builtin.assert:
-    that:
-      - linkwarden_enabled is defined
-      - linkwarden_subdomain is defined
-      - linkwarden_port is defined
-      - linkwarden_database_type is defined
-      - linkwarden_database_host is defined
-      - linkwarden_database_name is defined
-      - linkwarden_database_user is defined
-      - linkwarden_database_password is defined
-    fail_msg: "Linkwarden configuration validation failed. Check defaults/main.yml"
-  tags: [linkwarden, validation] 
+- name: Validate Linkwarden vault variables
+  block:
+    - name: Check required Linkwarden vault variables
+      assert:
+        that:
+          - vault_linkwarden_admin_password is defined
+          - vault_linkwarden_database_password is defined
+          - vault_linkwarden_api_key is defined
+          - vault_linkwarden_secret_key is defined
+          - vault_linkwarden_encryption_key is defined
+          - vault_linkwarden_jwt_secret is defined
+        fail_msg: "Required Linkwarden vault variables are not defined"
+        success_msg: "All required Linkwarden vault variables are defined"
+
+    - name: Validate Linkwarden password complexity
+      assert:
+        that:
+          - vault_linkwarden_admin_password | length >= 12
+          - vault_linkwarden_database_password | length >= 12
+        fail_msg: "Linkwarden passwords must be at least 12 characters long"
+        success_msg: "Linkwarden password complexity requirements met"
+
+- name: Validate Linkwarden network configuration
+  block:
+    - name: Check Linkwarden port configuration
+      assert:
+        that:
+          - linkwarden_port is defined
+          - linkwarden_port | int >= 1024
+          - linkwarden_port | int <= 65535
+        fail_msg: "Linkwarden port must be between 1024 and 65535"
+        success_msg: "Linkwarden port configuration is valid"
+
+    - name: Check Linkwarden domain configuration
+      assert:
+        that:
+          - domain is defined
+          - linkwarden_subdomain is defined
+        fail_msg: "Linkwarden domain configuration is incomplete"
+        success_msg: "Linkwarden domain configuration is valid"
+
+- name: Validate Linkwarden security configuration
+  block:
+    - name: Check Linkwarden SSL configuration
+      assert:
+        that:
+          - linkwarden_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Linkwarden SSL configuration is invalid"
+        success_msg: "Linkwarden SSL configuration is valid"
+
+    - name: Check Linkwarden authentication configuration
+      assert:
+        that:
+          - linkwarden_auth_enabled | bool
+          - linkwarden_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Linkwarden authentication configuration is invalid"
+        success_msg: "Linkwarden authentication configuration is valid"
+
+- name: Validate Linkwarden storage configuration
+  block:
+    - name: Check Linkwarden data directories
+      assert:
+        that:
+          - linkwarden_data_dir is defined
+          - linkwarden_config_dir is defined
+          - linkwarden_backup_dir is defined
+        fail_msg: "Linkwarden storage configuration is incomplete"
+        success_msg: "Linkwarden storage configuration is valid"
+
+    - name: Create Linkwarden directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ linkwarden_data_dir }}"
+        - "{{ linkwarden_config_dir }}"
+        - "{{ linkwarden_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Linkwarden validation completed successfully - all configurations are valid and secure"

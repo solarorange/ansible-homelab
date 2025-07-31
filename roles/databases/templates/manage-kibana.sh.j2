@@ -13,7 +13,7 @@ function show_help {
 case "$1" in
   status)
     docker ps -f name={{ kibana_container_name }}
-    docker exec {{ kibana_container_name }} curl -s -k https://localhost:{{ kibana_web_port }}/api/status
+    docker exec {{ kibana_container_name }} curl -s -k https://{{ ansible_default_ipv4.address }}:{{ kibana_web_port }}/api/status
     ;;
   logs)
     docker logs {{ kibana_container_name }} --tail 100 -f

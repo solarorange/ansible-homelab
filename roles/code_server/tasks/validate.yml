@@ -1,0 +1,89 @@
+---
+# Code_Server Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Code_Server vault variables
+  block:
+    - name: Check required Code_Server vault variables
+      assert:
+        that:
+          - vault_code_server_admin_password is defined
+          - vault_code_server_database_password is defined
+          - vault_code_server_api_key is defined
+          - vault_code_server_secret_key is defined
+          - vault_code_server_encryption_key is defined
+          - vault_code_server_jwt_secret is defined
+        fail_msg: "Required Code_Server vault variables are not defined"
+        success_msg: "All required Code_Server vault variables are defined"
+
+    - name: Validate Code_Server password complexity
+      assert:
+        that:
+          - vault_code_server_admin_password | length >= 12
+          - vault_code_server_database_password | length >= 12
+        fail_msg: "Code_Server passwords must be at least 12 characters long"
+        success_msg: "Code_Server password complexity requirements met"
+
+- name: Validate Code_Server network configuration
+  block:
+    - name: Check Code_Server port configuration
+      assert:
+        that:
+          - code_server_port is defined
+          - code_server_port | int >= 1024
+          - code_server_port | int <= 65535
+        fail_msg: "Code_Server port must be between 1024 and 65535"
+        success_msg: "Code_Server port configuration is valid"
+
+    - name: Check Code_Server domain configuration
+      assert:
+        that:
+          - domain is defined
+          - code_server_subdomain is defined
+        fail_msg: "Code_Server domain configuration is incomplete"
+        success_msg: "Code_Server domain configuration is valid"
+
+- name: Validate Code_Server security configuration
+  block:
+    - name: Check Code_Server SSL configuration
+      assert:
+        that:
+          - code_server_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Code_Server SSL configuration is invalid"
+        success_msg: "Code_Server SSL configuration is valid"
+
+    - name: Check Code_Server authentication configuration
+      assert:
+        that:
+          - code_server_auth_enabled | bool
+          - code_server_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Code_Server authentication configuration is invalid"
+        success_msg: "Code_Server authentication configuration is valid"
+
+- name: Validate Code_Server storage configuration
+  block:
+    - name: Check Code_Server data directories
+      assert:
+        that:
+          - code_server_data_dir is defined
+          - code_server_config_dir is defined
+          - code_server_backup_dir is defined
+        fail_msg: "Code_Server storage configuration is incomplete"
+        success_msg: "Code_Server storage configuration is valid"
+
+    - name: Create Code_Server directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ code_server_data_dir }}"
+        - "{{ code_server_config_dir }}"
+        - "{{ code_server_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Code_Server validation completed successfully - all configurations are valid and secure"

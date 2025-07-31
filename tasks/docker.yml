@@ -134,28 +134,28 @@
             "live-restore": true,
             "userland-proxy": false,
             "experimental": false,
-            "metrics-addr": "127.0.0.1:9323",
+            "metrics-addr": "{{ ansible_default_ipv4.address }}:9323",
             "default-address-pools": [
               {
-                "base": "172.17.0.0/16",
+                "base": "{{ ansible_default_ipv4.address }}/16",
                 "size": 24
               },
               {
-                "base": "172.18.0.0/16",
+                "base": "{{ ansible_default_ipv4.address }}/16",
                 "size": 24
               },
               {
-                "base": "172.19.0.0/16",
+                "base": "{{ ansible_default_ipv4.address }}/16",
                 "size": 24
               },
               {
-                "base": "172.20.0.0/14",
+                "base": "{{ ansible_default_ipv4.address }}/14",
                 "size": 24
               }
             ],
             "dns": ["1.1.1.1", "8.8.8.8"],
-            "bip": "172.17.0.1/16",
-            "fixed-cidr": "172.17.0.0/16"
+            "bip": "{{ ansible_default_ipv4.address }}/16",
+            "fixed-cidr": "{{ ansible_default_ipv4.address }}/16"
           }
         dest: /etc/docker/daemon.json
         mode: "0644"
@@ -183,7 +183,7 @@
     - name: Wait for Docker to be ready
       ansible.builtin.wait_for:
         port: 2375
-        host: 127.0.0.1
+        host: {{ ansible_default_ipv4.address }}
         timeout: 60
       register: docker_ready
       retries: 3

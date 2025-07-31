@@ -139,7 +139,7 @@
           backend = systemd     # Use systemd backend
           
           # Email notifications
-          destemail = {{ username }}@localhost  # Alert recipient
+          destemail = {{ username }}@{{ ansible_default_ipv4.address }}  # Alert recipient
           sendername = Fail2Ban-{{ inventory_hostname }}  # Sender name
           mta = sendmail        # Mail transfer agent
           action = %(action_mwl)s  # Action with mail notification
@@ -350,7 +350,7 @@
         name: "AIDE integrity check"
         hour: "3"
         minute: "30"
-        job: "/usr/bin/aide --check 2>&1 | mail -s 'AIDE Report' {{ username }}@localhost"
+        job: "/usr/bin/aide --check 2>&1 | mail -s 'AIDE Report' {{ username }}@{{ ansible_default_ipv4.address }}"
         user: root
 
 - name: Configure ClamAV antivirus
@@ -521,7 +521,7 @@
           
           # Alert administrator (customize as needed)
           echo "Security incident detected on $(hostname) at $(date)" | \
-            mail -s "SECURITY INCIDENT" {{ username }}@localhost 2>/dev/null || true
+            mail -s "SECURITY INCIDENT" {{ username }}@{{ ansible_default_ipv4.address }} 2>/dev/null || true
         dest: "{{ config_dir }}/incident-response.sh"
         owner: "{{ username }}"
         group: "{{ username }}"
@@ -576,7 +576,7 @@
         hour: "7"
         minute: "0"
         job: "{{ config_dir }}/security-monitor.sh"
-        user: "{{ username }}"
+        user: "{{ vault_security_user }}"
 
     - name: Schedule security updates
       ansible.builtin.cron:
@@ -777,8 +777,8 @@
         homelab_pub: "{{ lookup('file', ansible_user_home + '/.ssh/homelab_key.pub') }}"
       
       vault_credentials:
-        admin_password: "{{ vault_fail2ban_secret_key }}"
-        database_password: "{{ vault_pihole_database_password }}"
+        admin_password: "{{ vault_security_password }}"
+        database_password: "{{ vault_security_password }}"
         api_keys:
           traefik: "{{ vault_traefik_api_key }}"
           portainer: "{{ vault_portainer_api_key }}"

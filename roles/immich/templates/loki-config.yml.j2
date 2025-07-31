@@ -8,7 +8,7 @@ server:
   grpc_listen_port: 9096
 
 common:
-  instance_addr: 127.0.0.1
+  instance_addr: {{ ansible_default_ipv4.address }}
   path_prefix: /var/lib/loki
   storage:
     filesystem:
@@ -58,12 +58,12 @@ table_manager:
 # Query frontend config
 query_frontend:
   compress_responses: true
-  downstream_url: http://localhost:3100
+  downstream_url: http://{{ ansible_default_ipv4.address }}:3100
 
 # Ingester config
 ingester:
   lifecycler:
-    address: 127.0.0.1
+    address: {{ ansible_default_ipv4.address }}
     ring:
       kvstore:
         store: inmemory

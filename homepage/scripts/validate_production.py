@@ -237,7 +237,7 @@ class ProductionValidator:
         
         # Check homepage accessibility
         try:
-            response = requests.get("http://localhost:3000", timeout=10)
+            response = requests.get("http://{{ ansible_default_ipv4.address }}:3000", timeout=10)
             if response.status_code == 200:
                 self.results["deployment"]["homepage_access"] = "PASS"
                 logger.info("✓ Homepage accessible")
@@ -257,7 +257,7 @@ class ProductionValidator:
         # Test response time
         try:
             start_time = time.time()
-            response = requests.get("http://localhost:3000", timeout=10)
+            response = requests.get("http://{{ ansible_default_ipv4.address }}:3000", timeout=10)
             response_time = time.time() - start_time
             
             if response_time < 2.0:
@@ -315,8 +315,8 @@ class ProductionValidator:
         
         # Test API endpoints
         api_endpoints = [
-            "http://localhost:3000/api/services",
-            "http://localhost:3000/api/widgets"
+            "http://{{ ansible_default_ipv4.address }}:3000/api/services",
+            "http://{{ ansible_default_ipv4.address }}:3000/api/widgets"
         ]
         
         for endpoint in api_endpoints:

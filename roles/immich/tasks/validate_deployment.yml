@@ -33,11 +33,11 @@
         timeout: 30
       register: health_checks
       loop:
-        - url: "http://127.0.0.1:{{ immich_ports.server }}/api/health"
+        - url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.server }}/api/health"
           service: "Immich Server"
-        - url: "http://127.0.0.1:{{ immich_ports.web }}/health"
+        - url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.web }}/health"
           service: "Immich Web"
-        - url: "http://127.0.0.1:{{ immich_ports.machine_learning }}/health"
+        - url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.machine_learning }}/health"
           service: "Immich ML"
       tags: [immich, validation]
 
@@ -82,7 +82,7 @@
 
     - name: Check Immich port accessibility
       ansible.builtin.wait_for:
-        host: "127.0.0.1"
+        host: "{{ ansible_default_ipv4.address }}"
         port: "{{ item }}"
         timeout: 30
       loop:

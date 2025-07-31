@@ -76,7 +76,7 @@
 
     - name: Wait for ARR services to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
         method: GET
         status_code: 200
       register: arr_health
@@ -219,7 +219,7 @@
 
     - name: Configure ARR service API keys
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/api/v3/system/status"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/api/v3/system/status"
         method: GET
         status_code: 200
       register: arr_api_keys
@@ -228,7 +228,7 @@
 
     - name: Verify ARR service deployment
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
         method: GET
         status_code: 200
       loop: "{{ media_arr_services | dict2items }}"

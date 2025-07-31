@@ -4,10 +4,10 @@
 
 - name: Wait for Grafana API to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/admin/users"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -20,7 +20,7 @@
 - name: Create Grafana users via Python script
   ansible.builtin.command: >
     python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
-    --url http://localhost:{{ grafana_port }}
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
     --username {{ grafana_admin_user }}
     --password {{ grafana_admin_password }}
     --config-dir {{ docker_dir }}/monitoring/grafana/config
@@ -33,7 +33,7 @@
 - name: Create Grafana teams via Python script
   ansible.builtin.command: >
     python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
-    --url http://localhost:{{ grafana_port }}
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
     --username {{ grafana_admin_user }}
     --password {{ grafana_admin_password }}
     --config-dir {{ docker_dir }}/monitoring/grafana/config
@@ -45,10 +45,10 @@
 
 - name: Validate users configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/admin/users"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -57,10 +57,10 @@
 
 - name: Validate teams configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/teams/search"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/teams/search"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30

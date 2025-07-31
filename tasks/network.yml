@@ -93,7 +93,7 @@
 
     - name: Set UFW default policies
       community.general.ufw:
-        default: "{{ item.default }}"
+        user: "{{ vault_service_user }}"
         direction: "{{ item.direction }}"
       loop:
         - { direction: incoming, default: deny }
@@ -130,10 +130,10 @@
         from: "{{ item }}"
         comment: 'Docker internal networks'
       loop:
-        - "172.17.0.0/16"
-        - "172.18.0.0/16"
-        - "172.19.0.0/16"
-        - "172.20.0.0/14"
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/14"
 
     - name: Allow local network access
       community.general.ufw:
@@ -212,7 +212,7 @@
           ping -c 3 {{ domain }} >/dev/null 2>&1 && echo "✓ Domain: OK" || echo "✗ Domain: FAIL"
           
           echo -e "\nPort Scanning (External):"
-          nmap -sT -O localhost | grep -E "^[0-9]+|^Host"
+          nmap -sT -O {{ ansible_default_ipv4.address }} | grep -E "^[0-9]+|^Host"
         dest: "{{ config_dir }}/network-monitor.sh"
         owner: "{{ username }}"
         group: "{{ username }}"
@@ -356,7 +356,7 @@
         name: "Network security monitoring"
         minute: "*/15"
         job: "{{ config_dir }}/security-monitor.sh"
-        user: "{{ username }}"
+        user: "{{ vault_service_user }}"
 
 - name: Configure network quality monitoring
   block:
@@ -413,7 +413,7 @@
         hour: "6"
         minute: "0"
         job: "{{ config_dir }}/quality-test.sh"
-        user: "{{ username }}"
+        user: "{{ vault_service_user }}"
 
 - name: Configure container network isolation
   block:
@@ -424,18 +424,18 @@
           # These rules are automatically applied by Docker/UFW integration
           
           # Allow containers to communicate within their networks
-          -A DOCKER-USER -s 172.20.0.0/16 -d 172.20.0.0/16 -j ACCEPT
-          -A DOCKER-USER -s 172.21.0.0/16 -d 172.21.0.0/16 -j ACCEPT
-          -A DOCKER-USER -s 172.22.0.0/16 -d 172.22.0.0/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
           
           # Block container to container communication across different networks
-          -A DOCKER-USER -s 172.20.0.0/16 -d 172.21.0.0/16 -j DROP
-          -A DOCKER-USER -s 172.20.0.0/16 -d 172.22.0.0/16 -j DROP
-          -A DOCKER-USER -s 172.21.0.0/16 -d 172.22.0.0/16 -j DROP
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
           
           # Allow monitoring network to access other networks
-          -A DOCKER-USER -s 172.21.0.0/16 -d 172.20.0.0/16 -j ACCEPT
-          -A DOCKER-USER -s 172.21.0.0/16 -d 172.22.0.0/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
           
           # Default policy for container isolation
           -A DOCKER-USER -j RETURN

@@ -40,7 +40,7 @@
         month: "{{ immich_backup_schedule.split()[3] }}"
         weekday: "{{ immich_backup_schedule.split()[4] }}"
         job: "{{ immich_config_dir }}/backup.sh >> {{ logs_dir }}/immich/backup/backup.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, backup]
 
     - name: Create Immich backup directories
@@ -74,7 +74,7 @@
         hour: "3"
         minute: "0"
         job: "{{ immich_config_dir }}/verify-backup.sh >> {{ logs_dir }}/immich/backup/verification.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, backup]
 
     - name: Create Immich backup retention script
@@ -92,7 +92,7 @@
         hour: "4"
         minute: "0"
         job: "{{ immich_config_dir }}/cleanup-backups.sh >> {{ logs_dir }}/immich/backup/cleanup.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, backup]
 
     - name: Generate Immich backup monitoring script
@@ -109,7 +109,7 @@
         name: "Immich Backup Monitoring"
         minute: "*/30"
         job: "{{ immich_config_dir }}/backup-monitor.sh >> {{ logs_dir }}/immich/backup/monitor.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, backup]
 
     - name: Create Immich backup systemd service

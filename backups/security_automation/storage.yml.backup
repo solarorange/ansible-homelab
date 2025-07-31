@@ -1,0 +1,441 @@
+---
+# Storage Configuration for Enhanced Homelab
+# Production-ready storage setup with optimization and monitoring
+
+- name: Install storage management tools
+  ansible.builtin.package:
+    name:
+      - lvm2
+      - parted
+      - gdisk
+      - smartmontools
+      - hdparm
+      - iotop
+      - ncdu
+      - tree
+      - rsync
+      - rclone
+      - fuse
+    state: present
+
+- name: Configure storage directories with proper permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "{{ item.mode | default('0755') }}"
+    recurse: "{{ item.recurse | default(false) }}"
+  loop:
+    - { path: "{{ docker_dir }}", mode: "0755" }
+    - { path: "{{ data_dir }}", mode: "0755" }
+    - { path: "{{ config_dir }}", mode: "0755" }
+    - { path: "{{ backup_dir }}", mode: "0750" }
+    - { path: "{{ logs_dir }}", mode: "0755" }
+    - { path: "/home/{{ username }}/.cache", mode: "0755" }
+    - { path: "/home/{{ username }}/.config", mode: "0755" }
+
+- name: Create detailed media directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop: "{{ media_directories }}"
+
+- name: Create application-specific storage directories
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop: "{{ enabled_services }}"
+
+- name: Configure filesystem optimization
+  ansible.builtin.blockinfile:
+    path: /etc/sysctl.conf
+    block: |
+      # Storage and filesystem optimization
+      
+      # Virtual memory settings
+      vm.dirty_ratio = 15
+      vm.dirty_background_ratio = 5
+      vm.dirty_expire_centisecs = 3000
+      vm.dirty_writeback_centisecs = 500
+      vm.swappiness = 10
+      
+      # File system settings
+      fs.file-max = 2097152
+      fs.inotify.max_user_watches = 524288
+      fs.inotify.max_user_instances = 512
+      fs.inotify.max_queued_events = 16384
+      
+      # I/O scheduler optimization
+      kernel.io_delay_type = 3
+    marker: "# {mark} HOMELAB STORAGE OPTIMIZATION"
+    backup: true
+
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl -p
+  changed_when: false
+
+- name: Configure disk I/O scheduler
+  block:
+    - name: Detect storage devices
+      ansible.builtin.shell: |
+        lsblk -dnio NAME,TYPE | awk '$2=="disk" {print $1}'
+      register: storage_devices
+      changed_when: false
+
+    - name: Set I/O scheduler for SSDs (mq-deadline)
+      ansible.builtin.shell: |
+        if [[ $(cat /sys/block/{{ item }}/queue/rotational) == "0" ]]; then
+          echo mq-deadline > /sys/block/{{ item }}/queue/scheduler
+        fi
+      loop: "{{ storage_devices.stdout_lines }}"
+      register: ssd_scheduler
+      ignore_errors: true
+      
+    - name: Handle SSD scheduler errors
+      ansible.builtin.debug:
+        msg: "SSD scheduler configuration completed with warnings for some devices"
+      when: ssd_scheduler.results | selectattr('failed', 'equalto', true) | list | length > 0
+
+    - name: Set I/O scheduler for HDDs (bfq)
+      ansible.builtin.shell: |
+        if [[ $(cat /sys/block/{{ item }}/queue/rotational) == "1" ]]; then
+          echo bfq > /sys/block/{{ item }}/queue/scheduler
+        fi
+      loop: "{{ storage_devices.stdout_lines }}"
+      register: hdd_scheduler
+      ignore_errors: true
+      
+    - name: Handle HDD scheduler errors
+      ansible.builtin.debug:
+        msg: "HDD scheduler configuration completed with warnings for some devices"
+      when: hdd_scheduler.results | selectattr('failed', 'equalto', true) | list | length > 0
+
+- name: Configure SMART monitoring
+  block:
+    - name: Enable SMART monitoring service
+      ansible.builtin.systemd:
+        name: smartd
+        enabled: true
+        state: started
+
+    - name: Configure SMART monitoring
+      ansible.builtin.copy:
+        content: |
+          # SMART monitoring configuration for homelab
+          
+          # Monitor all devices
+          DEVICESCAN -a -o on -S on -s (S/../.././02|L/../../6/03) \
+            -m {{ username }}@{{ ansible_default_ipv4.address }} \
+            -M exec /usr/share/smartmontools/smartd-runner
+          
+          # Custom monitoring for specific attributes
+          # Uncomment and modify as needed for your drives
+          # /dev/sda -a -d sat -o on -S on -s (S/../.././02|L/../../6/03) -m root
+        dest: /etc/smartd.conf
+        backup: true
+      notify: restart smartd
+
+- name: Create storage monitoring scripts
+  block:
+    - name: Create disk usage monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Disk usage monitoring for homelab
+          
+          REPORT_FILE="{{ logs_dir }}/storage-report-$(date +%Y%m%d).log"
+          THRESHOLD=80
+          
+          echo "Storage Report - $(date)" > "$REPORT_FILE"
+          echo "=========================" >> "$REPORT_FILE"
+          
+          echo -e "\nDisk Usage Summary:" >> "$REPORT_FILE"
+          df -h >> "$REPORT_FILE"
+          
+          echo -e "\nInode Usage:" >> "$REPORT_FILE"
+          df -i >> "$REPORT_FILE"
+          
+          echo -e "\nDirectory Sizes (Top 10):" >> "$REPORT_FILE"
+          du -sh {{ data_dir }}/* 2>/dev/null | sort -hr | head -10 >> "$REPORT_FILE"
+          
+          echo -e "\nDocker Storage Usage:" >> "$REPORT_FILE"
+          docker system df >> "$REPORT_FILE"
+          
+          echo -e "\nSMART Status:" >> "$REPORT_FILE"
+          for device in $(lsblk -dnio NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}'); do
+              echo "Device: $device" >> "$REPORT_FILE"
+              smartctl -H "$device" 2>/dev/null | grep -E "SMART overall-health|PASSED|FAILED" >> "$REPORT_FILE"
+          done
+          
+          # Check for high disk usage
+          echo -e "\nDisk Usage Alerts:" >> "$REPORT_FILE"
+          df -h | awk -v threshold="$THRESHOLD" '
+          NR>1 {
+              gsub(/%/, "", $5)
+              if ($5 > threshold) {
+                  print "⚠️  WARNING: " $6 " is " $5 "% full"
+              }
+          }' >> "$REPORT_FILE"
+          
+          # Docker volume analysis
+          echo -e "\nDocker Volume Usage:" >> "$REPORT_FILE"
+          docker volume ls -q | xargs -I {} docker volume inspect {} | \
+            jq -r '.[] | .Name + ": " + .Mountpoint' >> "$REPORT_FILE"
+        dest: "{{ config_dir }}/storage-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create storage cleanup script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Storage cleanup script for homelab
+          
+          echo "Starting storage cleanup - $(date)"
+          
+          # Docker cleanup
+          echo "Cleaning Docker resources..."
+          docker system prune -f
+          docker volume prune -f
+          docker image prune -a -f
+          
+          # Log file cleanup
+          echo "Cleaning old log files..."
+          find {{ logs_dir }} -name "*.log" -mtime +30 -delete
+          find /var/log -name "*.log.*" -mtime +7 -delete
+          
+          # Temporary file cleanup
+          echo "Cleaning temporary files..."
+          find /tmp -type f -mtime +7 -delete
+          find /var/tmp -type f -mtime +7 -delete
+          
+          # APT cache cleanup
+          if command -v apt >/dev/null 2>&1; then
+              echo "Cleaning APT cache..."
+              apt autoremove -y
+              apt autoclean
+          fi
+          
+          # Thumbnail cache cleanup
+          echo "Cleaning thumbnail caches..."
+          find /home/{{ username }}/.cache -name "*.thumb*" -mtime +30 -delete
+          
+          # Journal cleanup
+          echo "Cleaning systemd journal..."
+          journalctl --vacuum-time=30d
+          
+          # Application-specific cleanup
+          echo "Cleaning application caches..."
+          find {{ data_dir }} -name "*.tmp" -mtime +1 -delete
+          find {{ data_dir }} -name "Thumbs.db" -delete
+          find {{ data_dir }} -name ".DS_Store" -delete
+          
+          echo "Storage cleanup completed - $(date)"
+          
+          # Generate report
+          {{ config_dir }}/storage-monitor.sh
+        dest: "{{ config_dir }}/storage-cleanup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create storage performance test script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Storage performance testing script
+          
+          TEST_DIR="{{ data_dir }}/performance-test"
+          REPORT_FILE="{{ logs_dir }}/storage-performance-$(date +%Y%m%d-%H%M%S).log"
+          
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+          
+          echo "Storage Performance Test - $(date)" > "$REPORT_FILE"
+          echo "=================================" >> "$REPORT_FILE"
+          
+          # Disk information
+          echo -e "\nDisk Information:" >> "$REPORT_FILE"
+          lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE >> "$REPORT_FILE"
+          
+          # Sequential write test
+          echo -e "\nSequential Write Test (1GB):" >> "$REPORT_FILE"
+          sync && echo 3 > /proc/sys/vm/drop_caches
+          dd if=/dev/zero of=test_write bs=1M count=1024 conv=fdatasync 2>&1 | \
+            grep -E "copied|MB/s|GB/s" >> "$REPORT_FILE"
+          
+          # Sequential read test
+          echo -e "\nSequential Read Test:" >> "$REPORT_FILE"
+          sync && echo 3 > /proc/sys/vm/drop_caches
+          dd if=test_write of=/dev/null bs=1M 2>&1 | \
+            grep -E "copied|MB/s|GB/s" >> "$REPORT_FILE"
+          
+          # Random I/O test (if fio is available)
+          if command -v fio >/dev/null 2>&1; then
+              echo -e "\nRandom I/O Test (4K blocks):" >> "$REPORT_FILE"
+              fio --name=random-rw --ioengine=libaio --iodepth=4 --rw=randrw \
+                  --bs=4k --direct=1 --size=100M --numjobs=1 --runtime=30 \
+                  --group_reporting --filename=test_random 2>&1 | \
+                  grep -E "read:|write:|IOPS" >> "$REPORT_FILE"
+          fi
+          
+          # IOPS test with simple dd
+          echo -e "\nIOPS Test (4K random):" >> "$REPORT_FILE"
+          sync && echo 3 > /proc/sys/vm/drop_caches
+          dd if=/dev/urandom of=test_iops bs=4k count=10000 oflag=direct 2>&1 | \
+            grep -E "copied|MB/s" >> "$REPORT_FILE"
+          
+          # Cleanup test files
+          rm -f test_* 2>/dev/null
+          
+          echo -e "\nTest completed: $(date)" >> "$REPORT_FILE"
+          
+          # Display summary
+          cat "$REPORT_FILE"
+        dest: "{{ config_dir }}/storage-performance.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+- name: Configure automatic storage maintenance
+  block:
+    - name: Schedule daily storage monitoring
+      ansible.builtin.cron:
+        name: "Daily storage monitoring"
+        hour: "6"
+        minute: "30"
+        job: "{{ config_dir }}/storage-monitor.sh"
+        user: "{{ username }}"
+
+    - name: Schedule weekly storage cleanup
+      ansible.builtin.cron:
+        name: "Weekly storage cleanup"
+        weekday: "0"
+        hour: "3"
+        minute: "0"
+        job: "{{ config_dir }}/storage-cleanup.sh"
+        user: "{{ username }}"
+
+    - name: Schedule monthly performance test
+      ansible.builtin.cron:
+        name: "Monthly storage performance test"
+        day: "1"
+        hour: "4"
+        minute: "0"
+        job: "{{ config_dir }}/storage-performance.sh"
+        user: "{{ username }}"
+
+- name: Configure storage health monitoring
+  block:
+    - name: Create storage health check script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Storage health monitoring script
+          
+          ALERT_FILE="{{ logs_dir }}/storage-alerts.log"
+          DISK_THRESHOLD=85
+          INODE_THRESHOLD=90
+          
+          # Check disk usage
+          df -h | awk -v threshold="$DISK_THRESHOLD" '
+          NR>1 {
+              gsub(/%/, "", $5)
+              if ($5 > threshold) {
+                  print "ALERT: Disk " $6 " is " $5 "% full" >> "'"$ALERT_FILE"'"
+              }
+          }'
+          
+          # Check inode usage
+          df -i | awk -v threshold="$INODE_THRESHOLD" '
+          NR>1 {
+              gsub(/%/, "", $5)
+              if ($5 > threshold) {
+                  print "ALERT: Inodes on " $6 " are " $5 "% full" >> "'"$ALERT_FILE"'"
+              }
+          }'
+          
+          # Check SMART status
+          for device in $(lsblk -dnio NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}'); do
+              if ! smartctl -H "$device" 2>/dev/null | grep -q "PASSED"; then
+                  echo "ALERT: SMART test failed for $device" >> "$ALERT_FILE"
+              fi
+          done
+          
+          # Check for filesystem errors
+          dmesg | grep -i "error\|fail\|corrupt" | tail -5 >> "$ALERT_FILE"
+          
+          # If alerts exist, send notification (customize as needed)
+          if [ -s "$ALERT_FILE" ]; then
+              echo "Storage alerts detected on $(hostname) at $(date)" | \
+                mail -s "Storage Alert" {{ username }}@{{ ansible_default_ipv4.address }} 2>/dev/null || true
+          fi
+        dest: "{{ config_dir }}/storage-health.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule storage health checks
+      ansible.builtin.cron:
+        name: "Storage health monitoring"
+        minute: "*/30"
+        job: "{{ config_dir }}/storage-health.sh"
+        user: "{{ username }}"
+
+- name: Configure filesystem tuning
+  block:
+    - name: Detect filesystem types
+      ansible.builtin.shell: |
+        findmnt -n -o FSTYPE {{ item }}
+      register: fs_types
+      loop:
+        - "{{ docker_dir }}"
+        - "{{ data_dir }}"
+      changed_when: false
+
+    - name: Optimize ext4 filesystems
+      ansible.builtin.shell: |
+        tune2fs -o journal_data_writeback {{ ansible_mounts | selectattr('mount', 'equalto', item) | map(attribute='device') | first }}
+      loop:
+        - "{{ docker_dir }}"
+        - "{{ data_dir }}"
+      when: fs_types.results[ansible_loop.index0].stdout == "ext4"
+      ignore_errors: true
+
+- name: Display storage configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Storage Configuration Complete:
+      
+      Directory Structure:
+      - Docker: {{ docker_dir }}
+      - Data: {{ data_dir }}
+      - Config: {{ config_dir }}
+      - Backup: {{ backup_dir }}
+      - Logs: {{ logs_dir }}
+      
+      Monitoring Scripts:
+      - Usage Monitor: {{ config_dir }}/storage-monitor.sh
+      - Cleanup: {{ config_dir }}/storage-cleanup.sh
+      - Performance: {{ config_dir }}/storage-performance.sh
+      - Health Check: {{ config_dir }}/storage-health.sh
+      
+      Scheduled Tasks:
+      - Daily monitoring at 06:30
+      - Weekly cleanup on Sunday at 03:00
+      - Monthly performance test on 1st at 04:00
+      - Health checks every 30 minutes
+      
+      Optimization Features:
+      - I/O scheduler optimization (SSD/HDD)
+      - SMART monitoring enabled
+      - Filesystem tuning applied
+      - Automatic cleanup configured

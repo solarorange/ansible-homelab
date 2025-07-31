@@ -1,6 +1,7 @@
 #!/bin/bash
-# Enhanced Seamless Homelab Deployment Setup
-# Truly turnkey deployment with automatic variable handling
+# Seamless Homelab Deployment Setup - PRIMARY SETUP SCRIPT
+# Complete turnkey deployment with automatic variable handling
+# This is the one and only comprehensive setup script for homelab deployment
 
 set -euo pipefail
 
@@ -13,7 +14,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Logging
-LOG_FILE="enhanced_deployment.log"
+LOG_FILE="seamless_deployment.log"
 exec 1> >(tee -a "$LOG_FILE")
 exec 2> >(tee -a "$LOG_FILE" >&2)
 
@@ -24,8 +25,10 @@ log() {
 print_header() {
     echo -e "${CYAN}"
     echo "================================================"
-    echo "  🚀 Enhanced Seamless Homelab Deployment"
-    echo "  🔐 Truly Turnkey & Automatic Setup"
+    echo "  🚀 Seamless Homelab Deployment"
+    echo "  🔐 Complete Turnkey & Automatic Setup"
+    echo "  📋 PRIMARY SETUP SCRIPT - No other setup needed"
+    echo "  🔧 INCLUDES SERVER PREPARATION - Stock Ubuntu to Homelab"
     echo "================================================"
     echo -e "${NC}"
 }
@@ -46,7 +49,7 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
-# Enhanced secure password generation
+# Secure password generation
 generate_secure_password() {
     local length=${1:-32}
     local complexity=${2:-"full"}
@@ -88,9 +91,74 @@ generate_db_password() {
     echo "Db${password}"
 }
 
-# Check prerequisites
+# Check prerequisites and offer server preparation
 check_prerequisites() {
-    print_step "1" "Checking prerequisites..."
+    print_step "1" "Checking prerequisites and server preparation..."
+    
+    # Check if we're on Ubuntu and if server preparation is needed
+    if [[ -f /etc/os-release ]] && grep -q "Ubuntu" /etc/os-release; then
+        echo ""
+        echo -e "${CYAN}🔍 Server Preparation Check${NC}"
+        
+        # Check if Docker is installed
+        if ! command -v docker &> /dev/null; then
+            print_warning "Docker not found - server preparation needed"
+            echo ""
+            echo -e "${YELLOW}Server Preparation Required:${NC}"
+            echo "This appears to be a stock Ubuntu installation that needs server preparation."
+            echo "The seamless setup can automatically prepare your server for homelab deployment."
+            echo ""
+            read -p "Run server preparation automation? [Y/n]: " run_server_prep
+            run_server_prep=${run_server_prep:-Y}
+            
+            if [[ $run_server_prep =~ ^[Yy]$ ]]; then
+                print_step "1.1" "Running server preparation automation..."
+                
+                # Check if running as root
+                if [[ $EUID -ne 0 ]]; then
+                    print_error "Server preparation requires root access"
+                    echo "Please run: sudo $0"
+                    exit 1
+                fi
+                
+                # Run server preparation
+                if [ -f "scripts/server_preparation.sh" ]; then
+                    echo "Executing server preparation script..."
+                    ./scripts/server_preparation.sh
+                    
+                    # After server prep, reload environment
+                    source ~/.bashrc 2>/dev/null || true
+                    
+                    print_success "Server preparation completed"
+                    echo ""
+                    echo -e "${GREEN}✅ Server is now ready for homelab deployment!${NC}"
+                    echo ""
+                else
+                    print_error "Server preparation script not found"
+                    echo "Please ensure scripts/server_preparation.sh exists"
+                    exit 1
+                fi
+            else
+                print_warning "Server preparation skipped"
+                echo "Please ensure your server has:"
+                echo "- Docker installed and running"
+                echo "- Ansible installed"
+                echo "- SSH keys configured"
+                echo "- Static IP configured"
+                echo "- Firewall configured"
+                echo ""
+                read -p "Continue with deployment? [y/N]: " continue_anyway
+                if [[ ! $continue_anyway =~ ^[Yy]$ ]]; then
+                    exit 1
+                fi
+            fi
+        else
+            print_success "Docker found - server appears to be prepared"
+        fi
+    else
+        print_warning "Not running on Ubuntu - server preparation not available"
+        echo "Server preparation is currently only available for Ubuntu systems"
+    fi
     
     local missing_deps=()
     
@@ -122,7 +190,7 @@ check_prerequisites() {
     fi
     
     # Check for sufficient entropy
-    if [ $(cat /proc/sys/kernel/random/entropy_avail) -lt 1000 ]; then
+    if [ -f /proc/sys/kernel/random/entropy_avail ] && [ $(cat /proc/sys/kernel/random/entropy_avail) -lt 1000 ]; then
         print_warning "Low entropy detected. Installing haveged..."
         if command -v apt &> /dev/null; then
             sudo apt install -y haveged
@@ -214,6 +282,42 @@ get_configuration() {
         read -p "Cloudflare Email: " cloudflare_email
         read -sp "Cloudflare API Token: " cloudflare_api_token
         echo
+        
+        # Offer DNS automation
+        echo ""
+        echo -e "${CYAN}DNS Automation (Optional):${NC}"
+        read -p "Automatically create all DNS records using Cloudflare API? [Y/n]: " dns_automation
+        dns_automation=${dns_automation:-Y}
+        
+        if [[ $dns_automation =~ ^[Yy]$ ]]; then
+            echo ""
+            echo -e "${GREEN}🎉 DNS Automation Enabled!${NC}"
+            echo "The setup will automatically create all required DNS records:"
+            echo "• Root domain (@) → $ip_address"
+            echo "• 40+ subdomains → $ip_address"
+            echo "• Automatic validation after creation"
+            echo ""
+            echo -e "${YELLOW}Required Cloudflare API Permissions:${NC}"
+            echo "• Zone:Zone:Read"
+            echo "• Zone:DNS:Edit"
+            echo "• Zone:Zone Settings:Edit"
+            echo ""
+        else
+            echo ""
+            echo -e "${YELLOW}Manual DNS Setup Required${NC}"
+            echo "You'll need to manually create these DNS records:"
+            echo "• Root domain (@) → $ip_address"
+            echo "• 40+ subdomains → $ip_address"
+            echo ""
+            echo -e "${CYAN}Quick DNS Setup Commands:${NC}"
+            echo "You can run this after setup to create DNS records:"
+            echo "python3 scripts/automate_dns_setup.py \\"
+            echo "  --domain $domain \\"
+            echo "  --server-ip $ip_address \\"
+            echo "  --cloudflare-email $cloudflare_email \\"
+            echo "  --cloudflare-api-token YOUR_API_TOKEN"
+            echo ""
+        fi
     fi
     
     # Email configuration
@@ -317,6 +421,64 @@ get_configuration() {
     
     print_success "Configuration gathered"
 } 
+
+# Execute DNS automation if enabled
+execute_dns_automation() {
+    if [[ $cloudflare_enabled =~ ^[Yy]$ ]] && [[ $dns_automation =~ ^[Yy]$ ]]; then
+        print_step "3.5" "Automating DNS record creation..."
+        
+        echo ""
+        echo -e "${CYAN}🔧 Creating DNS records via Cloudflare API...${NC}"
+        
+        # Install required Python packages
+        if ! python3 -c "import requests" 2>/dev/null; then
+            echo "Installing required Python packages..."
+            pip3 install requests
+        fi
+        
+        # Execute DNS automation
+        if python3 scripts/automate_dns_setup.py \
+            --domain "$domain" \
+            --server-ip "$ip_address" \
+            --cloudflare-email "$cloudflare_email" \
+            --cloudflare-api-token "$cloudflare_api_token"; then
+            print_success "DNS automation completed successfully"
+        else
+            print_warning "DNS automation failed - you may need to create records manually"
+            echo ""
+            echo -e "${YELLOW}Manual DNS Setup Required:${NC}"
+            echo "Please create these DNS records in Cloudflare:"
+            echo "• @ → $ip_address"
+            echo "• traefik → $ip_address"
+            echo "• auth → $ip_address"
+            echo "• grafana → $ip_address"
+            echo "• dash → $ip_address"
+            echo "• (and 35+ more subdomains)"
+            echo ""
+            read -p "Press Enter when DNS records are created..."
+        fi
+    else
+        print_warning "DNS automation skipped - manual setup required"
+        echo ""
+        echo -e "${YELLOW}Manual DNS Setup Required:${NC}"
+        echo "Please create these DNS records in Cloudflare:"
+        echo "• @ → $ip_address"
+        echo "• traefik → $ip_address"
+        echo "• auth → $ip_address"
+        echo "• grafana → $ip_address"
+        echo "• dash → $ip_address"
+        echo "• (and 35+ more subdomains)"
+        echo ""
+        echo -e "${CYAN}Or run DNS automation later:${NC}"
+        echo "python3 scripts/automate_dns_setup.py \\"
+        echo "  --domain $domain \\"
+        echo "  --server-ip $ip_address \\"
+        echo "  --cloudflare-email $cloudflare_email \\"
+        echo "  --cloudflare-api-token YOUR_API_TOKEN"
+        echo ""
+        read -p "Press Enter when DNS records are created..."
+    fi
+}
 
 # Generate secure vault variables with comprehensive coverage
 generate_secure_vault() {
@@ -547,21 +709,21 @@ generate_secure_vault() {
 # DO NOT MODIFY MANUALLY - Regenerate if needed
 
 # Database Passwords (Cryptographically Secure)
-vault_postgresql_password: "$postgresql_password"
-vault_media_database_password: "$media_database_password"
-vault_paperless_database_password: "$paperless_database_password"
-vault_fing_database_password: "$fing_database_password"
-vault_redis_password: "$redis_password"
-vault_mariadb_root_password: "$mariadb_root_password"
+    vault_postgresql_password="$postgresql_password"
+    vault_media_database_password="$media_database_password"
+    vault_paperless_database_password="$paperless_database_password"
+    vault_fing_database_password="$fing_database_password"
+    vault_redis_password="$redis_password"
+    vault_mariadb_root_password="$mariadb_root_password"
 
 # InfluxDB Passwords
-vault_influxdb_admin_password: "$influxdb_admin_password"
+    vault_influxdb_admin_password="$influxdb_admin_password"
 vault_influxdb_token: "$influxdb_token"
 
 # Service Authentication (Secure)
-vault_paperless_admin_password: "$paperless_admin_password"
+    vault_paperless_admin_password="$paperless_admin_password"
 vault_paperless_secret_key: "$paperless_secret_key"
-vault_fing_admin_password: "$fing_admin_password"
+    vault_fing_admin_password="$fing_admin_password"
 vault_paperless_admin_token: "$paperless_admin_token"
 vault_fing_api_key: "$fing_api_key"
 
@@ -587,14 +749,14 @@ vault_qbittorrent_password: "$qbittorrent_password"
 
 # Home Automation Passwords
 vault_homeassistant_admin_password: "$homeassistant_admin_password"
-vault_mosquitto_admin_password: "$(generate_secure_password 32 'alphanumeric')"
-vault_zigbee2mqtt_mqtt_password: "$(generate_secure_password 32 'alphanumeric')"
+vault_mosquitto_admin_password: "$mosquitto_admin_password"
+vault_zigbee2mqtt_mqtt_password: "$zigbee2mqtt_mqtt_password"
 
 # File Service Passwords
 vault_nextcloud_admin_password: "$nextcloud_admin_password"
 vault_nextcloud_db_password: "$nextcloud_db_password"
 vault_nextcloud_db_root_password: "$nextcloud_db_root_password"
-vault_syncthing_gui_password: "$(generate_secure_password 32 'full')"
+vault_syncthing_gui_password: "$syncthing_gui_password"
 vault_syncthing_apikey: "$syncthing_apikey"
 
 # Backup Encryption (256-bit key)
@@ -1042,7 +1204,7 @@ update_homepage_config() {
     cat > roles/homepage/vars/main.yml << EOF
 ---
 # Homepage Service API Keys
-# Automatically generated by enhanced seamless setup
+# Automatically generated by seamless setup
 homepage_service_api_keys:
   traefik: "{{ vault_traefik_api_key }}"
   authentik: "{{ vault_authentik_api_key }}"
@@ -1077,10 +1239,10 @@ EOF
     # Update homepage/config/config.yml with generated API keys
     cat > homepage/config/config.yml << EOF
 # Homepage Configuration
-# Automatically generated by enhanced seamless setup
+# Automatically generated by seamless setup
 
 title: "Homelab Dashboard"
-description: "Enhanced Homelab Infrastructure Dashboard"
+description: "Homelab Infrastructure Dashboard"
 theme: "dark"
 color: "slate"
 language: "en"
@@ -1151,7 +1313,7 @@ EOF
     # Update homepage/config/settings.yml with generated API keys
     cat > homepage/config/settings.yml << EOF
 # Homepage Settings
-# Automatically generated by enhanced seamless setup
+# Automatically generated by seamless setup
 
 # Weather Settings
 weather:
@@ -1214,7 +1376,7 @@ EOF
     # Update homepage/config/widgets.yml with generated API keys
     cat > homepage/config/widgets.yml << EOF
 # Homepage Widgets
-# Automatically generated by enhanced seamless setup
+# Automatically generated by seamless setup
 
 # Google Drive Widget
 google:
@@ -1273,7 +1435,7 @@ EOF
     # Update homepage/config/docker.yml with generated API keys
     cat > homepage/config/docker.yml << EOF
 # Homepage Docker Configuration
-# Automatically generated by enhanced seamless setup
+# Automatically generated by seamless setup
 
 version: "3.8"
 
@@ -1316,7 +1478,7 @@ create_configuration() {
     # Create common.yml with all variables
     cat > group_vars/all/common.yml << EOF
 ---
-# Enhanced Homelab Configuration Variables
+# Homelab Configuration Variables
 # Comprehensive setup with all variables automatically configured
 
 # Basic Configuration
@@ -1353,7 +1515,7 @@ admin_email: "$admin_email"
 smtp_server: "${smtp_server:-}"
 smtp_port: "${smtp_port:-587}"
 smtp_username: "${smtp_username:-}"
-smtp_password: "${smtp_password:-}"
+smtp_password: "{{ vault_service_password }}"
 from_email: "${from_email:-}"
 
 # Notification Configuration
@@ -1367,7 +1529,7 @@ primary_dns: "$primary_dns"
 secondary_dns: "$secondary_dns"
 
 # Docker Configuration
-docker_root: "$docker_root"
+docker_user: "$username"
 
 # Network Configuration
 internal_subnet: "$internal_subnet"
@@ -1441,37 +1603,37 @@ docker_networks:
   - name: homelab
     driver: bridge
     ipam_config:
-      - subnet: "172.20.0.0/16"
-        gateway: "172.20.0.1"
+      - subnet: "$internal_subnet"
+        gateway: "$gateway"
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.21.0.0/16"
-        gateway: "172.21.0.1"
+      - subnet: "$internal_subnet"
+        gateway: "$gateway"
   - name: media
     driver: bridge
     ipam_config:
-      - subnet: "172.22.0.0/16"
-        gateway: "172.22.0.1"
+      - subnet: "$internal_subnet"
+        gateway: "$gateway"
 
 # Media directories structure
 media_directories:
-  - "{{ data_dir }}/media"
-  - "{{ data_dir }}/media/movies"
-  - "{{ data_dir }}/media/tv"
-  - "{{ data_dir }}/media/anime"
-  - "{{ data_dir }}/media/music"
-  - "{{ data_dir }}/media/books"
-  - "{{ data_dir }}/media/audiobooks"
-  - "{{ data_dir }}/media/podcasts"
-  - "{{ data_dir }}/torrents"
-  - "{{ data_dir }}/torrents/movies"
-  - "{{ data_dir }}/torrents/tv"
-  - "{{ data_dir }}/torrents/anime"
-  - "{{ data_dir }}/usenet"
-  - "{{ data_dir }}/usenet/incomplete"
-  - "{{ data_dir }}/usenet/complete"
+  - "/home/$username/data/media"
+  - "/home/$username/data/media/movies"
+  - "/home/$username/data/media/tv"
+  - "/home/$username/data/media/anime"
+  - "/home/$username/data/media/music"
+  - "/home/$username/data/media/books"
+  - "/home/$username/data/media/audiobooks"
+  - "/home/$username/data/media/podcasts"
+  - "/home/$username/data/torrents"
+  - "/home/$username/data/torrents/movies"
+  - "/home/$username/data/torrents/tv"
+  - "/home/$username/data/torrents/anime"
+  - "/home/$username/data/usenet"
+  - "/home/$username/data/usenet/incomplete"
+  - "/home/$username/data/usenet/complete"
 
 # Service enablement list
 enabled_services:
@@ -1631,7 +1793,7 @@ EOF
 
     # Create .env file for environment variables
     cat > .env << EOF
-# Enhanced Homelab Environment Variables
+# Homelab Environment Variables
 # Generated on $(date)
 
 # Basic Configuration
@@ -1799,7 +1961,10 @@ deploy_infrastructure() {
     echo "Deploying Stage 3: Applications..."
     ansible-playbook main.yml --tags "media,development,storage" --ask-vault-pass
     
-    echo "Deploying Stage 4: Validation..."
+    echo "Deploying Stage 4: Enhanced Nginx Proxy Manager..."
+    ansible-playbook main.yml --tags "nginx_proxy_manager" --ask-vault-pass
+    
+    echo "Deploying Stage 5: Validation..."
     ansible-playbook main.yml --tags "validation" --ask-vault-pass
     
     print_success "Infrastructure deployment completed"
@@ -1812,8 +1977,14 @@ post_deployment() {
     # Generate access information
     cat > deployment_summary.txt << EOF
 ===============================================
-   Enhanced Homelab Deployment Complete!
+   Homelab Deployment Complete!
 ===============================================
+
+🚀 DEPLOYMENT INFORMATION:
+- Server Preparation: ${run_server_prep:-"Not required"}
+- DNS Automation: ${dns_automation:-"Not configured"}
+- Security Hardening: Applied
+- All services deployed and configured
 
 🔐 SECURITY INFORMATION:
 - All passwords and keys are cryptographically secure
@@ -1823,6 +1994,7 @@ post_deployment() {
 🌐 ACCESS INFORMATION:
 - Homepage Dashboard: https://dash.$domain
 - Traefik Dashboard: https://traefik.$domain
+- Nginx Proxy Manager: http://$ip_address:81
 - Grafana: https://grafana.$domain
 - Authentik: https://auth.$domain
 - Portainer: https://portainer.$domain
@@ -1869,6 +2041,7 @@ post_deployment() {
 - Grafana Admin: admin / (see credentials backup)
 - Portainer Admin: admin / (see credentials backup)
 - Homepage Admin: admin / (see credentials backup)
+- Nginx Proxy Manager: $admin_email / (see credentials backup)
 
 📁 SSH ACCESS:
 - Server: $username@$ip_address
@@ -1880,17 +2053,29 @@ post_deployment() {
 - Vault: group_vars/all/vault.yml (encrypted)
 - Environment: .env
 
+🚀 ENHANCED NGINX PROXY MANAGER FEATURES:
+- Service Discovery: Automatic detection of running services
+- SSL Automation: Automatic certificate provisioning and renewal
+- Security Headers: Configurable security headers via vault
+- Rate Limiting: Built-in rate limiting protection
+- WAF Rules: Web Application Firewall protection
+- API Integration: Full API-driven automation
+- Health Monitoring: Comprehensive health checks
+- Backup Automation: Encrypted backup scheduling
+
 🚀 NEXT STEPS:
 1. Access Homepage at https://dash.$domain
-2. Configure service API keys in Homepage settings
-3. Set up weather widget with your location
-4. Customize bookmarks and service groups
-5. Test all service integrations
-6. Review monitoring dashboards
-7. Configure backup schedules
-8. Configure Reconya network scanning settings
-9. Configure ErsatzTV channels and media sources
-10. Set up Pezzo AI prompt management
+2. Access Nginx Proxy Manager at http://$ip_address:81
+3. Configure service API keys in Homepage settings
+4. Set up weather widget with your location
+5. Customize bookmarks and service groups
+6. Test all service integrations
+7. Review monitoring dashboards
+8. Configure backup schedules
+9. Configure Reconya network scanning settings
+10. Configure ErsatzTV channels and media sources
+11. Set up Pezzo AI prompt management
+12. Review NPM service discovery and SSL certificates
 
 🔐 CREDENTIALS BACKUP - YOUR HOMELAB KEYS:
 - File: $credentials_backup_path
@@ -1921,10 +2106,36 @@ EOF
 main() {
     print_header
     
-    log "Starting enhanced seamless deployment setup with comprehensive variable handling"
+    log "Starting seamless deployment setup with comprehensive variable handling"
     
+    # Check prerequisites and run server preparation if needed
     check_prerequisites
+    
+    # If server preparation was run, we need to switch to the homelab user
+    if [[ -n "$run_server_prep" ]] && [[ $run_server_prep =~ ^[Yy]$ ]]; then
+        echo ""
+        echo -e "${CYAN}🔄 Switching to homelab user for deployment...${NC}"
+        echo "Server preparation completed. Now switching to homelab user for deployment."
+        echo ""
+        
+        # Get the homelab username from the server prep
+        HOMELAB_USER=${HOMELAB_USER:-homelab}
+        
+        # Switch to homelab user and continue deployment
+        if [[ "$SUDO_USER" != "$HOMELAB_USER" ]]; then
+            echo "Switching to user: $HOMELAB_USER"
+            echo "Please run the deployment as the homelab user: sudo -u $HOMELAB_USER $0"
+            echo ""
+            echo "Or continue as current user (not recommended):"
+            read -p "Continue as current user? [y/N]: " continue_current
+            if [[ ! $continue_current =~ ^[Yy]$ ]]; then
+                exit 0
+            fi
+        fi
+    fi
+    
     get_configuration
+    execute_dns_automation
     generate_secure_vault
     create_configuration
     update_homepage_config
@@ -1952,6 +2163,7 @@ main() {
     echo "✓ API key prefixing for identification"
     echo "✓ Comprehensive variable coverage"
     echo "✓ Automatic configuration generation"
+    echo "✓ Integrated server preparation (NEW)"
     echo ""
     
     read -p "Proceed with deployment? [Y/n]: " proceed
@@ -1965,7 +2177,7 @@ main() {
     
     echo ""
     print_header
-    echo -e "${GREEN}🎉 Enhanced deployment completed successfully!${NC}"
+    echo -e "${GREEN}🎉 Seamless deployment completed successfully!${NC}"
     echo ""
     echo "🔐 CREDENTIALS BACKUP - YOUR HOMELAB KEYS"
     echo "📁 File: $credentials_backup_path"
@@ -1978,7 +2190,7 @@ main() {
     echo -e "${RED}🚨 CRITICAL: Backup credentials_backup.enc immediately!${NC}"
     echo -e "${YELLOW}This file contains ALL passwords and secrets for your homelab!${NC}"
     echo ""
-    log "Enhanced seamless deployment with comprehensive variable handling completed successfully"
+    log "Seamless deployment with comprehensive variable handling completed successfully"
 }
 
 # Run main function

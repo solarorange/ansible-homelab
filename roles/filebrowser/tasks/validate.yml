@@ -1,0 +1,89 @@
+---
+# Filebrowser Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Filebrowser vault variables
+  block:
+    - name: Check required Filebrowser vault variables
+      assert:
+        that:
+          - vault_filebrowser_admin_password is defined
+          - vault_filebrowser_database_password is defined
+          - vault_filebrowser_api_key is defined
+          - vault_filebrowser_secret_key is defined
+          - vault_filebrowser_encryption_key is defined
+          - vault_filebrowser_jwt_secret is defined
+        fail_msg: "Required Filebrowser vault variables are not defined"
+        success_msg: "All required Filebrowser vault variables are defined"
+
+    - name: Validate Filebrowser password complexity
+      assert:
+        that:
+          - vault_filebrowser_admin_password | length >= 12
+          - vault_filebrowser_database_password | length >= 12
+        fail_msg: "Filebrowser passwords must be at least 12 characters long"
+        success_msg: "Filebrowser password complexity requirements met"
+
+- name: Validate Filebrowser network configuration
+  block:
+    - name: Check Filebrowser port configuration
+      assert:
+        that:
+          - filebrowser_port is defined
+          - filebrowser_port | int >= 1024
+          - filebrowser_port | int <= 65535
+        fail_msg: "Filebrowser port must be between 1024 and 65535"
+        success_msg: "Filebrowser port configuration is valid"
+
+    - name: Check Filebrowser domain configuration
+      assert:
+        that:
+          - domain is defined
+          - filebrowser_subdomain is defined
+        fail_msg: "Filebrowser domain configuration is incomplete"
+        success_msg: "Filebrowser domain configuration is valid"
+
+- name: Validate Filebrowser security configuration
+  block:
+    - name: Check Filebrowser SSL configuration
+      assert:
+        that:
+          - filebrowser_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Filebrowser SSL configuration is invalid"
+        success_msg: "Filebrowser SSL configuration is valid"
+
+    - name: Check Filebrowser authentication configuration
+      assert:
+        that:
+          - filebrowser_auth_enabled | bool
+          - filebrowser_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Filebrowser authentication configuration is invalid"
+        success_msg: "Filebrowser authentication configuration is valid"
+
+- name: Validate Filebrowser storage configuration
+  block:
+    - name: Check Filebrowser data directories
+      assert:
+        that:
+          - filebrowser_data_dir is defined
+          - filebrowser_config_dir is defined
+          - filebrowser_backup_dir is defined
+        fail_msg: "Filebrowser storage configuration is incomplete"
+        success_msg: "Filebrowser storage configuration is valid"
+
+    - name: Create Filebrowser directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ filebrowser_data_dir }}"
+        - "{{ filebrowser_config_dir }}"
+        - "{{ filebrowser_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Filebrowser validation completed successfully - all configurations are valid and secure"

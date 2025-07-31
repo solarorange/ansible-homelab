@@ -1,0 +1,89 @@
+---
+# Loki Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Loki vault variables
+  block:
+    - name: Check required Loki vault variables
+      assert:
+        that:
+          - vault_loki_admin_password is defined
+          - vault_loki_database_password is defined
+          - vault_loki_api_key is defined
+          - vault_loki_secret_key is defined
+          - vault_loki_encryption_key is defined
+          - vault_loki_jwt_secret is defined
+        fail_msg: "Required Loki vault variables are not defined"
+        success_msg: "All required Loki vault variables are defined"
+
+    - name: Validate Loki password complexity
+      assert:
+        that:
+          - vault_loki_admin_password | length >= 12
+          - vault_loki_database_password | length >= 12
+        fail_msg: "Loki passwords must be at least 12 characters long"
+        success_msg: "Loki password complexity requirements met"
+
+- name: Validate Loki network configuration
+  block:
+    - name: Check Loki port configuration
+      assert:
+        that:
+          - loki_port is defined
+          - loki_port | int >= 1024
+          - loki_port | int <= 65535
+        fail_msg: "Loki port must be between 1024 and 65535"
+        success_msg: "Loki port configuration is valid"
+
+    - name: Check Loki domain configuration
+      assert:
+        that:
+          - domain is defined
+          - loki_subdomain is defined
+        fail_msg: "Loki domain configuration is incomplete"
+        success_msg: "Loki domain configuration is valid"
+
+- name: Validate Loki security configuration
+  block:
+    - name: Check Loki SSL configuration
+      assert:
+        that:
+          - loki_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Loki SSL configuration is invalid"
+        success_msg: "Loki SSL configuration is valid"
+
+    - name: Check Loki authentication configuration
+      assert:
+        that:
+          - loki_auth_enabled | bool
+          - loki_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Loki authentication configuration is invalid"
+        success_msg: "Loki authentication configuration is valid"
+
+- name: Validate Loki storage configuration
+  block:
+    - name: Check Loki data directories
+      assert:
+        that:
+          - loki_data_dir is defined
+          - loki_config_dir is defined
+          - loki_backup_dir is defined
+        fail_msg: "Loki storage configuration is incomplete"
+        success_msg: "Loki storage configuration is valid"
+
+    - name: Create Loki directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ loki_data_dir }}"
+        - "{{ loki_config_dir }}"
+        - "{{ loki_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Loki validation completed successfully - all configurations are valid and secure"

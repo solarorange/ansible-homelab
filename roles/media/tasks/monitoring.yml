@@ -94,14 +94,14 @@
         name: "Media stack monitoring"
         minute: "*/5"
         job: "{{ config_dir }}/media-monitor.sh"
-        user: "{{ username }}"
+        user: "{{ vault_media_user }}"
 
     - name: Schedule media stack metrics collection
       ansible.builtin.cron:
         name: "Media stack metrics collection"
         minute: "*/1"
         job: "{{ config_dir }}/media-metrics.sh"
-        user: "{{ username }}"
+        user: "{{ vault_media_user }}"
 
     - name: Configure media stack log aggregation
       ansible.builtin.template:
@@ -181,6 +181,6 @@
         hour: "4"
         minute: "0"
         job: "{{ config_dir }}/media-monitoring-maintenance.sh"
-        user: "{{ username }}"
+        user: "{{ vault_media_user }}"
 
   tags: [media, monitoring] 

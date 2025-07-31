@@ -1,0 +1,936 @@
+---
+# Authentication & Security Variables
+# These variables contain sensitive information and should be stored in Ansible Vault
+
+# Traefik Basic Auth
+# Generate with: htpasswd -nb admin your_password
+# Example: htpasswd -nb admin mySecurePassword
+traefik_basic_auth_hash: "{{ vault_traefik_basic_auth_hash }}"
+
+# Authentik Configuration
+# Generate secret key: openssl rand -base64 48
+# Example: openssl rand -base64 48
+authentik_secret_key: "{{ vault_authentik_secret_key }}"
+authentik_postgres_password: "{{ vault_authentik_postgres_password }}"
+authentik_admin_email: "{{ vault_authentik_admin_email | default('admin@' + domain) }}"
+authentik_admin_password: "{{ vault_authentik_admin_password | default('') }}"
+
+# Service Passwords
+wireguard_password: "{{ vault_wireguard_password | default('') }}"
+codeserver_password: "{{ vault_codeserver_password | default('') }}"
+gitlab_root_password: "{{ vault_gitlab_root_password | default('') }}"
+
+# Vault Configuration
+# Generate with: vault operator init
+vault_root_token: "{{ vault_root_token | default('') }}"
+vault_unseal_key: "{{ vault_unseal_key | default('') }}"
+
+# Email & SMTP Configuration
+smtp_host: "{{ vault_smtp_host | default('') }}"
+smtp_port: "{{ vault_smtp_port | default(587) }}"
+smtp_username: "{{ vault_smtp_username | default('') }}"
+smtp_password: "{{ vault_smtp_password | default('') }}"
+monitoring_email: "{{ vault_monitoring_email | default('monitoring@' + domain) }}"
+admin_email: "{{ vault_admin_email | default('admin@' + domain) }}"
+
+# Database Passwords
+vault_postgresql_password: "{{ lookup('env', 'VAULT_POSTGRESQL_PASSWORD') }}"
+vault_media_database_password: "{{ lookup('env', 'VAULT_MEDIA_DATABASE_PASSWORD') }}"
+vault_paperless_database_password: "{{ lookup('env', 'VAULT_PAPERLESS_DATABASE_PASSWORD') }}"
+vault_fing_database_password: "{{ lookup('env', 'VAULT_FING_DATABASE_PASSWORD') }}"
+vault_redis_password: "{{ lookup('env', 'VAULT_REDIS_PASSWORD') }}"
+
+# Service Admin Passwords
+vault_paperless_admin_password: "{{ lookup('env', 'VAULT_PAPERLESS_ADMIN_PASSWORD') }}"
+vault_paperless_secret_key: "{{ lookup('env', 'VAULT_PAPERLESS_SECRET_KEY') }}"
+vault_fing_admin_password: "{{ lookup('env', 'VAULT_FING_ADMIN_PASSWORD') }}"
+vault_paperless_admin_token: "{{ lookup('env', 'VAULT_PAPERLESS_ADMIN_TOKEN') }}"
+vault_fing_api_key: "{{ lookup('env', 'VAULT_FING_API_KEY') }}"
+
+# n8n Configuration
+vault_n8n_admin_password: "{{ lookup('env', 'VAULT_N8N_ADMIN_PASSWORD') | default('') }}"
+vault_n8n_encryption_key: "{{ lookup('env', 'VAULT_N8N_ENCRYPTION_KEY') | default('') }}"
+vault_n8n_postgres_password: "{{ lookup('env', 'VAULT_N8N_POSTGRES_PASSWORD') | default('') }}"
+vault_n8n_smtp_host: "{{ lookup('env', 'VAULT_N8N_SMTP_HOST') | default('') }}"
+vault_n8n_smtp_port: "{{ lookup('env', 'VAULT_N8N_SMTP_PORT') | default(587) }}"
+vault_n8n_smtp_user: "{{ lookup('env', 'VAULT_N8N_SMTP_USER') | default('') }}"
+vault_n8n_smtp_pass: "{{ lookup('env', 'VAULT_N8N_SMTP_PASS') | default('') }}"
+vault_n8n_smtp_sender: "{{ lookup('env', 'VAULT_N8N_SMTP_SENDER') | default('') }}"
+
+# Service API Keys
+# Generate these from their respective services' admin interfaces
+traefik_pilot_token: "{{ vault_traefik_pilot_token | default('') }}"
+portainer_api_key: "{{ vault_portainer_api_key | default('') }}"
+grafana_api_key: "{{ vault_grafana_api_key | default('') }}"
+jellyfin_api_key: "{{ vault_jellyfin_api_key | default('') }}"
+plex_api_key: "{{ vault_plex_api_key | default('') }}"
+sonarr_api_key: "{{ vault_sonarr_api_key | default('') }}"
+radarr_api_key: "{{ vault_radarr_api_key | default('') }}"
+lidarr_api_key: "{{ vault_lidarr_api_key | default('') }}"
+readarr_api_key: "{{ vault_readarr_api_key | default('') }}"
+prowlarr_api_key: "{{ vault_prowlarr_api_key | default('') }}"
+bazarr_api_key: "{{ vault_bazarr_api_key | default('') }}"
+tautulli_api_key: "{{ vault_tautulli_api_key | default('') }}"
+overseerr_api_key: "{{ vault_overseerr_api_key | default('') }}"
+homeassistant_api_key: "{{ vault_homeassistant_api_key | default('') }}"
+nextcloud_api_key: "{{ vault_nextcloud_api_key | default('') }}"
+gitlab_api_key: "{{ vault_gitlab_api_key | default('') }}"
+harbor_api_key: "{{ vault_harbor_api_key | default('') }}"
+minio_api_key: "{{ vault_minio_api_key | default('') }}"
+paperless_api_key: "{{ vault_paperless_api_key | default('') }}"
+bookstack_api_key: "{{ vault_bookstack_api_key | default('') }}"
+immich_api_key: "{{ vault_immich_api_key | default('') }}"
+filebrowser_api_key: "{{ vault_filebrowser_api_key | default('') }}"
+kopia_api_key: "{{ vault_kopia_api_key | default('') }}"
+duplicati_api_key: "{{ vault_duplicati_api_key | default('') }}"
+uptime_kuma_api_key: "{{ vault_uptime_kuma_api_key | default('') }}"
+guacamole_api_key: "{{ vault_guacamole_api_key | default('') }}"
+requestrr_api_key: "{{ vault_requestrr_api_key | default('') }}"
+unmanic_api_key: "{{ vault_unmanic_api_key | default('') }}"
+
+# Pi-hole
+pihole_web_password: "{{ vault_pihole_web_password | default('') }}"  # Web interface password
+
+# Encrypted sensitive data
+vault_ssh_keys:
+  homelab_key: "{{ vault_ssh_private_key | default('') }}"
+  homelab_pub: "{{ vault_ssh_public_key | default('') }}"
+
+vault_credentials:
+  admin_password: "{{ vault_admin_password | default('') }}"
+  database_password: "{{ vault_db_password | default('') }}"
+  api_keys:
+    traefik: "{{ vault_traefik_api_key | default('') }}"
+    portainer: "{{ vault_portainer_api_key | default('') }}"
+    monitoring: "{{ vault_monitoring_api_key | default('') }}"
+
+vault_certificates:
+  ssl_cert: "{{ vault_ssl_cert | default('') }}"
+  ssl_key: "{{ vault_ssl_key | default('') }}"
+
+vault_secrets:
+  jwt_secret: "{{ vault_jwt_secret | default('') }}"
+  encryption_key: "{{ vault_encryption_key | default('') }}"
+
+# Homepage API Keys
+vault_homepage_api_keys:
+  traefik: "{{ vault_traefik_api_key | default('') }}"
+  authentik: "{{ vault_authentik_api_key | default('') }}"
+  portainer: "{{ vault_portainer_api_key | default('') }}"
+  grafana: "{{ vault_grafana_api_key | default('') }}"
+  influxdb: "{{ vault_influxdb_api_key | default('') }}"
+  pihole: "{{ vault_pihole_api_key | default('') }}"
+  fing: "{{ vault_fing_api_key | default('') }}"
+  jellyfin: "{{ vault_jellyfin_api_key | default('') }}"
+  emby: "{{ vault_emby_api_key | default('') }}"
+  sonarr: "{{ vault_sonarr_api_key | default('') }}"
+  radarr: "{{ vault_radarr_api_key | default('') }}"
+  lidarr: "{{ vault_lidarr_api_key | default('') }}"
+  readarr: "{{ vault_readarr_api_key | default('') }}"
+  prowlarr: "{{ vault_prowlarr_api_key | default('') }}"
+  bazarr: "{{ vault_bazarr_api_key | default('') }}"
+  tautulli: "{{ vault_tautulli_api_key | default('') }}"
+  overseerr: "{{ vault_overseerr_api_key | default('') }}"
+  pulsarr: "{{ vault_pulsarr_api_key | default('') }}"
+  komga: "{{ vault_komga_api_key | default('') }}"
+  audiobookshelf: "{{ vault_audiobookshelf_api_key | default('') }}"
+  calibre: "{{ vault_calibre_api_key | default('') }}"
+  tdarr: "{{ vault_tdarr_api_key | default('') }}"
+  sabnzbd: "{{ vault_sabnzbd_api_key | default('') }}"
+  qbittorrent: "{{ vault_qbittorrent_api_key | default('') }}"
+  postgresql: "{{ vault_postgresql_api_key | default('') }}"
+  mariadb: "{{ vault_mariadb_api_key | default('') }}"
+  nextcloud: "{{ vault_nextcloud_api_key | default('') }}"
+  syncthing: "{{ vault_syncthing_api_key | default('') }}"
+  crowdsec: "{{ vault_crowdsec_api_key | default('') }}"
+  vault: "{{ vault_vault_api_key | default('') }}"
+  vaultwarden: "{{ vault_vaultwarden_api_key | default('') }}"
+  homeassistant: "{{ vault_homeassistant_api_key | default('') }}"
+  kopia: "{{ vault_kopia_api_key | default('') }}"
+  duplicati: "{{ vault_duplicati_api_key | default('') }}"
+  uptimekuma: "{{ vault_uptime_kuma_api_key | default('') }}"
+  guacamole: "{{ vault_guacamole_api_key | default('') }}"
+  requestrr: "{{ vault_requestrr_api_key | default('') }}"
+  unmanic: "{{ vault_unmanic_api_key | default('') }}"
+
+# Media Service API Keys
+vault_sabnzbd_api_key: "{{ lookup('env', 'VAULT_SABNZBD_API_KEY') }}"
+vault_sonarr_api_key: "{{ lookup('env', 'VAULT_SONARR_API_KEY') }}"
+vault_radarr_api_key: "{{ lookup('env', 'VAULT_RADARR_API_KEY') }}"
+vault_lidarr_api_key: "{{ lookup('env', 'VAULT_LIDARR_API_KEY') }}"
+vault_readarr_api_key: "{{ lookup('env', 'VAULT_READARR_API_KEY') }}"
+vault_prowlarr_api_key: "{{ lookup('env', 'VAULT_PROWLARR_API_KEY') }}"
+vault_bazarr_api_key: "{{ lookup('env', 'VAULT_BAZARR_API_KEY') }}"
+
+# Email Configuration
+vault_smtp_username: "{{ lookup('env', 'VAULT_SMTP_USERNAME') }}"
+vault_smtp_password: "{{ lookup('env', 'VAULT_SMTP_PASSWORD') }}"
+
+# Notification Services
+vault_slack_webhook: "{{ lookup('env', 'VAULT_SLACK_WEBHOOK') }}"
+vault_discord_webhook: "{{ lookup('env', 'VAULT_DISCORD_WEBHOOK') }}"
+
+# Container Update Service
+vault_watchtower_token: "{{ lookup('env', 'VAULT_WATCHTOWER_TOKEN') }}"
+
+# Monitoring Passwords
+vault_influxdb_admin_password: "{{ lookup('env', 'VAULT_INFLUXDB_ADMIN_PASSWORD') }}"
+vault_influxdb_token: "{{ lookup('env', 'VAULT_INFLUXDB_TOKEN') }}"
+vault_grafana_admin_password: "{{ lookup('env', 'VAULT_GRAFANA_ADMIN_PASSWORD') }}"
+vault_grafana_secret_key: "{{ lookup('env', 'VAULT_GRAFANA_SECRET_KEY') }}"
+
+# Security Passwords
+vault_authentik_secret_key: "{{ lookup('env', 'VAULT_AUTHENTIK_SECRET_KEY') }}"
+vault_authentik_postgres_password: "{{ lookup('env', 'VAULT_AUTHENTIK_POSTGRES_PASSWORD') }}"
+vault_authentik_admin_password: "{{ lookup('env', 'VAULT_AUTHENTIK_ADMIN_PASSWORD') }}"
+vault_cloudflare_api_token: "{{ lookup('env', 'VAULT_CLOUDFLARE_API_TOKEN') }}"
+vault_pihole_admin_password: "{{ lookup('env', 'VAULT_PIHOLE_ADMIN_PASSWORD') }}"
+
+# Immich Configuration
+vault_immich_db_password: "{{ lookup('env', 'VAULT_IMMICH_DB_PASSWORD') }}"
+vault_immich_postgres_password: "{{ lookup('env', 'VAULT_IMMICH_POSTGRES_PASSWORD') }}"
+vault_immich_redis_password: "{{ lookup('env', 'VAULT_IMMICH_REDIS_PASSWORD') }}"
+vault_immich_jwt_secret: "{{ lookup('env', 'VAULT_IMMICH_JWT_SECRET') }}"
+
+# Authentik Configuration (ensure these are properly defined)
+vault_authentik_admin_email: "{{ lookup('env', 'VAULT_AUTHENTIK_ADMIN_EMAIL') | default('admin@' + domain) }}"
+vault_authentik_secret_key: "{{ lookup('env', 'VAULT_AUTHENTIK_SECRET_KEY') }}"
+vault_authentik_postgres_password: "{{ lookup('env', 'VAULT_AUTHENTIK_POSTGRES_PASSWORD') }}"
+vault_authentik_admin_password: "{{ lookup('env', 'VAULT_AUTHENTIK_ADMIN_PASSWORD') }}" 
+
+# Vault Variables for Homelab Services
+# This file contains sensitive configuration data encrypted with Ansible Vault
+
+# =============================================================================
+# NGINX PROXY MANAGER VAULT VARIABLES
+# =============================================================================
+
+# Database Configuration
+vault_npm_db_root_password: "{{ vault_npm_db_root_password | password_hash('bcrypt') }}"
+vault_npm_db_password: "{{ vault_npm_db_password | password_hash('bcrypt') }}"
+
+# Admin Configuration
+vault_npm_admin_username: "admin@{{ domain }}"
+vault_npm_admin_password: "{{ vault_npm_admin_password | password_hash('bcrypt') }}"
+vault_npm_api_token: "{{ vault_npm_api_token | default('') }}"
+
+# SSL Configuration
+vault_letsencrypt_email: "{{ vault_letsencrypt_email | default('admin@' + domain) }}"
+vault_cloudflare_api_token: "{{ vault_cloudflare_api_token | default('') }}"
+vault_cloudflare_zone_id: "{{ vault_cloudflare_zone_id | default('') }}"
+
+# Service Discovery Configuration
+vault_npm_discovery_services:
+  - name: "authentik"
+    subdomain: "auth"
+    port: 9000
+    ssl: true
+    auth: false
+    health_check_path: "/health"
+  - name: "grafana"
+    subdomain: "grafana"
+    port: 3000
+    ssl: true
+    auth: true
+    health_check_path: "/api/health"
+  - name: "portainer"
+    subdomain: "portainer"
+    port: 9000
+    ssl: true
+    auth: true
+    health_check_path: "/api/status"
+  - name: "homepage"
+    subdomain: "dash"
+    port: 3000
+    ssl: true
+    auth: false
+    health_check_path: "/health"
+  - name: "jellyfin"
+    subdomain: "jellyfin"
+    port: 8096
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "sonarr"
+    subdomain: "sonarr"
+    port: 8989
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "radarr"
+    subdomain: "radarr"
+    port: 7878
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "prowlarr"
+    subdomain: "prowlarr"
+    port: 9696
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "bazarr"
+    subdomain: "bazarr"
+    port: 6767
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "overseerr"
+    subdomain: "overseerr"
+    port: 5055
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "tautulli"
+    subdomain: "tautulli"
+    port: 8181
+    ssl: true
+    auth: true
+    health_check_path: "/status"
+  - name: "nextcloud"
+    subdomain: "nextcloud"
+    port: 80
+    ssl: true
+    auth: true
+    health_check_path: "/status.php"
+  - name: "paperless"
+    subdomain: "paperless"
+    port: 8010
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "immich"
+    subdomain: "photos"
+    port: 3001
+    ssl: true
+    auth: true
+    health_check_path: "/health"
+  - name: "vault"
+    subdomain: "vault"
+    port: 8200
+    ssl: true
+    auth: true
+    health_check_path: "/v1/sys/health"
+  - name: "gitlab"
+    subdomain: "git"
+    port: 80
+    ssl: true
+    auth: true
+    health_check_path: "/-/health"
+  - name: "harbor"
+    subdomain: "registry"
+    port: 80
+    ssl: true
+    auth: true
+    health_check_path: "/api/v2.0/health"
+
+# Security Headers Configuration
+vault_npm_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# =============================================================================
+# AUTHENTIK VAULT VARIABLES
+# =============================================================================
+
+vault_authentik_admin_password: "{{ vault_authentik_admin_password | password_hash('bcrypt') }}"
+vault_authentik_admin_user: "admin"
+vault_authentik_secret_key: "{{ vault_authentik_secret_key | default('') }}"
+vault_authentik_database_password: "{{ vault_authentik_database_password | password_hash('bcrypt') }}"
+vault_authentik_redis_password: "{{ vault_authentik_redis_password | password_hash('bcrypt') }}"
+vault_authentik_api_token: "{{ vault_authentik_api_token | default('') }}"
+
+# Authentik User Passwords
+vault_user_password: "{{ vault_user_password | password_hash('bcrypt') }}"
+vault_user1_password: "{{ vault_user1_password | password_hash('bcrypt') }}"
+vault_user2_password: "{{ vault_user2_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# GRAFANA VAULT VARIABLES
+# =============================================================================
+
+vault_grafana_admin_password: "{{ vault_grafana_admin_password | password_hash('bcrypt') }}"
+vault_grafana_security_admin_password: "{{ vault_grafana_security_admin_password | password_hash('bcrypt') }}"
+vault_grafana_database_password: "{{ vault_grafana_database_password | password_hash('bcrypt') }}"
+
+# Grafana User Passwords
+vault_grafana_viewer_password: "{{ vault_grafana_viewer_password | password_hash('bcrypt') }}"
+vault_grafana_editor_password: "{{ vault_grafana_editor_password | password_hash('bcrypt') }}"
+vault_grafana_family_password: "{{ vault_grafana_family_password | password_hash('bcrypt') }}"
+vault_grafana_guest_password: "{{ vault_grafana_guest_password | password_hash('bcrypt') }}"
+vault_grafana_developer_password: "{{ vault_grafana_developer_password | password_hash('bcrypt') }}"
+vault_grafana_security_password: "{{ vault_grafana_security_password | password_hash('bcrypt') }}"
+vault_grafana_media_password: "{{ vault_grafana_media_password | password_hash('bcrypt') }}"
+vault_grafana_backup_password: "{{ vault_grafana_backup_password | password_hash('bcrypt') }}"
+vault_grafana_monitoring_password: "{{ vault_grafana_monitoring_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# DATABASE VAULT VARIABLES
+# =============================================================================
+
+# PostgreSQL
+vault_postgresql_password: "{{ vault_postgresql_password | password_hash('bcrypt') }}"
+vault_postgresql_user: "{{ vault_postgresql_user | default('homelab') }}"
+
+# MySQL/MariaDB
+vault_mysql_root_password: "{{ vault_mysql_root_password | password_hash('bcrypt') }}"
+vault_mysql_password: "{{ vault_mysql_password | password_hash('bcrypt') }}"
+
+# Redis
+vault_redis_password: "{{ vault_redis_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# MEDIA SERVICES VAULT VARIABLES
+# =============================================================================
+
+# Jellyfin
+vault_jellyfin_admin_password: "{{ vault_jellyfin_admin_password | password_hash('bcrypt') }}"
+
+# Sonarr
+vault_sonarr_api_key: "{{ vault_sonarr_api_key | default('') }}"
+
+# Radarr
+vault_radarr_api_key: "{{ vault_radarr_api_key | default('') }}"
+
+# Bazarr
+vault_bazarr_api_key: "{{ vault_bazarr_api_key | default('') }}"
+
+# Prowlarr
+vault_prowlarr_api_key: "{{ vault_prowlarr_api_key | default('') }}"
+
+# Lidarr
+vault_lidarr_api_key: "{{ vault_lidarr_api_key | default('') }}"
+vault_lidarr_username: "{{ vault_lidarr_username | default('') }}"
+vault_lidarr_password: "{{ vault_lidarr_password | password_hash('bcrypt') }}"
+vault_lidarr_anonymous_id: "{{ vault_lidarr_anonymous_id | default('') }}"
+
+# Readarr
+vault_readarr_api_key: "{{ vault_readarr_api_key | default('') }}"
+
+# =============================================================================
+# DOWNLOADER VAULT VARIABLES
+# =============================================================================
+
+# qBittorrent
+vault_qbittorrent_username: "{{ vault_qbittorrent_username | default('admin') }}"
+vault_qbittorrent_password: "{{ vault_qbittorrent_password | password_hash('bcrypt') }}"
+
+# SABnzbd
+vault_sabnzbd_api_key: "{{ vault_sabnzbd_api_key | default('') }}"
+
+# =============================================================================
+# EXTERNAL SERVICE VAULT VARIABLES
+# =============================================================================
+
+# Last.fm
+vault_lastfm_username: "{{ vault_lastfm_username | default('') }}"
+vault_lastfm_api_key: "{{ vault_lastfm_api_key | default('') }}"
+
+# =============================================================================
+# NOTIFICATION VAULT VARIABLES
+# =============================================================================
+
+# SMTP
+vault_smtp_username: "{{ vault_smtp_username | default('') }}"
+vault_smtp_password: "{{ vault_smtp_password | default('') }}"
+
+# Slack
+vault_slack_webhook: "{{ vault_slack_webhook | default('') }}"
+
+# Discord
+vault_discord_webhook: "{{ vault_discord_webhook | default('') }}"
+
+# =============================================================================
+# HOMEPAGE VAULT VARIABLES
+# =============================================================================
+
+vault_homepage_admin_password: "{{ vault_homepage_admin_password | password_hash('bcrypt') }}"
+vault_homepage_user_password: "{{ vault_homepage_user_password | password_hash('bcrypt') }}"
+vault_homepage_secret_key: "{{ vault_homepage_secret_key | default('') }}"
+vault_homepage_api_keys:
+  jellyfin: "{{ vault_homepage_api_keys.jellyfin | default('') }}"
+  sonarr: "{{ vault_homepage_api_keys.sonarr | default('') }}"
+  radarr: "{{ vault_homepage_api_keys.radarr | default('') }}"
+  bazarr: "{{ vault_homepage_api_keys.bazarr | default('') }}"
+  prowlarr: "{{ vault_homepage_api_keys.prowlarr | default('') }}"
+  lidarr: "{{ vault_homepage_api_keys.lidarr | default('') }}"
+  readarr: "{{ vault_homepage_api_keys.readarr | default('') }}"
+  tautulli: "{{ vault_homepage_api_keys.tautulli | default('') }}"
+  overseerr: "{{ vault_homepage_api_keys.overseerr | default('') }}"
+  vaultwarden: "{{ vault_homepage_api_keys.vaultwarden | default('') }}"
+
+# Google OAuth
+vault_google_client_secret: "{{ vault_google_client_secret | default('') }}"
+
+# =============================================================================
+# PAPERLESS-NGX VAULT VARIABLES
+# =============================================================================
+
+vault_paperless_admin_password: "{{ vault_paperless_admin_password | password_hash('bcrypt') }}"
+vault_paperless_secret_key: "{{ vault_paperless_secret_key | default('') }}"
+vault_paperless_database_password: "{{ vault_paperless_database_password | password_hash('bcrypt') }}"
+vault_paperless_admin_token: "{{ vault_paperless_admin_token | default('') }}"
+
+# =============================================================================
+# RECONYA VAULT VARIABLES
+# =============================================================================
+
+vault_reconya_admin_password: "{{ vault_reconya_admin_password | password_hash('bcrypt') }}"
+vault_reconya_jwt_secret: "{{ vault_reconya_jwt_secret | default('') }}"
+
+# =============================================================================
+# ROMM VAULT VARIABLES
+# =============================================================================
+
+vault_romm_admin_password: "{{ vault_romm_admin_password | password_hash('bcrypt') }}"
+vault_romm_secret_key: "{{ vault_romm_secret_key | default('') }}"
+vault_romm_database_password: "{{ vault_romm_database_password | password_hash('bcrypt') }}"
+vault_romm_api_key: "{{ vault_romm_api_key | default('') }}"
+
+# =============================================================================
+# VAULTWARDEN VAULT VARIABLES
+# =============================================================================
+
+vault_vaultwarden_admin_token: "{{ vault_vaultwarden_admin_token | default('') }}"
+vault_vaultwarden_postgres_password: "{{ vault_vaultwarden_postgres_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# LINKWARDEN VAULT VARIABLES
+# =============================================================================
+
+vault_linkwarden_postgres_password: "{{ vault_linkwarden_postgres_password | password_hash('bcrypt') }}"
+vault_linkwarden_nextauth_secret: "{{ vault_linkwarden_nextauth_secret | default('') }}"
+
+# =============================================================================
+# PEZZO VAULT VARIABLES
+# =============================================================================
+
+vault_pezzo_postgres_password: "{{ vault_pezzo_postgres_password | password_hash('bcrypt') }}"
+vault_pezzo_redis_password: "{{ vault_pezzo_redis_password | password_hash('bcrypt') }}"
+vault_pezzo_clickhouse_password: "{{ vault_pezzo_clickhouse_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# LOGGING VAULT VARIABLES
+# =============================================================================
+
+vault_loki_auth_token: "{{ vault_loki_auth_token | default('') }}"
+
+# =============================================================================
+# WATCHTOWER VAULT VARIABLES
+# =============================================================================
+
+vault_watchtower_token: "{{ vault_watchtower_token | default('') }}"
+
+# =============================================================================
+# FIREWALL VAULT VARIABLES
+# =============================================================================
+
+# UDM Pro specific variables
+vault_udm_pro_admin_password: "{{ vault_udm_pro_admin_password | password_hash('bcrypt') }}"
+vault_udm_pro_ssh_key: "{{ vault_udm_pro_ssh_key | default('') }}"
+
+# =============================================================================
+# MONITORING VAULT VARIABLES
+# =============================================================================
+
+# Prometheus
+vault_prometheus_admin_password: "{{ vault_prometheus_admin_password | password_hash('bcrypt') }}"
+
+# AlertManager
+vault_alertmanager_admin_password: "{{ vault_alertmanager_admin_password | password_hash('bcrypt') }}"
+
+# =============================================================================
+# BACKUP VAULT VARIABLES
+# =============================================================================
+
+# Backup encryption keys
+vault_backup_encryption_key: "{{ vault_backup_encryption_key | default('') }}"
+vault_backup_s3_access_key: "{{ vault_backup_s3_access_key | default('') }}"
+vault_backup_s3_secret_key: "{{ vault_backup_s3_secret_key | default('') }}"
+
+# =============================================================================
+# SECURITY VAULT VARIABLES
+# =============================================================================
+
+# SSL/TLS certificates
+vault_ssl_private_key: "{{ vault_ssl_private_key | default('') }}"
+vault_ssl_certificate: "{{ vault_ssl_certificate | default('') }}"
+
+# API keys for external services
+vault_github_token: "{{ vault_github_token | default('') }}"
+vault_docker_hub_token: "{{ vault_docker_hub_token | default('') }}"
+
+# =============================================================================
+# AUTOMATION VAULT VARIABLES
+# =============================================================================
+
+# Automation secrets
+vault_automation_api_key: "{{ vault_automation_api_key | default('') }}"
+vault_automation_webhook_secret: "{{ vault_automation_webhook_secret | default('') }}"
+
+# =============================================================================
+# DEVELOPMENT VAULT VARIABLES
+# =============================================================================
+
+# Development environment secrets
+vault_dev_database_password: "{{ vault_dev_database_password | password_hash('bcrypt') }}"
+vault_dev_api_key: "{{ vault_dev_api_key | default('') }}"
+
+# =============================================================================
+# TESTING VAULT VARIABLES
+# =============================================================================
+
+# Testing environment secrets
+vault_test_database_password: "{{ vault_test_database_password | password_hash('bcrypt') }}"
+vault_test_api_key: "{{ vault_test_api_key | default('') }}"
+
+# =============================================================================
+# PRODUCTION VAULT VARIABLES
+# =============================================================================
+
+# Production environment secrets
+vault_prod_database_password: "{{ vault_prod_database_password | password_hash('bcrypt') }}"
+vault_prod_api_key: "{{ vault_prod_api_key | default('') }}" 
+
+# =============================================================================
+# COMPREHENSIVE SERVICE STACK VAULT VARIABLES
+# =============================================================================
+
+vault_sonarr_admin_password: {{ vault_sonarr_admin_password | password_hash("bcrypt") }}
+vault_sonarr_database_password: {{ vault_sonarr_database_password | password_hash("bcrypt") }}
+vault_sonarr_api_token: {{ vault_sonarr_api_token | default("") }}
+vault_sonarr_secret_key: {{ vault_sonarr_secret_key | default("") }}
+vault_sonarr_encryption_key: {{ vault_sonarr_encryption_key | default("") }}
+vault_sonarr_jwt_secret: {{ vault_sonarr_jwt_secret | default("") }}
+vault_sonarr_redis_password: {{ vault_sonarr_redis_password | password_hash("bcrypt") }}
+vault_sonarr_smtp_password: {{ vault_sonarr_smtp_password | default("") }}
+vault_radarr_admin_password: {{ vault_radarr_admin_password | password_hash("bcrypt") }}
+vault_radarr_database_password: {{ vault_radarr_database_password | password_hash("bcrypt") }}
+vault_radarr_api_token: {{ vault_radarr_api_token | default("") }}
+vault_radarr_secret_key: {{ vault_radarr_secret_key | default("") }}
+vault_radarr_encryption_key: {{ vault_radarr_encryption_key | default("") }}
+vault_radarr_jwt_secret: {{ vault_radarr_jwt_secret | default("") }}
+vault_radarr_redis_password: {{ vault_radarr_redis_password | password_hash("bcrypt") }}
+vault_radarr_smtp_password: {{ vault_radarr_smtp_password | default("") }}
+vault_jellyfin_admin_password: {{ vault_jellyfin_admin_password | password_hash("bcrypt") }}
+vault_jellyfin_database_password: {{ vault_jellyfin_database_password | password_hash("bcrypt") }}
+vault_jellyfin_api_token: {{ vault_jellyfin_api_token | default("") }}
+vault_jellyfin_secret_key: {{ vault_jellyfin_secret_key | default("") }}
+vault_jellyfin_encryption_key: {{ vault_jellyfin_encryption_key | default("") }}
+vault_jellyfin_jwt_secret: {{ vault_jellyfin_jwt_secret | default("") }}
+vault_jellyfin_redis_password: {{ vault_jellyfin_redis_password | password_hash("bcrypt") }}
+vault_jellyfin_smtp_password: {{ vault_jellyfin_smtp_password | default("") }}
+vault_plex_admin_password: {{ vault_plex_admin_password | password_hash("bcrypt") }}
+vault_plex_database_password: {{ vault_plex_database_password | password_hash("bcrypt") }}
+vault_plex_api_token: {{ vault_plex_api_token | default("") }}
+vault_plex_secret_key: {{ vault_plex_secret_key | default("") }}
+vault_plex_encryption_key: {{ vault_plex_encryption_key | default("") }}
+vault_plex_jwt_secret: {{ vault_plex_jwt_secret | default("") }}
+vault_plex_redis_password: {{ vault_plex_redis_password | password_hash("bcrypt") }}
+vault_plex_smtp_password: {{ vault_plex_smtp_password | default("") }}
+vault_emby_admin_password: {{ vault_emby_admin_password | password_hash("bcrypt") }}
+vault_emby_database_password: {{ vault_emby_database_password | password_hash("bcrypt") }}
+vault_emby_api_token: {{ vault_emby_api_token | default("") }}
+vault_emby_secret_key: {{ vault_emby_secret_key | default("") }}
+vault_emby_encryption_key: {{ vault_emby_encryption_key | default("") }}
+vault_emby_jwt_secret: {{ vault_emby_jwt_secret | default("") }}
+vault_emby_redis_password: {{ vault_emby_redis_password | password_hash("bcrypt") }}
+vault_emby_smtp_password: {{ vault_emby_smtp_password | default("") }}
+vault_immich_admin_password: {{ vault_immich_admin_password | password_hash("bcrypt") }}
+vault_immich_database_password: {{ vault_immich_database_password | password_hash("bcrypt") }}
+vault_immich_api_token: {{ vault_immich_api_token | default("") }}
+vault_immich_secret_key: {{ vault_immich_secret_key | default("") }}
+vault_immich_encryption_key: {{ vault_immich_encryption_key | default("") }}
+vault_immich_jwt_secret: {{ vault_immich_jwt_secret | default("") }}
+vault_immich_redis_password: {{ vault_immich_redis_password | password_hash("bcrypt") }}
+vault_immich_smtp_password: {{ vault_immich_smtp_password | default("") }}
+vault_audiobookshelf_admin_password: {{ vault_audiobookshelf_admin_password | password_hash("bcrypt") }}
+vault_audiobookshelf_database_password: {{ vault_audiobookshelf_database_password | password_hash("bcrypt") }}
+vault_audiobookshelf_api_token: {{ vault_audiobookshelf_api_token | default("") }}
+vault_audiobookshelf_secret_key: {{ vault_audiobookshelf_secret_key | default("") }}
+vault_audiobookshelf_encryption_key: {{ vault_audiobookshelf_encryption_key | default("") }}
+vault_audiobookshelf_jwt_secret: {{ vault_audiobookshelf_jwt_secret | default("") }}
+vault_audiobookshelf_redis_password: {{ vault_audiobookshelf_redis_password | password_hash("bcrypt") }}
+vault_audiobookshelf_smtp_password: {{ vault_audiobookshelf_smtp_password | default("") }}
+vault_komga_admin_password: {{ vault_komga_admin_password | password_hash("bcrypt") }}
+vault_komga_database_password: {{ vault_komga_database_password | password_hash("bcrypt") }}
+vault_komga_api_token: {{ vault_komga_api_token | default("") }}
+vault_komga_secret_key: {{ vault_komga_secret_key | default("") }}
+vault_komga_encryption_key: {{ vault_komga_encryption_key | default("") }}
+vault_komga_jwt_secret: {{ vault_komga_jwt_secret | default("") }}
+vault_komga_redis_password: {{ vault_komga_redis_password | password_hash("bcrypt") }}
+vault_komga_smtp_password: {{ vault_komga_smtp_password | default("") }}
+vault_calibre_admin_password: {{ vault_calibre_admin_password | password_hash("bcrypt") }}
+vault_calibre_database_password: {{ vault_calibre_database_password | password_hash("bcrypt") }}
+vault_calibre_api_token: {{ vault_calibre_api_token | default("") }}
+vault_calibre_secret_key: {{ vault_calibre_secret_key | default("") }}
+vault_calibre_encryption_key: {{ vault_calibre_encryption_key | default("") }}
+vault_calibre_jwt_secret: {{ vault_calibre_jwt_secret | default("") }}
+vault_calibre_redis_password: {{ vault_calibre_redis_password | password_hash("bcrypt") }}
+vault_calibre_smtp_password: {{ vault_calibre_smtp_password | default("") }}
+vault_prometheus_admin_password: {{ vault_prometheus_admin_password | password_hash("bcrypt") }}
+vault_prometheus_database_password: {{ vault_prometheus_database_password | password_hash("bcrypt") }}
+vault_prometheus_api_token: {{ vault_prometheus_api_token | default("") }}
+vault_prometheus_secret_key: {{ vault_prometheus_secret_key | default("") }}
+vault_prometheus_encryption_key: {{ vault_prometheus_encryption_key | default("") }}
+vault_prometheus_jwt_secret: {{ vault_prometheus_jwt_secret | default("") }}
+vault_prometheus_redis_password: {{ vault_prometheus_redis_password | password_hash("bcrypt") }}
+vault_prometheus_smtp_password: {{ vault_prometheus_smtp_password | default("") }}
+vault_alertmanager_admin_password: {{ vault_alertmanager_admin_password | password_hash("bcrypt") }}
+vault_alertmanager_database_password: {{ vault_alertmanager_database_password | password_hash("bcrypt") }}
+vault_alertmanager_api_token: {{ vault_alertmanager_api_token | default("") }}
+vault_alertmanager_secret_key: {{ vault_alertmanager_secret_key | default("") }}
+vault_alertmanager_encryption_key: {{ vault_alertmanager_encryption_key | default("") }}
+vault_alertmanager_jwt_secret: {{ vault_alertmanager_jwt_secret | default("") }}
+vault_alertmanager_redis_password: {{ vault_alertmanager_redis_password | password_hash("bcrypt") }}
+vault_alertmanager_smtp_password: {{ vault_alertmanager_smtp_password | default("") }}
+vault_loki_admin_password: {{ vault_loki_admin_password | password_hash("bcrypt") }}
+vault_loki_database_password: {{ vault_loki_database_password | password_hash("bcrypt") }}
+vault_loki_api_token: {{ vault_loki_api_token | default("") }}
+vault_loki_secret_key: {{ vault_loki_secret_key | default("") }}
+vault_loki_encryption_key: {{ vault_loki_encryption_key | default("") }}
+vault_loki_jwt_secret: {{ vault_loki_jwt_secret | default("") }}
+vault_loki_redis_password: {{ vault_loki_redis_password | password_hash("bcrypt") }}
+vault_loki_smtp_password: {{ vault_loki_smtp_password | default("") }}
+vault_promtail_admin_password: {{ vault_promtail_admin_password | password_hash("bcrypt") }}
+vault_promtail_database_password: {{ vault_promtail_database_password | password_hash("bcrypt") }}
+vault_promtail_api_token: {{ vault_promtail_api_token | default("") }}
+vault_promtail_secret_key: {{ vault_promtail_secret_key | default("") }}
+vault_promtail_encryption_key: {{ vault_promtail_encryption_key | default("") }}
+vault_promtail_jwt_secret: {{ vault_promtail_jwt_secret | default("") }}
+vault_promtail_redis_password: {{ vault_promtail_redis_password | password_hash("bcrypt") }}
+vault_promtail_smtp_password: {{ vault_promtail_smtp_password | default("") }}
+vault_blackbox_exporter_admin_password: {{ vault_blackbox_exporter_admin_password | password_hash("bcrypt") }}
+vault_blackbox_exporter_database_password: {{ vault_blackbox_exporter_database_password | password_hash("bcrypt") }}
+vault_blackbox_exporter_api_token: {{ vault_blackbox_exporter_api_token | default("") }}
+vault_blackbox_exporter_secret_key: {{ vault_blackbox_exporter_secret_key | default("") }}
+vault_blackbox_exporter_encryption_key: {{ vault_blackbox_exporter_encryption_key | default("") }}
+vault_blackbox_exporter_jwt_secret: {{ vault_blackbox_exporter_jwt_secret | default("") }}
+vault_blackbox_exporter_redis_password: {{ vault_blackbox_exporter_redis_password | password_hash("bcrypt") }}
+vault_blackbox_exporter_smtp_password: {{ vault_blackbox_exporter_smtp_password | default("") }}
+vault_influxdb_admin_password: {{ vault_influxdb_admin_password | password_hash("bcrypt") }}
+vault_influxdb_database_password: {{ vault_influxdb_database_password | password_hash("bcrypt") }}
+vault_influxdb_api_token: {{ vault_influxdb_api_token | default("") }}
+vault_influxdb_secret_key: {{ vault_influxdb_secret_key | default("") }}
+vault_influxdb_encryption_key: {{ vault_influxdb_encryption_key | default("") }}
+vault_influxdb_jwt_secret: {{ vault_influxdb_jwt_secret | default("") }}
+vault_influxdb_redis_password: {{ vault_influxdb_redis_password | password_hash("bcrypt") }}
+vault_influxdb_smtp_password: {{ vault_influxdb_smtp_password | default("") }}
+vault_telegraf_admin_password: {{ vault_telegraf_admin_password | password_hash("bcrypt") }}
+vault_telegraf_database_password: {{ vault_telegraf_database_password | password_hash("bcrypt") }}
+vault_telegraf_api_token: {{ vault_telegraf_api_token | default("") }}
+vault_telegraf_secret_key: {{ vault_telegraf_secret_key | default("") }}
+vault_telegraf_encryption_key: {{ vault_telegraf_encryption_key | default("") }}
+vault_telegraf_jwt_secret: {{ vault_telegraf_jwt_secret | default("") }}
+vault_telegraf_redis_password: {{ vault_telegraf_redis_password | password_hash("bcrypt") }}
+vault_telegraf_smtp_password: {{ vault_telegraf_smtp_password | default("") }}
+vault_vault_admin_password: {{ vault_vault_admin_password | password_hash("bcrypt") }}
+vault_vault_database_password: {{ vault_vault_database_password | password_hash("bcrypt") }}
+vault_vault_api_token: {{ vault_vault_api_token | default("") }}
+vault_vault_secret_key: {{ vault_vault_secret_key | default("") }}
+vault_vault_encryption_key: {{ vault_vault_encryption_key | default("") }}
+vault_vault_jwt_secret: {{ vault_vault_jwt_secret | default("") }}
+vault_vault_redis_password: {{ vault_vault_redis_password | password_hash("bcrypt") }}
+vault_vault_smtp_password: {{ vault_vault_smtp_password | default("") }}
+vault_crowdsec_admin_password: {{ vault_crowdsec_admin_password | password_hash("bcrypt") }}
+vault_crowdsec_database_password: {{ vault_crowdsec_database_password | password_hash("bcrypt") }}
+vault_crowdsec_api_token: {{ vault_crowdsec_api_token | default("") }}
+vault_crowdsec_secret_key: {{ vault_crowdsec_secret_key | default("") }}
+vault_crowdsec_encryption_key: {{ vault_crowdsec_encryption_key | default("") }}
+vault_crowdsec_jwt_secret: {{ vault_crowdsec_jwt_secret | default("") }}
+vault_crowdsec_redis_password: {{ vault_crowdsec_redis_password | password_hash("bcrypt") }}
+vault_crowdsec_smtp_password: {{ vault_crowdsec_smtp_password | default("") }}
+vault_fail2ban_admin_password: {{ vault_fail2ban_admin_password | password_hash("bcrypt") }}
+vault_fail2ban_database_password: {{ vault_fail2ban_database_password | password_hash("bcrypt") }}
+vault_fail2ban_api_token: {{ vault_fail2ban_api_token | default("") }}
+vault_fail2ban_secret_key: {{ vault_fail2ban_secret_key | default("") }}
+vault_fail2ban_encryption_key: {{ vault_fail2ban_encryption_key | default("") }}
+vault_fail2ban_jwt_secret: {{ vault_fail2ban_jwt_secret | default("") }}
+vault_fail2ban_redis_password: {{ vault_fail2ban_redis_password | password_hash("bcrypt") }}
+vault_fail2ban_smtp_password: {{ vault_fail2ban_smtp_password | default("") }}
+vault_wireguard_admin_password: {{ vault_wireguard_admin_password | password_hash("bcrypt") }}
+vault_wireguard_database_password: {{ vault_wireguard_database_password | password_hash("bcrypt") }}
+vault_wireguard_api_token: {{ vault_wireguard_api_token | default("") }}
+vault_wireguard_secret_key: {{ vault_wireguard_secret_key | default("") }}
+vault_wireguard_encryption_key: {{ vault_wireguard_encryption_key | default("") }}
+vault_wireguard_jwt_secret: {{ vault_wireguard_jwt_secret | default("") }}
+vault_wireguard_redis_password: {{ vault_wireguard_redis_password | password_hash("bcrypt") }}
+vault_wireguard_smtp_password: {{ vault_wireguard_smtp_password | default("") }}
+vault_pihole_admin_password: {{ vault_pihole_admin_password | password_hash("bcrypt") }}
+vault_pihole_database_password: {{ vault_pihole_database_password | password_hash("bcrypt") }}
+vault_pihole_api_token: {{ vault_pihole_api_token | default("") }}
+vault_pihole_secret_key: {{ vault_pihole_secret_key | default("") }}
+vault_pihole_encryption_key: {{ vault_pihole_encryption_key | default("") }}
+vault_pihole_jwt_secret: {{ vault_pihole_jwt_secret | default("") }}
+vault_pihole_redis_password: {{ vault_pihole_redis_password | password_hash("bcrypt") }}
+vault_pihole_smtp_password: {{ vault_pihole_smtp_password | default("") }}
+vault_gitlab_admin_password: {{ vault_gitlab_admin_password | password_hash("bcrypt") }}
+vault_gitlab_database_password: {{ vault_gitlab_database_password | password_hash("bcrypt") }}
+vault_gitlab_api_token: {{ vault_gitlab_api_token | default("") }}
+vault_gitlab_secret_key: {{ vault_gitlab_secret_key | default("") }}
+vault_gitlab_encryption_key: {{ vault_gitlab_encryption_key | default("") }}
+vault_gitlab_jwt_secret: {{ vault_gitlab_jwt_secret | default("") }}
+vault_gitlab_redis_password: {{ vault_gitlab_redis_password | password_hash("bcrypt") }}
+vault_gitlab_smtp_password: {{ vault_gitlab_smtp_password | default("") }}
+vault_harbor_admin_password: {{ vault_harbor_admin_password | password_hash("bcrypt") }}
+vault_harbor_database_password: {{ vault_harbor_database_password | password_hash("bcrypt") }}
+vault_harbor_api_token: {{ vault_harbor_api_token | default("") }}
+vault_harbor_secret_key: {{ vault_harbor_secret_key | default("") }}
+vault_harbor_encryption_key: {{ vault_harbor_encryption_key | default("") }}
+vault_harbor_jwt_secret: {{ vault_harbor_jwt_secret | default("") }}
+vault_harbor_redis_password: {{ vault_harbor_redis_password | password_hash("bcrypt") }}
+vault_harbor_smtp_password: {{ vault_harbor_smtp_password | default("") }}
+vault_code_server_admin_password: {{ vault_code_server_admin_password | password_hash("bcrypt") }}
+vault_code_server_database_password: {{ vault_code_server_database_password | password_hash("bcrypt") }}
+vault_code_server_api_token: {{ vault_code_server_api_token | default("") }}
+vault_code_server_secret_key: {{ vault_code_server_secret_key | default("") }}
+vault_code_server_encryption_key: {{ vault_code_server_encryption_key | default("") }}
+vault_code_server_jwt_secret: {{ vault_code_server_jwt_secret | default("") }}
+vault_code_server_redis_password: {{ vault_code_server_redis_password | password_hash("bcrypt") }}
+vault_code_server_smtp_password: {{ vault_code_server_smtp_password | default("") }}
+vault_portainer_admin_password: {{ vault_portainer_admin_password | password_hash("bcrypt") }}
+vault_portainer_database_password: {{ vault_portainer_database_password | password_hash("bcrypt") }}
+vault_portainer_api_token: {{ vault_portainer_api_token | default("") }}
+vault_portainer_secret_key: {{ vault_portainer_secret_key | default("") }}
+vault_portainer_encryption_key: {{ vault_portainer_encryption_key | default("") }}
+vault_portainer_jwt_secret: {{ vault_portainer_jwt_secret | default("") }}
+vault_portainer_redis_password: {{ vault_portainer_redis_password | password_hash("bcrypt") }}
+vault_portainer_smtp_password: {{ vault_portainer_smtp_password | default("") }}
+vault_nextcloud_admin_password: {{ vault_nextcloud_admin_password | password_hash("bcrypt") }}
+vault_nextcloud_database_password: {{ vault_nextcloud_database_password | password_hash("bcrypt") }}
+vault_nextcloud_api_token: {{ vault_nextcloud_api_token | default("") }}
+vault_nextcloud_secret_key: {{ vault_nextcloud_secret_key | default("") }}
+vault_nextcloud_encryption_key: {{ vault_nextcloud_encryption_key | default("") }}
+vault_nextcloud_jwt_secret: {{ vault_nextcloud_jwt_secret | default("") }}
+vault_nextcloud_redis_password: {{ vault_nextcloud_redis_password | password_hash("bcrypt") }}
+vault_nextcloud_smtp_password: {{ vault_nextcloud_smtp_password | default("") }}
+vault_syncthing_admin_password: {{ vault_syncthing_admin_password | password_hash("bcrypt") }}
+vault_syncthing_database_password: {{ vault_syncthing_database_password | password_hash("bcrypt") }}
+vault_syncthing_api_token: {{ vault_syncthing_api_token | default("") }}
+vault_syncthing_secret_key: {{ vault_syncthing_secret_key | default("") }}
+vault_syncthing_encryption_key: {{ vault_syncthing_encryption_key | default("") }}
+vault_syncthing_jwt_secret: {{ vault_syncthing_jwt_secret | default("") }}
+vault_syncthing_redis_password: {{ vault_syncthing_redis_password | password_hash("bcrypt") }}
+vault_syncthing_smtp_password: {{ vault_syncthing_smtp_password | default("") }}
+vault_bookstack_admin_password: {{ vault_bookstack_admin_password | password_hash("bcrypt") }}
+vault_bookstack_database_password: {{ vault_bookstack_database_password | password_hash("bcrypt") }}
+vault_bookstack_api_token: {{ vault_bookstack_api_token | default("") }}
+vault_bookstack_secret_key: {{ vault_bookstack_secret_key | default("") }}
+vault_bookstack_encryption_key: {{ vault_bookstack_encryption_key | default("") }}
+vault_bookstack_jwt_secret: {{ vault_bookstack_jwt_secret | default("") }}
+vault_bookstack_redis_password: {{ vault_bookstack_redis_password | password_hash("bcrypt") }}
+vault_bookstack_smtp_password: {{ vault_bookstack_smtp_password | default("") }}
+vault_filebrowser_admin_password: {{ vault_filebrowser_admin_password | password_hash("bcrypt") }}
+vault_filebrowser_database_password: {{ vault_filebrowser_database_password | password_hash("bcrypt") }}
+vault_filebrowser_api_token: {{ vault_filebrowser_api_token | default("") }}
+vault_filebrowser_secret_key: {{ vault_filebrowser_secret_key | default("") }}
+vault_filebrowser_encryption_key: {{ vault_filebrowser_encryption_key | default("") }}
+vault_filebrowser_jwt_secret: {{ vault_filebrowser_jwt_secret | default("") }}
+vault_filebrowser_redis_password: {{ vault_filebrowser_redis_password | password_hash("bcrypt") }}
+vault_filebrowser_smtp_password: {{ vault_filebrowser_smtp_password | default("") }}
+vault_kopia_admin_password: {{ vault_kopia_admin_password | password_hash("bcrypt") }}
+vault_kopia_database_password: {{ vault_kopia_database_password | password_hash("bcrypt") }}
+vault_kopia_api_token: {{ vault_kopia_api_token | default("") }}
+vault_kopia_secret_key: {{ vault_kopia_secret_key | default("") }}
+vault_kopia_encryption_key: {{ vault_kopia_encryption_key | default("") }}
+vault_kopia_jwt_secret: {{ vault_kopia_jwt_secret | default("") }}
+vault_kopia_redis_password: {{ vault_kopia_redis_password | password_hash("bcrypt") }}
+vault_kopia_smtp_password: {{ vault_kopia_smtp_password | default("") }}
+vault_duplicati_admin_password: {{ vault_duplicati_admin_password | password_hash("bcrypt") }}
+vault_duplicati_database_password: {{ vault_duplicati_database_password | password_hash("bcrypt") }}
+vault_duplicati_api_token: {{ vault_duplicati_api_token | default("") }}
+vault_duplicati_secret_key: {{ vault_duplicati_secret_key | default("") }}
+vault_duplicati_encryption_key: {{ vault_duplicati_encryption_key | default("") }}
+vault_duplicati_jwt_secret: {{ vault_duplicati_jwt_secret | default("") }}
+vault_duplicati_redis_password: {{ vault_duplicati_redis_password | password_hash("bcrypt") }}
+vault_duplicati_smtp_password: {{ vault_duplicati_smtp_password | default("") }}
+vault_uptime_kuma_admin_password: {{ vault_uptime_kuma_admin_password | password_hash("bcrypt") }}
+vault_uptime_kuma_database_password: {{ vault_uptime_kuma_database_password | password_hash("bcrypt") }}
+vault_uptime_kuma_api_token: {{ vault_uptime_kuma_api_token | default("") }}
+vault_uptime_kuma_secret_key: {{ vault_uptime_kuma_secret_key | default("") }}
+vault_uptime_kuma_encryption_key: {{ vault_uptime_kuma_encryption_key | default("") }}
+vault_uptime_kuma_jwt_secret: {{ vault_uptime_kuma_jwt_secret | default("") }}
+vault_uptime_kuma_redis_password: {{ vault_uptime_kuma_redis_password | password_hash("bcrypt") }}
+vault_uptime_kuma_smtp_password: {{ vault_uptime_kuma_smtp_password | default("") }}
+vault_guacamole_admin_password: {{ vault_guacamole_admin_password | password_hash("bcrypt") }}
+vault_guacamole_database_password: {{ vault_guacamole_database_password | password_hash("bcrypt") }}
+vault_guacamole_api_token: {{ vault_guacamole_api_token | default("") }}
+vault_guacamole_secret_key: {{ vault_guacamole_secret_key | default("") }}
+vault_guacamole_encryption_key: {{ vault_guacamole_encryption_key | default("") }}
+vault_guacamole_jwt_secret: {{ vault_guacamole_jwt_secret | default("") }}
+vault_guacamole_redis_password: {{ vault_guacamole_redis_password | password_hash("bcrypt") }}
+vault_guacamole_smtp_password: {{ vault_guacamole_smtp_password | default("") }}
+vault_requestrr_admin_password: {{ vault_requestrr_admin_password | password_hash("bcrypt") }}
+vault_requestrr_database_password: {{ vault_requestrr_database_password | password_hash("bcrypt") }}
+vault_requestrr_api_token: {{ vault_requestrr_api_token | default("") }}
+vault_requestrr_secret_key: {{ vault_requestrr_secret_key | default("") }}
+vault_requestrr_encryption_key: {{ vault_requestrr_encryption_key | default("") }}
+vault_requestrr_jwt_secret: {{ vault_requestrr_jwt_secret | default("") }}
+vault_requestrr_redis_password: {{ vault_requestrr_redis_password | password_hash("bcrypt") }}
+vault_requestrr_smtp_password: {{ vault_requestrr_smtp_password | default("") }}
+vault_unmanic_admin_password: {{ vault_unmanic_admin_password | password_hash("bcrypt") }}
+vault_unmanic_database_password: {{ vault_unmanic_database_password | password_hash("bcrypt") }}
+vault_unmanic_api_token: {{ vault_unmanic_api_token | default("") }}
+vault_unmanic_secret_key: {{ vault_unmanic_secret_key | default("") }}
+vault_unmanic_encryption_key: {{ vault_unmanic_encryption_key | default("") }}
+vault_unmanic_jwt_secret: {{ vault_unmanic_jwt_secret | default("") }}
+vault_unmanic_redis_password: {{ vault_unmanic_redis_password | password_hash("bcrypt") }}
+vault_unmanic_smtp_password: {{ vault_unmanic_smtp_password | default("") }}
+vault_tdarr_admin_password: {{ vault_tdarr_admin_password | password_hash("bcrypt") }}
+vault_tdarr_database_password: {{ vault_tdarr_database_password | password_hash("bcrypt") }}
+vault_tdarr_api_token: {{ vault_tdarr_api_token | default("") }}
+vault_tdarr_secret_key: {{ vault_tdarr_secret_key | default("") }}
+vault_tdarr_encryption_key: {{ vault_tdarr_encryption_key | default("") }}
+vault_tdarr_jwt_secret: {{ vault_tdarr_jwt_secret | default("") }}
+vault_tdarr_redis_password: {{ vault_tdarr_redis_password | password_hash("bcrypt") }}
+vault_tdarr_smtp_password: {{ vault_tdarr_smtp_password | default("") }}
+vault_sabnzbd_admin_password: {{ vault_sabnzbd_admin_password | password_hash("bcrypt") }}
+vault_sabnzbd_database_password: {{ vault_sabnzbd_database_password | password_hash("bcrypt") }}
+vault_sabnzbd_api_token: {{ vault_sabnzbd_api_token | default("") }}
+vault_sabnzbd_secret_key: {{ vault_sabnzbd_secret_key | default("") }}
+vault_sabnzbd_encryption_key: {{ vault_sabnzbd_encryption_key | default("") }}
+vault_sabnzbd_jwt_secret: {{ vault_sabnzbd_jwt_secret | default("") }}
+vault_sabnzbd_redis_password: {{ vault_sabnzbd_redis_password | password_hash("bcrypt") }}
+vault_sabnzbd_smtp_password: {{ vault_sabnzbd_smtp_password | default("") }}
+vault_qbittorrent_admin_password: {{ vault_qbittorrent_admin_password | password_hash("bcrypt") }}
+vault_qbittorrent_database_password: {{ vault_qbittorrent_database_password | password_hash("bcrypt") }}
+vault_qbittorrent_api_token: {{ vault_qbittorrent_api_token | default("") }}
+vault_qbittorrent_secret_key: {{ vault_qbittorrent_secret_key | default("") }}
+vault_qbittorrent_encryption_key: {{ vault_qbittorrent_encryption_key | default("") }}
+vault_qbittorrent_jwt_secret: {{ vault_qbittorrent_jwt_secret | default("") }}
+vault_qbittorrent_redis_password: {{ vault_qbittorrent_redis_password | password_hash("bcrypt") }}
+vault_qbittorrent_smtp_password: {{ vault_qbittorrent_smtp_password | default("") }}
+vault_transmission_admin_password: {{ vault_transmission_admin_password | password_hash("bcrypt") }}
+vault_transmission_database_password: {{ vault_transmission_database_password | password_hash("bcrypt") }}
+vault_transmission_api_token: {{ vault_transmission_api_token | default("") }}
+vault_transmission_secret_key: {{ vault_transmission_secret_key | default("") }}
+vault_transmission_encryption_key: {{ vault_transmission_encryption_key | default("") }}
+vault_transmission_jwt_secret: {{ vault_transmission_jwt_secret | default("") }}
+vault_transmission_redis_password: {{ vault_transmission_redis_password | password_hash("bcrypt") }}
+vault_transmission_smtp_password: {{ vault_transmission_smtp_password | default("") }}
+vault_deluge_admin_password: {{ vault_deluge_admin_password | password_hash("bcrypt") }}
+vault_deluge_database_password: {{ vault_deluge_database_password | password_hash("bcrypt") }}
+vault_deluge_api_token: {{ vault_deluge_api_token | default("") }}
+vault_deluge_secret_key: {{ vault_deluge_secret_key | default("") }}
+vault_deluge_encryption_key: {{ vault_deluge_encryption_key | default("") }}
+vault_deluge_jwt_secret: {{ vault_deluge_jwt_secret | default("") }}
+vault_deluge_redis_password: {{ vault_deluge_redis_password | password_hash("bcrypt") }}
+vault_deluge_smtp_password: {{ vault_deluge_smtp_password | default("") }}
+vault_rtorrent_admin_password: {{ vault_rtorrent_admin_password | password_hash("bcrypt") }}
+vault_rtorrent_database_password: {{ vault_rtorrent_database_password | password_hash("bcrypt") }}
+vault_rtorrent_api_token: {{ vault_rtorrent_api_token | default("") }}
+vault_rtorrent_secret_key: {{ vault_rtorrent_secret_key | default("") }}
+vault_rtorrent_encryption_key: {{ vault_rtorrent_encryption_key | default("") }}
+vault_rtorrent_jwt_secret: {{ vault_rtorrent_jwt_secret | default("") }}
+vault_rtorrent_redis_password: {{ vault_rtorrent_redis_password | password_hash("bcrypt") }}
+vault_rtorrent_smtp_password: {{ vault_rtorrent_smtp_password | default("") }}
+vault_server_ip: {{ ansible_default_ipv4.address }}
+vault_domain: {{ domain }}
+vault_admin_email: {{ admin_email | default("admin@" + domain) }}
+vault_monitoring_email: {{ monitoring_email | default("monitoring@" + domain) }}
+vault_ssl_email: {{ ssl_email | default("admin@" + domain) }}

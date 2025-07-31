@@ -251,7 +251,7 @@ class InfrastructureValidator:
         
         # Check Traefik API health
         try:
-            with urllib.request.urlopen("http://localhost:8080/api/health", timeout=10) as response:
+            with urllib.request.urlopen("http://{{ ansible_default_ipv4.address }}:8080/api/health", timeout=10) as response:
                 if response.getcode() == 200:
                     self.log("✅ Traefik API is responding")
                 else:
@@ -263,7 +263,7 @@ class InfrastructureValidator:
         
         # Check certificate resolvers
         try:
-            with urllib.request.urlopen("http://localhost:8080/api/http/certresolvers", timeout=10) as response:
+            with urllib.request.urlopen("http://{{ ansible_default_ipv4.address }}:8080/api/http/certresolvers", timeout=10) as response:
                 if response.getcode() == 200:
                     data = json.loads(response.read().decode())
                     resolvers = list(data.keys())

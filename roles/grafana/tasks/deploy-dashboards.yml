@@ -148,7 +148,7 @@
 
 - name: Wait for Grafana to be ready
   uri:
-    url: "http://localhost:{{ grafana_port | default(3000) }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/health"
     method: GET
     status_code: 200
   register: grafana_health
@@ -158,10 +158,10 @@
 
 - name: Validate Dashboard Deployment
   uri:
-    url: "http://localhost:{{ grafana_port | default(3000) }}/api/dashboards/db/homelab-overview"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/dashboards/db/homelab-overview"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: yes
     status_code: 200
   register: dashboard_validation
@@ -169,10 +169,10 @@
 
 - name: Validate Alert Rules Deployment
   uri:
-    url: "http://localhost:{{ grafana_port | default(3000) }}/api/v1/provisioning/alert-rules"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/v1/provisioning/alert-rules"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: yes
     status_code: 200
   register: alert_validation
@@ -180,10 +180,10 @@
 
 - name: Validate Notification Channels Deployment
   uri:
-    url: "http://localhost:{{ grafana_port | default(3000) }}/api/v1/provisioning/notification-policies"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/v1/provisioning/notification-policies"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: yes
     status_code: 200
   register: notification_validation
@@ -256,7 +256,7 @@
     hour: "2"
     minute: "0"
     job: "{{ grafana_config_dir }}/backup.sh"
-    user: "{{ grafana_user | default('grafana') }}"
+    user: "{{ vault_grafana_user }}"grafana') }}"
   when: grafana_enabled | default(true)
 
 - name: Create Grafana Performance Monitoring

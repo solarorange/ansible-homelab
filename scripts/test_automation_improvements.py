@@ -24,7 +24,7 @@ class TestInputValidation(unittest.TestCase):
     def test_validate_url_valid(self):
         """Test valid URL validation"""
         self.assertTrue(InputValidator.validate_url("https://example.com"))
-        self.assertTrue(InputValidator.validate_url("http://localhost:3000"))
+        self.assertTrue(InputValidator.validate_url("http://{{ ansible_default_ipv4.address }}:3000"))
         self.assertTrue(InputValidator.validate_url("https://api.example.com/v1"))
     
     def test_validate_url_invalid(self):

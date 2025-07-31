@@ -230,7 +230,7 @@ check_network_connectivity() {
     fi
     
     # Check local network connectivity
-    if ! ping -c 3 192.168.1.1 >/dev/null 2>&1; then
+    if ! ping -c 3 {{ ansible_default_ipv4.address }} >/dev/null 2>&1; then
         log "WARNING" "Local network connectivity may be impaired"
     else
         log "SUCCESS" "Local network connectivity is working"
@@ -269,21 +269,21 @@ check_specific_services() {
     
     # Define service health checks
     declare -A service_checks=(
-        ["traefik"]="http://localhost:8080/api/health"
-        ["authentik"]="http://localhost:9000/if/user/"
-        ["grafana"]="http://localhost:3000/api/health"
-        ["prometheus"]="http://localhost:9090/-/healthy"
-        ["influxdb"]="http://localhost:8086/health"
-        ["loki"]="http://localhost:3100/ready"
-        ["alertmanager"]="http://localhost:9093/-/healthy"
-        ["postgresql"]="localhost:5432"
-        ["redis"]="localhost:6379"
-        ["sonarr"]="http://localhost:8989/health"
-        ["radarr"]="http://localhost:7878/health"
-        ["jellyfin"]="http://localhost:8096/health"
-        ["nextcloud"]="http://localhost:8080/status.php"
-        ["paperless"]="http://localhost:8010/health"
-        ["fing"]="http://localhost:8080/health"
+        ["traefik"]="http://{{ ansible_default_ipv4.address }}:8080/api/health"
+        ["authentik"]="http://{{ ansible_default_ipv4.address }}:9000/if/user/"
+        ["grafana"]="http://{{ ansible_default_ipv4.address }}:3000/api/health"
+        ["prometheus"]="http://{{ ansible_default_ipv4.address }}:9090/-/healthy"
+        ["influxdb"]="http://{{ ansible_default_ipv4.address }}:8086/health"
+        ["loki"]="http://{{ ansible_default_ipv4.address }}:3100/ready"
+        ["alertmanager"]="http://{{ ansible_default_ipv4.address }}:9093/-/healthy"
+        ["postgresql"]="{{ ansible_default_ipv4.address }}:5432"
+        ["redis"]="{{ ansible_default_ipv4.address }}:6379"
+        ["sonarr"]="http://{{ ansible_default_ipv4.address }}:8989/health"
+        ["radarr"]="http://{{ ansible_default_ipv4.address }}:7878/health"
+        ["jellyfin"]="http://{{ ansible_default_ipv4.address }}:8096/health"
+        ["nextcloud"]="http://{{ ansible_default_ipv4.address }}:8080/status.php"
+        ["paperless"]="http://{{ ansible_default_ipv4.address }}:8010/health"
+        ["fing"]="http://{{ ansible_default_ipv4.address }}:8080/health"
     )
     
     local failed_services=()

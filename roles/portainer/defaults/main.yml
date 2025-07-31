@@ -1,0 +1,259 @@
+# Portainer Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# PORTAINER SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+portainer_service_name: "portainer"
+portainer_container_name: "{{ portainer_service_name }}"
+portainer_image: "portainer/portainer-ce:latest"
+portainer_version: "latest"
+
+# Network Configuration
+portainer_port: 9000
+portainer_external_port: "{{ portainer_port }}"
+portainer_protocol: "http"
+portainer_host: "{{ ansible_default_ipv4.address }}"
+portainer_url: "{{ portainer_protocol }}://{{ portainer_host }}:{{ portainer_port }}"
+
+# Domain Configuration
+portainer_subdomain: "portainer"
+portainer_domain: "{{ portainer_subdomain }}.{{ domain }}"
+portainer_external_url: "https://{{ portainer_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+portainer_auth_enabled: true
+portainer_auth_method: "authentik"  # Options: basic, authentik, none
+portainer_admin_username: "admin"
+portainer_admin_password: "{{ vault_portainer_admin_password }}"
+
+# API Configuration
+portainer_api_key: "{{ vault_portainer_api_key }}"
+portainer_api_token: "{{ vault_portainer_api_token }}"
+
+# Encryption & Security
+portainer_secret_key: "{{ vault_portainer_secret_key }}"
+portainer_encryption_key: "{{ vault_portainer_encryption_key }}"
+portainer_jwt_secret: "{{ vault_portainer_jwt_secret }}"
+
+# SSL/TLS Configuration
+portainer_ssl_enabled: true
+portainer_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+portainer_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+portainer_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+portainer_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+portainer_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+portainer_database_port: "{{ databases_postgresql_port | default(5432) }}"
+portainer_database_name: "portainer"
+portainer_database_username: "portainer"
+portainer_database_password: "{{ vault_portainer_database_password }}"
+
+# Redis Configuration (if using)
+portainer_redis_enabled: false
+portainer_redis_host: "{{ redis_host | default('redis') }}"
+portainer_redis_port: "{{ redis_port | default(6379) }}"
+portainer_redis_password: "{{ vault_portainer_redis_password }}"
+portainer_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+portainer_data_dir: "{{ homelab_data_dir }}/portainer"
+portainer_config_dir: "{{ portainer_data_dir }}/config"
+portainer_backup_dir: "{{ portainer_data_dir }}/backups"
+
+# Volume Mappings
+portainer_volumes:
+  - "{{ portainer_config_dir }}:/config"
+  - "{{ portainer_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+portainer_health_check_enabled: true
+portainer_health_check_path: "/health"
+portainer_health_check_interval: 30
+portainer_health_check_timeout: 10
+portainer_health_check_retries: 3
+
+# Monitoring Integration
+portainer_monitoring_enabled: true
+portainer_prometheus_enabled: true
+portainer_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+portainer_backup_enabled: true
+portainer_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+portainer_backup_retention_days: 30
+portainer_backup_encryption_enabled: true
+portainer_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+portainer_smtp_enabled: false
+portainer_smtp_host: "{{ smtp_host | default('') }}"
+portainer_smtp_port: "{{ smtp_port | default(587) }}"
+portainer_smtp_username: "{{ vault_smtp_username }}"
+portainer_smtp_password: "{{ vault_portainer_smtp_password }}"
+portainer_smtp_from: "{{ portainer_admin_email | default('admin@' + domain) }}"
+portainer_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+portainer_webhook_enabled: false
+portainer_webhook_url: "{{ vault_webhook_url | default('') }}"
+portainer_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+portainer_discovery_enabled: true
+portainer_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+portainer_cpu_limit: "1.0"
+portainer_memory_limit: "1g"
+portainer_memory_reservation: "512m"
+
+# Performance Settings
+portainer_scan_interval: 10
+portainer_parallel_downloads: 3
+portainer_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+portainer_log_level: "info"  # Options: trace, debug, info, warn, error
+portainer_log_rotation_enabled: true
+portainer_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+portainer_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+portainer_rate_limit_enabled: true
+portainer_rate_limit_requests: 100
+portainer_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+portainer_deploy_enabled: true
+portainer_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+portainer_restart_policy: "unless-stopped"
+portainer_auto_update_enabled: true
+
+# Environment Variables
+portainer_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  PORTAINER_API_KEY: "{{ portainer_api_key }}"
+  PORTAINER_SECRET_KEY: "{{ portainer_secret_key }}"
+  PORTAINER_ENCRYPTION_KEY: "{{ portainer_encryption_key }}"
+  PORTAINER_JWT_SECRET: "{{ portainer_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+portainer_validation_enabled: true
+portainer_validation_timeout: 300
+portainer_validation_retries: 3
+
+# Testing Configuration
+portainer_test_enabled: false
+portainer_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+portainer_compliance_enabled: true
+portainer_audit_logging_enabled: true
+portainer_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+portainer_automation_enabled: true
+portainer_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+portainer_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+portainer_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+portainer_fallback_enabled: true
+portainer_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

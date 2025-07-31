@@ -1,0 +1,259 @@
+# Telegraf Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# TELEGRAF SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+telegraf_service_name: "telegraf"
+telegraf_container_name: "{{ telegraf_service_name }}"
+telegraf_image: "telegraf:latest"
+telegraf_version: "latest"
+
+# Network Configuration
+telegraf_port: 8125
+telegraf_external_port: "{{ telegraf_port }}"
+telegraf_protocol: "http"
+telegraf_host: "{{ ansible_default_ipv4.address }}"
+telegraf_url: "{{ telegraf_protocol }}://{{ telegraf_host }}:{{ telegraf_port }}"
+
+# Domain Configuration
+telegraf_subdomain: "telegraf"
+telegraf_domain: "{{ telegraf_subdomain }}.{{ domain }}"
+telegraf_external_url: "https://{{ telegraf_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+telegraf_auth_enabled: true
+telegraf_auth_method: "authentik"  # Options: basic, authentik, none
+telegraf_admin_username: "admin"
+telegraf_admin_password: "{{ vault_telegraf_admin_password }}"
+
+# API Configuration
+telegraf_api_key: "{{ vault_telegraf_api_key }}"
+telegraf_api_token: "{{ vault_telegraf_api_token }}"
+
+# Encryption & Security
+telegraf_secret_key: "{{ vault_telegraf_secret_key }}"
+telegraf_encryption_key: "{{ vault_telegraf_encryption_key }}"
+telegraf_jwt_secret: "{{ vault_telegraf_jwt_secret }}"
+
+# SSL/TLS Configuration
+telegraf_ssl_enabled: true
+telegraf_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+telegraf_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+telegraf_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+telegraf_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+telegraf_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+telegraf_database_port: "{{ databases_postgresql_port | default(5432) }}"
+telegraf_database_name: "telegraf"
+telegraf_database_username: "telegraf"
+telegraf_database_password: "{{ vault_telegraf_database_password }}"
+
+# Redis Configuration (if using)
+telegraf_redis_enabled: false
+telegraf_redis_host: "{{ redis_host | default('redis') }}"
+telegraf_redis_port: "{{ redis_port | default(6379) }}"
+telegraf_redis_password: "{{ vault_telegraf_redis_password }}"
+telegraf_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+telegraf_data_dir: "{{ homelab_data_dir }}/telegraf"
+telegraf_config_dir: "{{ telegraf_data_dir }}/config"
+telegraf_backup_dir: "{{ telegraf_data_dir }}/backups"
+
+# Volume Mappings
+telegraf_volumes:
+  - "{{ telegraf_config_dir }}:/config"
+  - "{{ telegraf_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+telegraf_health_check_enabled: true
+telegraf_health_check_path: "/health"
+telegraf_health_check_interval: 30
+telegraf_health_check_timeout: 10
+telegraf_health_check_retries: 3
+
+# Monitoring Integration
+telegraf_monitoring_enabled: true
+telegraf_prometheus_enabled: true
+telegraf_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+telegraf_backup_enabled: true
+telegraf_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+telegraf_backup_retention_days: 30
+telegraf_backup_encryption_enabled: true
+telegraf_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+telegraf_smtp_enabled: false
+telegraf_smtp_host: "{{ smtp_host | default('') }}"
+telegraf_smtp_port: "{{ smtp_port | default(587) }}"
+telegraf_smtp_username: "{{ vault_smtp_username }}"
+telegraf_smtp_password: "{{ vault_telegraf_smtp_password }}"
+telegraf_smtp_from: "{{ telegraf_admin_email | default('admin@' + domain) }}"
+telegraf_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+telegraf_webhook_enabled: false
+telegraf_webhook_url: "{{ vault_webhook_url | default('') }}"
+telegraf_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+telegraf_discovery_enabled: true
+telegraf_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+telegraf_cpu_limit: "1.0"
+telegraf_memory_limit: "1g"
+telegraf_memory_reservation: "512m"
+
+# Performance Settings
+telegraf_scan_interval: 10
+telegraf_parallel_downloads: 3
+telegraf_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+telegraf_log_level: "info"  # Options: trace, debug, info, warn, error
+telegraf_log_rotation_enabled: true
+telegraf_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+telegraf_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+telegraf_rate_limit_enabled: true
+telegraf_rate_limit_requests: 100
+telegraf_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+telegraf_deploy_enabled: true
+telegraf_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+telegraf_restart_policy: "unless-stopped"
+telegraf_auto_update_enabled: true
+
+# Environment Variables
+telegraf_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  TELEGRAF_API_KEY: "{{ telegraf_api_key }}"
+  TELEGRAF_SECRET_KEY: "{{ telegraf_secret_key }}"
+  TELEGRAF_ENCRYPTION_KEY: "{{ telegraf_encryption_key }}"
+  TELEGRAF_JWT_SECRET: "{{ telegraf_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+telegraf_validation_enabled: true
+telegraf_validation_timeout: 300
+telegraf_validation_retries: 3
+
+# Testing Configuration
+telegraf_test_enabled: false
+telegraf_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+telegraf_compliance_enabled: true
+telegraf_audit_logging_enabled: true
+telegraf_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+telegraf_automation_enabled: true
+telegraf_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+telegraf_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+telegraf_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+telegraf_fallback_enabled: true
+telegraf_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

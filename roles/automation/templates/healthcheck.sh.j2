@@ -21,19 +21,19 @@ check_service() {
 }
 
 {% if home_assistant_enabled %}
-check_service "Home Assistant" "http://localhost:{{ home_assistant_port }}"
+check_service "Home Assistant" "http://{{ ansible_default_ipv4.address }}:{{ home_assistant_port }}"
 {% endif %}
 
 {% if zigbee2mqtt_enabled %}
-check_service "Zigbee2MQTT" "http://localhost:{{ zigbee2mqtt_port }}"
+check_service "Zigbee2MQTT" "http://{{ ansible_default_ipv4.address }}:{{ zigbee2mqtt_port }}"
 {% endif %}
 
 {% if node_red_enabled %}
-check_service "Node-RED" "http://localhost:{{ node_red_port }}"
+check_service "Node-RED" "http://{{ ansible_default_ipv4.address }}:{{ node_red_port }}"
 {% endif %}
 
 {% if n8n_enabled %}
-check_service "n8n" "http://localhost:{{ n8n_port }}/healthz"
+check_service "n8n" "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
 {% endif %}
 
 if [ "${FAILURES}" -gt 0 ]; then

@@ -46,10 +46,9 @@ class DashboardImporter:
     def __init__(self, config_path: str = None):
         self.config_path = config_path or "automation_config.yml"
         self.config = self.load_config()
-        self.grafana_url = "http://localhost:{{ grafana_port }}"
+        self.grafana_url = "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}"
         self.admin_user = "{{ grafana_admin_user }}"
-        self.admin_password = "{{ grafana_admin_password }}"
-        self.api_key = "{{ grafana_api_key | default('') }}"
+        self.admin_password: "{{ vault_grafana_admin_password | password_hash("bcrypt") }}"{{ grafana_api_key | default('') }}"
         self.session = self.create_session()
         
     def load_config(self) -> Dict[str, Any]:

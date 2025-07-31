@@ -60,7 +60,7 @@
 
     - name: Test service endpoints
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.port }}{{ item.endpoint | default('/health') }}"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}{{ item.endpoint | default('/health') }}"
         method: GET
         status_code: [200, 401, 403]
         timeout: 10
@@ -81,7 +81,7 @@
   block:
     - name: Test PostgreSQL connection
       ansible.builtin.shell: |
-        PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c "SELECT version();"
+        PGPASSWORD={{ vault_postgresql_password }} psql -h {{ ansible_default_ipv4.address }} -U {{ vault_postgresql_user }} -d homelab -c "SELECT version();"
       register: postgres_validation
       changed_when: false
       tags: [validation, database]
@@ -94,7 +94,7 @@
 
     - name: Test Redis connection
       ansible.builtin.shell: |
-        redis-cli -h localhost -p 6379 -a {{ vault_redis_password }} ping
+        redis-cli -h {{ ansible_default_ipv4.address }} -p 6379 -a {{ vault_redis_password }} ping
       register: redis_validation
       changed_when: false
       tags: [validation, database]
@@ -112,7 +112,7 @@
   block:
     - name: Check Prometheus targets
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -128,7 +128,7 @@
 
     - name: Check Grafana datasources
       ansible.builtin.uri:
-        url: "http://localhost:3000/api/datasources"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/datasources"
         method: GET
         status_code: 200
         timeout: 10
@@ -150,7 +150,7 @@
   block:
     - name: Check Traefik configuration
       ansible.builtin.uri:
-        url: "http://localhost:8080/api/http/routers"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
         method: GET
         status_code: 200
         timeout: 10
@@ -165,7 +165,7 @@
 
     - name: Check Authentik configuration
       ansible.builtin.uri:
-        url: "http://localhost:9000/if/user/"
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
         method: GET
         status_code: [200, 302]
         timeout: 10

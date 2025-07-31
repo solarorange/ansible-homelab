@@ -1,0 +1,89 @@
+---
+# Nextcloud Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Nextcloud vault variables
+  block:
+    - name: Check required Nextcloud vault variables
+      assert:
+        that:
+          - vault_nextcloud_admin_password is defined
+          - vault_nextcloud_database_password is defined
+          - vault_nextcloud_api_key is defined
+          - vault_nextcloud_secret_key is defined
+          - vault_nextcloud_encryption_key is defined
+          - vault_nextcloud_jwt_secret is defined
+        fail_msg: "Required Nextcloud vault variables are not defined"
+        success_msg: "All required Nextcloud vault variables are defined"
+
+    - name: Validate Nextcloud password complexity
+      assert:
+        that:
+          - vault_nextcloud_admin_password | length >= 12
+          - vault_nextcloud_database_password | length >= 12
+        fail_msg: "Nextcloud passwords must be at least 12 characters long"
+        success_msg: "Nextcloud password complexity requirements met"
+
+- name: Validate Nextcloud network configuration
+  block:
+    - name: Check Nextcloud port configuration
+      assert:
+        that:
+          - nextcloud_port is defined
+          - nextcloud_port | int >= 1024
+          - nextcloud_port | int <= 65535
+        fail_msg: "Nextcloud port must be between 1024 and 65535"
+        success_msg: "Nextcloud port configuration is valid"
+
+    - name: Check Nextcloud domain configuration
+      assert:
+        that:
+          - domain is defined
+          - nextcloud_subdomain is defined
+        fail_msg: "Nextcloud domain configuration is incomplete"
+        success_msg: "Nextcloud domain configuration is valid"
+
+- name: Validate Nextcloud security configuration
+  block:
+    - name: Check Nextcloud SSL configuration
+      assert:
+        that:
+          - nextcloud_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Nextcloud SSL configuration is invalid"
+        success_msg: "Nextcloud SSL configuration is valid"
+
+    - name: Check Nextcloud authentication configuration
+      assert:
+        that:
+          - nextcloud_auth_enabled | bool
+          - nextcloud_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Nextcloud authentication configuration is invalid"
+        success_msg: "Nextcloud authentication configuration is valid"
+
+- name: Validate Nextcloud storage configuration
+  block:
+    - name: Check Nextcloud data directories
+      assert:
+        that:
+          - nextcloud_data_dir is defined
+          - nextcloud_config_dir is defined
+          - nextcloud_backup_dir is defined
+        fail_msg: "Nextcloud storage configuration is incomplete"
+        success_msg: "Nextcloud storage configuration is valid"
+
+    - name: Create Nextcloud directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ nextcloud_data_dir }}"
+        - "{{ nextcloud_config_dir }}"
+        - "{{ nextcloud_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Nextcloud validation completed successfully - all configurations are valid and secure"

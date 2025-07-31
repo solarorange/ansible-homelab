@@ -18,7 +18,7 @@
 
 - name: Wait for SABnzbd to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_ports.sabnzbd }}/api?mode=version"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_ports.sabnzbd }}/api?mode=version"
     method: GET
     status_code: 200
   register: sabnzbd_health
@@ -29,7 +29,7 @@
 
 - name: Wait for qBittorrent to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_ports.qbittorrent }}/api/v2/app/version"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_ports.qbittorrent }}/api/v2/app/version"
     method: GET
     status_code: 200
   register: qbittorrent_health

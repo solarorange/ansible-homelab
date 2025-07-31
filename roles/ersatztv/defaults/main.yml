@@ -1,226 +1,259 @@
----
-# ErsatzTV Configuration
-# Production-ready defaults for homelab ErsatzTV deployment
+# Ersatztv Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# WARNING: Manual overrides for ports, certificates, or service enablement (e.g., via extra-vars or direct variable assignment)
-# can cause port conflicts, security issues, or break automation/monitoring. Avoid manual overrides unless absolutely necessary.
-# Use group_vars or role defaults for configuration. If manual overrides are detected, the playbook will require explicit confirmation.
-# See documentation for details on risks and best practices.
+# =============================================================================
+# ERSATZTV SERVICE CONFIGURATION
+# =============================================================================
 
-# Service Configuration
-ersatztv_enabled: true
+# Service Information
+ersatztv_service_name: "ersatztv"
+ersatztv_container_name: "{{ ersatztv_service_name }}"
+ersatztv_image: "ersatztv/ersatztv:latest"
 ersatztv_version: "latest"
-ersatztv_network_name: "media"
-ersatztv_network_external: true
 
-# Container Configuration
-ersatztv_container_restart_policy: "unless-stopped"
-ersatztv_container_network_mode: "bridge"
-
-# Port Configuration
+# Network Configuration
 ersatztv_port: 8409
-ersatztv_web_port: 8409
+ersatztv_external_port: "{{ ersatztv_port }}"
+ersatztv_protocol: "http"
+ersatztv_host: "{{ ansible_default_ipv4.address }}"
+ersatztv_url: "{{ ersatztv_protocol }}://{{ ersatztv_host }}:{{ ersatztv_port }}"
 
 # Domain Configuration
 ersatztv_subdomain: "ersatztv"
 ersatztv_domain: "{{ ersatztv_subdomain }}.{{ domain }}"
+ersatztv_external_url: "https://{{ ersatztv_domain }}"
 
-# Image Configuration
-ersatztv_image: "ghcr.io/ersatztv/ersatztv:latest"
-ersatztv_image_pull_policy: "always"
-ersatztv_container_name: "ersatztv"
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
 
-# Directory Configuration
-ersatztv_config_dir: "{{ docker_root }}/ersatztv/config"
-ersatztv_data_dir: "{{ docker_root }}/ersatztv/data"
-ersatztv_logs_dir: "{{ docker_root }}/ersatztv/logs"
-ersatztv_transcode_dir: "{{ docker_root }}/ersatztv/transcode"
-ersatztv_cache_dir: "{{ docker_root }}/ersatztv/cache"
-
-# Media Library Configuration
-ersatztv_media_mounts:
-  - "{{ data_dir }}/media/movies:/media/movies:ro"
-  - "{{ data_dir }}/media/tv:/media/tv:ro"
-  - "{{ data_dir }}/media/music:/media/music:ro"
-  - "{{ data_dir }}/media/anime:/media/anime:ro"
-
-# Authentication Configuration
+# Authentication
 ersatztv_auth_enabled: true
-ersatztv_auth_method: "authentik"  # Options: authentik, basic, none
-ersatztv_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+ersatztv_auth_method: "authentik"  # Options: basic, authentik, none
+ersatztv_admin_username: "admin"
+ersatztv_admin_password: "{{ vault_ersatztv_admin_password }}"
 
-# Database Configuration
-ersatztv_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
-ersatztv_database_host: "{{ postgresql_host | default('postgresql') }}"
-ersatztv_database_port: "{{ postgresql_port | default(5432) }}"
+# API Configuration
+ersatztv_api_key: "{{ vault_ersatztv_api_key }}"
+ersatztv_api_token: "{{ vault_ersatztv_api_token }}"
+
+# Encryption & Security
+ersatztv_secret_key: "{{ vault_ersatztv_secret_key }}"
+ersatztv_encryption_key: "{{ vault_ersatztv_encryption_key }}"
+ersatztv_jwt_secret: "{{ vault_ersatztv_jwt_secret }}"
+
+# SSL/TLS Configuration
+ersatztv_ssl_enabled: true
+ersatztv_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+ersatztv_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+ersatztv_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+ersatztv_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+ersatztv_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+ersatztv_database_port: "{{ databases_postgresql_port | default(5432) }}"
 ersatztv_database_name: "ersatztv"
-ersatztv_database_user: "ersatztv"
-ersatztv_database_password: "{{ vault_ersatztv_database_password | default('') }}"
+ersatztv_database_username: "ersatztv"
+ersatztv_database_password: "{{ vault_ersatztv_database_password }}"
 
-# Hardware Acceleration Configuration
-ersatztv_hardware_acceleration: "none"  # Options: none, vaapi, nvenc, qsv
-ersatztv_vaapi_device: "/dev/dri/renderD128"
-ersatztv_nvidia_runtime: false
-ersatztv_nvidia_visible_devices: "all"
+# Redis Configuration (if using)
+ersatztv_redis_enabled: false
+ersatztv_redis_host: "{{ redis_host | default('redis') }}"
+ersatztv_redis_port: "{{ redis_port | default(6379) }}"
+ersatztv_redis_password: "{{ vault_ersatztv_redis_password }}"
+ersatztv_redis_database: 0
 
-# Transcoding Configuration
-ersatztv_transcode_enabled: true
-ersatztv_transcode_threads: 2
-ersatztv_transcode_quality: "medium"  # Options: low, medium, high
-ersatztv_transcode_format: "h264"  # Options: h264, h265, vp9
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
 
-# Streaming Configuration
-ersatztv_streaming_mode: "mpegts"  # Options: mpegts, hls
-ersatztv_streaming_quality: "720p"  # Options: 480p, 720p, 1080p
-ersatztv_streaming_bitrate: "2000k"
-ersatztv_streaming_framerate: 30
+# Data Directories
+ersatztv_data_dir: "{{ homelab_data_dir }}/ersatztv"
+ersatztv_config_dir: "{{ ersatztv_data_dir }}/config"
+ersatztv_backup_dir: "{{ ersatztv_data_dir }}/backups"
 
-# Channel Configuration
-ersatztv_channels_enabled: true
-ersatztv_default_channel_count: 10
-ersatztv_channel_scheduling: "random"  # Options: random, chronological, smart
+# Volume Mappings
+ersatztv_volumes:
+  - "{{ ersatztv_config_dir }}:/config"
+  - "{{ ersatztv_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
 
-# Filler Content Configuration
-ersatztv_filler_enabled: true
-ersatztv_preroll_enabled: true
-ersatztv_midroll_enabled: true
-ersatztv_postroll_enabled: true
-ersatztv_filler_duration: 30  # seconds
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
 
-# Subtitle Configuration
-ersatztv_subtitles_enabled: true
-ersatztv_subtitle_burn_in: false
-ersatztv_subtitle_language: "eng"
+# Health Check Configuration
+ersatztv_health_check_enabled: true
+ersatztv_health_check_path: "/health"
+ersatztv_health_check_interval: 30
+ersatztv_health_check_timeout: 10
+ersatztv_health_check_retries: 3
 
-# Traefik Configuration
-ersatztv_traefik_enabled: true
-ersatztv_traefik_ssl_resolver: "cloudflare"
-ersatztv_traefik_auth_enabled: true
-ersatztv_traefik_network: "homelab"
-
-# Monitoring Configuration
+# Monitoring Integration
 ersatztv_monitoring_enabled: true
 ersatztv_prometheus_enabled: true
-ersatztv_prometheus_port: 8409
-ersatztv_prometheus_path: "/metrics"
-ersatztv_healthcheck_enabled: true
-ersatztv_healthcheck_interval: "30s"
-ersatztv_healthcheck_timeout: "10s"
-ersatztv_healthcheck_retries: 3
-ersatztv_healthcheck_start_period: "40s"
+ersatztv_grafana_enabled: true
 
-# Security Configuration
-ersatztv_security_enabled: true
-ersatztv_security_headers_enabled: true
-ersatztv_cors_enabled: true
-ersatztv_cors_origins: "*"
-ersatztv_rate_limiting_enabled: true
-ersatztv_rate_limit_requests: 100
-ersatztv_rate_limit_window: "1m"
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 ersatztv_backup_enabled: true
-ersatztv_backup_retention: 30
-ersatztv_backup_schedule: "0 2 * * *"
-ersatztv_backup_include_logs: true
-ersatztv_backup_include_cache: false
+ersatztv_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+ersatztv_backup_retention_days: 30
+ersatztv_backup_encryption_enabled: true
+ersatztv_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-ersatztv_logging_enabled: true
-ersatztv_log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+ersatztv_smtp_enabled: false
+ersatztv_smtp_host: "{{ smtp_host | default('') }}"
+ersatztv_smtp_port: "{{ smtp_port | default(587) }}"
+ersatztv_smtp_username: "{{ vault_smtp_username }}"
+ersatztv_smtp_password: "{{ vault_ersatztv_smtp_password }}"
+ersatztv_smtp_from: "{{ ersatztv_admin_email | default('admin@' + domain) }}"
+ersatztv_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+ersatztv_webhook_enabled: false
+ersatztv_webhook_url: "{{ vault_webhook_url | default('') }}"
+ersatztv_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+ersatztv_discovery_enabled: true
+ersatztv_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+ersatztv_cpu_limit: "1.0"
+ersatztv_memory_limit: "1g"
+ersatztv_memory_reservation: "512m"
+
+# Performance Settings
+ersatztv_scan_interval: 10
+ersatztv_parallel_downloads: 3
+ersatztv_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+ersatztv_log_level: "info"  # Options: trace, debug, info, warn, error
 ersatztv_log_rotation_enabled: true
-ersatztv_log_rotation_max_size: "100M"
-ersatztv_log_rotation_max_files: 10
+ersatztv_log_retention_days: 30
 
-# Resource Configuration
-ersatztv_resources:
-  limits:
-    cpus: '2'
-    memory: 4G
-  reservations:
-    cpus: '0.5'
-    memory: 1G
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+ersatztv_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+ersatztv_rate_limit_enabled: true
+ersatztv_rate_limit_requests: 100
+ersatztv_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+ersatztv_deploy_enabled: true
+ersatztv_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+ersatztv_restart_policy: "unless-stopped"
+ersatztv_auto_update_enabled: true
 
 # Environment Variables
 ersatztv_environment:
-  - "TZ={{ timezone }}"
-  - "PUID={{ user_id | default(1000) }}"
-  - "PGID={{ group_id | default(1000) }}"
-  - "ERSATZTV_LOG_LEVEL={{ ersatztv_log_level }}"
-  - "ERSATZTV_TRANSCODE_THREADS={{ ersatztv_transcode_threads }}"
-  - "ERSATZTV_STREAMING_MODE={{ ersatztv_streaming_mode }}"
-  - "ERSATZTV_STREAMING_QUALITY={{ ersatztv_streaming_quality }}"
-  - "ERSATZTV_STREAMING_BITRATE={{ ersatztv_streaming_bitrate }}"
-  - "ERSATZTV_STREAMING_FRAMERATE={{ ersatztv_streaming_framerate }}"
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  ERSATZTV_API_KEY: "{{ ersatztv_api_key }}"
+  ERSATZTV_SECRET_KEY: "{{ ersatztv_secret_key }}"
+  ERSATZTV_ENCRYPTION_KEY: "{{ ersatztv_encryption_key }}"
+  ERSATZTV_JWT_SECRET: "{{ ersatztv_jwt_secret }}"
 
-# Homepage Integration
-ersatztv_homepage_enabled: true
-ersatztv_homepage_group: "Media"
-ersatztv_homepage_icon: "ersatztv.png"
-ersatztv_homepage_description: "Custom Live TV Channels"
-ersatztv_homepage_widget: "ersatztv"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Alerting Configuration
-ersatztv_alerting_enabled: true
-ersatztv_alerting_channels:
-  - email
-  - slack
-  - discord
-ersatztv_alerting_conditions:
-  - service_down
-  - high_cpu_usage
-  - high_memory_usage
-  - transcoding_errors
-  - stream_errors
-
-# Performance Configuration
-ersatztv_performance_monitoring: true
-ersatztv_performance_metrics:
-  - cpu_usage
-  - memory_usage
-  - disk_usage
-  - network_usage
-  - transcoding_performance
-  - stream_quality
-
-# Integration Configuration
-ersatztv_plex_integration: false
-ersatztv_plex_url: ""
-ersatztv_plex_token: ""
-
-ersatztv_jellyfin_integration: false
-ersatztv_jellyfin_url: ""
-ersatztv_jellyfin_api_key: ""
-
-ersatztv_emby_integration: false
-ersatztv_emby_url: ""
-ersatztv_emby_api_key: ""
-
-# Advanced Configuration
-ersatztv_advanced_enabled: false
-ersatztv_advanced_options:
-  enable_debug: false
-  enable_profiling: false
-  enable_tracing: false
-  custom_ffmpeg_args: ""
-  custom_streaming_args: ""
-
-# Validation Configuration
+# Validation Settings
 ersatztv_validation_enabled: true
 ersatztv_validation_timeout: 300
 ersatztv_validation_retries: 3
-ersatztv_validation_checks:
-  - service_health
-  - web_interface
-  - api_endpoints
-  - transcoding
-  - streaming
 
-# Maintenance Configuration
-ersatztv_maintenance_enabled: true
-ersatztv_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM Sunday
-ersatztv_maintenance_tasks:
-  - cleanup_logs
-  - cleanup_cache
-  - optimize_database
-  - update_metadata 
+# Testing Configuration
+ersatztv_test_enabled: false
+ersatztv_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+ersatztv_compliance_enabled: true
+ersatztv_audit_logging_enabled: true
+ersatztv_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+ersatztv_automation_enabled: true
+ersatztv_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+ersatztv_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+ersatztv_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+ersatztv_fallback_enabled: true
+ersatztv_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

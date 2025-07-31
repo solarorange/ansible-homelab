@@ -1,205 +1,259 @@
----
-# Logging Stack Configuration
-# Production-ready defaults for centralized logging infrastructure
+# Logging Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-#==============================================================================
-# GENERAL LOGGING STACK CONFIGURATION
-#==============================================================================
+# =============================================================================
+# LOGGING SERVICE CONFIGURATION
+# =============================================================================
 
-# Service Configuration
-logging_enabled: true
+# Service Information
+logging_service_name: "logging"
+logging_container_name: "{{ logging_service_name }}"
+logging_image: "ghcr.io/logging/logging:latest"
 logging_version: "latest"
-logging_network: "monitoring"
 
-# Container Configuration
-logging_container_restart_policy: "unless-stopped"
-logging_container_network_mode: "bridge"
+# Network Configuration
+logging_port: 8080
+logging_external_port: "{{ logging_port }}"
+logging_protocol: "http"
+logging_host: "{{ ansible_default_ipv4.address }}"
+logging_url: "{{ logging_protocol }}://{{ logging_host }}:{{ logging_port }}"
 
-# Resource Limits
-logging_memory_limit: "2g"
-logging_cpu_limit: "1.0"
-logging_storage_limit: "50g"
+# Domain Configuration
+logging_subdomain: "logging"
+logging_domain: "{{ logging_subdomain }}.{{ domain }}"
+logging_external_url: "https://{{ logging_domain }}"
 
-#==============================================================================
-# LOKI CONFIGURATION
-#==============================================================================
-
-# Loki Configuration
-loki_enabled: true
-loki_version: "2.9.0"
-loki_image: "grafana/loki:2.9.0"
-loki_container_name: "loki"
-loki_restart_policy: "unless-stopped"
-loki_network_mode: "bridge"
-loki_web_port: 3100
-loki_data_dir: "{{ docker_dir }}/monitoring/loki/data"
-loki_config_dir: "{{ docker_dir }}/monitoring/loki/config"
-loki_backup_dir: "{{ docker_dir }}/monitoring/loki/backup"
-loki_logs_dir: "{{ logs_dir }}/monitoring/loki"
-
-# Loki Performance Tuning
-loki_retention_period: "744h"  # 31 days
-loki_max_cache_fresh_period: "1m"
-loki_chunk_store_cache_lookups: 1000
-loki_table_manager_retention_deletes_enabled: true
-loki_table_manager_retention_period: "744h"
-
-# Loki Security
-loki_auth_enabled: false
-loki_auth_token: "{{ vault_loki_auth_token | default('') }}"
-
-#==============================================================================
-# PROMTAIL CONFIGURATION
-#==============================================================================
-
-# Promtail Configuration
-promtail_enabled: true
-promtail_version: "2.9.0"
-promtail_image: "grafana/promtail:2.9.0"
-promtail_container_name: "promtail"
-promtail_restart_policy: "unless-stopped"
-promtail_network_mode: "bridge"
-promtail_config_dir: "{{ docker_dir }}/monitoring/promtail/config"
-promtail_logs_dir: "{{ logs_dir }}/monitoring/promtail"
-
-# Promtail Scraping Configuration
-promtail_scrape_interval: "15s"
-promtail_batch_wait: "1s"
-promtail_batch_size: 1024
-promtail_max_retries: 5
-
-# Promtail Targets
-promtail_targets:
-  - name: "system_logs"
-    path: "/var/log/*.log"
-    labels:
-      job: "system"
-      __path__: "/var/log/*.log"
-  
-  - name: "docker_logs"
-    path: "/var/lib/docker/containers/*/*.log"
-    labels:
-      job: "docker"
-      __path__: "/var/lib/docker/containers/*/*.log"
-  
-  - name: "application_logs"
-    path: "{{ logs_dir }}/applications/*.log"
-    labels:
-      job: "applications"
-      __path__: "{{ logs_dir }}/applications/*.log"
-
-#==============================================================================
-# LOG ROTATION CONFIGURATION
-#==============================================================================
-
-# Log Rotation Settings
-logrotate_enabled: true
-logrotate_compress: true
-logrotate_delaycompress: true
-logrotate_missingok: true
-logrotate_notifempty: true
-logrotate_rotate: 7
-logrotate_size: "100M"
-logrotate_frequency: "daily"
-
-# Log Rotation Paths
-logrotate_paths:
-  - "{{ logs_dir }}/applications/*.log"
-  - "{{ logs_dir }}/system/*.log"
-  - "{{ logs_dir }}/containers/*.log"
-  - "{{ logs_dir }}/security/*.log"
-  - "{{ logs_dir }}/monitoring/*.log"
-
-#==============================================================================
-# DOCKER LOGGING CONFIGURATION
-#==============================================================================
-
-# Docker Logging Driver
-docker_logging_driver: "json-file"
-docker_logging_max_size: "10m"
-docker_logging_max_files: 3
-docker_logging_compress: true
-
-#==============================================================================
-# MONITORING CONFIGURATION
-#==============================================================================
-
-logging_monitoring_enabled: true
-logging_metrics_enabled: true
-logging_health_check_enabled: true
-logging_health_check_interval: 30
-
-# Prometheus Integration
-logging_prometheus_enabled: true
-logging_prometheus_metrics: true
-logging_prometheus_scrape_interval: 30
-
-# Grafana Integration
-logging_grafana_enabled: true
-logging_grafana_dashboard: true
-logging_grafana_datasource: "loki"
-
-# Alerting Configuration
-logging_alerting_enabled: true
-logging_alerting_rules:
-  - alert: "LoggingServiceDown"
-    expr: "up{job=\"loki\"} == 0"
-    for: "1m"
-    labels:
-      severity: "critical"
-    annotations:
-      summary: "Loki logging service is down"
-      description: "Loki has been down for more than 1 minute"
-
-  - alert: "HighLogVolume"
-    expr: "rate(loki_log_entries_total[5m]) > 1000"
-    for: "5m"
-    labels:
-      severity: "warning"
-    annotations:
-      summary: "High log volume detected"
-      description: "Log volume is above 1000 entries per second"
-
-#==============================================================================
+# =============================================================================
 # SECURITY CONFIGURATION
-#==============================================================================
+# =============================================================================
 
-logging_security_enabled: true
-logging_encryption_enabled: true
-logging_network_isolation: true
+# Authentication
+logging_auth_enabled: true
+logging_auth_method: "authentik"  # Options: basic, authentik, none
+logging_admin_username: "admin"
+logging_admin_password: "{{ vault_logging_admin_password }}"
 
-# Access Control
-logging_access_control_enabled: true
-logging_admin_users: []
-logging_readonly_users: []
+# API Configuration
+logging_api_key: "{{ vault_logging_api_key }}"
+logging_api_token: "{{ vault_logging_api_token }}"
 
-#==============================================================================
-# BACKUP CONFIGURATION
-#==============================================================================
+# Encryption & Security
+logging_secret_key: "{{ vault_logging_secret_key }}"
+logging_encryption_key: "{{ vault_logging_encryption_key }}"
+logging_jwt_secret: "{{ vault_logging_jwt_secret }}"
 
+# SSL/TLS Configuration
+logging_ssl_enabled: true
+logging_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+logging_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+logging_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+logging_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+logging_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+logging_database_port: "{{ databases_postgresql_port | default(5432) }}"
+logging_database_name: "logging"
+logging_database_username: "logging"
+logging_database_password: "{{ vault_logging_database_password }}"
+
+# Redis Configuration (if using)
+logging_redis_enabled: false
+logging_redis_host: "{{ redis_host | default('redis') }}"
+logging_redis_port: "{{ redis_port | default(6379) }}"
+logging_redis_password: "{{ vault_logging_redis_password }}"
+logging_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+logging_data_dir: "{{ homelab_data_dir }}/logging"
+logging_config_dir: "{{ logging_data_dir }}/config"
+logging_backup_dir: "{{ logging_data_dir }}/backups"
+
+# Volume Mappings
+logging_volumes:
+  - "{{ logging_config_dir }}:/config"
+  - "{{ logging_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+logging_health_check_enabled: true
+logging_health_check_path: "/health"
+logging_health_check_interval: 30
+logging_health_check_timeout: 10
+logging_health_check_retries: 3
+
+# Monitoring Integration
+logging_monitoring_enabled: true
+logging_prometheus_enabled: true
+logging_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
 logging_backup_enabled: true
 logging_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-logging_backup_retention: 7
-logging_backup_compression: true
-logging_backup_encryption: false
+logging_backup_retention_days: 30
+logging_backup_encryption_enabled: true
+logging_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-#==============================================================================
-# HOMEPAGE INTEGRATION
-#==============================================================================
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
 
-logging_homepage_enabled: true
-logging_homepage_category: "Monitoring"
-logging_homepage_description: "Centralized Logging Infrastructure"
-logging_homepage_icon: "logging.png"
+# Email Notifications
+logging_smtp_enabled: false
+logging_smtp_host: "{{ smtp_host | default('') }}"
+logging_smtp_port: "{{ smtp_port | default(587) }}"
+logging_smtp_username: "{{ vault_smtp_username }}"
+logging_smtp_password: "{{ vault_logging_smtp_password }}"
+logging_smtp_from: "{{ logging_admin_email | default('admin@' + domain) }}"
+logging_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
 
-# Homepage Services
-logging_homepage_services:
-  - name: "Loki"
-    url: "http://loki.{{ domain | default('localhost') }}:3100"
-    icon: "loki"
-    description: "Log aggregation and querying"
-  
-  - name: "Grafana Logs"
-    url: "http://grafana.{{ domain | default('localhost') }}:3000/explore"
-    icon: "grafana"
-    description: "Log visualization and dashboards" 
+# Webhook Notifications
+logging_webhook_enabled: false
+logging_webhook_url: "{{ vault_webhook_url | default('') }}"
+logging_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+logging_discovery_enabled: true
+logging_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+logging_cpu_limit: "1.0"
+logging_memory_limit: "1g"
+logging_memory_reservation: "512m"
+
+# Performance Settings
+logging_scan_interval: 10
+logging_parallel_downloads: 3
+logging_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+logging_log_level: "info"  # Options: trace, debug, info, warn, error
+logging_log_rotation_enabled: true
+logging_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+logging_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+logging_rate_limit_enabled: true
+logging_rate_limit_requests: 100
+logging_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+logging_deploy_enabled: true
+logging_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+logging_restart_policy: "unless-stopped"
+logging_auto_update_enabled: true
+
+# Environment Variables
+logging_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  LOGGING_API_KEY: "{{ logging_api_key }}"
+  LOGGING_SECRET_KEY: "{{ logging_secret_key }}"
+  LOGGING_ENCRYPTION_KEY: "{{ logging_encryption_key }}"
+  LOGGING_JWT_SECRET: "{{ logging_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+logging_validation_enabled: true
+logging_validation_timeout: 300
+logging_validation_retries: 3
+
+# Testing Configuration
+logging_test_enabled: false
+logging_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+logging_compliance_enabled: true
+logging_audit_logging_enabled: true
+logging_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+logging_automation_enabled: true
+logging_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+logging_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+logging_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+logging_fallback_enabled: true
+logging_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

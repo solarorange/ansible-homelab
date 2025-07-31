@@ -4,7 +4,7 @@
 
 - name: Wait for Lidarr to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
     method: GET
     status_code: 200
   register: lidarr_health
@@ -14,7 +14,7 @@
 
 - name: Configure Lidarr download clients via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/downloadclient"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/downloadclient"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -37,7 +37,7 @@
       useSsl: false
       urlBase: ""
       username: ""
-      password: ""
+      password: "{{ vault_service_password }}"
       enable: true
 
     # qBittorrent Configuration
@@ -48,7 +48,7 @@
       host: "qbittorrent"
       port: {{ media_qbittorrent_port | default(8081) }}
       username: "{{ media_qbittorrent_username }}"
-      password: "{{ vault_qbittorrent_password }}"
+      password: "{{ vault_service_password }}"
       category: "music"
       recentTvPriority: 0
       olderTvPriority: 0
@@ -60,7 +60,7 @@
 
 - name: Configure Lidarr indexers via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/indexer"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/indexer"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -80,13 +80,13 @@
       useSsl: false
       urlBase: ""
       username: ""
-      password: ""
+      password: "{{ vault_service_password }}"
       enable: true
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr quality profiles via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/qualityprofile"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/qualityprofile"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -238,7 +238,7 @@
 
 - name: Configure Lidarr metadata profiles via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/metadataprofile"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/metadataprofile"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -265,7 +265,7 @@
 
 - name: Configure Lidarr root folders via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/rootfolder"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/rootfolder"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -277,7 +277,7 @@
 
 - name: Configure Lidarr notifications via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/notification"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/notification"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -307,7 +307,7 @@
       server: "{{ vault_smtp_server | default('') }}"
       port: {{ vault_smtp_port | default(587) }}
       username: "{{ vault_smtp_username | default('') }}"
-      password: "{{ vault_smtp_password | default('') }}"
+      password: "{{ vault_service_password }}"') }}"
       from: "{{ vault_smtp_from | default('lidarr@' + domain) }}"
       to: "{{ vault_smtp_to | default(admin_email) }}"
       useSsl: true
@@ -324,7 +324,7 @@
 
 - name: Configure Lidarr connections via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/connection"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/connection"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -339,7 +339,7 @@
       host: "plex"
       port: {{ media_plex_port | default(32400) }}
       username: "{{ vault_plex_username | default('') }}"
-      password: "{{ vault_plex_password | default('') }}"
+      password: "{{ vault_service_password }}"') }}"
       updateLibrary: true
       useSsl: false
       authToken: "{{ vault_plex_token | default('') }}"
@@ -352,7 +352,7 @@
       host: "jellyfin"
       port: {{ media_jellyfin_port | default(8096) }}
       username: "{{ vault_jellyfin_username | default('') }}"
-      password: "{{ vault_jellyfin_password | default('') }}"
+      password: "{{ vault_service_password }}"') }}"
       updateLibrary: true
       useSsl: false
       apiKey: "{{ vault_jellyfin_api_key | default('') }}"
@@ -361,7 +361,7 @@
 
 - name: Configure Lidarr auto tagging via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/autotagging"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/autotagging"
     method: POST
     headers:
       Content-Type: "application/json"
@@ -393,7 +393,7 @@
 
 - name: Configure Lidarr system settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/ui"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/ui"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -421,7 +421,7 @@
 
 - name: Configure Lidarr backup settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/backup"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/backup"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -437,7 +437,7 @@
 
 - name: Configure Lidarr update settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/update"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/update"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -452,7 +452,7 @@
 
 - name: Configure Lidarr security settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/security"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/security"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -462,12 +462,12 @@
       authenticationMethod: "forms"
       authenticationRequired: "enabled"
       username: "{{ vault_lidarr_username }}"
-      password: "{{ vault_lidarr_password | default('') }}"
+      password: "{{ vault_service_password }}"') }}"
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr SSL settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/ssl"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/ssl"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -477,12 +477,12 @@
       enabled: false
       port: 9898
       certPath: ""
-      certPassword: ""
+      certpassword: "{{ vault_service_password }}"
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr proxy settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/proxy"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/proxy"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -494,14 +494,14 @@
       hostname: ""
       port: 8080
       username: ""
-      password: ""
+      password: "{{ vault_service_password }}"
       bypassFilter: ""
       bypassLocalAddresses: true
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr analytics settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/analytics"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/analytics"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -514,7 +514,7 @@
 
 - name: Configure Lidarr instance settings via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/instance"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/instance"
     method: PUT
     headers:
       Content-Type: "application/json"
@@ -531,7 +531,7 @@
 
 - name: Verify Lidarr configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
     method: GET
     headers:
       X-Api-Key: "{{ vault_lidarr_api_key }}"

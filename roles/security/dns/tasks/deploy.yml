@@ -81,7 +81,7 @@
 
 - name: Wait for Pi-hole to be ready
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php?status"
+    url: "http://{{ ansible_default_ipv4.address }}:80/admin/api.php?status"
     return_content: yes
     status_code: 200
   register: pihole_status
@@ -92,7 +92,7 @@
 
 - name: Configure Pi-hole DNS settings
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php"
+    url: "http://{{ ansible_default_ipv4.address }}:80/admin/api.php"
     method: POST
     body_format: json
     body: |
@@ -106,7 +106,7 @@
 
 - name: Configure Pi-hole blocklists
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php"
+    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php"
     method: POST
     body_format: json
     body: |
@@ -119,7 +119,7 @@
 
 - name: Update Pi-hole gravity
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php?update"
+    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php?update"
     method: POST
     status_code: 200
   when: pihole_status.status == 200
@@ -127,7 +127,7 @@
 
 - name: Configure Pi-hole monitoring in Prometheus
   ansible.builtin.uri:
-    url: "http://localhost:9090/-/reload"
+    url: "http://{{ ansible_default_ipv4.address }}:/-/reload"
     method: POST
     status_code: 200
   when: monitoring_enabled | default(true)
@@ -144,7 +144,7 @@
 
 - name: Reload Traefik configuration
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/rawdata"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/rawdata"
     method: POST
     status_code: 200
   tags: [pihole, traefik]

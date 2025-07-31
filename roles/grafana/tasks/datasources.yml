@@ -35,10 +35,10 @@
 
 - name: Wait for Grafana to reload data sources
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -50,10 +50,10 @@
 
 - name: Validate data sources via API
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -64,10 +64,10 @@
 
 - name: Test data source connections
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30

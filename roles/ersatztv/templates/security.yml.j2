@@ -11,7 +11,7 @@ firewall:
       action: "allow"
     - port: "{{ ersatztv_prometheus_port | default(9090) }}"
       protocol: "tcp"
-      source: "{{ ersatztv_monitoring_network | default('127.0.0.1') }}"
+      source: "{{ ersatztv_monitoring_network | default('{{ ansible_default_ipv4.address }}') }}"
       action: "allow"
 
 # Fail2ban Configuration
@@ -57,7 +57,7 @@ access_control:
     realm: "ErsatzTV"
     users:
       - username: "{{ ersatztv_admin_username | default('admin') }}"
-        password: "{{ ersatztv_admin_password | default('changeme') }}"
+        password: "{{ ersatztv_admin_password | default('{{ vault_admin_password | password_hash("bcrypt") }}') }}"
   authorization:
     roles:
       - name: "admin"
@@ -84,7 +84,7 @@ cors:
   allowed_origins:
     - "https://{{ ersatztv_domain }}"
     - "https://{{ domain }}"
-    - "http://localhost:{{ ersatztv_port }}"
+    - "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
   allowed_methods:
     - "GET"
     - "POST"
@@ -135,7 +135,7 @@ api_security:
   authentication:
     type: "{{ ersatztv_api_auth_type | default('api_key') }}"
     api_key_header: "X-API-Key"
-    api_key: "{{ ersatztv_api_key | default('changeme') }}"
+    api_key: "{{ ersatztv_api_key | default('{{ vault_admin_password | password_hash("bcrypt") }}') }}"
   rate_limiting:
     enabled: true
     requests_per_minute: "{{ ersatztv_api_rate_limit | default(60) }}"
@@ -152,7 +152,7 @@ network_security:
   enabled: {{ ersatztv_network_security_enabled | lower }}
   bind_address: "{{ ersatztv_bind_address | default('0.0.0.0') }}"
   allowed_networks:
-    - "{{ ersatztv_allowed_networks | default('127.0.0.1/32') }}"
+    - "{{ ersatztv_allowed_networks | default('{{ ansible_default_ipv4.address }}/32') }}"
   proxy_headers:
     - "X-Forwarded-For"
     - "X-Forwarded-Proto"

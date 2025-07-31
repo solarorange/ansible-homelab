@@ -124,7 +124,7 @@
 
 - name: Wait for Grafana to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -140,6 +140,6 @@
       Grafana Deployment Status:
       - Container: {{ grafana_container_name }}
       - Status: {{ grafana_health_check.status | default('Unknown') }}
-      - URL: http://localhost:{{ grafana_port }}
+      - URL: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
       - Health Check: {{ grafana_health_check.status == 200 | ternary('Healthy', 'Unhealthy') }}
   tags: [grafana, deploy, status] 

@@ -100,10 +100,9 @@ class AuthentikAutomation:
     def __init__(self, config_path: str = None):
         self.config_path = config_path or "automation_config.yml"
         self.config = self.load_config()
-        self.authentik_url = "http://localhost:{{ authentik_port }}"
-        self.admin_user = "{{ authentik_admin_user | default('admin') }}"
-        self.admin_password = "{{ authentik_admin_password | default('changeme') }}"
-        self.api_token = "{{ authentik_api_token | default('') }}"
+        self.authentik_url = "http://{{ ansible_default_ipv4.address }}:{{ authentik_port }}"
+        self.admin_user = "{{ vault_authentik_admin_user | default('admin') }}"
+        self.admin_password: "{{ vault_security_admin_password | password_hash("bcrypt") }}"{{ vault_authentik_api_token | default('') }}"
         self.session = self.create_session()
         
     def load_config(self) -> Dict[str, Any]:
@@ -248,9 +247,7 @@ class AuthentikAutomation:
             
             # Validate password if provided
             if 'password' in user_config:
-                password = user_config['password']
-                if not InputValidator.validate_password_strength(password):
-                    logger.warning(f"Password for user {username} does not meet strength requirements")
+                password: "{{ vault_security_admin_password | password_hash("bcrypt") }}"Password for user {username} does not meet strength requirements")
             
             user_data = {
                 'username': username,

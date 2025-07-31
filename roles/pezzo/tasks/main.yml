@@ -1,48 +1,39 @@
 ---
-# Pezzo Deployment
-# Production-ready Ansible tasks for Pezzo AI prompt management deployment
+# Pezzo Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Pezzo validation tasks
+  include_tasks: validate.yml
+  when: pezzo_validation_enabled | default(true)
 
 - name: Include Pezzo deployment tasks
-  block:
-    - name: Validate Pezzo configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [pezzo, validation]
+  include_tasks: deploy.yml
+  when: pezzo_deploy_enabled | default(true)
 
-    - name: Setup Pezzo prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [pezzo, setup]
+- name: Include Pezzo configuration tasks
+  include_tasks: configure.yml
+  when: pezzo_deploy_enabled | default(true)
 
-    - name: Deploy Pezzo services
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [pezzo, deploy]
+- name: Include Pezzo security tasks
+  include_tasks: security.yml
+  when: pezzo_deploy_enabled | default(true)
 
-    - name: Configure Pezzo monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: pezzo_monitoring_enabled | default(true)
-      tags: [pezzo, monitoring]
+- name: Include Pezzo monitoring tasks
+  include_tasks: monitoring.yml
+  when: pezzo_monitoring_enabled | default(true)
 
-    - name: Configure Pezzo security
-      ansible.builtin.include_tasks: security.yml
-      tags: [pezzo, security]
+- name: Include Pezzo backup tasks
+  include_tasks: backup.yml
+  when: pezzo_backup_enabled | default(true)
 
-    - name: Configure Pezzo backup
-      ansible.builtin.include_tasks: backup.yml
-      when: pezzo_backup_enabled | default(true)
-      tags: [pezzo, backup]
+- name: Include Pezzo automation tasks
+  include_tasks: automation.yml
+  when: pezzo_automation_enabled | default(true)
 
-    - name: Configure Pezzo homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: pezzo_homepage_enabled | default(true)
-      tags: [pezzo, homepage]
+- name: Include Pezzo integration tasks
+  include_tasks: integration.yml
+  when: pezzo_discovery_enabled | default(true)
 
-    - name: Configure Pezzo alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: pezzo_alerting_enabled | default(true)
-      tags: [pezzo, alerts]
-
-    - name: Validate Pezzo deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [pezzo, validation]
-
-  when: pezzo_enabled | default(true)
-  tags: [pezzo, always] 
+- name: Include Pezzo health check tasks
+  include_tasks: health_check.yml
+  when: pezzo_health_check_enabled | default(true)

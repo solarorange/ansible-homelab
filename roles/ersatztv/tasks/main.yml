@@ -1,49 +1,39 @@
 ---
-# ErsatzTV Deployment
-# Production-ready Ansible tasks for homelab ErsatzTV deployment
+# Ersatztv Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Include ErsatzTV deployment tasks
-  block:
-    - name: Validate ErsatzTV configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [ersatztv, validation]
+- name: Include Ersatztv validation tasks
+  include_tasks: validate.yml
+  when: ersatztv_validation_enabled | default(true)
 
-    - name: Setup ErsatzTV prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [ersatztv, setup]
+- name: Include Ersatztv deployment tasks
+  include_tasks: deploy.yml
+  when: ersatztv_deploy_enabled | default(true)
 
-    - name: Deploy ErsatzTV service
-      ansible.builtin.include_tasks: deploy.yml
-      when: ersatztv_enabled | default(true)
-      tags: [ersatztv, deploy]
+- name: Include Ersatztv configuration tasks
+  include_tasks: configure.yml
+  when: ersatztv_deploy_enabled | default(true)
 
-    - name: Configure ErsatzTV monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: ersatztv_monitoring_enabled | default(true)
-      tags: [ersatztv, monitoring]
+- name: Include Ersatztv security tasks
+  include_tasks: security.yml
+  when: ersatztv_deploy_enabled | default(true)
 
-    - name: Configure ErsatzTV security
-      ansible.builtin.include_tasks: security.yml
-      tags: [ersatztv, security]
+- name: Include Ersatztv monitoring tasks
+  include_tasks: monitoring.yml
+  when: ersatztv_monitoring_enabled | default(true)
 
-    - name: Configure ErsatzTV backup
-      ansible.builtin.include_tasks: backup.yml
-      when: ersatztv_backup_enabled | default(true)
-      tags: [ersatztv, backup]
+- name: Include Ersatztv backup tasks
+  include_tasks: backup.yml
+  when: ersatztv_backup_enabled | default(true)
 
-    - name: Configure ErsatzTV homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: ersatztv_homepage_enabled | default(true)
-      tags: [ersatztv, homepage]
+- name: Include Ersatztv automation tasks
+  include_tasks: automation.yml
+  when: ersatztv_automation_enabled | default(true)
 
-    - name: Configure ErsatzTV alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: ersatztv_alerting_enabled | default(true)
-      tags: [ersatztv, alerts]
+- name: Include Ersatztv integration tasks
+  include_tasks: integration.yml
+  when: ersatztv_discovery_enabled | default(true)
 
-    - name: Validate ErsatzTV deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [ersatztv, validation]
-
-  when: ersatztv_enabled | default(true)
-  tags: [ersatztv, always] 
+- name: Include Ersatztv health check tasks
+  include_tasks: health_check.yml
+  when: ersatztv_health_check_enabled | default(true)

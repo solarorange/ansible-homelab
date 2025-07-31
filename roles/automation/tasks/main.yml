@@ -1,69 +1,39 @@
 ---
-# Main entry point for automation role
+# Automation Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Detect manual overrides for ports, certificates, or service enablement
-  block:
-    - name: Warn about risks of manual overrides
-      ansible.builtin.debug:
-        msg: |
-          WARNING: Manual overrides for ports, certificates, or service enablement have been detected.
-          This can cause port conflicts, security issues, or break automation/monitoring.
-          Proceed ONLY if you understand the risks. See documentation for details.
+- name: Include Automation validation tasks
+  include_tasks: validate.yml
+  when: automation_validation_enabled | default(true)
 
-    - name: Require explicit user confirmation to proceed
-      ansible.builtin.pause:
-        prompt: "Manual overrides detected. Type 'yes' to continue, or Ctrl+C to abort: "
-      register: manual_override_confirm
+- name: Include Automation deployment tasks
+  include_tasks: deploy.yml
+  when: automation_deploy_enabled | default(true)
 
-    - name: Fail if user did not confirm manual override risk
-      ansible.builtin.fail:
-        msg: "Deployment aborted due to manual override risk."
-      when: manual_override_confirm.user_input | lower != 'yes'
-  when: >
-    (manual_override_ports is defined and manual_override_ports|length > 0) or
-    (manual_override_certs is defined and manual_override_certs|length > 0) or
-    (manual_override_services is defined and manual_override_services|length > 0)
+- name: Include Automation configuration tasks
+  include_tasks: configure.yml
+  when: automation_deploy_enabled | default(true)
 
-- name: Check for duplicate port assignments among enabled services
-  ansible.builtin.command: scripts/check_port_conflicts.py
-  register: port_conflict_check
-  changed_when: false
-  failed_when: port_conflict_check.rc != 0
-  tags: [preflight, validation, ports]
+- name: Include Automation security tasks
+  include_tasks: security.yml
+  when: automation_deploy_enabled | default(true)
 
-- name: Include prerequisites
-  import_tasks: prerequisites.yml
-
-- name: Include container management tasks
-  import_tasks: ../container_management/tasks/main.yml
-  when: container_management_enabled | default(true)
-
-- name: Include home automation tasks
-  import_tasks: ../home_automation/tasks/main.yml
-  when: home_automation_enabled | default(true)
-
-- name: Include scheduling tasks
-  import_tasks: ../scheduling/tasks/main.yml
-  when: scheduling_enabled | default(true)
-
-- name: Include deployment tasks
-  import_tasks: deploy.yml
-
-- name: Include monitoring integration
-  import_tasks: monitoring.yml
+- name: Include Automation monitoring tasks
+  include_tasks: monitoring.yml
   when: automation_monitoring_enabled | default(true)
 
-- name: Include backup procedures
-  import_tasks: backup.yml
+- name: Include Automation backup tasks
+  include_tasks: backup.yml
   when: automation_backup_enabled | default(true)
 
-- name: Include security hardening
-  import_tasks: security.yml
-  when: automation_security_enabled | default(true)
+- name: Include Automation automation tasks
+  include_tasks: automation.yml
+  when: automation_automation_enabled | default(true)
 
-- name: Include homepage integration
-  import_tasks: homepage.yml
-  when: automation_homepage_enabled | default(true)
+- name: Include Automation integration tasks
+  include_tasks: integration.yml
+  when: automation_discovery_enabled | default(true)
 
-- name: Include validation tasks
-  import_tasks: validate.yml 
+- name: Include Automation health check tasks
+  include_tasks: health_check.yml
+  when: automation_health_check_enabled | default(true)

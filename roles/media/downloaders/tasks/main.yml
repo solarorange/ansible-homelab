@@ -26,7 +26,7 @@
 
     - name: Wait for SABnzbd to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_downloaders.sabnzbd.port }}/api?mode=version"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.sabnzbd.port }}/api?mode=version"
         method: GET
         status_code: 200
       register: sabnzbd_health
@@ -37,7 +37,7 @@
 
     - name: Wait for qBittorrent to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
         method: GET
         status_code: 200
       register: qbittorrent_health
@@ -48,7 +48,7 @@
 
     - name: Configure SABnzbd API key
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_downloaders.sabnzbd.port }}/api"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.sabnzbd.port }}/api"
         method: GET
         body_format: form-urlencoded
         body:
@@ -60,7 +60,7 @@
 
     - name: Configure qBittorrent API key
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
         method: GET
         status_code: 200
       register: qbittorrent_api_key
@@ -136,7 +136,7 @@
 
     - name: Verify downloader deployment
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
         method: GET
         status_code: 200
       loop: "{{ media_downloaders | dict2items }}"

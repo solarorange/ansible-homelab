@@ -788,7 +788,7 @@ deploy_homepage() {
     # Check service status
     if docker-compose -f "$SCRIPT_DIR/docker-compose.yml" ps | grep -q "Up"; then
         log "Homepage deployed successfully!"
-        log "Access your dashboard at: http://localhost:$HOMEPAGE_PORT"
+        log "Access your dashboard at: http://{{ ansible_default_ipv4.address }}:$HOMEPAGE_PORT"
         log "Or at: https://homepage.$DOMAIN"
     else
         error "Failed to deploy homepage"
@@ -823,8 +823,8 @@ show_status() {
     fi
     
     # Check if homepage is accessible
-    if curl -s "http://localhost:$HOMEPAGE_PORT" >/dev/null; then
-        echo -e "${GREEN}✅ Homepage is accessible at http://localhost:$HOMEPAGE_PORT${NC}"
+    if curl -s "http://{{ ansible_default_ipv4.address }}:$HOMEPAGE_PORT" >/dev/null; then
+        echo -e "${GREEN}✅ Homepage is accessible at http://{{ ansible_default_ipv4.address }}:$HOMEPAGE_PORT${NC}"
     else
         echo -e "${RED}❌ Homepage is not accessible${NC}"
     fi

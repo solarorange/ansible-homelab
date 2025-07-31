@@ -1,86 +1,259 @@
-# Automation Role Defaults
+# Automation Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# General
-automation_enabled: true
-automation_stack_name: "automation"
-automation_timezone: "UTC"
-automation_domain: "{{ domain }}"
-automation_username: "{{ username }}"
-automation_puid: "1000"
-automation_pgid: "1000"
+# =============================================================================
+# AUTOMATION SERVICE CONFIGURATION
+# =============================================================================
 
-# Container Management
-container_updater_enabled: true
-container_updater_schedule: "0 4 * * *"  # Daily at 4 AM
-container_updater_log_level: "info"
-container_updater_cleanup: true
+# Service Information
+automation_service_name: "automation"
+automation_container_name: "{{ automation_service_name }}"
+automation_image: "ghcr.io/automation/automation:latest"
+automation_version: "latest"
 
-# Home Automation
-home_automation_enabled: true
-home_assistant_enabled: true
-home_assistant_port: 8123
-home_assistant_config_dir: "{{ docker_data_root }}/homeassistant/config"
-home_assistant_ssl_dir: "{{ docker_data_root }}/homeassistant/ssl"
-home_assistant_backup_dir: "{{ backup_root }}/homeassistant"
-home_assistant_log_file: "{{ docker_data_root }}/homeassistant/config/home-assistant.log"
-home_assistant_backup_schedule: "0 2 * * *"
-zigbee2mqtt_enabled: true
-zigbee2mqtt_port: 8080
-zigbee2mqtt_data_dir: "{{ docker_data_root }}/zigbee2mqtt/data"
-zigbee2mqtt_backup_dir: "{{ backup_root }}/zigbee2mqtt"
-zigbee2mqtt_log_file: "{{ docker_data_root }}/zigbee2mqtt/data/log.txt"
-zigbee2mqtt_backup_schedule: "30 2 * * *"
-node_red_enabled: true
-node_red_port: 1880
-n8n_enabled: true
-n8n_port: 5678
+# Network Configuration
+automation_port: 8080
+automation_external_port: "{{ automation_port }}"
+automation_protocol: "http"
+automation_host: "{{ ansible_default_ipv4.address }}"
+automation_url: "{{ automation_protocol }}://{{ automation_host }}:{{ automation_port }}"
 
-# Scheduling
-scheduling_enabled: true
+# Domain Configuration
+automation_subdomain: "automation"
+automation_domain: "{{ automation_subdomain }}.{{ domain }}"
+automation_external_url: "https://{{ automation_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+automation_auth_enabled: true
+automation_auth_method: "authentik"  # Options: basic, authentik, none
+automation_admin_username: "admin"
+automation_admin_password: "{{ vault_automation_admin_password }}"
+
+# API Configuration
+automation_api_key: "{{ vault_automation_api_key }}"
+automation_api_token: "{{ vault_automation_api_token }}"
+
+# Encryption & Security
+automation_secret_key: "{{ vault_automation_secret_key }}"
+automation_encryption_key: "{{ vault_automation_encryption_key }}"
+automation_jwt_secret: "{{ vault_automation_jwt_secret }}"
+
+# SSL/TLS Configuration
+automation_ssl_enabled: true
+automation_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+automation_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+automation_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+automation_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+automation_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+automation_database_port: "{{ databases_postgresql_port | default(5432) }}"
+automation_database_name: "automation"
+automation_database_username: "automation"
+automation_database_password: "{{ vault_automation_database_password }}"
+
+# Redis Configuration (if using)
+automation_redis_enabled: false
+automation_redis_host: "{{ redis_host | default('redis') }}"
+automation_redis_port: "{{ redis_port | default(6379) }}"
+automation_redis_password: "{{ vault_automation_redis_password }}"
+automation_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+automation_data_dir: "{{ homelab_data_dir }}/automation"
+automation_config_dir: "{{ automation_data_dir }}/config"
+automation_backup_dir: "{{ automation_data_dir }}/backups"
+
+# Volume Mappings
+automation_volumes:
+  - "{{ automation_config_dir }}:/config"
+  - "{{ automation_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+automation_health_check_enabled: true
+automation_health_check_path: "/health"
+automation_health_check_interval: 30
+automation_health_check_timeout: 10
+automation_health_check_retries: 3
 
 # Monitoring Integration
 automation_monitoring_enabled: true
-automation_metrics_enabled: true
-automation_health_check_enabled: true
-automation_health_check_interval: 30
 automation_prometheus_enabled: true
 automation_grafana_enabled: true
-automation_loki_enabled: true
-automation_alerting_enabled: true
-automation_alerting_provider: "alertmanager"
-automation_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
 
-# Security
-automation_security_enabled: true
-automation_crowdsec_enabled: true
-automation_fail2ban_enabled: true
-automation_fail2ban_jail: "automation"
-automation_fail2ban_max_retry: 5
-automation_fail2ban_bantime: 3600
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
-# Backup
+# Backup Configuration
 automation_backup_enabled: true
-automation_backup_schedule: "0 3 * * *"
-automation_backup_retention: 7
-automation_backup_compression: true
+automation_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+automation_backup_retention_days: 30
+automation_backup_encryption_enabled: true
+automation_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Vault Integration
-automation_vault_enabled: true
-automation_vault_path: "secret/automation"
-automation_vault_secrets:
-  - "home_assistant_api_key"
-  - "zigbee2mqtt_mqtt_password"
-  - "node_red_admin_password"
-  - "n8n_api_key"
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
 
-# Homepage Integration
-automation_homepage_enabled: true
-automation_homepage_category: "Automation"
-automation_homepage_description: "Home & Workflow Automation"
-automation_homepage_icon: "automation.png"
-automation_homepage_widget_enabled: true
+# Email Notifications
+automation_smtp_enabled: false
+automation_smtp_host: "{{ smtp_host | default('') }}"
+automation_smtp_port: "{{ smtp_port | default(587) }}"
+automation_smtp_username: "{{ vault_smtp_username }}"
+automation_smtp_password: "{{ vault_automation_smtp_password }}"
+automation_smtp_from: "{{ automation_admin_email | default('admin@' + domain) }}"
+automation_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+automation_webhook_enabled: false
+automation_webhook_url: "{{ vault_webhook_url | default('') }}"
+automation_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+automation_discovery_enabled: true
+automation_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-automation_memory_limit: "2g"
 automation_cpu_limit: "1.0"
-automation_storage_limit: "20g" 
+automation_memory_limit: "1g"
+automation_memory_reservation: "512m"
+
+# Performance Settings
+automation_scan_interval: 10
+automation_parallel_downloads: 3
+automation_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+automation_log_level: "info"  # Options: trace, debug, info, warn, error
+automation_log_rotation_enabled: true
+automation_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+automation_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+automation_rate_limit_enabled: true
+automation_rate_limit_requests: 100
+automation_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+automation_deploy_enabled: true
+automation_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+automation_restart_policy: "unless-stopped"
+automation_auto_update_enabled: true
+
+# Environment Variables
+automation_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  AUTOMATION_API_KEY: "{{ automation_api_key }}"
+  AUTOMATION_SECRET_KEY: "{{ automation_secret_key }}"
+  AUTOMATION_ENCRYPTION_KEY: "{{ automation_encryption_key }}"
+  AUTOMATION_JWT_SECRET: "{{ automation_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+automation_validation_enabled: true
+automation_validation_timeout: 300
+automation_validation_retries: 3
+
+# Testing Configuration
+automation_test_enabled: false
+automation_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+automation_compliance_enabled: true
+automation_audit_logging_enabled: true
+automation_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+automation_automation_enabled: true
+automation_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+automation_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+automation_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+automation_fallback_enabled: true
+automation_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

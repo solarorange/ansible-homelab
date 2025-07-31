@@ -13,7 +13,7 @@ scrape_configs:
   - job_name: system_logs
     static_configs:
       - targets:
-          - localhost
+          - {{ ansible_default_ipv4.address }}
         labels:
           job: system_logs
           __path__: {{ system_log_path | default('/var/log/syslog') }}
@@ -28,7 +28,7 @@ scrape_configs:
   - job_name: docker_logs
     static_configs:
       - targets:
-          - localhost
+          - {{ ansible_default_ipv4.address }}
         labels:
           job: docker_logs
           __path__: {{ docker_log_path | default('/var/lib/docker/containers/*/*-json.log') }}

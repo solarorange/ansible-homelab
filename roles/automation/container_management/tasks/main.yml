@@ -30,7 +30,7 @@
   ansible.builtin.cron:
     name: "Rotate Watchtower logs"
     job: "logrotate {{ docker_dir }}/watchtower/config/logrotate.conf"
-    user: "{{ automation_username }}"
+    user: "{{ vault_automation_user }}"
     minute: "0"
     hour: "*/6"
   when: watchtower_log_rotation | default(true)
@@ -74,7 +74,7 @@
         traefik:
           image: traefik:v2.10
           container_name: traefik
-          user: "{{ puid }}:{{ pgid }}"
+          user: "{{ vault_automation_user }}"
           read_only: true
           security_opt:
             - no-new-privileges:true
@@ -109,7 +109,7 @@
             - "traefik.http.middlewares.traefik-auth.forwardauth.trustForwardHeader=true"
             - "traefik.http.routers.traefik.middlewares=traefik-auth"
           healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/ping"]
             interval: 30s
             timeout: 10s
             retries: 3

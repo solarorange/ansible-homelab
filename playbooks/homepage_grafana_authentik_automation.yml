@@ -219,7 +219,7 @@
     
     - name: Wait for Authentik to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ authentik_port }}/api/v3/core/applications/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ authentik_port }}/api/v3/core/applications/"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
@@ -252,7 +252,7 @@
     
     - name: Wait for Homepage to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ homepage_port }}/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
@@ -285,7 +285,7 @@
     
     - name: Wait for Grafana to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ grafana_port }}/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
@@ -396,7 +396,7 @@
     
     - name: Validate monitoring integration
       ansible.builtin.uri:
-        url: "http://localhost:{{ grafana_port }}/api/datasources"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30

@@ -49,7 +49,7 @@
         month: "{{ reconya_backup_schedule.split()[3] | default('*') }}"
         weekday: "{{ reconya_backup_schedule.split()[4] | default('*') }}"
         job: "{{ reconya_config_dir }}/backup/backup.sh >> {{ reconya_backup_log_file }} 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_reconya_user }}"
         state: present
 
     - name: Set up Reconya backup retention cleanup
@@ -58,7 +58,7 @@
         hour: "3"
         minute: "0"
         job: "find {{ reconya_backup_dir }} -name '*.tar.gz' -mtime +{{ reconya_backup_retention_days | default(7) }} -delete"
-        user: "{{ username }}"
+        user: "{{ vault_reconya_user }}"
         state: present
 
   tags: [reconya, backup]
@@ -101,7 +101,7 @@
         hour: "4"
         minute: "0"
         job: "{{ reconya_config_dir }}/backup/verify.sh >> {{ reconya_backup_log_file }} 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_reconya_user }}"
         state: present
 
   tags: [reconya, backup] 

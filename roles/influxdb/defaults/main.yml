@@ -1,0 +1,259 @@
+# Influxdb Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# INFLUXDB SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+influxdb_service_name: "influxdb"
+influxdb_container_name: "{{ influxdb_service_name }}"
+influxdb_image: "influxdb:latest"
+influxdb_version: "latest"
+
+# Network Configuration
+influxdb_port: 8086
+influxdb_external_port: "{{ influxdb_port }}"
+influxdb_protocol: "http"
+influxdb_host: "{{ ansible_default_ipv4.address }}"
+influxdb_url: "{{ influxdb_protocol }}://{{ influxdb_host }}:{{ influxdb_port }}"
+
+# Domain Configuration
+influxdb_subdomain: "influxdb"
+influxdb_domain: "{{ influxdb_subdomain }}.{{ domain }}"
+influxdb_external_url: "https://{{ influxdb_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+influxdb_auth_enabled: true
+influxdb_auth_method: "authentik"  # Options: basic, authentik, none
+influxdb_admin_username: "admin"
+influxdb_admin_password: "{{ vault_influxdb_admin_password }}"
+
+# API Configuration
+influxdb_api_key: "{{ vault_influxdb_api_key }}"
+influxdb_api_token: "{{ vault_influxdb_api_token }}"
+
+# Encryption & Security
+influxdb_secret_key: "{{ vault_influxdb_secret_key }}"
+influxdb_encryption_key: "{{ vault_influxdb_encryption_key }}"
+influxdb_jwt_secret: "{{ vault_influxdb_jwt_secret }}"
+
+# SSL/TLS Configuration
+influxdb_ssl_enabled: true
+influxdb_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+influxdb_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+influxdb_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+influxdb_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+influxdb_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+influxdb_database_port: "{{ databases_postgresql_port | default(5432) }}"
+influxdb_database_name: "influxdb"
+influxdb_database_username: "influxdb"
+influxdb_database_password: "{{ vault_influxdb_database_password }}"
+
+# Redis Configuration (if using)
+influxdb_redis_enabled: false
+influxdb_redis_host: "{{ redis_host | default('redis') }}"
+influxdb_redis_port: "{{ redis_port | default(6379) }}"
+influxdb_redis_password: "{{ vault_influxdb_redis_password }}"
+influxdb_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+influxdb_data_dir: "{{ homelab_data_dir }}/influxdb"
+influxdb_config_dir: "{{ influxdb_data_dir }}/config"
+influxdb_backup_dir: "{{ influxdb_data_dir }}/backups"
+
+# Volume Mappings
+influxdb_volumes:
+  - "{{ influxdb_config_dir }}:/config"
+  - "{{ influxdb_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+influxdb_health_check_enabled: true
+influxdb_health_check_path: "/health"
+influxdb_health_check_interval: 30
+influxdb_health_check_timeout: 10
+influxdb_health_check_retries: 3
+
+# Monitoring Integration
+influxdb_monitoring_enabled: true
+influxdb_prometheus_enabled: true
+influxdb_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+influxdb_backup_enabled: true
+influxdb_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+influxdb_backup_retention_days: 30
+influxdb_backup_encryption_enabled: true
+influxdb_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+influxdb_smtp_enabled: false
+influxdb_smtp_host: "{{ smtp_host | default('') }}"
+influxdb_smtp_port: "{{ smtp_port | default(587) }}"
+influxdb_smtp_username: "{{ vault_smtp_username }}"
+influxdb_smtp_password: "{{ vault_influxdb_smtp_password }}"
+influxdb_smtp_from: "{{ influxdb_admin_email | default('admin@' + domain) }}"
+influxdb_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+influxdb_webhook_enabled: false
+influxdb_webhook_url: "{{ vault_webhook_url | default('') }}"
+influxdb_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+influxdb_discovery_enabled: true
+influxdb_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+influxdb_cpu_limit: "1.0"
+influxdb_memory_limit: "1g"
+influxdb_memory_reservation: "512m"
+
+# Performance Settings
+influxdb_scan_interval: 10
+influxdb_parallel_downloads: 3
+influxdb_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+influxdb_log_level: "info"  # Options: trace, debug, info, warn, error
+influxdb_log_rotation_enabled: true
+influxdb_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+influxdb_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+influxdb_rate_limit_enabled: true
+influxdb_rate_limit_requests: 100
+influxdb_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+influxdb_deploy_enabled: true
+influxdb_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+influxdb_restart_policy: "unless-stopped"
+influxdb_auto_update_enabled: true
+
+# Environment Variables
+influxdb_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  INFLUXDB_API_KEY: "{{ influxdb_api_key }}"
+  INFLUXDB_SECRET_KEY: "{{ influxdb_secret_key }}"
+  INFLUXDB_ENCRYPTION_KEY: "{{ influxdb_encryption_key }}"
+  INFLUXDB_JWT_SECRET: "{{ influxdb_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+influxdb_validation_enabled: true
+influxdb_validation_timeout: 300
+influxdb_validation_retries: 3
+
+# Testing Configuration
+influxdb_test_enabled: false
+influxdb_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+influxdb_compliance_enabled: true
+influxdb_audit_logging_enabled: true
+influxdb_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+influxdb_automation_enabled: true
+influxdb_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+influxdb_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+influxdb_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+influxdb_fallback_enabled: true
+influxdb_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

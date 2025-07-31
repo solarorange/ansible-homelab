@@ -16,7 +16,7 @@
 
 - name: Verify Fing web interface
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}{{ fing_health_check_url }}"
     method: GET
     status_code: 200
     timeout: "{{ fing_health_check_timeout }}"
@@ -29,7 +29,7 @@
 
 - name: Verify Fing API endpoint
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_api_port }}/api/{{ fing_api_version }}/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_api_port }}/api/{{ fing_api_version }}/health"
     method: GET
     status_code: 200
     timeout: 10
@@ -44,7 +44,7 @@
 
 - name: Verify Fing metrics endpoint
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_metrics_port }}/metrics"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_metrics_port }}/metrics"
     method: GET
     status_code: 200
     timeout: 10
@@ -85,7 +85,7 @@
 
 - name: Verify Fing authentication
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_web_port }}/auth/login"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}/auth/login"
     method: POST
     body_format: json
     body: |
@@ -122,7 +122,7 @@
 
 - name: Verify Fing monitoring integration
   ansible.builtin.uri:
-    url: "http://localhost:9090/api/v1/targets"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
     method: GET
     status_code: 200
     timeout: 10
@@ -137,7 +137,7 @@
 
 - name: Verify Fing Homepage integration
   ansible.builtin.uri:
-    url: "http://localhost:3000/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/services"
     method: GET
     status_code: 200
     timeout: 10
@@ -275,7 +275,7 @@
 
 - name: Verify Fing port accessibility
   ansible.builtin.wait_for:
-    host: "localhost"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ item }}"
     delay: 5
     timeout: 30

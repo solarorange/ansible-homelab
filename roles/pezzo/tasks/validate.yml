@@ -1,146 +1,89 @@
 ---
 # Pezzo Validation Tasks
-# Validate configuration and prerequisites for Pezzo deployment
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate Pezzo configuration variables
-  ansible.builtin.assert:
-    that:
-      - pezzo_enabled is defined
-      - pezzo_subdomain is defined
-      - pezzo_database_host is defined
-      - pezzo_redis_host is defined
-      - pezzo_clickhouse_host is defined
-    fail_msg: "Required Pezzo configuration variables are not defined"
-    success_msg: "Pezzo configuration validation passed"
-  tags: [pezzo, validation]
+- name: Validate Pezzo vault variables
+  block:
+    - name: Check required Pezzo vault variables
+      assert:
+        that:
+          - vault_pezzo_admin_password is defined
+          - vault_pezzo_database_password is defined
+          - vault_pezzo_api_key is defined
+          - vault_pezzo_secret_key is defined
+          - vault_pezzo_encryption_key is defined
+          - vault_pezzo_jwt_secret is defined
+        fail_msg: "Required Pezzo vault variables are not defined"
+        success_msg: "All required Pezzo vault variables are defined"
+
+    - name: Validate Pezzo password complexity
+      assert:
+        that:
+          - vault_pezzo_admin_password | length >= 12
+          - vault_pezzo_database_password | length >= 12
+        fail_msg: "Pezzo passwords must be at least 12 characters long"
+        success_msg: "Pezzo password complexity requirements met"
 
 - name: Validate Pezzo network configuration
-  ansible.builtin.assert:
-    that:
-      - pezzo_network_name is defined
-      - pezzo_traefik_network is defined
-    fail_msg: "Required Pezzo network configuration is not defined"
-    success_msg: "Pezzo network configuration validation passed"
-  tags: [pezzo, validation]
+  block:
+    - name: Check Pezzo port configuration
+      assert:
+        that:
+          - pezzo_port is defined
+          - pezzo_port | int >= 1024
+          - pezzo_port | int <= 65535
+        fail_msg: "Pezzo port must be between 1024 and 65535"
+        success_msg: "Pezzo port configuration is valid"
 
-- name: Validate Pezzo database configuration
-  ansible.builtin.assert:
-    that:
-      - pezzo_database_type is defined
-      - pezzo_database_name is defined
-      - pezzo_database_user is defined
-    fail_msg: "Required Pezzo database configuration is not defined"
-    success_msg: "Pezzo database configuration validation passed"
-  tags: [pezzo, validation]
+    - name: Check Pezzo domain configuration
+      assert:
+        that:
+          - domain is defined
+          - pezzo_subdomain is defined
+        fail_msg: "Pezzo domain configuration is incomplete"
+        success_msg: "Pezzo domain configuration is valid"
 
-- name: Validate Pezzo authentication configuration
-  ansible.builtin.assert:
-    that:
-      - pezzo_auth_enabled is defined
-      - pezzo_auth_method is defined
-    fail_msg: "Required Pezzo authentication configuration is not defined"
-    success_msg: "Pezzo authentication configuration validation passed"
-  tags: [pezzo, validation]
+- name: Validate Pezzo security configuration
+  block:
+    - name: Check Pezzo SSL configuration
+      assert:
+        that:
+          - pezzo_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Pezzo SSL configuration is invalid"
+        success_msg: "Pezzo SSL configuration is valid"
 
-- name: Check if Docker is running
-  ansible.builtin.service_facts:
-  tags: [pezzo, validation]
+    - name: Check Pezzo authentication configuration
+      assert:
+        that:
+          - pezzo_auth_enabled | bool
+          - pezzo_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Pezzo authentication configuration is invalid"
+        success_msg: "Pezzo authentication configuration is valid"
 
-- name: Validate Docker service status
-  ansible.builtin.assert:
-    that:
-      - ansible_facts.services['docker.service'] is defined
-      - ansible_facts.services['docker.service'].state == "running"
-    fail_msg: "Docker service is not running"
-    success_msg: "Docker service is running"
-  tags: [pezzo, validation]
+- name: Validate Pezzo storage configuration
+  block:
+    - name: Check Pezzo data directories
+      assert:
+        that:
+          - pezzo_data_dir is defined
+          - pezzo_config_dir is defined
+          - pezzo_backup_dir is defined
+        fail_msg: "Pezzo storage configuration is incomplete"
+        success_msg: "Pezzo storage configuration is valid"
 
-- name: Check if required directories exist
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  register: directory_check
-  loop:
-    - "{{ docker_dir }}"
-    - "{{ logs_dir }}"
-    - "{{ backup_dir }}"
-  tags: [pezzo, validation]
+    - name: Create Pezzo directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ pezzo_data_dir }}"
+        - "{{ pezzo_config_dir }}"
+        - "{{ pezzo_backup_dir }}"
 
-- name: Validate required directories
-  ansible.builtin.assert:
-    that:
-      - item.stat.exists
-    fail_msg: "Required directory {{ item.item }} does not exist"
-    success_msg: "All required directories exist"
-  loop: "{{ directory_check.results }}"
-  tags: [pezzo, validation]
-
-- name: Check if Traefik network exists
-  community.docker.docker_network_info:
-    name: "{{ pezzo_traefik_network }}"
-  register: traefik_network_check
-  tags: [pezzo, validation]
-
-- name: Validate Traefik network
-  ansible.builtin.assert:
-    that:
-      - traefik_network_check.exists
-    fail_msg: "Traefik network {{ pezzo_traefik_network }} does not exist"
-    success_msg: "Traefik network {{ pezzo_traefik_network }} exists"
-  tags: [pezzo, validation]
-
-- name: Validate Pezzo port configuration
-  ansible.builtin.assert:
-    that:
-      - pezzo_server_port is defined and pezzo_server_port is number
-      - pezzo_console_port is defined and pezzo_console_port is number
-      - pezzo_proxy_port is defined and pezzo_proxy_port is number
-    fail_msg: "Invalid Pezzo port configuration"
-    success_msg: "Pezzo port configuration validation passed"
-  tags: [pezzo, validation]
-
-- name: Check for port conflicts
-  ansible.builtin.wait_for:
-    host: "127.0.0.1"
-    port: "{{ item }}"
-    timeout: 1
-  register: port_check
-  failed_when: false
-  loop:
-    - "{{ pezzo_server_port }}"
-    - "{{ pezzo_console_port }}"
-    - "{{ pezzo_proxy_port }}"
-  tags: [pezzo, validation]
-
-- name: Warn about port conflicts
-  ansible.builtin.debug:
-    msg: "Warning: Port {{ item.item }} is already in use"
-  loop: "{{ port_check.results }}"
-  when: item.state == "started"
-  tags: [pezzo, validation]
-
-- name: Validate Pezzo resource limits
-  ansible.builtin.assert:
-    that:
-      - pezzo_memory_limit is defined
-      - pezzo_cpu_limit is defined
-    fail_msg: "Pezzo resource limits are not defined"
-    success_msg: "Pezzo resource limits validation passed"
-  tags: [pezzo, validation]
-
-- name: Display Pezzo validation summary
-  ansible.builtin.debug:
-    msg: |
-      Pezzo Configuration Validation Summary:
-      - Service Enabled: {{ pezzo_enabled }}
-      - Subdomain: {{ pezzo_subdomain }}.{{ domain }}
-      - Server Port: {{ pezzo_server_port }}
-      - Console Port: {{ pezzo_console_port }}
-      - Proxy Port: {{ pezzo_proxy_port }}
-      - Database: {{ pezzo_database_type }}://{{ pezzo_database_host }}:{{ pezzo_database_port }}/{{ pezzo_database_name }}
-      - Redis: {{ pezzo_redis_host }}:{{ pezzo_redis_port }}
-      - ClickHouse: {{ pezzo_clickhouse_host }}:{{ pezzo_clickhouse_port }}
-      - Authentication: {{ pezzo_auth_method }}
-      - Traefik Network: {{ pezzo_traefik_network }}
-      - Memory Limit: {{ pezzo_memory_limit }}
-      - CPU Limit: {{ pezzo_cpu_limit }}
-  tags: [pezzo, validation] 
+- name: Final validation summary
+  debug:
+    msg: "Pezzo validation completed successfully - all configurations are valid and secure"

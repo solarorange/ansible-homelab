@@ -50,7 +50,7 @@
 - name: Wait for n8n services to be ready
   ansible.builtin.wait_for:
     port: "{{ n8n_port }}"
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     delay: 10
     timeout: 300
   tags: [n8n, deploy]
@@ -69,7 +69,7 @@
 
 - name: Check n8n app health
   ansible.builtin.uri:
-    url: "http://localhost:{{ n8n_port }}/healthz"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
     method: GET
     status_code: 200
     timeout: 30

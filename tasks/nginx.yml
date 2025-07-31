@@ -192,7 +192,7 @@
       fi
       
       # Check if Nginx is responding
-      if ! curl -s -f http://localhost:80 > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:80 > /dev/null; then
         echo "Nginx is not responding"
         exit 1
       fi
@@ -225,4 +225,4 @@
     job: "logrotate {{ docker_dir }}/nginx/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

@@ -7,7 +7,7 @@ set -e
 # Configuration
 SERVICE_NAME="paperless-ngx"
 CONTAINER_NAME="{{ paperless_ngx_container_name }}"
-HEALTH_URL="http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+HEALTH_URL="http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
 TIMEOUT="{{ paperless_ngx_health_check_timeout }}"
 RETRIES="{{ paperless_ngx_health_check_retries }}"
 
@@ -77,7 +77,7 @@ check_web_interface() {
 check_api() {
     log "Checking API endpoint..."
     
-    API_URL="http://localhost:{{ paperless_ngx_web_port }}/api/"
+    API_URL="http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/"
     
     if curl -f -s --max-time $TIMEOUT "$API_URL" > /dev/null 2>&1; then
         log "${GREEN}✓ API endpoint is responding${NC}"

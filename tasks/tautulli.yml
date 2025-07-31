@@ -53,7 +53,7 @@
 
 - name: Wait for Tautulli to be ready
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
     method: GET
     status_code: 200
     timeout: 30
@@ -65,7 +65,7 @@
 
 - name: Configure Tautulli Plex server
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_plex_server"
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_plex_server"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -76,7 +76,7 @@
 
 - name: Configure Tautulli notifications
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -87,7 +87,7 @@
 
 - name: Configure Tautulli backup
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -98,7 +98,7 @@
 
 - name: Verify Tautulli configuration
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
     method: GET
     status_code: 200
     register: tautulli_verify

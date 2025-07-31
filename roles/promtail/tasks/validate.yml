@@ -1,0 +1,89 @@
+---
+# Promtail Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Promtail vault variables
+  block:
+    - name: Check required Promtail vault variables
+      assert:
+        that:
+          - vault_promtail_admin_password is defined
+          - vault_promtail_database_password is defined
+          - vault_promtail_api_key is defined
+          - vault_promtail_secret_key is defined
+          - vault_promtail_encryption_key is defined
+          - vault_promtail_jwt_secret is defined
+        fail_msg: "Required Promtail vault variables are not defined"
+        success_msg: "All required Promtail vault variables are defined"
+
+    - name: Validate Promtail password complexity
+      assert:
+        that:
+          - vault_promtail_admin_password | length >= 12
+          - vault_promtail_database_password | length >= 12
+        fail_msg: "Promtail passwords must be at least 12 characters long"
+        success_msg: "Promtail password complexity requirements met"
+
+- name: Validate Promtail network configuration
+  block:
+    - name: Check Promtail port configuration
+      assert:
+        that:
+          - promtail_port is defined
+          - promtail_port | int >= 1024
+          - promtail_port | int <= 65535
+        fail_msg: "Promtail port must be between 1024 and 65535"
+        success_msg: "Promtail port configuration is valid"
+
+    - name: Check Promtail domain configuration
+      assert:
+        that:
+          - domain is defined
+          - promtail_subdomain is defined
+        fail_msg: "Promtail domain configuration is incomplete"
+        success_msg: "Promtail domain configuration is valid"
+
+- name: Validate Promtail security configuration
+  block:
+    - name: Check Promtail SSL configuration
+      assert:
+        that:
+          - promtail_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Promtail SSL configuration is invalid"
+        success_msg: "Promtail SSL configuration is valid"
+
+    - name: Check Promtail authentication configuration
+      assert:
+        that:
+          - promtail_auth_enabled | bool
+          - promtail_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Promtail authentication configuration is invalid"
+        success_msg: "Promtail authentication configuration is valid"
+
+- name: Validate Promtail storage configuration
+  block:
+    - name: Check Promtail data directories
+      assert:
+        that:
+          - promtail_data_dir is defined
+          - promtail_config_dir is defined
+          - promtail_backup_dir is defined
+        fail_msg: "Promtail storage configuration is incomplete"
+        success_msg: "Promtail storage configuration is valid"
+
+    - name: Create Promtail directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ promtail_data_dir }}"
+        - "{{ promtail_config_dir }}"
+        - "{{ promtail_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Promtail validation completed successfully - all configurations are valid and secure"

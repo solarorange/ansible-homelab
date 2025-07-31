@@ -7,16 +7,16 @@ all:
     homelab_core:
       hosts:
         core1:
-          ansible_host: "{{ lookup('env', 'HOMELAB_IP_1') | default('192.168.1.100') }}"
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_1') | default('{{ ansible_default_ipv4.address }}') }}"
           ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
         core2:
-          ansible_host: "{{ lookup('env', 'HOMELAB_IP_2') | default('192.168.1.101') }}"
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_2') | default('{{ ansible_default_ipv4.address }}') }}"
           ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
         core3:
-          ansible_host: "{{ lookup('env', 'HOMELAB_IP_3') | default('192.168.1.102') }}"
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_3') | default('{{ ansible_default_ipv4.address }}') }}"
           ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
         core4:
-          ansible_host: "{{ lookup('env', 'HOMELAB_IP_4') | default('192.168.1.103') }}"
+          ansible_host: "{{ lookup('env', 'HOMELAB_IP_4') | default('{{ ansible_default_ipv4.address }}') }}"
           ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
       vars:
         ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
@@ -33,7 +33,7 @@ all:
     ansible_control:
       hosts:
         ansible:
-          ansible_host: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('192.168.1.99') }}"
+          ansible_host: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('{{ ansible_default_ipv4.address }}') }}"
           ansible_user: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
       vars:
         ansible_connection: local
@@ -41,8 +41,8 @@ all:
 # Network segmentation configuration
 network_segments:
   - name: homelab
-    subnet: "{{ lookup('env', 'HOMELAB_SUBNET') | default('192.168.1.0/24') }}"
-    gateway: "{{ lookup('env', 'HOMELAB_GATEWAY') | default('192.168.1.1') }}"
+    subnet: "{{ lookup('env', 'HOMELAB_SUBNET') | default('{{ ansible_default_ipv4.address }}/24') }}"
+    gateway: "{{ lookup('env', 'HOMELAB_GATEWAY') | default('{{ ansible_default_ipv4.address }}') }}"
 
 # Resource limits
 resource_limits:
@@ -54,19 +54,92 @@ resource_limits:
 
 # Service configuration
 enabled_services:
+  # Core Infrastructure
   - traefik
   - authentik
   - portainer
-  - monitoring_stack
-  - media_stack
-  - security_stack
-  - automation_stack
-  - dumbassets
+  
+  # Monitoring Stack
+  - grafana
+  - prometheus
+  - influxdb
+  - telegraf
+  - loki
+  - promtail
+  - alertmanager
+  - blackbox_exporter
+  
+  # Media Services
+  - sonarr
+  - radarr
+  - prowlarr
+  - bazarr
+  - overseerr
+  - jellyfin
+  - tautulli
+  - komga
+  - audiobookshelf
+  - ersatztv
+  - lidarr
+  - readarr
+  - emby
+  - calibre-web
+  
+  # File Services
+  - nextcloud
+  - samba
+  - syncthing
+  
+  # Development Tools
+  - gitlab
+  - harbor
+  - code_server
+  
+  # AI and Development
+  - pezzo
+  
+  # Storage and files
+  - minio
+  - paperless
+  - bookstack
   - immich
-  - linkwarden
-  - vaultwarden
-  - reconya
+  - filebrowser
+  
+  # Automation and smart home
+  - homeassistant
+  - mosquitto
+  - zigbee2mqtt
+  - nodered
   - n8n
+  
+  # Security services
+  - vault
+  - crowdsec
+  - fail2ban
+  - wireguard
+  
+  # Network services
+  - pihole
+  - nginx_proxy_manager
+  
+  # Backup solutions
+  - kopia
+  - duplicati
+  
+  # Utilities
+  - watchtower
+  - dashdot
+  - guacamole
+  - heimdall
+  - homarr
+  - requestrr
+  - unmanic
+  - vaultwarden
+  - linkwarden
+  - reconya
+  - dumbassets
+  - romm
+  - fing
 
 # Feature toggles
 monitoring_enabled: "{{ lookup('env', 'MONITORING_ENABLED') | default('true') | bool }}"

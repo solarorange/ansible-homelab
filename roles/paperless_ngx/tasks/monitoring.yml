@@ -164,7 +164,7 @@
         name: "Paperless-ngx metrics collection"
         minute: "*/5"
         job: "{{ docker_dir }}/paperless-ngx/metrics.sh >> {{ logs_dir }}/paperless-ngx/metrics.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
     - name: Add Paperless-ngx log rotation to crontab
@@ -173,7 +173,7 @@
         hour: "2"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/logs.sh >> {{ logs_dir }}/paperless-ngx/log-rotation.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, monitoring]
@@ -202,7 +202,7 @@
   block:
     - name: Test Paperless-ngx health endpoint
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
         method: GET
         status_code: [200, 302, 401, 403]
         timeout: 10
@@ -210,7 +210,7 @@
 
     - name: Test Paperless-ngx metrics endpoint
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/health/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/health/"
         method: GET
         status_code: [200, 401, 403]
         timeout: 10

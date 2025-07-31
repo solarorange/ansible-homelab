@@ -1,0 +1,259 @@
+# Sabnzbd Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# SABNZBD SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+sabnzbd_service_name: "sabnzbd"
+sabnzbd_container_name: "{{ sabnzbd_service_name }}"
+sabnzbd_image: "linuxserver/sabnzbd:latest"
+sabnzbd_version: "latest"
+
+# Network Configuration
+sabnzbd_port: 8080
+sabnzbd_external_port: "{{ sabnzbd_port }}"
+sabnzbd_protocol: "http"
+sabnzbd_host: "{{ ansible_default_ipv4.address }}"
+sabnzbd_url: "{{ sabnzbd_protocol }}://{{ sabnzbd_host }}:{{ sabnzbd_port }}"
+
+# Domain Configuration
+sabnzbd_subdomain: "sabnzbd"
+sabnzbd_domain: "{{ sabnzbd_subdomain }}.{{ domain }}"
+sabnzbd_external_url: "https://{{ sabnzbd_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+sabnzbd_auth_enabled: true
+sabnzbd_auth_method: "authentik"  # Options: basic, authentik, none
+sabnzbd_admin_username: "admin"
+sabnzbd_admin_password: "{{ vault_sabnzbd_admin_password }}"
+
+# API Configuration
+sabnzbd_api_key: "{{ vault_sabnzbd_api_key }}"
+sabnzbd_api_token: "{{ vault_sabnzbd_api_token }}"
+
+# Encryption & Security
+sabnzbd_secret_key: "{{ vault_sabnzbd_secret_key }}"
+sabnzbd_encryption_key: "{{ vault_sabnzbd_encryption_key }}"
+sabnzbd_jwt_secret: "{{ vault_sabnzbd_jwt_secret }}"
+
+# SSL/TLS Configuration
+sabnzbd_ssl_enabled: true
+sabnzbd_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+sabnzbd_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+sabnzbd_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+sabnzbd_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+sabnzbd_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+sabnzbd_database_port: "{{ databases_postgresql_port | default(5432) }}"
+sabnzbd_database_name: "sabnzbd"
+sabnzbd_database_username: "sabnzbd"
+sabnzbd_database_password: "{{ vault_sabnzbd_database_password }}"
+
+# Redis Configuration (if using)
+sabnzbd_redis_enabled: false
+sabnzbd_redis_host: "{{ redis_host | default('redis') }}"
+sabnzbd_redis_port: "{{ redis_port | default(6379) }}"
+sabnzbd_redis_password: "{{ vault_sabnzbd_redis_password }}"
+sabnzbd_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+sabnzbd_data_dir: "{{ homelab_data_dir }}/sabnzbd"
+sabnzbd_config_dir: "{{ sabnzbd_data_dir }}/config"
+sabnzbd_backup_dir: "{{ sabnzbd_data_dir }}/backups"
+
+# Volume Mappings
+sabnzbd_volumes:
+  - "{{ sabnzbd_config_dir }}:/config"
+  - "{{ sabnzbd_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+sabnzbd_health_check_enabled: true
+sabnzbd_health_check_path: "/health"
+sabnzbd_health_check_interval: 30
+sabnzbd_health_check_timeout: 10
+sabnzbd_health_check_retries: 3
+
+# Monitoring Integration
+sabnzbd_monitoring_enabled: true
+sabnzbd_prometheus_enabled: true
+sabnzbd_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+sabnzbd_backup_enabled: true
+sabnzbd_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+sabnzbd_backup_retention_days: 30
+sabnzbd_backup_encryption_enabled: true
+sabnzbd_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+sabnzbd_smtp_enabled: false
+sabnzbd_smtp_host: "{{ smtp_host | default('') }}"
+sabnzbd_smtp_port: "{{ smtp_port | default(587) }}"
+sabnzbd_smtp_username: "{{ vault_smtp_username }}"
+sabnzbd_smtp_password: "{{ vault_sabnzbd_smtp_password }}"
+sabnzbd_smtp_from: "{{ sabnzbd_admin_email | default('admin@' + domain) }}"
+sabnzbd_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+sabnzbd_webhook_enabled: false
+sabnzbd_webhook_url: "{{ vault_webhook_url | default('') }}"
+sabnzbd_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+sabnzbd_discovery_enabled: true
+sabnzbd_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+sabnzbd_cpu_limit: "1.0"
+sabnzbd_memory_limit: "1g"
+sabnzbd_memory_reservation: "512m"
+
+# Performance Settings
+sabnzbd_scan_interval: 10
+sabnzbd_parallel_downloads: 3
+sabnzbd_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+sabnzbd_log_level: "info"  # Options: trace, debug, info, warn, error
+sabnzbd_log_rotation_enabled: true
+sabnzbd_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+sabnzbd_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+sabnzbd_rate_limit_enabled: true
+sabnzbd_rate_limit_requests: 100
+sabnzbd_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+sabnzbd_deploy_enabled: true
+sabnzbd_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+sabnzbd_restart_policy: "unless-stopped"
+sabnzbd_auto_update_enabled: true
+
+# Environment Variables
+sabnzbd_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  SABNZBD_API_KEY: "{{ sabnzbd_api_key }}"
+  SABNZBD_SECRET_KEY: "{{ sabnzbd_secret_key }}"
+  SABNZBD_ENCRYPTION_KEY: "{{ sabnzbd_encryption_key }}"
+  SABNZBD_JWT_SECRET: "{{ sabnzbd_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+sabnzbd_validation_enabled: true
+sabnzbd_validation_timeout: 300
+sabnzbd_validation_retries: 3
+
+# Testing Configuration
+sabnzbd_test_enabled: false
+sabnzbd_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+sabnzbd_compliance_enabled: true
+sabnzbd_audit_logging_enabled: true
+sabnzbd_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+sabnzbd_automation_enabled: true
+sabnzbd_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+sabnzbd_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+sabnzbd_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+sabnzbd_fallback_enabled: true
+sabnzbd_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

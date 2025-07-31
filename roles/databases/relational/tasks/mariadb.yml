@@ -56,7 +56,7 @@
     published_ports:
       - "{{ mariadb_web_port }}:3306"
     env:
-      MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
+      MARIADB_ROOT_password: "{{ vault_databases_database_password }}"
     volumes:
       - "{{ docker_dir }}/mariadb/data:/var/lib/mysql"
       - "{{ docker_dir }}/mariadb/config:/etc/mysql/conf.d"
@@ -84,7 +84,7 @@
     job: "{{ docker_dir }}/mariadb/scripts/backup.sh >> {{ logs_dir }}/mariadb/backup.log 2>&1"
     minute: "30"
     hour: "2"
-    user: "{{ username }}"
+    user: "{{ vault_databases_user }}"
     state: present
 
 - name: Integrate MariaDB with homepage

@@ -70,7 +70,7 @@ smtp_host=$(prompt_with_default "SMTP Host" "smtp.gmail.com" "smtp_host")
 smtp_port=$(prompt_with_default "SMTP Port" "587" "smtp_port")
 smtp_username=$(prompt_with_default "SMTP Username" "" "smtp_username")
 smtp_password=$(prompt_with_default "SMTP Password" "" "smtp_password")
-admin_email=$(prompt_with_default "Admin Email" "admin@$(hostname -d)" "admin_email")
+admin_email=$(prompt_with_default "Admin Email" "{{ admin_email | default("admin@" + domain) }} -d)" "admin_email")
 
 update_vault "vault_smtp_host" "$smtp_host"
 update_vault "vault_smtp_port" "$smtp_port"

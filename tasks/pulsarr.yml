@@ -53,7 +53,7 @@
 
 - name: Wait for Pulsarr to be ready
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:8080/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -65,7 +65,7 @@
 
 - name: Configure Pulsarr Plex server
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/config/plex"
+    url: "http://{{ ansible_default_ipv4.address }}:8080/api/config/plex"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -78,7 +78,7 @@
 
 - name: Configure Pulsarr Sonarr
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/config/sonarr"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/sonarr"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -91,7 +91,7 @@
 
 - name: Configure Pulsarr Radarr
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/config/radarr"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/radarr"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -104,7 +104,7 @@
 
 - name: Configure Pulsarr notifications
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/config/notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/notifications"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -117,7 +117,7 @@
 
 - name: Verify Pulsarr configuration
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
     method: GET
     status_code: 200
     register: pulsarr_verify

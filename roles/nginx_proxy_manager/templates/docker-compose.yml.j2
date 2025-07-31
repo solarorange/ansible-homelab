@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  # Nginx Proxy Manager Database
+  npm-db:
+    image: {{ nginx_proxy_manager_db_image }}
+    container_name: {{ nginx_proxy_manager_db_container_name }}
+    restart: {{ nginx_proxy_manager_db_restart_policy }}
+    environment:
+      {% for key, value in nginx_proxy_manager_db_env.items() %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+      TZ: {{ timezone }}
+    volumes:
+      {% for volume in nginx_proxy_manager_db_volumes %}
+      - {{ volume }}
+      {% endfor %}
+    networks:
+      - homelab
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "{{ ansible_default_ipv4.address }}", "-u", "root", "-p{{ vault_npm_db_root_password }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+
+  # Nginx Proxy Manager
+  nginx-proxy-manager:
+    image: {{ nginx_proxy_manager_image }}
+    container_name: {{ nginx_proxy_manager_container_name }}
+    restart: {{ nginx_proxy_manager_restart_policy }}
+    ports:
+      - "{{ nginx_proxy_manager_ports.web }}:80"
+      - "{{ nginx_proxy_manager_ports.ssl }}:443"
+      - "{{ nginx_proxy_manager_ports.admin }}:81"
+      {% if nginx_proxy_manager_metrics_enabled %}
+      - "{{ nginx_proxy_manager_metrics_port }}:{{ nginx_proxy_manager_metrics_port }}"
+      {% endif %}
+    environment:
+      - DB_MYSQL_HOST=npm-db
+      - DB_MYSQL_PORT=3306
+      - DB_MYSQL_DATABASE={{ nginx_proxy_manager_db_env.MYSQL_DATABASE }}
+      - DB_MYSQL_USER={{ nginx_proxy_manager_db_env.MYSQL_USER }}
+      - DB_MYSQL_PASSWORD={{ nginx_proxy_manager_db_env.MYSQL_PASSWORD }}
+      - TZ={{ timezone }}
+      {% if nginx_proxy_manager_monitoring_enabled %}
+      - ENABLE_METRICS=true
+      - METRICS_PORT={{ nginx_proxy_manager_metrics_port }}
+      {% endif %}
+      {% if nginx_proxy_manager_logging_enabled %}
+      - LOG_LEVEL={{ nginx_proxy_manager_log_level }}
+      {% endif %}
+    volumes:
+      {% for volume in nginx_proxy_manager_volumes %}
+      - {{ volume }}
+      {% endfor %}
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab
+    depends_on:
+      npm-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:{{ nginx_proxy_manager_ports.admin }}/api/health"]
+      interval: {{ nginx_proxy_manager_health_check_interval }}
+      timeout: {{ nginx_proxy_manager_health_check_timeout }}
+      retries: {{ nginx_proxy_manager_health_check_retries }}
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: {{ nginx_proxy_manager_resource_limits.memory }}
+          cpus: {{ nginx_proxy_manager_resource_limits.cpus }}
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    labels:
+      - "traefik.enable=false"
+      {% if nginx_proxy_manager_monitoring_enabled %}
+      - "prometheus.enable=true"
+      - "prometheus.port={{ nginx_proxy_manager_metrics_port }}"
+      - "prometheus.path={{ nginx_proxy_manager_metrics_path }}"
+      {% endif %}
+      {% if nginx_proxy_manager_logging_enabled %}
+      - "logging.enable=true"
+      - "logging.driver=json-file"
+      - "logging.options.max-size=10m"
+      - "logging.options.max-file=3"
+      {% endif %}
+
+  # NPM Automation Service (Optional)
+  {% if nginx_proxy_manager_automation_enabled %}
+  npm-automation:
+    image: python:3.9-alpine
+    container_name: npm-automation
+    restart: unless-stopped
+    volumes:
+      - {{ docker_dir }}/nginx-proxy-manager/scripts:/scripts:ro
+      - {{ docker_dir }}/nginx-proxy-manager/automation.log:/var/log/npm-automation.log
+    environment:
+      - PYTHONPATH=/scripts
+      - NPM_API_URL={{ nginx_proxy_manager_api_url }}
+      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+    working_dir: /scripts
+    command: >
+      sh -c "
+        pip install requests pyyaml jinja2 click rich tabulate cryptography certifi urllib3 &&
+        python3 npm_automation.py --config automation_config.yml --discover-services --create-proxy-hosts --auto-ssl
+      "
+    depends_on:
+      - nginx-proxy-manager
+    networks:
+      - homelab
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+  {% endif %}
+
+  # NPM SSL Manager (Optional)
+  {% if nginx_proxy_manager_auto_ssl_enabled %}
+  npm-ssl-manager:
+    image: python:3.9-alpine
+    container_name: npm-ssl-manager
+    restart: unless-stopped
+    volumes:
+      - {{ docker_dir }}/nginx-proxy-manager/scripts:/scripts:ro
+      - {{ docker_dir }}/nginx-proxy-manager/letsencrypt:/etc/letsencrypt:ro
+      - {{ docker_dir }}/nginx-proxy-manager/ssl.log:/var/log/npm-ssl.log
+    environment:
+      - PYTHONPATH=/scripts
+      - NPM_API_URL={{ nginx_proxy_manager_api_url }}
+      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+    working_dir: /scripts
+    command: >
+      sh -c "
+        pip install requests pyyaml cryptography certifi &&
+        python3 ssl_manager.py --config automation_config.yml --renew-certificates
+      "
+    depends_on:
+      - nginx-proxy-manager
+    networks:
+      - homelab
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+  {% endif %}
+
+  # NPM Health Checker (Optional)
+  {% if nginx_proxy_manager_health_check_enabled %}
+  npm-health-checker:
+    image: python:3.9-alpine
+    container_name: npm-health-checker
+    restart: unless-stopped
+    volumes:
+      - {{ docker_dir }}/nginx-proxy-manager/scripts:/scripts:ro
+      - {{ docker_dir }}/nginx-proxy-manager/health.log:/var/log/npm-health.log
+    environment:
+      - PYTHONPATH=/scripts
+      - NPM_API_URL={{ nginx_proxy_manager_api_url }}
+      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+    working_dir: /scripts
+    command: >
+      sh -c "
+        pip install requests pyyaml rich &&
+        python3 health_check.py --config automation_config.yml --check-services --send-alerts
+      "
+    depends_on:
+      - nginx-proxy-manager
+    networks:
+      - homelab
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+  {% endif %}
+
+  # NPM Backup Manager (Optional)
+  {% if nginx_proxy_manager_backup_enabled %}
+  npm-backup-manager:
+    image: python:3.9-alpine
+    container_name: npm-backup-manager
+    restart: unless-stopped
+    volumes:
+      - {{ docker_dir }}/nginx-proxy-manager/scripts:/scripts:ro
+      - {{ docker_dir }}/nginx-proxy-manager/data:/data:ro
+      - {{ docker_dir }}/nginx-proxy-manager/letsencrypt:/letsencrypt:ro
+      - {{ backup_root }}/nginx-proxy-manager:/backup
+      - {{ docker_dir }}/nginx-proxy-manager/backup.log:/var/log/npm-backup.log
+    environment:
+      - PYTHONPATH=/scripts
+      - BACKUP_ENCRYPTION={{ nginx_proxy_manager_backup_encryption | default(true) }}
+    working_dir: /scripts
+    command: >
+      sh -c "
+        pip install requests pyyaml cryptography &&
+        python3 backup_manager.py --config automation_config.yml --backup --encrypt
+      "
+    depends_on:
+      - nginx-proxy-manager
+    networks:
+      - homelab
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+  {% endif %}
+
+networks:
+  homelab:
+    external: true 

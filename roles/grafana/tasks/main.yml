@@ -1,111 +1,39 @@
 ---
-# Grafana Role - Main Tasks
-# Comprehensive Grafana deployment and configuration for homelab environment
+# Grafana Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Grafana validation tasks
+  include_tasks: validate.yml
+  when: grafana_validation_enabled | default(true)
 
 - name: Include Grafana deployment tasks
   include_tasks: deploy.yml
-  when: grafana_enabled | default(true)
-  tags: [grafana, deploy]
+  when: grafana_deploy_enabled | default(true)
 
-- name: Include Grafana automation integration tasks
-  include_tasks: automation_integration.yml
-  when: grafana_enabled | default(true) and grafana_automation_enabled | default(true)
-  tags: [grafana, automation]
+- name: Include Grafana configuration tasks
+  include_tasks: configure.yml
+  when: grafana_deploy_enabled | default(true)
 
-- name: Include Grafana data source configuration
-  include_tasks: datasources.yml
-  when: grafana_enabled | default(true) and grafana_datasources is defined
-  tags: [grafana, datasources]
+- name: Include Grafana security tasks
+  include_tasks: security.yml
+  when: grafana_deploy_enabled | default(true)
 
-- name: Include Grafana dashboard configuration
-  include_tasks: dashboards.yml
-  when: grafana_enabled | default(true) and grafana_dashboards_enabled | default(true)
-  tags: [grafana, dashboards]
-
-- name: Include Grafana user management
-  include_tasks: users.yml
-  when: grafana_enabled | default(true) and grafana_users_enabled | default(true)
-  tags: [grafana, users]
-
-- name: Include Grafana alerting configuration
-  include_tasks: alerts.yml
-  when: grafana_enabled | default(true) and grafana_alerting_enabled | default(true)
-  tags: [grafana, alerts]
-
-- name: Include Grafana monitoring configuration
+- name: Include Grafana monitoring tasks
   include_tasks: monitoring.yml
-  when: grafana_enabled | default(true) and grafana_health_check_enabled | default(true)
-  tags: [grafana, monitoring]
+  when: grafana_monitoring_enabled | default(true)
 
-- name: Include Grafana backup configuration
+- name: Include Grafana backup tasks
   include_tasks: backup.yml
-  when: grafana_enabled | default(true) and grafana_backup_enabled | default(true)
-  tags: [grafana, backup]
+  when: grafana_backup_enabled | default(true)
 
-- name: Include Grafana validation tasks
-  include_tasks: validation.yml
-  when: grafana_enabled | default(true) and grafana_validation_enabled | default(true)
-  tags: [grafana, validation]
+- name: Include Grafana automation tasks
+  include_tasks: automation.yml
+  when: grafana_automation_enabled | default(true)
 
-- name: Display Grafana deployment summary
-  ansible.builtin.debug:
-    msg: |
-      ========================================
-      GRAFANA DEPLOYMENT COMPLETED
-      ========================================
-      
-      Grafana Configuration:
-      - Version: {{ grafana_version }}
-      - Domain: {{ grafana_domain }}
-      - Port: {{ grafana_port }}
-      - Admin User: {{ grafana_admin_user }}
-      - Database Type: {{ grafana_database_type }}
-      
-      Data Sources Configured:
-      {% for name, config in grafana_datasources.items() %}
-      {% if config.enabled | default(false) %}
-      - {{ name }}: {{ config.url }}
-      {% endif %}
-      {% endfor %}
-      
-      Dashboard Categories:
-      {% for name, config in grafana_dashboard_categories.items() %}
-      {% if config.enabled | default(false) %}
-      - {{ name }}: {{ config.folder }}
-      {% endif %}
-      {% endfor %}
-      
-      Alerting Configuration:
-      - Enabled: {{ grafana_alerting_enabled | default(false) }}
-      - Notification Channels: {{ grafana_notification_channels | length }}
-      - Alert Rules: {{ grafana_alert_rules | length }}
-      
-      Monitoring Features:
-      - Health Checks: {{ grafana_health_check_enabled | default(false) }}
-      - Performance Monitoring: {{ grafana_performance_monitoring_enabled | default(false) }}
-      - Backup: {{ grafana_backup_enabled | default(false) }}
-      
-      Automation Features:
-      - Automation Integration: {{ grafana_automation_enabled | default(false) }}
-      - Data Source Auto-Configuration: {{ grafana_automation_enabled | default(false) }}
-      - Dashboard Auto-Import: {{ grafana_automation_enabled | default(false) }}
-      - Alerting Auto-Configuration: {{ grafana_automation_enabled | default(false) }}
-      
-      Access Information:
-      - Web Interface: https://{{ grafana_domain }}
-      - API Endpoint: https://{{ grafana_domain }}/api
-      - Health Check: https://{{ grafana_domain }}/api/health
-      
-      Integration Points:
-      - Traefik: {{ grafana_traefik_enabled | default(false) }}
-      - Authentication: {{ grafana_auth_enabled | default(false) }}
-      - Monitoring Stack: Integrated
-      
-      Resource Allocation:
-      - Memory Limit: {{ grafana_memory_limit }}
-      - CPU Limit: {{ grafana_cpu_limit }}
-      - Storage: {{ grafana_data_volume }}
-      
-      ========================================
-  when: grafana_enabled | default(true)
-  tags: [grafana, summary] 
+- name: Include Grafana integration tasks
+  include_tasks: integration.yml
+  when: grafana_discovery_enabled | default(true)
+
+- name: Include Grafana health check tasks
+  include_tasks: health_check.yml
+  when: grafana_health_check_enabled | default(true)

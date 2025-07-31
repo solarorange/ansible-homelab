@@ -65,10 +65,9 @@ class GrafanaAutomation:
         """Get Grafana API configuration"""
         api_config = self.config.get('grafana_api', {})
         return GrafanaConfig(
-            base_url=api_config.get('base_url', 'http://localhost:3000'),
+            base_url=api_config.get('base_url', 'http://{{ ansible_default_ipv4.address }}:3000'),
             admin_user=api_config.get('admin_user', 'admin'),
-            admin_password=api_config.get('admin_password', 'admin'),
-            api_key=api_config.get('api_key'),
+            admin_password: "{{ vault_grafana_admin_password | password_hash("bcrypt") }}"api_key'),
             timeout=api_config.get('timeout', 30),
             verify_ssl=api_config.get('verify_ssl', False)
         )

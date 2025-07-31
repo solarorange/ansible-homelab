@@ -50,7 +50,7 @@
             - "traefik.http.routers.grafana.middlewares=authentik@docker"
             - "traefik.http.services.grafana.loadbalancer.server.port=3000"
           healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:3000/api/health"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -70,9 +70,9 @@
       # Server
       [server]
       protocol = http
-      http_addr = 0.0.0.0
+      http_addr = {{ ansible_default_ipv4.address }}
       http_port = 3000
-      domain = localhost
+      domain = {{ ansible_default_ipv4.address }}
       root_url = %(protocol)s://%(domain)s:%(http_port)s/
       serve_from_sub_path = false
       enable_gzip = true
@@ -137,7 +137,7 @@
       password = {{ smtp_password }}
       from_address = {{ smtp_from_address }}
       from_name = Grafana
-      ehlo_identity = localhost
+      ehlo_identity = {{ ansible_default_ipv4.address }}
       startTLS_policy = MandatoryStartTLS
       
       # Auth
@@ -516,7 +516,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:3000/api/health
+          curl -s http://{{ ansible_default_ipv4.address }}:/api/health
           ;;
         logs)
           docker logs grafana --tail 100 -f
@@ -557,7 +557,7 @@
       fi
       
       # Check Grafana API health
-      if ! curl -s http://localhost:3000/api/health | grep -q "ok"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/health | grep -q "ok"; then
         echo "Grafana API health check failed"
         exit 1
       fi
@@ -650,4 +650,4 @@
     job: "{{ docker_dir }}/monitoring/grafana/scripts/health.sh >> {{ logs_dir }}/monitoring/grafana/health.log 2>&1"
     minute: "*/5"
     hour: "*"
-    user: "{{ username }}" 
+    user: "{{ vault_grafana_user }}" 

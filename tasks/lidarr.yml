@@ -132,7 +132,7 @@
       case "$1" in
         status)
           docker ps -f name=lidarr
-          curl -s http://localhost:8686/api/v1/health
+          curl -s http://{{ ansible_default_ipv4.address }}:8686/api/v1/health
           ;;
         logs)
           docker logs lidarr --tail 100 -f
@@ -167,13 +167,13 @@
       fi
       
       # Check if Lidarr is responding
-      if ! curl -s -f http://localhost:8686/api/v1/health > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8686/api/v1/health > /dev/null; then
         echo "Lidarr is not responding"
         exit 1
       fi
       
       # Check Lidarr status
-      STATUS=$(curl -s http://localhost:8686/api/v1/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Lidarr status is $STATUS"
         exit 1
@@ -207,7 +207,7 @@
     job: "logrotate {{ docker_dir }}/lidarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add Lidarr backup to crontab
   ansible.builtin.cron:
@@ -215,4 +215,4 @@
     job: "{{ docker_dir }}/lidarr/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

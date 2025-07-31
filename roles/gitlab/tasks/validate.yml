@@ -1,0 +1,89 @@
+---
+# Gitlab Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Gitlab vault variables
+  block:
+    - name: Check required Gitlab vault variables
+      assert:
+        that:
+          - vault_gitlab_admin_password is defined
+          - vault_gitlab_database_password is defined
+          - vault_gitlab_api_key is defined
+          - vault_gitlab_secret_key is defined
+          - vault_gitlab_encryption_key is defined
+          - vault_gitlab_jwt_secret is defined
+        fail_msg: "Required Gitlab vault variables are not defined"
+        success_msg: "All required Gitlab vault variables are defined"
+
+    - name: Validate Gitlab password complexity
+      assert:
+        that:
+          - vault_gitlab_admin_password | length >= 12
+          - vault_gitlab_database_password | length >= 12
+        fail_msg: "Gitlab passwords must be at least 12 characters long"
+        success_msg: "Gitlab password complexity requirements met"
+
+- name: Validate Gitlab network configuration
+  block:
+    - name: Check Gitlab port configuration
+      assert:
+        that:
+          - gitlab_port is defined
+          - gitlab_port | int >= 1024
+          - gitlab_port | int <= 65535
+        fail_msg: "Gitlab port must be between 1024 and 65535"
+        success_msg: "Gitlab port configuration is valid"
+
+    - name: Check Gitlab domain configuration
+      assert:
+        that:
+          - domain is defined
+          - gitlab_subdomain is defined
+        fail_msg: "Gitlab domain configuration is incomplete"
+        success_msg: "Gitlab domain configuration is valid"
+
+- name: Validate Gitlab security configuration
+  block:
+    - name: Check Gitlab SSL configuration
+      assert:
+        that:
+          - gitlab_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Gitlab SSL configuration is invalid"
+        success_msg: "Gitlab SSL configuration is valid"
+
+    - name: Check Gitlab authentication configuration
+      assert:
+        that:
+          - gitlab_auth_enabled | bool
+          - gitlab_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Gitlab authentication configuration is invalid"
+        success_msg: "Gitlab authentication configuration is valid"
+
+- name: Validate Gitlab storage configuration
+  block:
+    - name: Check Gitlab data directories
+      assert:
+        that:
+          - gitlab_data_dir is defined
+          - gitlab_config_dir is defined
+          - gitlab_backup_dir is defined
+        fail_msg: "Gitlab storage configuration is incomplete"
+        success_msg: "Gitlab storage configuration is valid"
+
+    - name: Create Gitlab directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ gitlab_data_dir }}"
+        - "{{ gitlab_config_dir }}"
+        - "{{ gitlab_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Gitlab validation completed successfully - all configurations are valid and secure"

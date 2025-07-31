@@ -10,12 +10,12 @@ notifications:
     smtp_host: "{{ vault_smtp_host | default('smtp.gmail.com') }}"
     smtp_port: "{{ vault_smtp_port | default(587) }}"
     smtp_username: "{{ vault_smtp_username | default('') }}"
-    smtp_password: "{{ vault_smtp_password | default('') }}"
+    smtp_password: "{{ vault_service_password }}"') }}"
     smtp_use_tls: true
     smtp_use_ssl: false
-    from_address: "{{ admin_email | default('admin@' + domain) }}"
+    from_address: "{{ admin_email | default('{{ admin_email | default("admin@" + domain) }} + domain) }}"
     to_addresses:
-      - "{{ admin_email | default('admin@' + domain) }}"
+      - "{{ admin_email | default('{{ admin_email | default("admin@" + domain) }} + domain) }}"
       - "{{ monitoring_email | default('monitoring@' + domain) }}"
     
     # Email templates

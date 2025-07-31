@@ -50,11 +50,11 @@
     name: "Utilities stack health check"
     job: "{{ utilities_config_dir }}/health_check_utilities.sh"
     minute: "*/5"
-    user: "{{ username }}"
+    user: "{{ vault_utilities_user }}"
 
 - name: Validate Prometheus and Grafana endpoints
   ansible.builtin.uri:
-    url: "http://localhost:9090/api/v1/status/config"
+    url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/status/config"
     method: GET
     status_code: 200
     timeout: 10
@@ -63,7 +63,7 @@
 
 - name: Validate Grafana health endpoint
   ansible.builtin.uri:
-    url: "http://localhost:3000/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:3000/api/health"
     method: GET
     status_code: 200
     timeout: 10

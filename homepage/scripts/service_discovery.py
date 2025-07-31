@@ -522,10 +522,10 @@ class ServiceDiscovery:
         }
         
         try:
-            # Scan localhost for services
+            # Scan {{ ansible_default_ipv4.address }} for services
             for port, possible_services in common_ports.items():
                 try:
-                    response = requests.get(f"http://localhost:{port}", timeout=2)
+                    response = requests.get(f"http://{{ ansible_default_ipv4.address }}:{port}", timeout=2)
                     if response.status_code == 200:
                         # Try to identify the service
                         for service_name in possible_services:
@@ -536,7 +536,7 @@ class ServiceDiscovery:
                                 services[service_name] = {
                                     'name': service_name,
                                     'type': 'network',
-                                    'ip': 'localhost',
+                                    'ip': '{{ ansible_default_ipv4.address }}',
                                     'port': port,
                                     'health_path': service_config['health_path'],
                                     'widget_type': service_config['widget_type'],

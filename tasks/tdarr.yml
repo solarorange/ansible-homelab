@@ -20,11 +20,11 @@
     content: |
       {
         "serverPort": 8265,
-        "serverIP": "0.0.0.0",
+        "serverIP": "{{ ansible_default_ipv4.address }}",
         "handbrakePath": "/usr/bin/HandBrakeCLI",
         "ffmpegPath": "/usr/bin/ffmpeg",
         "nodeID": "tdarr",
-        "nodeIP": "0.0.0.0",
+        "nodeIP": "{{ ansible_default_ipv4.address }}",
         "nodePort": 8266,
         "logLevel": "info",
         "maxLogSize": 5,
@@ -127,7 +127,7 @@
       fi
       
       # Check if Tdarr is responding
-      if ! curl -s http://localhost:8265/api/v2/status | grep -q "status"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8265/api/v2/status | grep -q "status"; then
           echo "Tdarr is not responding"
           exit 1
       fi
@@ -160,7 +160,7 @@
     job: "logrotate {{ docker_dir }}/tdarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_tdarr_user }}"
 
 - name: Add Tdarr backup cron job
   ansible.builtin.cron:
@@ -168,4 +168,4 @@
     job: "{{ docker_dir }}/tdarr/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_tdarr_user }}" 

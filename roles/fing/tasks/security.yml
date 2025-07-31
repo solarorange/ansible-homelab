@@ -109,7 +109,7 @@
     name: "Fing security monitoring"
     minute: "*/5"
     job: "{{ docker_dir }}/fing/security-monitor.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
 
 - name: Create Fing threat detection cron
@@ -117,7 +117,7 @@
     name: "Fing threat detection"
     minute: "*/10"
     job: "{{ docker_dir }}/fing/threat-detection.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_crowdsec_enabled | default(true)
 
 - name: Create Fing vulnerability scan cron
@@ -125,7 +125,7 @@
     name: "Fing vulnerability scan"
     hour: "2"
     job: "{{ docker_dir }}/fing/vulnerability-scan.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_crowdsec_enabled | default(true)
 
 - name: Create Fing access control cron
@@ -133,7 +133,7 @@
     name: "Fing access control"
     minute: "*/15"
     job: "{{ docker_dir }}/fing/access-control.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_fail2ban_enabled | default(true)
 
 - name: Create Fing audit log cron
@@ -141,7 +141,7 @@
     name: "Fing audit log"
     minute: "*/30"
     job: "{{ docker_dir }}/fing/audit-log.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_fail2ban_enabled | default(true)
 
 - name: Create Fing security report cron
@@ -149,7 +149,7 @@
     name: "Fing security report"
     hour: "6"
     job: "{{ docker_dir }}/fing/security-report.sh"
-    user: "{{ username }}"
+    user: "{{ vault_fing_user }}"
   when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
 
 - name: Configure UFW rules for Fing
@@ -203,7 +203,7 @@
 
 - name: Wait for security services to be ready
   ansible.builtin.wait_for:
-    host: "localhost"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ item }}"
     delay: 10
     timeout: 300
@@ -229,7 +229,7 @@
 
 - name: Test Fing security endpoints
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_web_port }}/security/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}/security/health"
     method: GET
     status_code: 200
     timeout: 10
@@ -240,7 +240,7 @@
 
 - name: Test Fing authentication
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_web_port }}/auth/login"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}/auth/login"
     method: POST
     body_format: json
     body: |
@@ -258,7 +258,7 @@
 
 - name: Test Fing rate limiting
   ansible.builtin.uri:
-    url: "http://localhost:{{ fing_web_port }}/api/test"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}/api/test"
     method: GET
     status_code: [200, 429]
     timeout: 10

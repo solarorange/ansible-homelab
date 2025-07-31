@@ -1,0 +1,89 @@
+---
+# Emby Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Emby vault variables
+  block:
+    - name: Check required Emby vault variables
+      assert:
+        that:
+          - vault_emby_admin_password is defined
+          - vault_emby_database_password is defined
+          - vault_emby_api_key is defined
+          - vault_emby_secret_key is defined
+          - vault_emby_encryption_key is defined
+          - vault_emby_jwt_secret is defined
+        fail_msg: "Required Emby vault variables are not defined"
+        success_msg: "All required Emby vault variables are defined"
+
+    - name: Validate Emby password complexity
+      assert:
+        that:
+          - vault_emby_admin_password | length >= 12
+          - vault_emby_database_password | length >= 12
+        fail_msg: "Emby passwords must be at least 12 characters long"
+        success_msg: "Emby password complexity requirements met"
+
+- name: Validate Emby network configuration
+  block:
+    - name: Check Emby port configuration
+      assert:
+        that:
+          - emby_port is defined
+          - emby_port | int >= 1024
+          - emby_port | int <= 65535
+        fail_msg: "Emby port must be between 1024 and 65535"
+        success_msg: "Emby port configuration is valid"
+
+    - name: Check Emby domain configuration
+      assert:
+        that:
+          - domain is defined
+          - emby_subdomain is defined
+        fail_msg: "Emby domain configuration is incomplete"
+        success_msg: "Emby domain configuration is valid"
+
+- name: Validate Emby security configuration
+  block:
+    - name: Check Emby SSL configuration
+      assert:
+        that:
+          - emby_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Emby SSL configuration is invalid"
+        success_msg: "Emby SSL configuration is valid"
+
+    - name: Check Emby authentication configuration
+      assert:
+        that:
+          - emby_auth_enabled | bool
+          - emby_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Emby authentication configuration is invalid"
+        success_msg: "Emby authentication configuration is valid"
+
+- name: Validate Emby storage configuration
+  block:
+    - name: Check Emby data directories
+      assert:
+        that:
+          - emby_data_dir is defined
+          - emby_config_dir is defined
+          - emby_backup_dir is defined
+        fail_msg: "Emby storage configuration is incomplete"
+        success_msg: "Emby storage configuration is valid"
+
+    - name: Create Emby directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ emby_data_dir }}"
+        - "{{ emby_config_dir }}"
+        - "{{ emby_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Emby validation completed successfully - all configurations are valid and secure"

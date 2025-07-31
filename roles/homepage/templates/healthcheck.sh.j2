@@ -8,7 +8,7 @@ set -e
 # Configuration
 CONTAINER_NAME="{{ homepage_container_name }}"
 PORT="{{ homepage_port }}"
-API_BASE="http://localhost:$PORT/api"
+API_BASE="http://{{ ansible_default_ipv4.address }}:$PORT/api"
 TIMEOUT=30
 
 # Colors for output
@@ -119,7 +119,7 @@ main() {
     
     # Check 3: Web Interface
     print_status "Checking web interface..."
-    if check_http "http://localhost:$PORT" "Web Interface"; then
+    if check_http "http://{{ ansible_default_ipv4.address }}:$PORT" "Web Interface"; then
         print_status "✅ Web interface is accessible"
     else
         print_error "❌ Web interface is not accessible"

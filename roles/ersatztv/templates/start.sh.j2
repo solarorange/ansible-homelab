@@ -75,7 +75,7 @@ docker-compose -f "$COMPOSE_FILE" up -d
 # Wait for service to be ready
 log "Waiting for service to be ready..."
 for i in {1..30}; do
-    if curl -f -s "http://localhost:{{ ersatztv_port }}/api/health" > /dev/null 2>&1; then
+    if curl -f -s "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health" > /dev/null 2>&1; then
         log "Service is ready!"
         break
     fi
@@ -91,7 +91,7 @@ done
 if docker ps --format "table {{.Names}}" | grep -q "^$CONTAINER_NAME$"; then
     log "ErsatzTV service started successfully"
     log "Service URL: https://{{ ersatztv_domain }}"
-    log "Local URL: http://localhost:{{ ersatztv_port }}"
+    log "Local URL: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
 else
     error "Failed to start ErsatzTV service"
     docker-compose -f "$COMPOSE_FILE" logs

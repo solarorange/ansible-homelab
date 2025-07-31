@@ -157,21 +157,21 @@
       block:
         - name: Test PostgreSQL connectivity
           ansible.builtin.wait_for:
-            host: localhost
+            host: {{ ansible_default_ipv4.address }}
             port: 5432
             timeout: 10
           register: postgres_test
           
         - name: Test Redis connectivity
           ansible.builtin.wait_for:
-            host: localhost
+            host: {{ ansible_default_ipv4.address }}
             port: 6379
             timeout: 10
           register: redis_test
           
         - name: Test MariaDB connectivity
           ansible.builtin.wait_for:
-            host: localhost
+            host: {{ ansible_default_ipv4.address }}
             port: 3306
             timeout: 10
           register: mariadb_test
@@ -192,7 +192,7 @@
       block:
         - name: Test Prometheus accessibility
           ansible.builtin.uri:
-            url: http://localhost:9090/-/healthy
+            url: http://{{ ansible_default_ipv4.address }}:/-/healthy
             method: GET
             timeout: "{{ test_timeout }}"
           register: prometheus_test
@@ -202,7 +202,7 @@
           
         - name: Test Grafana accessibility
           ansible.builtin.uri:
-            url: http://localhost:3000/api/health
+            url: http://{{ ansible_default_ipv4.address }}:/api/health
             method: GET
             timeout: "{{ test_timeout }}"
           register: grafana_test
@@ -212,7 +212,7 @@
           
         - name: Test Loki accessibility
           ansible.builtin.uri:
-            url: http://localhost:3100/ready
+            url: http://{{ ansible_default_ipv4.address }}:/ready
             method: GET
             timeout: "{{ test_timeout }}"
           register: loki_test

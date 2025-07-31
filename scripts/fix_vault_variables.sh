@@ -273,8 +273,8 @@ fix_role_files() {
     
     # Fix group vars
     safe_replace "group_vars/all/roles.yml" \
-        "nextcloud_admin_password: '{{ vault_nextcloud_admin_password }}'" \
-        "nextcloud_admin_password: '{{ vault_nextcloud_admin_password }}'" \
+        "nextcloud_admin_password: "{{ vault_vault_password }}"" \
+        "nextcloud_admin_password: "{{ vault_vault_password }}"" \
         "nextcloud admin password"
     
     print_success "Role files fixed"
@@ -286,8 +286,8 @@ fix_test_files() {
     
     # Fix performance tests
     safe_replace "tests/performance/load_test.yml" \
-        "time curl -s \"http://localhost:3000/api/dashboards\" -H \"Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}\"" \
-        "time curl -s \"http://localhost:3000/api/dashboards\" -H \"Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}\"" \
+        "time curl -s \"http://{{ ansible_default_ipv4.address }}:3000/api/dashboards\" -H \"Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}\"" \
+        "time curl -s \"http://{{ ansible_default_ipv4.address }}:3000/api/dashboards\" -H \"Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}\"" \
         "grafana admin password"
     
     # Fix validation tests

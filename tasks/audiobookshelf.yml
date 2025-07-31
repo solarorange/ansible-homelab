@@ -20,7 +20,7 @@
     content: |
       {
         "port": 13378,
-        "host": "0.0.0.0",
+        "host": "{{ ansible_default_ipv4.address }}",
         "logDir": "{{ logs_dir }}/audiobookshelf",
         "audiobooksDir": "{{ docker_dir }}/audiobookshelf/audiobooks",
         "dataDir": "{{ docker_dir }}/audiobookshelf/data"
@@ -104,7 +104,7 @@
       fi
       
       # Check if Audiobookshelf is responding
-      if ! curl -s http://localhost:13378 | grep -q "Audiobookshelf"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:13378 | grep -q "Audiobookshelf"; then
           echo "Audiobookshelf is not responding"
           exit 1
       fi
@@ -137,7 +137,7 @@
     job: "logrotate {{ docker_dir }}/audiobookshelf/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_audiobookshelf_user }}"
 
 - name: Add Audiobookshelf backup cron job
   ansible.builtin.cron:
@@ -145,7 +145,7 @@
     job: "{{ docker_dir }}/audiobookshelf/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_audiobookshelf_user }}"
 
 - name: Create Audiobookshelf configuration file
   ansible.builtin.copy:

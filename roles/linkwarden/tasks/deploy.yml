@@ -88,7 +88,7 @@
 
 - name: Wait for Linkwarden to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ linkwarden_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ linkwarden_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -116,7 +116,7 @@
       
       Status: {{ 'SUCCESS' if linkwarden_verification.status == 200 or linkwarden_verification.status == 302 else 'FAILED' }}
       URL: https://{{ linkwarden_subdomain }}.{{ domain }}
-      Local URL: http://localhost:{{ linkwarden_port }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ linkwarden_port }}
       
       Configuration:
       - Database: {{ linkwarden_database_type }}

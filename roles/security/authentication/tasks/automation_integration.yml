@@ -80,7 +80,7 @@
 
 - name: Wait for Authentik API to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -93,7 +93,7 @@
 
 - name: Configure Authentik initial admin credentials
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/users/"
     method: POST
     headers:
       Content-Type: application/json
@@ -102,7 +102,7 @@
     body:
       username: "{{ security_authentik.automation_admin_user }}"
       email: "{{ security_authentik.automation_admin_email }}"
-      password: "{{ security_authentik.automation_admin_password }}"
+      password: "{{ vault_security_password }}"
       is_superuser: true
       is_active: true
     status_code: [200, 201, 400]
@@ -154,7 +154,7 @@
 
 - name: Validate Authentik service configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -164,7 +164,7 @@
 
 - name: Validate Authentik users
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/users/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/users/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -174,7 +174,7 @@
 
 - name: Validate Authentik groups
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/groups/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/groups/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -184,7 +184,7 @@
 
 - name: Validate Authentik policies
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/policies/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/policies/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -236,7 +236,7 @@
 
 - name: Wait for Authentik to be ready after restart
   ansible.builtin.uri:
-    url: "http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/"
     method: GET
     status_code: [200, 302, 401]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
@@ -338,7 +338,7 @@ rescue:
         Recovery Commands:
         1. Container Status: docker-compose -f {{ docker_dir }}/security/authentik/docker-compose.yml ps
         2. Container Logs: docker-compose -f {{ docker_dir }}/security/authentik/docker-compose.yml logs -f
-        3. API Health Check: curl -v http://localhost:{{ security_authentik.port }}/api/v3/core/applications/
+        3. API Health Check: curl -v http://{{ ansible_default_ipv4.address }}:{{ security_authentik.port }}/api/v3/core/applications/
         4. Python Dependencies: pip3 list | grep -E "(requests|pyyaml|docker|jinja2)"
         5. Script Permissions: ls -la {{ docker_dir }}/security/authentik/scripts/
         6. Config Validation: python3 {{ docker_dir }}/security/authentik/scripts/authentik_automation.py --validate

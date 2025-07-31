@@ -83,7 +83,7 @@
 
 - name: Verify DumbAssets service health
   ansible.builtin.uri:
-    url: "http://localhost:{{ dumbassets_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ dumbassets_port }}"
     status_code: [200, 302, 401, 403]
   register: result
   until: result.status in [200, 302, 401, 403]
@@ -101,5 +101,5 @@
       - Container Deployment: {{ dumbassets_container_deployment.changed }}
       - Service Health: {{ dumbassets_service_start.state }}
       - Access URL: https://{{ dumbassets_subdomain }}.{{ domain }}
-      - Local URL: http://localhost:{{ dumbassets_port }}
+      - Local URL: http://{{ ansible_default_ipv4.address }}:{{ dumbassets_port }}
   tags: [dumbassets, deploy, summary] 

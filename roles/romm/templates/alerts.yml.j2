@@ -1,0 +1,14 @@
+---
+# Romm Alerting Rules
+
+groups:
+  - name: Romm
+    rules:
+      - alert: RommDown
+        expr: up{job="romm"} == 0
+        for: 1m
+        labels:
+          severity: {{ romm_alert_severity | default('warning') }}
+        annotations:
+          summary: "Romm is down"
+          description: "Romm has been down for more than 1 minute"

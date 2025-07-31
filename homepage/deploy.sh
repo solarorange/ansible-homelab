@@ -181,7 +181,7 @@ check_health() {
     sleep 5
     
     # Check if Homepage is responding
-    if curl -f -s http://localhost:3000/health &> /dev/null; then
+    if curl -f -s http://{{ ansible_default_ipv4.address }}:3000/health &> /dev/null; then
         log_info "Homepage health check passed!"
     else
         log_warning "Homepage health check failed. Service may still be starting..."
@@ -200,7 +200,7 @@ show_info() {
     echo -e "${GREEN}  HOMEPAGE DASHBOARD DEPLOYMENT INFO${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
-    echo -e "${BLUE}Dashboard URL:${NC} http://localhost:3000"
+    echo -e "${BLUE}Dashboard URL:${NC} http://{{ ansible_default_ipv4.address }}:3000"
     echo -e "${BLUE}Configuration:${NC} $CONFIG_DIR"
     echo -e "${BLUE}Logs:${NC} $LOG_DIR"
     echo -e "${BLUE}Backups:${NC} $BACKUP_DIR"

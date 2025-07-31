@@ -1,0 +1,621 @@
+---
+# Relational Databases Deployment
+# PostgreSQL and MariaDB configuration and deployment
+
+- name: Deploy PostgreSQL
+  block:
+    - name: Create PostgreSQL directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ docker_dir }}/postgresql/data"
+        - "{{ docker_dir }}/postgresql/config"
+        - "{{ docker_dir }}/postgresql/scripts"
+        - "{{ docker_dir }}/postgresql/backup"
+        - "{{ logs_dir }}/postgresql"
+
+    - name: Create PostgreSQL configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/config/postgresql.conf"
+        content: |
+          # Connection Settings
+          listen_addresses = '*'
+          max_connections = {{ postgresql_max_connections }}
+          superuser_reserved_connections = 3
+          
+          # Memory Settings
+          shared_buffers = '{{ postgresql_shared_buffers }}'
+          work_mem = '{{ postgresql_work_mem }}'
+          maintenance_work_mem = '{{ postgresql_maintenance_work_mem }}'
+          effective_cache_size = '{{ postgresql_effective_cache_size }}'
+          
+          # Write Ahead Log
+          wal_level = {{ postgresql_wal_level }}
+          max_wal_senders = 10
+          max_wal_size = '{{ postgresql_max_wal_size }}'
+          min_wal_size = '{{ postgresql_min_wal_size }}'
+          
+          # Query Planning
+          random_page_cost = 1.1
+          effective_io_concurrency = 200
+          
+          # Background Writer
+          bgwriter_delay = '200ms'
+          bgwriter_lru_maxpages = 100
+          bgwriter_lru_multiplier = 2.0
+          
+          # Asynchronous Behavior
+          synchronous_commit = off
+          
+          # Logging
+          log_destination = 'stderr'
+          logging_collector = on
+          log_directory = '/var/log/postgresql'
+          log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+          log_rotation_age = 1d
+          log_rotation_size = 100MB
+          log_min_duration_statement = 1000
+          log_checkpoints = on
+          log_connections = on
+          log_disconnections = on
+          log_lock_waits = on
+          log_temp_files = 0
+          log_autovacuum_min_duration = 0
+          
+          # Autovacuum
+          autovacuum = on
+          autovacuum_max_workers = 3
+          autovacuum_naptime = '1min'
+          autovacuum_vacuum_threshold = 50
+          autovacuum_analyze_threshold = 50
+          autovacuum_vacuum_scale_factor = 0.2
+          autovacuum_analyze_scale_factor = 0.1
+          autovacuum_vacuum_cost_delay = '20ms'
+          autovacuum_vacuum_cost_limit = 200
+          
+          # Client Connection Defaults
+          statement_timeout = '60s'
+          lock_timeout = '60s'
+          idle_in_transaction_session_timeout = '60s'
+          
+          # Locale and Formatting
+          datestyle = 'iso, mdy'
+          timezone = 'UTC'
+          lc_messages = 'en_US.utf8'
+          lc_monetary = 'en_US.utf8'
+          lc_numeric = 'en_US.utf8'
+          lc_time = 'en_US.utf8'
+          
+          # Other Defaults
+          default_text_search_config = 'pg_catalog.english'
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create PostgreSQL access configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/config/pg_hba.conf"
+        content: |
+          # TYPE  DATABASE        USER            ADDRESS                 METHOD
+          local   all            postgres                                peer
+          local   all            all                                     md5
+          host    all            all             {{ ansible_default_ipv4.address }}/32           md5
+          host    all            all             ::1/128                 md5
+          host    all            all             0.0.0.0/0              md5
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create PostgreSQL backup script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/scripts/backup.sh"
+        content: |
+          #!/bin/bash
+          
+          # PostgreSQL Backup Script
+          
+          BACKUP_DIR="{{ docker_dir }}/postgresql/backup"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_FILE="$BACKUP_DIR/postgresql_backup_$TIMESTAMP.sql.gz"
+          
+          # Create backup directory if it doesn't exist
+          mkdir -p "$BACKUP_DIR"
+          
+          # Perform backup
+          docker exec postgresql pg_dumpall -U postgres | gzip > "$BACKUP_FILE"
+          
+          # Remove backups older than 7 days
+          find "$BACKUP_DIR" -name "postgresql_backup_*.sql.gz" -mtime +7 -delete
+          
+          echo "Backup created: $BACKUP_FILE"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create PostgreSQL restore script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/scripts/restore.sh"
+        content: |
+          #!/bin/bash
+          
+          # PostgreSQL Restore Script
+          
+          if [ -z "$1" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          
+          BACKUP_FILE="$1"
+          if [ ! -f "$BACKUP_FILE" ]; then
+            echo "Backup file not found: $BACKUP_FILE"
+            exit 1
+          fi
+          
+          # Restore backup
+          gunzip -c "$BACKUP_FILE" | docker exec -i postgresql psql -U postgres
+          
+          echo "Backup restored from: $BACKUP_FILE"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create PostgreSQL management script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/scripts/manage.sh"
+        content: |
+          #!/bin/bash
+          
+          # PostgreSQL Management Script
+          
+          function show_help {
+            echo "PostgreSQL Management Script"
+            echo "Usage: $0 [command]"
+            echo ""
+            echo "Commands:"
+            echo "  status    - Show PostgreSQL status"
+            echo "  logs      - Show PostgreSQL logs"
+            echo "  restart   - Restart PostgreSQL"
+            echo "  backup    - Create backup"
+            echo "  restore   - Restore from backup"
+            echo "  vacuum    - Run VACUUM ANALYZE"
+            echo "  help      - Show this help"
+          }
+          
+          case "$1" in
+            status)
+              docker ps -f name=postgresql
+              docker exec postgresql pg_isready
+              ;;
+            logs)
+              docker logs postgresql --tail 100 -f
+              ;;
+            restart)
+              docker restart postgresql
+              ;;
+            backup)
+              {{ docker_dir }}/postgresql/scripts/backup.sh
+              ;;
+            restore)
+              {{ docker_dir }}/postgresql/scripts/restore.sh "$2"
+              ;;
+            vacuum)
+              docker exec postgresql psql -U postgres -c "VACUUM ANALYZE;"
+              ;;
+            help|*)
+              show_help
+              ;;
+          esac
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create PostgreSQL health check script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/scripts/healthcheck.sh"
+        content: |
+          #!/bin/bash
+          
+          # Check if PostgreSQL is running
+          if ! docker ps -f name=postgresql -f status=running | grep -q postgresql; then
+            echo "PostgreSQL is not running"
+            exit 1
+          fi
+          
+          # Check if PostgreSQL is responding
+          if ! docker exec postgresql pg_isready -U postgres > /dev/null 2>&1; then
+            echo "PostgreSQL is not responding"
+            exit 1
+          fi
+          
+          # Check PostgreSQL status
+          STATUS=$(docker exec postgresql pg_isready -U postgres | grep -o "accepting connections")
+          if [ "$STATUS" != "accepting connections" ]; then
+            echo "PostgreSQL status is not accepting connections"
+            exit 1
+          fi
+          
+          exit 0
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create PostgreSQL log rotation configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/postgresql/config/logrotate.conf"
+        content: |
+          {{ logs_dir }}/postgresql/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ username }} {{ username }}
+          }
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Add PostgreSQL log rotation to crontab
+      ansible.builtin.cron:
+        name: "Rotate PostgreSQL logs"
+        job: "logrotate {{ docker_dir }}/postgresql/config/logrotate.conf"
+        hour: "0"
+        minute: "0"
+        user: "{{ username }}"
+
+    - name: Add PostgreSQL backup to crontab
+      ansible.builtin.cron:
+        name: "PostgreSQL daily backup"
+        job: "{{ docker_dir }}/postgresql/scripts/backup.sh"
+        hour: "2"
+        minute: "0"
+        user: "{{ username }}"
+
+    - name: Add PostgreSQL maintenance to crontab
+      ansible.builtin.cron:
+        name: "PostgreSQL weekly maintenance"
+        job: "{{ docker_dir }}/postgresql/scripts/manage.sh vacuum"
+        weekday: "0"
+        hour: "3"
+        minute: "0"
+        user: "{{ username }}"
+
+  when: postgresql_enabled | default(true)
+  tags: [databases, postgresql, relational]
+
+- name: Deploy MariaDB
+  block:
+    - name: Create MariaDB directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ docker_dir }}/mariadb/data"
+        - "{{ docker_dir }}/mariadb/config"
+        - "{{ docker_dir }}/mariadb/scripts"
+        - "{{ docker_dir }}/mariadb/backup"
+        - "{{ logs_dir }}/mariadb"
+
+    - name: Create MariaDB configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/config/my.cnf"
+        content: |
+          [mysqld]
+          # Basic Settings
+          user                    = mysql
+          pid-file                = /var/run/mysqld/mysqld.pid
+          socket                  = /var/run/mysqld/mysqld.sock
+          port                    = 3306
+          basedir                 = /usr
+          datadir                 = /var/lib/mysql
+          tmpdir                  = /tmp
+          lc_messages_dir         = /usr/share/mysql
+          lc_messages             = en_US
+          
+          # Character Set
+          character-set-server    = utf8mb4
+          collation-server        = utf8mb4_unicode_ci
+          
+          # InnoDB Settings
+          innodb_buffer_pool_size = {{ mariadb_innodb_buffer_pool_size }}
+          innodb_log_file_size    = {{ mariadb_innodb_log_file_size }}
+          innodb_log_buffer_size  = {{ mariadb_innodb_log_buffer_size }}
+          innodb_flush_log_at_trx_commit = 2
+          innodb_flush_method     = O_DIRECT
+          innodb_file_per_table   = 1
+          
+          # MyISAM Settings
+          key_buffer_size         = {{ mariadb_key_buffer_size }}
+          myisam_sort_buffer_size = 128M
+          myisam_max_sort_file_size = 10G
+          myisam_repair_threads   = 1
+          
+          # Connection Settings
+          max_connections         = {{ mariadb_max_connections }}
+          max_allowed_packet      = {{ mariadb_max_allowed_packet }}
+          thread_cache_size       = {{ mariadb_thread_cache_size }}
+          thread_stack            = 192K
+          
+          # Query Cache
+          query_cache_type        = 0
+          query_cache_size        = 0
+          
+          # Logging
+          slow_query_log          = 1
+          slow_query_log_file     = /var/log/mariadb/mysql-slow.log
+          long_query_time         = 2
+          log_error               = /var/log/mariadb/error.log
+          
+          # Binary Log
+          server_id               = 1
+          log_bin                 = /var/log/mariadb/mysql-bin.log
+          expire_logs_days        = 10
+          max_binlog_size         = 100M
+          
+          # Security
+          local_infile            = 0
+          skip_name_resolve       = 1
+          
+          [client]
+          port                    = 3306
+          socket                  = /var/run/mysqld/mysqld.sock
+          default-character-set   = utf8mb4
+          
+          [mysql]
+          default-character-set   = utf8mb4
+          
+          [mysqldump]
+          quick
+          quote-names
+          max_allowed_packet      = 16M
+          default-character-set   = utf8mb4
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create MariaDB backup script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/scripts/backup.sh"
+        content: |
+          #!/bin/bash
+          
+          # MariaDB Backup Script
+          
+          BACKUP_DIR="{{ docker_dir }}/mariadb/backup"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_FILE="$BACKUP_DIR/mariadb_backup_$TIMESTAMP.sql.gz"
+          
+          # Create backup directory if it doesn't exist
+          mkdir -p "$BACKUP_DIR"
+          
+          # Get list of databases
+          DATABASES=$(docker exec mariadb mysql -u root -p"{{ mariadb_root_password }}" -N -e "SHOW DATABASES" | grep -v "information_schema\|performance_schema\|mysql\|sys")
+          
+          # Create backup
+          docker exec mariadb mysqldump -u root -p"{{ mariadb_root_password }}" \
+            --single-transaction \
+            --quick \
+            --lock-tables=false \
+            --databases $DATABASES | gzip > "$BACKUP_FILE"
+          
+          # Remove backups older than 7 days
+          find "$BACKUP_DIR" -name "mariadb_backup_*.sql.gz" -mtime +7 -delete
+          
+          echo "Backup created: $BACKUP_FILE"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create MariaDB restore script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/scripts/restore.sh"
+        content: |
+          #!/bin/bash
+          
+          # MariaDB Restore Script
+          
+          if [ -z "$1" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          
+          BACKUP_FILE="$1"
+          if [ ! -f "$BACKUP_FILE" ]; then
+            echo "Backup file not found: $BACKUP_FILE"
+            exit 1
+          fi
+          
+          # Restore backup
+          gunzip -c "$BACKUP_FILE" | docker exec -i mariadb mysql -u root -p"{{ mariadb_root_password }}"
+          
+          echo "Backup restored from: $BACKUP_FILE"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create MariaDB management script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/scripts/manage.sh"
+        content: |
+          #!/bin/bash
+          
+          # MariaDB Management Script
+          
+          function show_help {
+            echo "MariaDB Management Script"
+            echo "Usage: $0 [command]"
+            echo ""
+            echo "Commands:"
+            echo "  status    - Show MariaDB status"
+            echo "  logs      - Show MariaDB logs"
+            echo "  restart   - Restart MariaDB"
+            echo "  backup    - Backup databases"
+            echo "  restore   - Restore databases"
+            echo "  optimize  - Optimize databases"
+            echo "  help      - Show this help"
+          }
+          
+          function optimize_databases {
+            # Get list of databases
+            DATABASES=$(docker exec mariadb mysql -u root -p"{{ mariadb_root_password }}" -N -e "SHOW DATABASES" | grep -v "information_schema\|performance_schema\|mysql\|sys")
+            
+            # Optimize each database
+            for DB in $DATABASES; do
+              echo "Optimizing database: $DB"
+              docker exec mariadb mysql -u root -p"{{ mariadb_root_password }}" -e "OPTIMIZE TABLE \`$DB\`.*"
+            done
+          }
+          
+          case "$1" in
+            status)
+              docker ps -f name=mariadb
+              docker exec mariadb mysqladmin -u root -p"{{ mariadb_root_password }}" status
+              ;;
+            logs)
+              docker logs mariadb --tail 100 -f
+              ;;
+            restart)
+              docker restart mariadb
+              ;;
+            backup)
+              {{ docker_dir }}/mariadb/scripts/backup.sh
+              ;;
+            restore)
+              {{ docker_dir }}/mariadb/scripts/restore.sh "$2"
+              ;;
+            optimize)
+              optimize_databases
+              ;;
+            help|*)
+              show_help
+              ;;
+          esac
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create MariaDB health check script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/scripts/healthcheck.sh"
+        content: |
+          #!/bin/bash
+          
+          # Check if MariaDB is running
+          if ! docker ps -f name=mariadb -f status=running | grep -q mariadb; then
+            echo "MariaDB is not running"
+            exit 1
+          fi
+          
+          # Check if MariaDB is responding
+          if ! docker exec mariadb mysqladmin -u root -p"{{ mariadb_root_password }}" ping > /dev/null 2>&1; then
+            echo "MariaDB is not responding"
+            exit 1
+          fi
+          
+          # Check MariaDB status
+          STATUS=$(docker exec mariadb mysqladmin -u root -p"{{ mariadb_root_password }}" status | grep -o "Uptime")
+          if [ "$STATUS" != "Uptime" ]; then
+            echo "MariaDB status is not running"
+            exit 1
+          fi
+          
+          exit 0
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create MariaDB log rotation configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/mariadb/config/logrotate.conf"
+        content: |
+          {{ logs_dir }}/mariadb/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ username }} {{ username }}
+          }
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Add MariaDB log rotation to crontab
+      ansible.builtin.cron:
+        name: "Rotate MariaDB logs"
+        job: "logrotate {{ docker_dir }}/mariadb/config/logrotate.conf"
+        hour: "0"
+        minute: "0"
+        user: "{{ username }}"
+
+    - name: Add MariaDB backup to crontab
+      ansible.builtin.cron:
+        name: "MariaDB daily backup"
+        job: "{{ docker_dir }}/mariadb/scripts/backup.sh"
+        hour: "2"
+        minute: "30"
+        user: "{{ username }}"
+
+    - name: Add MariaDB maintenance to crontab
+      ansible.builtin.cron:
+        name: "MariaDB weekly maintenance"
+        job: "{{ docker_dir }}/mariadb/scripts/manage.sh optimize"
+        weekday: "0"
+        hour: "3"
+        minute: "30"
+        user: "{{ username }}"
+
+  when: mariadb_enabled | default(true)
+  tags: [databases, mariadb, relational]
+
+- name: Validate relational databases deployment
+  block:
+    - name: Test PostgreSQL connectivity
+      ansible.builtin.command: "{{ docker_dir }}/postgresql/scripts/healthcheck.sh"
+      register: postgresql_health
+      failed_when: false
+      when: postgresql_enabled | default(true)
+
+    - name: Test MariaDB connectivity
+      ansible.builtin.command: "{{ docker_dir }}/mariadb/scripts/healthcheck.sh"
+      register: mariadb_health
+      failed_when: false
+      when: mariadb_enabled | default(true)
+
+    - name: Display relational databases deployment status
+      ansible.builtin.debug:
+        msg: |
+          Relational Databases deployment completed!
+          
+          PostgreSQL Status:
+          - Enabled: {{ postgresql_enabled | default(true) }}
+          - Health Check: {{ postgresql_health.rc == 0 if postgresql_health is defined else 'N/A' }}
+          - Port: {{ postgresql_port }}
+          - Data Directory: {{ docker_dir }}/postgresql/data
+          - Backup Directory: {{ docker_dir }}/postgresql/backup
+          
+          MariaDB Status:
+          - Enabled: {{ mariadb_enabled | default(true) }}
+          - Health Check: {{ mariadb_health.rc == 0 if mariadb_health is defined else 'N/A' }}
+          - Port: {{ mariadb_port }}
+          - Data Directory: {{ docker_dir }}/mariadb/data
+          - Backup Directory: {{ docker_dir }}/mariadb/backup
+          
+          Management Scripts:
+          - PostgreSQL: {{ docker_dir }}/postgresql/scripts/manage.sh
+          - MariaDB: {{ docker_dir }}/mariadb/scripts/manage.sh
+          
+          Backup Scripts:
+          - PostgreSQL: {{ docker_dir }}/postgresql/scripts/backup.sh
+          - MariaDB: {{ docker_dir }}/mariadb/scripts/backup.sh
+
+  tags: [databases, relational, validation] 

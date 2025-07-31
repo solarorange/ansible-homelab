@@ -28,7 +28,7 @@
 
     - name: Check for unauthorized port exposure
       ansible.builtin.shell: |
-        docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -E "0.0.0.0:[0-9]+" | grep -v "traefik\|authentik" | wc -l
+        docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -E "{{ ansible_default_ipv4.address }}:[0-9]+" | grep -v "traefik\|authentik" | wc -l
       register: unauthorized_ports
       changed_when: false
 

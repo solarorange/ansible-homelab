@@ -6,7 +6,7 @@
   block:
     - name: Check Prometheus targets
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -21,7 +21,7 @@
 
     - name: Check Grafana datasources
       ansible.builtin.uri:
-        url: "http://localhost:3000/api/datasources"
+        url: "http://{{ ansible_default_ipv4.address }}:3000/api/datasources"
         method: GET
         status_code: 200
         timeout: 10
@@ -38,7 +38,7 @@
 
     - name: Check Loki targets
       ansible.builtin.uri:
-        url: "http://localhost:3100/loki/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/loki/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -53,7 +53,7 @@
 
     - name: Check Alertmanager configuration
       ansible.builtin.uri:
-        url: "http://localhost:9093/api/v1/status"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
         method: GET
         status_code: 200
         timeout: 10
@@ -98,7 +98,7 @@
 
     - name: Validate monitoring metrics collection
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/query?query=up"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up"
         method: GET
         status_code: 200
         timeout: 10

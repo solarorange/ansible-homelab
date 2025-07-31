@@ -10,7 +10,7 @@
 
 - name: Validate Grafana API health
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -19,10 +19,10 @@
 
 - name: Validate Grafana authentication
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/user"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/user"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -31,10 +31,10 @@
 
 - name: Validate data sources
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -43,10 +43,10 @@
 
 - name: Validate dashboards
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/search"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -55,10 +55,10 @@
 
 - name: Validate folder structure
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/folders"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/folders"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -67,10 +67,10 @@
 
 - name: Validate alerting configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/alert-notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alert-notifications"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -79,10 +79,10 @@
 
 - name: Validate user management
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/admin/users"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -91,10 +91,10 @@
 
 - name: Validate team management
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/teams/search"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/teams/search"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -103,10 +103,10 @@
 
 - name: Test data source connections
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -153,7 +153,7 @@
 
 - name: Validate Grafana service status
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -208,15 +208,15 @@
     timeout: 30
   register: grafana_api_validation
   loop:
-    - "http://localhost:{{ grafana_port }}/api/datasources"
-    - "http://localhost:{{ grafana_port }}/api/dashboards"
-    - "http://localhost:{{ grafana_port }}/api/folders"
-    - "http://localhost:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/dashboards"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/folders"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
   tags: [grafana, automation, validate]
 
 - name: Validate Grafana data sources
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -225,7 +225,7 @@
 
 - name: Validate Grafana dashboards
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/search"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -234,7 +234,7 @@
 
 - name: Validate Grafana alerting
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: 30
@@ -243,7 +243,7 @@
 
 - name: Validate Grafana authentication integration
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/admin/settings"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/settings"
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: 30
@@ -277,7 +277,7 @@
 
 - name: Validate Grafana database connection
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30

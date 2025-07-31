@@ -1,0 +1,296 @@
+---
+# =============================================================================
+# HOMELAB PORT MANAGEMENT SYSTEM
+# =============================================================================
+# Centralized port management to prevent conflicts and ensure consistency
+# 
+# PORT RANGES:
+# 1000-1999: Infrastructure & Management Services
+# 2000-2999: Monitoring & Observability Services  
+# 3000-3999: Web Applications & Dashboards
+# 4000-4999: Media & Entertainment Services
+# 5000-5999: Development & Automation Services
+# 6000-6999: Storage & Backup Services
+# 7000-7999: Security & Authentication Services
+# 8000-8999: Database & Cache Services
+# 9000-9999: Specialized Services & Utilities
+# =============================================================================
+
+# =============================================================================
+# INFRASTRUCTURE & MANAGEMENT SERVICES (1000-1999)
+# =============================================================================
+infrastructure_ports:
+  traefik_dashboard: 8080
+  traefik_api: 8081
+  portainer: 9000
+  watchtower: 8082
+  authentik: 9000
+  crowdsec: 8083
+  fail2ban: 8084
+
+# =============================================================================
+# MONITORING & OBSERVABILITY SERVICES (2000-2999)
+# =============================================================================
+monitoring_ports:
+  prometheus: 9090
+  alertmanager: 9093
+  grafana: 3000  # Changed from 3000 to avoid conflict
+  loki: 3100
+  tempo: 3200
+  jaeger: 16686
+  zipkin: 9411
+  cadvisor: 8080
+  node_exporter: 9100
+  blackbox_exporter: 9115
+  uptime_kuma: 3001  # Changed from 3001 to avoid conflict
+  dashdot: 3002  # Changed from 3002 to avoid conflict
+
+# =============================================================================
+# WEB APPLICATIONS & DASHBOARDS (3000-3999)
+# =============================================================================
+web_application_ports:
+  homepage: 3000  # Primary dashboard - KEEPING THIS PORT
+  pezzo_server: 3001  # Changed from 3000
+  pezzo_console: 8080  # Already correct
+  pezzo_proxy: 3002  # Changed from 3000
+  immich_web: 3003  # Changed from 3000
+  immich_server: 3004  # Changed from 3001
+  immich_ml: 3005  # Changed from 3003
+  linkwarden: 3006
+  paperless_ngx: 3007
+  bookstack: 3008
+  romm: 3009
+  reconya: 3010
+  dumbassets: 3011
+  fing: 3012
+
+# =============================================================================
+# MEDIA & ENTERTAINMENT SERVICES (4000-4999)
+# =============================================================================
+media_ports:
+  jellyfin: 8096
+  sonarr: 8989
+  radarr: 7878
+  lidarr: 8686
+  readarr: 8787
+  prowlarr: 9696
+  bazarr: 6767
+  tautulli: 8181
+  overseerr: 5055
+  sabnzbd: 8080
+  qbittorrent: 8081
+  pulsarr: 8088
+  tdarr: 4000
+  unmanic: 4001
+  requestrr: 4002
+
+# =============================================================================
+# DEVELOPMENT & AUTOMATION SERVICES (5000-5999)
+# =============================================================================
+development_ports:
+  n8n: 5678
+  nodered: 1880
+  homeassistant: 8123
+  zigbee2mqtt: 8080
+  code_server: 8080
+  guacamole: 8080
+  gitlab: 8080
+  harbor: 8080
+
+# =============================================================================
+# STORAGE & BACKUP SERVICES (6000-6999)
+# =============================================================================
+storage_ports:
+  nextcloud: 8080
+  vaultwarden: 8080
+  minio: 9000
+  kopia: 6000
+  duplicati: 8200
+  restic: 6001
+  filebrowser: 8080
+
+# =============================================================================
+# SECURITY & AUTHENTICATION SERVICES (7000-7999)
+# =============================================================================
+security_ports:
+  pihole: 80
+  wireguard: 51820
+  openvpn: 1194
+  crowdsec_bouncer: 7000
+  fail2ban_api: 7001
+
+# =============================================================================
+# DATABASE & CACHE SERVICES (8000-8999)
+# =============================================================================
+database_ports:
+  postgresql: 5432
+  mariadb: 3306
+  mysql: 3306
+  redis: 6379
+  mongodb: 27017
+  elasticsearch: 9200
+  kibana: 5601
+  clickhouse: 8123
+  influxdb: 8086
+  timescaledb: 5432
+
+# =============================================================================
+# SPECIALIZED SERVICES & UTILITIES (9000-9999)
+# =============================================================================
+specialized_ports:
+  supertokens: 3567
+  local_kms: 9981
+  weather_api: 9000
+  system_monitor: 9001
+  docs_portal: 9002
+  status_page: 9003
+  support_portal: 9004
+
+# =============================================================================
+# PORT CONFLICT RESOLUTION MAPPING
+# =============================================================================
+# This section documents the changes made to resolve port conflicts
+port_conflict_resolution:
+  original_conflicts:
+    - service: "Homepage"
+      original_port: 3000
+      status: "KEPT"  # Primary dashboard keeps 3000
+      reason: "Primary dashboard service"
+    - service: "Immich Web"
+      original_port: 3000
+      new_port: 3003
+      reason: "Photo management web interface"
+    - service: "Pezzo Server"
+      original_port: 3000
+      new_port: 3001
+      reason: "AI prompt management server"
+    - service: "Pezzo Proxy"
+      original_port: 3000
+      new_port: 3002
+      reason: "AI prompt management proxy"
+    - service: "Immich Server"
+      original_port: 3001
+      new_port: 3004
+      reason: "Photo management API server"
+    - service: "Immich ML"
+      original_port: 3003
+      new_port: 3005
+      reason: "Photo management ML service"
+
+# =============================================================================
+# PORT VALIDATION RULES
+# =============================================================================
+port_validation:
+  # Reserved ports that should not be used
+  reserved_ports:
+    - 22    # SSH
+    - 25    # SMTP
+    - 53    # DNS
+    - 80    # HTTP
+    - 443   # HTTPS
+    - 143   # IMAP
+    - 993   # IMAPS
+    - 110   # POP3
+    - 995   # POP3S
+    - 587   # SMTP submission
+    - 465   # SMTPS
+    - 993   # IMAPS
+    - 995   # POP3S
+    - 1433  # SQL Server
+    - 1521  # Oracle
+    - 3306  # MySQL
+    - 5432  # PostgreSQL
+    - 6379  # Redis
+    - 27017 # MongoDB
+    - 9200  # Elasticsearch
+    - 5601  # Kibana
+
+  # Port range validation
+  valid_ranges:
+    - start: 1000
+      end: 65535
+      description: "User-defined ports"
+
+# =============================================================================
+# SERVICE PORT ASSIGNMENT DOCUMENTATION
+# =============================================================================
+service_port_documentation:
+  homepage:
+    port: 3000
+    description: "Primary homelab dashboard"
+    url: "https://homepage.{{ domain }}"
+    category: "Infrastructure"
+    priority: "High"
+    
+  pezzo_server:
+    port: 3001
+    description: "AI prompt management server"
+    url: "https://pezzo.{{ domain }}"
+    category: "AI & Development"
+    priority: "Medium"
+    
+  pezzo_proxy:
+    port: 3002
+    description: "AI prompt management proxy"
+    url: "https://pezzo.{{ domain }}"
+    category: "AI & Development"
+    priority: "Medium"
+    
+  immich_web:
+    port: 3003
+    description: "Photo management web interface"
+    url: "https://immich.{{ domain }}"
+    category: "Media"
+    priority: "Medium"
+    
+  immich_server:
+    port: 3004
+    description: "Photo management API server"
+    url: "https://immich.{{ domain }}/api"
+    category: "Media"
+    priority: "Medium"
+    
+  immich_ml:
+    port: 3005
+    description: "Photo management ML service"
+    url: "https://immich.{{ domain }}/ml"
+    category: "Media"
+    priority: "Low"
+
+# =============================================================================
+# PORT MONITORING & ALERTING
+# =============================================================================
+port_monitoring:
+  enabled: true
+  check_interval: 300  # 5 minutes
+  alert_on_conflict: true
+  alert_on_unused: false
+  log_port_changes: true
+  
+  # Services to monitor for port conflicts
+  critical_services:
+    - homepage
+    - pezzo_server
+    - immich_web
+    - grafana
+    - traefik
+    - authentik
+
+# =============================================================================
+# PORT MANAGEMENT AUTOMATION
+# =============================================================================
+port_automation:
+  # Auto-detect port conflicts
+  auto_detect_conflicts: true
+  
+  # Auto-suggest alternative ports
+  auto_suggest_alternatives: true
+  
+  # Validate port assignments before deployment
+  validate_before_deploy: true
+  
+  # Generate port documentation
+  generate_documentation: true
+  
+  # Update service configurations
+  auto_update_configs: true 

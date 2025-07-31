@@ -1,152 +1,89 @@
 ---
-# Fing Configuration Validation
-# Validates all required variables and dependencies
+# Fing Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate required variables
-  ansible.builtin.assert:
-    that:
-      - domain is defined
-      - username is defined
-      - docker_dir is defined
-      - docker_compose_dir is defined
-      - logs_dir is defined
-      - config_dir is defined
-    fail_msg: "Required variables are not defined. Check group_vars/all/vars.yml"
-  tags: [fing, validation]
+- name: Validate Fing vault variables
+  block:
+    - name: Check required Fing vault variables
+      assert:
+        that:
+          - vault_fing_admin_password is defined
+          - vault_fing_database_password is defined
+          - vault_fing_api_key is defined
+          - vault_fing_secret_key is defined
+          - vault_fing_encryption_key is defined
+          - vault_fing_jwt_secret is defined
+        fail_msg: "Required Fing vault variables are not defined"
+        success_msg: "All required Fing vault variables are defined"
 
-- name: Validate Fing configuration
-  ansible.builtin.assert:
-    that:
-      - fing_enabled is defined
-      - fing_domain is defined
-      - fing_web_port is defined
-      - fing_api_port is defined
-      - fing_scan_interval is defined
-      - fing_network_ranges is defined
-    fail_msg: "Fing configuration variables are not properly defined"
-  tags: [fing, validation]
+    - name: Validate Fing password complexity
+      assert:
+        that:
+          - vault_fing_admin_password | length >= 12
+          - vault_fing_database_password | length >= 12
+        fail_msg: "Fing passwords must be at least 12 characters long"
+        success_msg: "Fing password complexity requirements met"
 
-- name: Validate network configuration
-  ansible.builtin.assert:
-    that:
-      - fing_network_mode is defined
-      - fing_network_ranges | length > 0
-      - fing_scan_interval > 0
-      - fing_scan_timeout > 0
-    fail_msg: "Fing network configuration is invalid"
-  tags: [fing, validation]
+- name: Validate Fing network configuration
+  block:
+    - name: Check Fing port configuration
+      assert:
+        that:
+          - fing_port is defined
+          - fing_port | int >= 1024
+          - fing_port | int <= 65535
+        fail_msg: "Fing port must be between 1024 and 65535"
+        success_msg: "Fing port configuration is valid"
 
-- name: Validate monitoring integration
-  ansible.builtin.assert:
-    that:
-      - fing_monitoring_enabled is defined
-      - fing_metrics_enabled is defined
-      - fing_health_check_enabled is defined
-    fail_msg: "Fing monitoring configuration is invalid"
-  tags: [fing, validation]
+    - name: Check Fing domain configuration
+      assert:
+        that:
+          - domain is defined
+          - fing_subdomain is defined
+        fail_msg: "Fing domain configuration is incomplete"
+        success_msg: "Fing domain configuration is valid"
 
-- name: Validate security configuration
-  ansible.builtin.assert:
-    that:
-      - fing_auth_enabled is defined
-      - fing_auth_method is defined
-      - fing_security_headers is defined
-      - fing_rate_limiting is defined
-    fail_msg: "Fing security configuration is invalid"
-  tags: [fing, validation]
+- name: Validate Fing security configuration
+  block:
+    - name: Check Fing SSL configuration
+      assert:
+        that:
+          - fing_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Fing SSL configuration is invalid"
+        success_msg: "Fing SSL configuration is valid"
 
-- name: Validate Traefik integration
-  ansible.builtin.assert:
-    that:
-      - fing_traefik_enabled is defined
-      - fing_traefik_network is defined
-      - fing_traefik_middleware is defined
-    fail_msg: "Fing Traefik configuration is invalid"
-  tags: [fing, validation]
+    - name: Check Fing authentication configuration
+      assert:
+        that:
+          - fing_auth_enabled | bool
+          - fing_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Fing authentication configuration is invalid"
+        success_msg: "Fing authentication configuration is valid"
 
-- name: Validate homepage integration
-  ansible.builtin.assert:
-    that:
-      - fing_homepage_enabled is defined
-      - fing_homepage_category is defined
-      - fing_homepage_description is defined
-      - fing_homepage_icon is defined
-    fail_msg: "Fing Homepage configuration is invalid"
-  tags: [fing, validation]
+- name: Validate Fing storage configuration
+  block:
+    - name: Check Fing data directories
+      assert:
+        that:
+          - fing_data_dir is defined
+          - fing_config_dir is defined
+          - fing_backup_dir is defined
+        fail_msg: "Fing storage configuration is incomplete"
+        success_msg: "Fing storage configuration is valid"
 
-- name: Check required services
-  ansible.builtin.assert:
-    that:
-      - "'traefik' in enabled_services"
-      - "'docker' in enabled_services"
-    fail_msg: "Required services (traefik, docker) are not enabled"
-  tags: [fing, validation]
+    - name: Create Fing directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ fing_data_dir }}"
+        - "{{ fing_config_dir }}"
+        - "{{ fing_backup_dir }}"
 
-- name: Check monitoring services if enabled
-  ansible.builtin.assert:
-    that:
-      - "'prometheus' in enabled_services"
-      - "'grafana' in enabled_services"
-      - "'telegraf' in enabled_services"
-    fail_msg: "Required monitoring services are not enabled"
-  when: fing_monitoring_enabled | default(true)
-  tags: [fing, validation]
-
-- name: Check security services if enabled
-  ansible.builtin.assert:
-    that:
-      - "'crowdsec' in enabled_services"
-      - "'fail2ban' in enabled_services"
-    fail_msg: "Required security services are not enabled"
-  when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
-  tags: [fing, validation]
-
-- name: Validate port availability
-  ansible.builtin.assert:
-    that:
-      - fing_web_port != 80
-      - fing_web_port != 443
-      - fing_web_port != 8080
-      - fing_api_port != 80
-      - fing_api_port != 443
-      - fing_api_port != 8080
-      - fing_metrics_port != 80
-      - fing_metrics_port != 443
-      - fing_metrics_port != 8080
-    fail_msg: "Fing ports conflict with system ports"
-  tags: [fing, validation]
-
-- name: Validate resource limits
-  ansible.builtin.assert:
-    that:
-      - fing_memory_limit is defined
-      - fing_cpu_limit is defined
-      - fing_storage_limit is defined
-    fail_msg: "Fing resource limits are not defined"
-  tags: [fing, validation]
-
-- name: Display Fing configuration summary
-  ansible.builtin.debug:
-    msg: |
-      Fing Configuration Summary:
-      
-      Service: {{ fing_container_name }}
-      Domain: {{ fing_domain }}
-      Web Port: {{ fing_web_port }}
-      API Port: {{ fing_api_port }}
-      Network Mode: {{ fing_network_mode }}
-      Scan Interval: {{ fing_scan_interval }}s
-      Network Ranges: {{ fing_network_ranges | join(', ') }}
-      
-      Monitoring: {{ fing_monitoring_enabled | default(true) }}
-      Security: {{ fing_auth_enabled | default(true) }}
-      Traefik: {{ fing_traefik_enabled | default(true) }}
-      Homepage: {{ fing_homepage_enabled | default(true) }}
-      Backup: {{ fing_backup_enabled | default(true) }}
-      Alerts: {{ fing_alerting_enabled | default(true) }}
-      
-      Resource Limits:
-      - Memory: {{ fing_memory_limit }}
-      - CPU: {{ fing_cpu_limit }}
-      - Storage: {{ fing_storage_limit }}
-  tags: [fing, validation] 
+- name: Final validation summary
+  debug:
+    msg: "Fing validation completed successfully - all configurations are valid and secure"

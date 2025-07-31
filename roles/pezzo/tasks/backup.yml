@@ -76,7 +76,7 @@
     month: "{{ pezzo_backup_schedule.split(' ')[3] | default('*') }}"
     weekday: "{{ pezzo_backup_schedule.split(' ')[4] | default('*') }}"
     job: "{{ pezzo_config_dir }}/backup_full.sh >> {{ pezzo_backup_log_file }} 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_pezzo_user }}"
   when: pezzo_backup_enabled | default(true)
   tags: [pezzo, backup]
 
@@ -86,7 +86,7 @@
     minute: "30"
     hour: "4"
     job: "{{ pezzo_config_dir }}/backup_verify.sh >> {{ logs_dir }}/pezzo/backup/verification.log 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_pezzo_user }}"
   when: pezzo_backup_enabled | default(true)
   tags: [pezzo, backup]
 
@@ -114,7 +114,7 @@
     minute: "0"
     hour: "5"
     job: "{{ pezzo_config_dir }}/backup_cleanup.sh >> {{ logs_dir }}/pezzo/backup/cleanup.log 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_pezzo_user }}"
   when: pezzo_backup_enabled | default(true)
   tags: [pezzo, backup]
 
@@ -142,7 +142,7 @@
     name: "Pezzo Backup Monitoring"
     minute: "*/30"
     job: "{{ pezzo_config_dir }}/backup_monitor.sh >> {{ logs_dir }}/pezzo/backup/monitoring.log 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_pezzo_user }}"
   when: pezzo_backup_enabled | default(true)
   tags: [pezzo, backup]
 

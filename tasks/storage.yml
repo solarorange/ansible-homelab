@@ -132,7 +132,7 @@
           
           # Monitor all devices
           DEVICESCAN -a -o on -S on -s (S/../.././02|L/../../6/03) \
-            -m {{ username }}@localhost \
+            -m {{ username }}@{{ ansible_default_ipv4.address }} \
             -M exec /usr/share/smartmontools/smartd-runner
           
           # Custom monitoring for specific attributes
@@ -313,7 +313,7 @@
         hour: "6"
         minute: "30"
         job: "{{ config_dir }}/storage-monitor.sh"
-        user: "{{ username }}"
+        user: "{{ vault_storage_user }}"
 
     - name: Schedule weekly storage cleanup
       ansible.builtin.cron:
@@ -322,7 +322,7 @@
         hour: "3"
         minute: "0"
         job: "{{ config_dir }}/storage-cleanup.sh"
-        user: "{{ username }}"
+        user: "{{ vault_storage_user }}"
 
     - name: Schedule monthly performance test
       ansible.builtin.cron:
@@ -331,7 +331,7 @@
         hour: "4"
         minute: "0"
         job: "{{ config_dir }}/storage-performance.sh"
-        user: "{{ username }}"
+        user: "{{ vault_storage_user }}"
 
 - name: Configure storage health monitoring
   block:
@@ -376,7 +376,7 @@
           # If alerts exist, send notification (customize as needed)
           if [ -s "$ALERT_FILE" ]; then
               echo "Storage alerts detected on $(hostname) at $(date)" | \
-                mail -s "Storage Alert" {{ username }}@localhost 2>/dev/null || true
+                mail -s "Storage Alert" {{ username }}@{{ ansible_default_ipv4.address }} 2>/dev/null || true
           fi
         dest: "{{ config_dir }}/storage-health.sh"
         owner: "{{ username }}"
@@ -388,7 +388,7 @@
         name: "Storage health monitoring"
         minute: "*/30"
         job: "{{ config_dir }}/storage-health.sh"
-        user: "{{ username }}"
+        user: "{{ vault_storage_user }}"
 
 - name: Configure filesystem tuning
   block:

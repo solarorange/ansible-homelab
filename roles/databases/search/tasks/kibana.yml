@@ -41,7 +41,7 @@
     env:
       ELASTICSEARCH_HOSTS: "https://{{ elasticsearch_domain }}:{{ elasticsearch_port }}"
       ELASTICSEARCH_USERNAME: "elastic"
-      ELASTICSEARCH_PASSWORD: "{{ elasticsearch_elastic_password }}"
+      ELASTICSEARCH_password: "{{ vault_databases_database_password }}"
       SERVER_SSL_ENABLED: "{{ kibana_server_ssl_enabled | lower }}"
       XPACK_SECURITY_ENABLED: "{{ kibana_xpack_security_enabled | lower }}"
       XPACK_ENCRYPTIONKEY: "{{ kibana_encryption_key }}"
@@ -51,7 +51,7 @@
       - "{{ docker_dir }}/kibana/scripts:/docker-entrypoint-initdb.d"
       - "{{ logs_dir }}/kibana:/usr/share/kibana/logs"
     healthcheck:
-      test: ["CMD", "curl", "-s", "-k", "https://localhost:{{ kibana_web_port }}/api/status"]
+      test: ["CMD", "curl", "-s", "-k", "https://{{ ansible_default_ipv4.address }}:{{ kibana_web_port }}/api/status"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -60,7 +60,7 @@
   register: kibana_container
 
 - name: Validate Kibana is running
-  ansible.builtin.command: docker exec {{ kibana_container_name }} curl -s -k https://localhost:{{ kibana_web_port }}/api/status
+  ansible.builtin.command: docker exec {{ kibana_container_name }} curl -s -k https://{{ ansible_default_ipv4.address }}:{{ kibana_web_port }}/api/status
   register: kibana_status_result
   changed_when: false
   failed_when: kibana_status_result.rc != 0

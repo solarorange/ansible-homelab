@@ -151,7 +151,7 @@
           
         - name: Wait for Homepage to be ready
           ansible.builtin.uri:
-            url: "http://localhost:{{ homepage_port }}/api/health"
+            url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
             method: GET
             status_code: [200, 302, 401]
             timeout: 30
@@ -187,7 +187,7 @@
           
         - name: Wait for Grafana to be ready
           ansible.builtin.uri:
-            url: "http://localhost:{{ grafana_port }}/api/health"
+            url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
             method: GET
             status_code: 200
             timeout: 30
@@ -342,8 +342,8 @@
           Access Information:
           - Homepage: https://{{ homepage_subdomain }}.{{ domain }}
           - Grafana: https://{{ grafana_subdomain }}.{{ domain }}
-          - Homepage API: http://localhost:{{ homepage_port }}/api
-          - Grafana API: http://localhost:{{ grafana_port }}/api
+          - Homepage API: http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api
+          - Grafana API: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api
           
           Configuration Files:
           - Homepage Config: {{ homepage_config_dir }}

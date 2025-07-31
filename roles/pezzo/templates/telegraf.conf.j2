@@ -22,17 +22,7 @@
   write_consistency = "any"
   timeout = "5s"
   username = "{{ telegraf_username | default('telegraf') }}"
-  password = "{{ telegraf_password | default('') }}"
-
-# Input plugins - System metrics
-[[inputs.cpu]]
-  percpu = true
-  totalcpu = true
-  collect_cpu_time = false
-  report_active = false
-
-[[inputs.disk]]
-  ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
+  password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
 
 [[inputs.diskio]]
 
@@ -69,15 +59,13 @@
 
 # Input plugins - PostgreSQL metrics
 [[inputs.postgresql]]
-  address = "host=pezzo-postgres port=5432 user={{ pezzo_database_user }} password={{ pezzo_database_password }} dbname={{ pezzo_database_name }} sslmode=disable"
-  databases = ["{{ pezzo_database_name }}"]
+  address = "host=pezzo-postgres port=5432 user={{ pezzo_database_user }} password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"{{ pezzo_database_name }}"]
   interval = "30s"
 
 # Input plugins - Redis metrics
 [[inputs.redis]]
   servers = ["pezzo-redis:6379"]
-  password = "{{ pezzo_redis_password }}"
-  interval = "30s"
+  password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"30s"
 
 # Input plugins - ClickHouse metrics
 [[inputs.http]]

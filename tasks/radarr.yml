@@ -108,13 +108,13 @@
       fi
       
       # Check if Radarr is responding
-      if ! curl -s -f http://localhost:7878/api/v3/health > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:7878/api/v3/health > /dev/null; then
         echo "Radarr is not responding"
         exit 1
       fi
       
       # Check Radarr status
-      STATUS=$(curl -s http://localhost:7878/api/v3/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:7878/api/v3/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Radarr status is $STATUS"
         exit 1
@@ -148,7 +148,7 @@
     job: "logrotate {{ docker_dir }}/radarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_radarr_user }}"
 
 - name: Add Radarr backup to crontab
   ansible.builtin.cron:
@@ -156,4 +156,4 @@
     job: "{{ docker_dir }}/radarr/scripts/manage.sh backup"
     minute: "{{ backup_schedules.radarr.split(' ')[0] }}"
     hour: "{{ backup_schedules.radarr.split(' ')[1] }}"
-    user: "{{ username }}" 
+    user: "{{ vault_radarr_user }}" 

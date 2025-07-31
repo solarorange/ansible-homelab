@@ -32,7 +32,7 @@
   block:
     - name: Test database connectivity from applications
       ansible.builtin.uri:
-        url: "http://localhost:8989/api/v3/health"
+        url: "http://{{ ansible_default_ipv4.address }}:8989/api/v3/health"
         method: GET
         status_code: 200
         timeout: 10
@@ -41,14 +41,14 @@
 
     - name: Test Redis connectivity from applications
       ansible.builtin.shell: |
-        curl -f http://localhost:6767/api/v1/health
+        curl -f http://{{ ansible_default_ipv4.address }}:6767/api/v1/health
       register: bazarr_redis_test
       changed_when: false
       tags: [integration, dependencies]
 
     - name: Test monitoring integration
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -79,7 +79,7 @@
 
     - name: Test service discovery
       ansible.builtin.uri:
-        url: "http://localhost:8080/api/http/services"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
         method: GET
         status_code: 200
         timeout: 10
@@ -106,7 +106,7 @@
   block:
     - name: Test Authentik authentication
       ansible.builtin.uri:
-        url: "http://localhost:9000/if/user/"
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
         method: GET
         status_code: [200, 302]
         timeout: 10
@@ -177,7 +177,7 @@
   block:
     - name: Test AlertManager configuration
       ansible.builtin.uri:
-        url: "http://localhost:9093/api/v1/status"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
         method: GET
         status_code: 200
         timeout: 10
@@ -186,7 +186,7 @@
 
     - name: Test Prometheus rule evaluation
       ansible.builtin.uri:
-        url: "http://localhost:9090/api/v1/rules"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/rules"
         method: GET
         status_code: 200
         timeout: 10
@@ -203,7 +203,7 @@
 
     - name: Test notification delivery
       ansible.builtin.shell: |
-        curl -X POST http://localhost:9093/api/v1/alerts \
+        curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v1/alerts \
           -H "Content-Type: application/json" \
           -d '[{"labels":{"alertname":"test_alert"},"annotations":{"description":"Test alert"}}]'
       register: test_alert
@@ -217,7 +217,7 @@
   block:
     - name: Test Traefik load balancing
       ansible.builtin.uri:
-        url: "http://localhost:8080/api/http/services"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
         method: GET
         status_code: 200
         timeout: 10

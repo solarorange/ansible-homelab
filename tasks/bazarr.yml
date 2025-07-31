@@ -54,7 +54,7 @@
 
 - name: Wait for Bazarr to be ready
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:6767/api/health"
     method: GET
     status_code: 200
     timeout: 30
@@ -66,7 +66,7 @@
 
 - name: Configure Bazarr Sonarr
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/sonarr"
+    url: "http://{{ ansible_default_ipv4.address }}:6767/api/sonarr"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -79,7 +79,7 @@
 
 - name: Configure Bazarr Radarr
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/radarr"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/radarr"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -92,7 +92,7 @@
 
 - name: Configure Bazarr subtitle providers
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/providers"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/providers"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -105,7 +105,7 @@
 
 - name: Configure Bazarr languages
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/languages"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/languages"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -118,7 +118,7 @@
 
 - name: Configure Bazarr notifications
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/notifications"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -131,7 +131,7 @@
 
 - name: Verify Bazarr configuration
   ansible.builtin.uri:
-    url: "http://localhost:6767/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
     method: GET
     status_code: 200
     register: bazarr_verify

@@ -1,0 +1,259 @@
+# Plex Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# PLEX SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+plex_service_name: "plex"
+plex_container_name: "{{ plex_service_name }}"
+plex_image: "plexinc/pms-docker:latest"
+plex_version: "latest"
+
+# Network Configuration
+plex_port: 32400
+plex_external_port: "{{ plex_port }}"
+plex_protocol: "http"
+plex_host: "{{ ansible_default_ipv4.address }}"
+plex_url: "{{ plex_protocol }}://{{ plex_host }}:{{ plex_port }}"
+
+# Domain Configuration
+plex_subdomain: "plex"
+plex_domain: "{{ plex_subdomain }}.{{ domain }}"
+plex_external_url: "https://{{ plex_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+plex_auth_enabled: true
+plex_auth_method: "authentik"  # Options: basic, authentik, none
+plex_admin_username: "admin"
+plex_admin_password: "{{ vault_plex_admin_password }}"
+
+# API Configuration
+plex_api_key: "{{ vault_plex_api_key }}"
+plex_api_token: "{{ vault_plex_api_token }}"
+
+# Encryption & Security
+plex_secret_key: "{{ vault_plex_secret_key }}"
+plex_encryption_key: "{{ vault_plex_encryption_key }}"
+plex_jwt_secret: "{{ vault_plex_jwt_secret }}"
+
+# SSL/TLS Configuration
+plex_ssl_enabled: true
+plex_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+plex_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+plex_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+plex_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+plex_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+plex_database_port: "{{ databases_postgresql_port | default(5432) }}"
+plex_database_name: "plex"
+plex_database_username: "plex"
+plex_database_password: "{{ vault_plex_database_password }}"
+
+# Redis Configuration (if using)
+plex_redis_enabled: false
+plex_redis_host: "{{ redis_host | default('redis') }}"
+plex_redis_port: "{{ redis_port | default(6379) }}"
+plex_redis_password: "{{ vault_plex_redis_password }}"
+plex_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+plex_data_dir: "{{ homelab_data_dir }}/plex"
+plex_config_dir: "{{ plex_data_dir }}/config"
+plex_backup_dir: "{{ plex_data_dir }}/backups"
+
+# Volume Mappings
+plex_volumes:
+  - "{{ plex_config_dir }}:/config"
+  - "{{ plex_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+plex_health_check_enabled: true
+plex_health_check_path: "/health"
+plex_health_check_interval: 30
+plex_health_check_timeout: 10
+plex_health_check_retries: 3
+
+# Monitoring Integration
+plex_monitoring_enabled: true
+plex_prometheus_enabled: true
+plex_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+plex_backup_enabled: true
+plex_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+plex_backup_retention_days: 30
+plex_backup_encryption_enabled: true
+plex_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+plex_smtp_enabled: false
+plex_smtp_host: "{{ smtp_host | default('') }}"
+plex_smtp_port: "{{ smtp_port | default(587) }}"
+plex_smtp_username: "{{ vault_smtp_username }}"
+plex_smtp_password: "{{ vault_plex_smtp_password }}"
+plex_smtp_from: "{{ plex_admin_email | default('admin@' + domain) }}"
+plex_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+plex_webhook_enabled: false
+plex_webhook_url: "{{ vault_webhook_url | default('') }}"
+plex_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+plex_discovery_enabled: true
+plex_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+plex_cpu_limit: "1.0"
+plex_memory_limit: "1g"
+plex_memory_reservation: "512m"
+
+# Performance Settings
+plex_scan_interval: 10
+plex_parallel_downloads: 3
+plex_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+plex_log_level: "info"  # Options: trace, debug, info, warn, error
+plex_log_rotation_enabled: true
+plex_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+plex_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+plex_rate_limit_enabled: true
+plex_rate_limit_requests: 100
+plex_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+plex_deploy_enabled: true
+plex_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+plex_restart_policy: "unless-stopped"
+plex_auto_update_enabled: true
+
+# Environment Variables
+plex_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  PLEX_API_KEY: "{{ plex_api_key }}"
+  PLEX_SECRET_KEY: "{{ plex_secret_key }}"
+  PLEX_ENCRYPTION_KEY: "{{ plex_encryption_key }}"
+  PLEX_JWT_SECRET: "{{ plex_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+plex_validation_enabled: true
+plex_validation_timeout: 300
+plex_validation_retries: 3
+
+# Testing Configuration
+plex_test_enabled: false
+plex_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+plex_compliance_enabled: true
+plex_audit_logging_enabled: true
+plex_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+plex_automation_enabled: true
+plex_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+plex_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+plex_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+plex_fallback_enabled: true
+plex_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

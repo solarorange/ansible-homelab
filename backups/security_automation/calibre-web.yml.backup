@@ -1,0 +1,162 @@
+---
+# Calibre-Web Configuration Tasks
+
+- name: Create Calibre-Web directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/calibre-web/config"
+    - "{{ docker_dir }}/calibre-web/data"
+    - "{{ docker_dir }}/calibre-web/scripts"
+    - "{{ logs_dir }}/calibre-web"
+
+- name: Create Calibre-Web config.py
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/config/config.py"
+    content: |
+      # Calibre-Web configuration
+      SQLALCHEMY_DATABASE_URI = 'postgresql://{{ calibreweb_db_user }}:{{ calibreweb_db_password }}@postgresql:5432/{{ calibreweb_db_name }}'
+      SECRET_KEY = '{{ calibreweb_secret_key }}'
+      LOG_DIR = '{{ logs_dir }}/calibre-web'
+      BOOKS_DIR = '{{ docker_dir }}/calibre-web/books'
+      DEBUG = False
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Calibre-Web management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Calibre-Web Management Script
+      
+      function show_help {
+          echo "Calibre-Web Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Calibre-Web status"
+          echo "  logs      - View Calibre-Web logs"
+          echo "  restart   - Restart Calibre-Web"
+          echo "  backup    - Backup Calibre-Web data"
+          echo "  restore   - Restore Calibre-Web data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Calibre-Web data..."
+          tar -czf "{{ docker_dir }}/calibre-web/backup/calibre-web_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/calibre-web" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Calibre-Web data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/calibre-web"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep calibre-web
+              ;;
+          logs)
+              docker logs -f calibre-web
+              ;;
+          restart)
+              docker restart calibre-web
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Calibre-Web health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Calibre-Web is running
+      if ! docker ps | grep -q calibre-web; then
+          echo "Calibre-Web is not running"
+          exit 1
+      fi
+      
+      # Check if Calibre-Web is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8083 | grep -q "Calibre-Web"; then
+          echo "Calibre-Web is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Calibre-Web log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/calibre-web/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Calibre-Web log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Calibre-Web logs"
+    job: "logrotate {{ docker_dir }}/calibre-web/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Calibre-Web backup cron job
+  ansible.builtin.cron:
+    name: "Backup Calibre-Web data"
+    job: "{{ docker_dir }}/calibre-web/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Create Calibre-Web basic configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/config/config.env"
+    content: |
+      CALIBRE_WEB_PORT=8083
+      CALIBRE_WEB_LOG_LEVEL=info
+      CALIBRE_WEB_LOG_PATH={{ logs_dir }}/calibre-web/app.log
+      CALIBRE_WEB_MAX_LOG_SIZE=5
+      CALIBRE_WEB_MAX_LOG_FILES=5
+      CALIBRE_WEB_ADMIN_USER={{ calibre_web_username }}
+      CALIBRE_WEB_ADMIN_PASSWORD={{ calibre_web_password }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640" 

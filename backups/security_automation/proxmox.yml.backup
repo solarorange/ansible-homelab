@@ -1,0 +1,132 @@
+---
+# Proxmox VM Deployment Tasks
+# Handles VM creation, configuration, and resource management
+
+- name: Verify Proxmox API access
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    validate_certs: "{{ proxmox_validate_certs | default(true) }}"
+  register: proxmox_connection
+  delegate_to: {{ ansible_default_ipv4.address }}
+  tags: [proxmox, always]
+
+- name: Check available resources
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ proxmox_vmid }}"
+    state: present
+  register: proxmox_resources
+  delegate_to: {{ ansible_default_ipv4.address }}
+  tags: [proxmox]
+
+- name: Validate resource availability
+  ansible.builtin.assert:
+    that:
+      - proxmox_resources.memory.free >= (vm_memory | default(2048))
+      - proxmox_resources.cpu.free >= (vm_cores | default(2))
+      - proxmox_resources.disk.free >= (vm_disk | default(20))
+    fail_msg: "Insufficient resources available on Proxmox node"
+  tags: [proxmox]
+
+- name: Create VM template if not exists
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ proxmox_template_id }}"
+    name: "{{ vm_name }}-template"
+    memory: "{{ vm_memory | default(2048) }}"
+    cores: "{{ vm_cores | default(2) }}"
+    disk: "{{ vm_disk | default(20) }}"
+    netif: "{{ vm_network | default('virtio,bridge=vmbr0') }}"
+    ostype: "{{ vm_os_type | default('l26') }}"
+    storage: "{{ vm_storage | default('local-lvm') }}"
+    template: true
+    state: present
+  register: template_creation
+  delegate_to: localhost
+  tags: [proxmox]
+
+- name: Clone VM from template
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ proxmox_vmid }}"
+    clone: "{{ proxmox_template_id }}"
+    name: "{{ vm_name }}"
+    full: true
+    state: present
+  register: vm_clone
+  delegate_to: localhost
+  tags: [proxmox]
+
+- name: Configure VM resources
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ proxmox_vmid }}"
+    memory: "{{ vm_memory | default(2048) }}"
+    cores: "{{ vm_cores | default(2) }}"
+    disk: "{{ vm_disk | default(20) }}"
+    netif: "{{ vm_network | default('virtio,bridge=vmbr0') }}"
+    state: present
+  register: vm_config
+  delegate_to: localhost
+  tags: [proxmox]
+
+- name: Start VM
+  community.general.proxmox:
+    api_host: "{{ proxmox_host }}"
+    api_user: "{{ proxmox_user }}"
+    api_password: "{{ proxmox_password }}"
+    api_token_id: "{{ proxmox_token_id | default(omit) }}"
+    api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ proxmox_vmid }}"
+    state: started
+  register: vm_start
+  delegate_to: localhost
+  tags: [proxmox]
+
+- name: Wait for VM to be ready
+  ansible.builtin.wait_for:
+    host: "{{ vm_ip }}"
+    port: 22
+    delay: 10
+    timeout: 300
+  register: vm_ready
+  delegate_to: localhost
+  tags: [proxmox]
+
+- name: Display VM deployment status
+  ansible.builtin.debug:
+    msg: |
+      VM Deployment completed successfully
+      Name: {{ vm_name }}
+      IP: {{ vm_ip }}
+      Resources:
+        Memory: {{ vm_memory | default(2048) }}MB
+        Cores: {{ vm_cores | default(2) }}
+        Disk: {{ vm_disk | default(20) }}GB
+      Status: {{ vm_start.status }}
+  tags: [proxmox] 

@@ -112,7 +112,7 @@
       fi
       
       # Check if Komga is responding
-      if ! curl -s http://localhost:8080 | grep -q "Komga"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8080 | grep -q "Komga"; then
           echo "Komga is not responding"
           exit 1
       fi
@@ -145,7 +145,7 @@
     job: "logrotate {{ docker_dir }}/komga/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_komga_user }}"
 
 - name: Add Komga backup cron job
   ansible.builtin.cron:
@@ -153,4 +153,4 @@
     job: "{{ docker_dir }}/komga/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_komga_user }}" 

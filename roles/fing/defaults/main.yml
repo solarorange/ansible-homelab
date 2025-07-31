@@ -1,224 +1,259 @@
----
-# Fing Network Monitoring Service Configuration
-# Production-ready defaults for homelab deployment
+# Fing Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Service Configuration
-fing_enabled: true
+# =============================================================================
+# FING SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+fing_service_name: "fing"
+fing_container_name: "{{ fing_service_name }}"
+fing_image: "ghcr.io/fingapp/fing:latest"
 fing_version: "latest"
-fing_image: "fingapp/fing:latest"
 
-# Container Configuration
-fing_container_name: "fing"
-fing_restart_policy: "unless-stopped"
-fing_network_mode: "host"  # Required for network discovery
-
-# Port Configuration
-fing_web_port: 8080
-fing_api_port: 8081
+# Network Configuration
+fing_port: 8080
+fing_external_port: "{{ fing_port }}"
+fing_protocol: "http"
+fing_host: "{{ ansible_default_ipv4.address }}"
+fing_url: "{{ fing_protocol }}://{{ fing_host }}:{{ fing_port }}"
 
 # Domain Configuration
 fing_subdomain: "fing"
 fing_domain: "{{ fing_subdomain }}.{{ domain }}"
+fing_external_url: "https://{{ fing_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 fing_auth_enabled: true
-fing_auth_method: "authentik"  # Options: authentik, basic, none
-fing_admin_email: "{{ admin_email | default('admin@' + domain) }}"
-fing_admin_password: "{{ vault_fing_admin_password | default('') }}"
+fing_auth_method: "authentik"  # Options: basic, authentik, none
+fing_admin_username: "admin"
+fing_admin_password: "{{ vault_fing_admin_password }}"
 
-# Database Configuration
-fing_database_type: "sqlite"  # Options: sqlite, postgresql, mysql
-fing_database_host: "{{ postgresql_host | default('localhost') }}"
-fing_database_port: "{{ postgresql_port | default(5432) }}"
+# API Configuration
+fing_api_key: "{{ vault_fing_api_key }}"
+fing_api_token: "{{ vault_fing_api_token }}"
+
+# Encryption & Security
+fing_secret_key: "{{ vault_fing_secret_key }}"
+fing_encryption_key: "{{ vault_fing_encryption_key }}"
+fing_jwt_secret: "{{ vault_fing_jwt_secret }}"
+
+# SSL/TLS Configuration
+fing_ssl_enabled: true
+fing_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+fing_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+fing_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+fing_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+fing_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+fing_database_port: "{{ databases_postgresql_port | default(5432) }}"
 fing_database_name: "fing"
-fing_database_user: "fing"
-fing_database_password: "{{ vault_fing_database_password | default('') }}"
+fing_database_username: "fing"
+fing_database_password: "{{ vault_fing_database_password }}"
 
-# Network Discovery Configuration
-fing_scan_interval: 300  # 5 minutes
-fing_scan_timeout: 60
-fing_max_devices: 1000
-fing_auto_discovery: true
-fing_network_ranges:
-  - "192.168.1.0/24"
-  - "10.0.0.0/8"
-  - "172.16.0.0/12"
+# Redis Configuration (if using)
+fing_redis_enabled: false
+fing_redis_host: "{{ redis_host | default('redis') }}"
+fing_redis_port: "{{ redis_port | default(6379) }}"
+fing_redis_password: "{{ vault_fing_redis_password }}"
+fing_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+fing_data_dir: "{{ homelab_data_dir }}/fing"
+fing_config_dir: "{{ fing_data_dir }}/config"
+fing_backup_dir: "{{ fing_data_dir }}/backups"
+
+# Volume Mappings
+fing_volumes:
+  - "{{ fing_config_dir }}:/config"
+  - "{{ fing_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+fing_health_check_enabled: true
+fing_health_check_path: "/health"
+fing_health_check_interval: 30
+fing_health_check_timeout: 10
+fing_health_check_retries: 3
 
 # Monitoring Integration
 fing_monitoring_enabled: true
-fing_metrics_enabled: true
-fing_metrics_port: 9090
-fing_health_check_enabled: true
-fing_health_check_interval: 30
+fing_prometheus_enabled: true
+fing_grafana_enabled: true
 
-# Security Configuration
-fing_security_headers: true
-fing_rate_limiting: true
-fing_rate_limit_requests: 100
-fing_rate_limit_window: 60
-fing_cors_enabled: false
-fing_cors_origins: []
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 fing_backup_enabled: true
 fing_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-fing_backup_retention: 7  # Keep backups for 7 days
-fing_backup_compression: true
-fing_backup_dir: "{{ backup_dir }}/fing"
-fing_backup_retention_days: 7
-fing_backup_log_file: "{{ logs_dir }}/fing/backup/backup.log"
-fing_backup_max_log_size: "10M"
-fing_backup_notifications_enabled: true
+fing_backup_retention_days: 30
+fing_backup_encryption_enabled: true
+fing_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-fing_log_level: "info"  # Options: debug, info, warn, error
-fing_log_format: "json"
-fing_log_retention: 30  # Days
-fing_log_rotation: true
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+fing_smtp_enabled: false
+fing_smtp_host: "{{ smtp_host | default('') }}"
+fing_smtp_port: "{{ smtp_port | default(587) }}"
+fing_smtp_username: "{{ vault_smtp_username }}"
+fing_smtp_password: "{{ vault_fing_smtp_password }}"
+fing_smtp_from: "{{ fing_admin_email | default('admin@' + domain) }}"
+fing_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+fing_webhook_enabled: false
+fing_webhook_url: "{{ vault_webhook_url | default('') }}"
+fing_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+fing_discovery_enabled: true
+fing_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-fing_memory_limit: "512m"
-fing_cpu_limit: "0.5"
-fing_storage_limit: "10g"
+fing_cpu_limit: "1.0"
+fing_memory_limit: "1g"
+fing_memory_reservation: "512m"
 
-# Traefik Configuration
-fing_traefik_enabled: true
-fing_traefik_network: "{{ traefik_network | default('homelab') }}"
-fing_traefik_middleware: "secure-headers,compress"
-fing_traefik_auth_middleware: "authentik-forward-auth"
-fing_traefik_ssl_enabled: true
-fing_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Performance Settings
+fing_scan_interval: 10
+fing_parallel_downloads: 3
+fing_auto_download_enabled: true
 
-# Homepage Integration
-fing_homepage_enabled: true
-fing_homepage_category: "Network"
-fing_homepage_description: "Network Device Discovery & Monitoring"
-fing_homepage_icon: "fing.png"
-fing_homepage_widget_enabled: true
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
 
-# Telegraf Integration
-fing_telegraf_enabled: true
-fing_telegraf_metrics: true
-fing_telegraf_logs: true
+# Log Settings
+fing_log_level: "info"  # Options: trace, debug, info, warn, error
+fing_log_rotation_enabled: true
+fing_log_retention_days: 30
 
-# Prometheus Integration
-fing_prometheus_enabled: true
-fing_prometheus_metrics: true
-fing_prometheus_scrape_interval: 30
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Grafana Integration
-fing_grafana_enabled: true
-fing_grafana_dashboard: true
-fing_grafana_datasource: "prometheus"
+# Security Headers
+fing_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Loki Integration
-fing_loki_enabled: true
-fing_loki_logs: true
+# Rate Limiting
+fing_rate_limit_enabled: true
+fing_rate_limit_requests: 100
+fing_rate_limit_window: 60
 
-# Alerting Configuration
-fing_alerting_enabled: true
-fing_alerting_provider: "alertmanager"
-fing_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
 
-# CrowdSec Integration
-fing_crowdsec_enabled: true
-fing_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
+# Deployment Settings
+fing_deploy_enabled: true
+fing_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+fing_restart_policy: "unless-stopped"
+fing_auto_update_enabled: true
 
-# Fail2ban Integration
-fing_fail2ban_enabled: true
-fing_fail2ban_jail: "fing"
-fing_fail2ban_max_retry: 5
-fing_fail2ban_bantime: 3600
+# Environment Variables
+fing_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  FING_API_KEY: "{{ fing_api_key }}"
+  FING_SECRET_KEY: "{{ fing_secret_key }}"
+  FING_ENCRYPTION_KEY: "{{ fing_encryption_key }}"
+  FING_JWT_SECRET: "{{ fing_jwt_secret }}"
 
-# Vault Integration
-fing_vault_enabled: true
-fing_vault_path: "secret/fing"
-fing_vault_secrets:
-  - "database_password"
-  - "admin_password"
-  - "api_key"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Service Dependencies
-fing_dependencies:
-  - "docker"
-  - "traefik"
-  - "monitoring_infrastructure"
+# Validation Settings
+fing_validation_enabled: true
+fing_validation_timeout: 300
+fing_validation_retries: 3
 
-# Health Check Configuration
-fing_health_check_url: "/health"
-fing_health_check_timeout: 10
-fing_health_check_retries: 3
-fing_health_check_log_file: "{{ logs_dir }}/fing/health/health.log"
-fing_health_check_max_log_size: "10M"
-fing_health_check_retention_days: 7
+# Testing Configuration
+fing_test_enabled: false
+fing_test_items: 3
 
-# API Configuration
-fing_api_enabled: true
-fing_api_version: "v1"
-fing_api_rate_limit: 1000
-fing_api_rate_limit_window: 3600
-fing_api_key: "{{ vault_fing_api_key | default('') }}"
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
 
-# Webhook Configuration
-fing_webhooks_enabled: true
-fing_webhook_events:
-  - "device_discovered"
-  - "device_offline"
-  - "device_online"
-  - "scan_completed"
-  - "alert_triggered"
+# Compliance Settings
+fing_compliance_enabled: true
+fing_audit_logging_enabled: true
+fing_access_logging_enabled: true
 
-# Notification Configuration
-fing_notifications_enabled: true
-fing_notification_channels:
-  - "email"
-  - "webhook"
-  - "slack"
-  - "discord"
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
 
-# Email Configuration
-fing_email_enabled: false
-fing_smtp_host: "{{ smtp_host | default('localhost') }}"
-fing_smtp_port: "{{ smtp_port | default(587) }}"
-fing_smtp_username: "{{ vault_smtp_username | default('') }}"
-fing_smtp_password: "{{ vault_smtp_password | default('') }}"
-fing_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+# Automation Scripts
+fing_automation_enabled: true
+fing_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
 
-# Slack Configuration
-fing_slack_enabled: false
-fing_slack_webhook: "{{ vault_slack_webhook | default('') }}"
-fing_slack_channel: "{{ slack_channel | default('#alerts') }}"
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
 
-# Discord Configuration
-fing_discord_enabled: false
-fing_discord_webhook: "{{ vault_discord_webhook | default('') }}"
-fing_discord_channel: "{{ discord_channel | default('alerts') }}"
+# Default Values
+fing_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+fing_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
 
-# Custom Configuration
-fing_custom_config: {}
-fing_environment_variables: {}
-fing_volume_mounts: []
-fing_extra_labels: {}
-
-# Maintenance Configuration
-fing_maintenance_enabled: true
-fing_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM on Sunday
-fing_maintenance_window: 3600  # 1 hour
-fing_maintenance_tasks:
-  - "database_cleanup"
-  - "log_rotation"
-  - "cache_clear"
-  - "backup_verification"
-
-# Performance Configuration
-fing_performance_mode: "balanced"  # Options: minimal, balanced, performance
-fing_cache_enabled: true
-fing_cache_size: "256m"
-fing_cache_ttl: 3600
-
-# Development Configuration
-fing_debug_enabled: false
-fing_debug_port: 40000
-fing_debug_host: "0.0.0.0" 
+# Fallback Configuration
+fing_fallback_enabled: true
+fing_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

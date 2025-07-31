@@ -80,20 +80,19 @@ echo
 echo -e "${GREEN}=== Basic Configuration ===${NC}"
 prompt_with_default "HOMELAB_DOMAIN" "yourdomain.com" "Enter your domain name:"
 prompt_with_default "HOMELAB_TIMEZONE" "America/New_York" "Enter your timezone:"
-prompt_with_default "HOMELAB_USERNAME" "homelab" "Enter the username for the homelab user:"
-prompt_with_default "HOMELAB_PUID" "1000" "Enter the user ID (PUID):"
+prompt_with_default "HOMELAB_USERNAME" "homelab" "Enter the username for the homelab user: "{{ vault_service_user }}"HOMELAB_PUID" "1000" "Enter the user ID (PUID):"
 prompt_with_default "HOMELAB_PGID" "1000" "Enter the group ID (PGID):"
 
 # Network Configuration
 echo -e "${GREEN}=== Network Configuration ===${NC}"
-prompt_with_default "HOMELAB_SUBNET" "192.168.1.0/24" "Enter your network subnet:"
-prompt_with_default "HOMELAB_GATEWAY" "192.168.1.1" "Enter your gateway IP:"
-prompt_with_default "HOMELAB_IP_1" "192.168.1.100" "Enter IP for core1:"
-prompt_with_default "HOMELAB_IP_2" "192.168.1.101" "Enter IP for core2:"
-prompt_with_default "HOMELAB_IP_3" "192.168.1.102" "Enter IP for core3:"
-prompt_with_default "HOMELAB_IP_4" "192.168.1.103" "Enter IP for core4:"
-prompt_with_default "ANSIBLE_SERVER_IP" "192.168.1.99" "Enter Ansible control server IP:"
-prompt_with_default "PLEX_SERVER_IP" "192.168.1.41" "Enter your Plex server IP (if different):"
+prompt_with_default "HOMELAB_SUBNET" "{{ ansible_default_ipv4.address }}/24" "Enter your network subnet:"
+prompt_with_default "HOMELAB_GATEWAY" "{{ ansible_default_ipv4.address }}" "Enter your gateway IP:"
+prompt_with_default "HOMELAB_IP_1" "{{ ansible_default_ipv4.address }}" "Enter IP for core1:"
+prompt_with_default "HOMELAB_IP_2" "{{ ansible_default_ipv4.address }}" "Enter IP for core2:"
+prompt_with_default "HOMELAB_IP_3" "{{ ansible_default_ipv4.address }}" "Enter IP for core3:"
+prompt_with_default "HOMELAB_IP_4" "{{ ansible_default_ipv4.address }}" "Enter IP for core4:"
+prompt_with_default "ANSIBLE_SERVER_IP" "{{ ansible_default_ipv4.address }}" "Enter Ansible control server IP:"
+prompt_with_default "PLEX_SERVER_IP" "{{ ansible_default_ipv4.address }}" "Enter your Plex server IP (if different):"
 
 # DNS Configuration
 echo -e "${GREEN}=== DNS Configuration ===${NC}"
@@ -134,6 +133,16 @@ echo "LIDARR_API_KEY=$(generate_password)" >> .env
 echo "READARR_API_KEY=$(generate_password)" >> .env
 echo "SABNZBD_API_KEY=$(generate_password)" >> .env
 echo -e "${GREEN}✓ Generated API keys for media services${NC}"
+echo
+
+# RomM Configuration
+echo -e "${GREEN}=== RomM Configuration ===${NC}"
+echo -e "${YELLOW}Generating RomM credentials...${NC}"
+echo "ROMM_ADMIN_PASSWORD=$(generate_password)" >> .env
+echo "ROMM_SECRET_KEY=$(generate_password)" >> .env
+echo "ROMM_DATABASE_PASSWORD=$(generate_password)" >> .env
+echo "ROMM_API_KEY=$(generate_password)" >> .env
+echo -e "${GREEN}✓ Generated RomM credentials${NC}"
 echo
 
 # Notification Configuration (Optional)

@@ -1,0 +1,3829 @@
+{
+  "hardcoded_results": {
+    "password": [
+      [
+        "tasks/backup_databases.yml",
+        20,
+        "mongodump --uri=\"mongodb://{{ item.user }}:{{ item.password }}@{{ item.host | default('localhost') }}:{{ item.port | default('27017') }}/{{ item.name }}\" --gzip --archive={{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.archive"
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        100,
+        "new_vault_postgresql_password: \"Db{{ lookup('password', '/dev/null chars=ascii_letters,digits length=30') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        101,
+        "new_vault_redis_password: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        102,
+        "new_vault_media_database_password: \"Db{{ lookup('password', '/dev/null chars=ascii_letters,digits length=30') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        103,
+        "new_vault_paperless_database_password: \"Db{{ lookup('password', '/dev/null chars=ascii_letters,digits length=30') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        108,
+        "new_vault_grafana_admin_password: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits,punctuation length=32') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        109,
+        "new_vault_authentik_admin_password: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits,punctuation length=32') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        110,
+        "new_vault_portainer_admin_password: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits,punctuation length=32') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        111,
+        "new_vault_gitlab_root_password: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits,punctuation length=32') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        116,
+        "new_vault_sonarr_api_key: \"sonarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        117,
+        "new_vault_radarr_api_key: \"radarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        118,
+        "new_vault_lidarr_api_key: \"lidarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        119,
+        "new_vault_readarr_api_key: \"readarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        120,
+        "new_vault_prowlarr_api_key: \"prowlarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        121,
+        "new_vault_bazarr_api_key: \"bazarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        126,
+        "new_vault_authentik_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        127,
+        "new_vault_grafana_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        128,
+        "new_vault_paperless_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        129,
+        "new_vault_immich_jwt_secret: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        84,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c \"SELECT version();\""
+      ],
+      [
+        "tests/performance/load_test.yml",
+        125,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c \"SELECT 1;\" &"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        236,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c \"SELECT pg_sleep(1);\" &"
+      ],
+      [
+        "roles/vaultwarden/tasks/configure.yml",
+        56,
+        "vaultwarden_database_url: \"{{ 'postgresql://' + vaultwarden_database_user + ':' + vaultwarden_postgres_password + '@' + vaultwarden_database_host + ':' + vaultwarden_database_port | string + '/' + vaultwarden_database_name if vaultwarden_database_type == 'postgresql' else 'data/db.sqlite3' }}\""
+      ]
+    ],
+    "localhost": [
+      [
+        "tasks/service_recovery.yml",
+        204,
+        "url: \"{{ service_health_url | default('http://localhost:8080/health') }}\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        56,
+        "url: \"http://localhost:5055/api/v1/status\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        68,
+        "url: \"http://localhost:5055/api/v1/settings/services\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        81,
+        "url: \"http://localhost:5055/api/v1/settings/notifications\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        94,
+        "url: \"http://localhost:5055/api/v1/user\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        107,
+        "url: \"http://localhost:5055/api/v1/settings/permissions\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        120,
+        "url: \"http://localhost:5055/api/v1/settings/webhooks\""
+      ],
+      [
+        "tasks/overseerr.yml",
+        133,
+        "url: \"http://localhost:5055/api/v1/status\""
+      ],
+      [
+        "tasks/network.yml",
+        215,
+        "nmap -sT -O localhost | grep -E \"^[0-9]+|^Host\""
+      ],
+      [
+        "tasks/homepage.yml",
+        89,
+        "url: \"http://localhost:3000\""
+      ],
+      [
+        "tasks/emby.yml",
+        362,
+        "curl -s http://localhost:8096/System/Info/Public"
+      ],
+      [
+        "tasks/emby.yml",
+        397,
+        "if ! curl -s -f http://localhost:8096/System/Info/Public > /dev/null; then"
+      ],
+      [
+        "tasks/emby.yml",
+        403,
+        "STATUS=$(curl -s http://localhost:8096/System/Info/Public | jq -r .ServerName)"
+      ],
+      [
+        "tasks/security.yml",
+        142,
+        "destemail = {{ username }}@localhost  # Alert recipient"
+      ],
+      [
+        "tasks/security.yml",
+        353,
+        "job: \"/usr/bin/aide --check 2>&1 | mail -s 'AIDE Report' {{ username }}@localhost\""
+      ],
+      [
+        "tasks/security.yml",
+        524,
+        "mail -s \"SECURITY INCIDENT\" {{ username }}@localhost 2>/dev/null || true"
+      ],
+      [
+        "tasks/radarr.yml",
+        111,
+        "if ! curl -s -f http://localhost:7878/api/v3/health > /dev/null; then"
+      ],
+      [
+        "tasks/radarr.yml",
+        117,
+        "STATUS=$(curl -s http://localhost:7878/api/v3/health | jq -r .status)"
+      ],
+      [
+        "tasks/lidarr.yml",
+        135,
+        "curl -s http://localhost:8686/api/v1/health"
+      ],
+      [
+        "tasks/lidarr.yml",
+        170,
+        "if ! curl -s -f http://localhost:8686/api/v1/health > /dev/null; then"
+      ],
+      [
+        "tasks/lidarr.yml",
+        176,
+        "STATUS=$(curl -s http://localhost:8686/api/v1/health | jq -r .status)"
+      ],
+      [
+        "tasks/proxmox.yml",
+        14,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        28,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        59,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        76,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        94,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        108,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/proxmox.yml",
+        118,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/mosquitto.yml",
+        66,
+        "if ! nc -z localhost 1883; then"
+      ],
+      [
+        "tasks/portainer.yml",
+        119,
+        "if ! curl -s -f http://localhost:9000/api/status > /dev/null; then"
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        149,
+        "curl -s http://localhost:9115/-/healthy"
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        164,
+        "curl -s \"http://localhost:9115/probe?target=$2&module=https_2xx\" | grep -E \"(probe_success|probe_duration_seconds)\""
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        172,
+        "curl -s \"http://localhost:9115/probe?target=$2&module=https_2xx\" | grep -E \"(probe_ssl_earliest_cert_expiry|probe_ssl_validation_success)\""
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        180,
+        "curl -s \"http://localhost:9115/probe?target=$2&module=dns_udp_53\" | grep -E \"(probe_success|probe_duration_seconds)\""
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        188,
+        "curl -s \"http://localhost:9115/probe?target=$2&module=icmp\" | grep -E \"(probe_success|probe_duration_seconds)\""
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        207,
+        "if ! curl -s http://localhost:9115/-/healthy > /dev/null; then"
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        213,
+        "if ! curl -s http://localhost:9115/metrics > /dev/null; then"
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        219,
+        "if ! curl -s \"http://localhost:9115/probe?target=localhost&module=http_2xx\" > /dev/null; then"
+      ],
+      [
+        "tasks/blackbox_exporter.yml",
+        219,
+        "if ! curl -s \"http://localhost:9115/probe?target=localhost&module=http_2xx\" > /dev/null; then"
+      ],
+      [
+        "tasks/grafana.yml",
+        53,
+        "test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:3000/api/health\"]"
+      ],
+      [
+        "tasks/grafana.yml",
+        75,
+        "domain = localhost"
+      ],
+      [
+        "tasks/grafana.yml",
+        140,
+        "ehlo_identity = localhost"
+      ],
+      [
+        "tasks/grafana.yml",
+        519,
+        "curl -s http://localhost:3000/api/health"
+      ],
+      [
+        "tasks/grafana.yml",
+        560,
+        "if ! curl -s http://localhost:3000/api/health | grep -q \"ok\"; then"
+      ],
+      [
+        "tasks/nginx.yml",
+        195,
+        "if ! curl -s -f http://localhost:80 > /dev/null; then"
+      ],
+      [
+        "tasks/sabnzbd.yml",
+        45,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/api?mode=version\"]"
+      ],
+      [
+        "tasks/sabnzbd.yml",
+        69,
+        "if ! curl -s http://localhost:8080/api?mode=version | grep -q \"version\"; then"
+      ],
+      [
+        "tasks/pulsarr.yml",
+        56,
+        "url: \"http://localhost:8080/api/health\""
+      ],
+      [
+        "tasks/pulsarr.yml",
+        68,
+        "url: \"http://localhost:8080/api/config/plex\""
+      ],
+      [
+        "tasks/pulsarr.yml",
+        81,
+        "url: \"http://localhost:8080/api/config/sonarr\""
+      ],
+      [
+        "tasks/pulsarr.yml",
+        94,
+        "url: \"http://localhost:8080/api/config/radarr\""
+      ],
+      [
+        "tasks/pulsarr.yml",
+        107,
+        "url: \"http://localhost:8080/api/config/notifications\""
+      ],
+      [
+        "tasks/pulsarr.yml",
+        120,
+        "url: \"http://localhost:8080/api/health\""
+      ],
+      [
+        "tasks/storage.yml",
+        135,
+        "-m {{ username }}@localhost \\"
+      ],
+      [
+        "tasks/storage.yml",
+        379,
+        "mail -s \"Storage Alert\" {{ username }}@localhost 2>/dev/null || true"
+      ],
+      [
+        "tasks/readarr.yml",
+        135,
+        "curl -s http://localhost:8787/api/v1/health"
+      ],
+      [
+        "tasks/readarr.yml",
+        170,
+        "if ! curl -s -f http://localhost:8787/api/v1/health > /dev/null; then"
+      ],
+      [
+        "tasks/readarr.yml",
+        176,
+        "STATUS=$(curl -s http://localhost:8787/api/v1/health | jq -r .status)"
+      ],
+      [
+        "tasks/loki.yml",
+        110,
+        "curl -s http://localhost:3100/ready"
+      ],
+      [
+        "tasks/loki.yml",
+        148,
+        "if ! curl -s http://localhost:3100/ready > /dev/null; then"
+      ],
+      [
+        "tasks/loki.yml",
+        154,
+        "if ! curl -s \"http://localhost:3100/loki/api/v1/query?query={}\" > /dev/null; then"
+      ],
+      [
+        "tasks/linkwarden.yml",
+        21,
+        "Local URL: http://localhost:{{ linkwarden_port | default(3000) }}"
+      ],
+      [
+        "tasks/setup.yml",
+        69,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/prowlarr.yml",
+        124,
+        "if ! curl -s http://localhost:9696/health | grep -q \"ok\"; then"
+      ],
+      [
+        "tasks/audiobookshelf.yml",
+        107,
+        "if ! curl -s http://localhost:13378 | grep -q \"Audiobookshelf\"; then"
+      ],
+      [
+        "tasks/bazarr.yml",
+        57,
+        "url: \"http://localhost:6767/api/health\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        69,
+        "url: \"http://localhost:6767/api/sonarr\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        82,
+        "url: \"http://localhost:6767/api/radarr\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        95,
+        "url: \"http://localhost:6767/api/providers\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        108,
+        "url: \"http://localhost:6767/api/languages\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        121,
+        "url: \"http://localhost:6767/api/notifications\""
+      ],
+      [
+        "tasks/bazarr.yml",
+        134,
+        "url: \"http://localhost:6767/api/health\""
+      ],
+      [
+        "tasks/qbittorrent.yml",
+        54,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/api/v2/app/version\"]"
+      ],
+      [
+        "tasks/qbittorrent.yml",
+        80,
+        "if ! curl -s http://localhost:8080/api/v2/app/version | grep -q \"version\"; then"
+      ],
+      [
+        "tasks/qbittorrent.yml",
+        110,
+        "WebUI\\LocalHostAuth=true"
+      ],
+      [
+        "tasks/kibana.yml",
+        122,
+        "curl -s -k https://localhost:5601/api/status | jq ."
+      ],
+      [
+        "tasks/kibana.yml",
+        131,
+        "curl -s -k https://localhost:5601/api/status | jq ."
+      ],
+      [
+        "tasks/kibana.yml",
+        154,
+        "if ! curl -s -k -f https://localhost:5601/api/status > /dev/null; then"
+      ],
+      [
+        "tasks/kibana.yml",
+        160,
+        "STATUS=$(curl -s -k https://localhost:5601/api/status | jq -r .status.overall.level)"
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        7,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/system/status\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        17,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/downloadclient\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        63,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/indexer\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        89,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/qualityprofile\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        241,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/metadataprofile\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        268,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/rootfolder\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        280,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/notification\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        327,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/connection\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        364,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/autotagging\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        396,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/ui\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        424,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/backup\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        440,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/update\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        455,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/security\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        470,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/ssl\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        485,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/proxy\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        504,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/analytics\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        517,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/config/instance\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        534,
+        "url: \"http://localhost:{{ media_lidarr_port | default(8686) }}/api/v1/system/status\""
+      ],
+      [
+        "tasks/backup_databases.yml",
+        6,
+        "pg_dump -U {{ item.user }} -h {{ item.host | default('localhost') }} -p {{ item.port | default('5432') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz"
+      ],
+      [
+        "tasks/backup_databases.yml",
+        14,
+        "mysqldump -u {{ item.user }} -p{{ item.password }} -h {{ item.host | default('localhost') }} -P {{ item.port | default('3306') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz"
+      ],
+      [
+        "tasks/backup_databases.yml",
+        20,
+        "mongodump --uri=\"mongodb://{{ item.user }}:{{ item.password }}@{{ item.host | default('localhost') }}:{{ item.port | default('27017') }}/{{ item.name }}\" --gzip --archive={{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.archive"
+      ],
+      [
+        "tasks/backup_databases.yml",
+        26,
+        "redis-cli -h {{ item.host | default('localhost') }} -p {{ item.port | default('6379') }} -a {{ item.password }} SAVE && cp {{ item.rdb_path | default('/var/lib/redis/dump.rdb') }} {{ backup_root_dir | default('/var/backups') }}/databases/redis-{{ ansible_date_time.iso8601_basic_short }}.rdb"
+      ],
+      [
+        "tasks/monitoring_infrastructure.yml",
+        165,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8086/health\"]"
+      ],
+      [
+        "tasks/monitoring_infrastructure.yml",
+        243,
+        "test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:9090/-/healthy\"]"
+      ],
+      [
+        "tasks/monitoring_infrastructure.yml",
+        301,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:3000/api/health || exit 1\"]"
+      ],
+      [
+        "tasks/komga.yml",
+        115,
+        "if ! curl -s http://localhost:8080 | grep -q \"Komga\"; then"
+      ],
+      [
+        "tasks/media_stack.yml",
+        130,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/api?mode=version\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        180,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/api/v2/app/version\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        211,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:9696/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        244,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8989/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        277,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:7878/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        310,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8686/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        343,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8787/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        375,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:6767/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        408,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8088/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        450,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8096/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        490,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3001/api/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        522,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        579,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3003/health\"]"
+      ],
+      [
+        "tasks/media_stack.yml",
+        972,
+        "if curl -f -s \"http://localhost:$port$path\" >/dev/null 2>&1; then"
+      ],
+      [
+        "tasks/media_stack.yml",
+        1009,
+        "local speed=$(docker-compose exec -T \"$service\" curl -s \"http://localhost:8080/api?mode=diskspace\" | jq -r '.diskspace[].speed' 2>/dev/null || echo \"0\")"
+      ],
+      [
+        "tasks/media_stack.yml",
+        1102,
+        "url: \"http://localhost:{{ item.port }}{{ item.path }}\""
+      ],
+      [
+        "tasks/watchtower.yml",
+        80,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/ping\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        128,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:9000/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        243,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/api/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        291,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:9090/-/healthy\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        339,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8086/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        385,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        482,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8096/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        529,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8989/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        576,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:7878/health\"]"
+      ],
+      [
+        "tasks/watchtower.yml",
+        621,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "tasks/jellyfin.yml",
+        382,
+        "if ! curl -s http://localhost:8096 | grep -q \"Jellyfin\"; then"
+      ],
+      [
+        "tasks/test_notifications.yml",
+        9,
+        "url: \"{{ notifications.email.smtp_url | default('smtp://localhost:587') }}\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        190,
+        "url: \"http://localhost:9093/api/v1/status\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        201,
+        "url: \"http://localhost:9093/api/v1/alerts\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        231,
+        "url: \"http://localhost:9090/api/v1/status/config\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        242,
+        "url: \"http://localhost:9090/api/v1/rules\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        254,
+        "url: \"http://localhost:9090/api/v1/alerts\""
+      ],
+      [
+        "tasks/test_notifications.yml",
+        285,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/test_notifications.yml",
+        302,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/test_notifications.yml",
+        319,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/test_notifications.yml",
+        329,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/test_notifications.yml",
+        340,
+        "delegate_to: localhost"
+      ],
+      [
+        "tasks/influxdb.yml",
+        42,
+        "until curl -s http://localhost:8086/health > /dev/null 2>&1; do"
+      ],
+      [
+        "tasks/influxdb.yml",
+        138,
+        "if ! curl -s http://localhost:8086/health > /dev/null; then"
+      ],
+      [
+        "tasks/influxdb.yml",
+        214,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8086/health\"]"
+      ],
+      [
+        "tasks/tautulli.yml",
+        56,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info\""
+      ],
+      [
+        "tasks/tautulli.yml",
+        68,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_plex_server\""
+      ],
+      [
+        "tasks/tautulli.yml",
+        79,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config\""
+      ],
+      [
+        "tasks/tautulli.yml",
+        90,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config\""
+      ],
+      [
+        "tasks/tautulli.yml",
+        101,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info\""
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        143,
+        "curl -X PUT \"localhost:9200/_snapshot/backup\" -H 'Content-Type: application/json' -d'"
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        152,
+        "curl -X PUT \"localhost:9200/_snapshot/backup/$SNAPSHOT_NAME?wait_for_completion=true\""
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        178,
+        "if ! curl -s -f \"localhost:9200/_snapshot/backup/$SNAPSHOT_NAME\" > /dev/null; then"
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        184,
+        "curl -X POST \"localhost:9200/_snapshot/backup/$SNAPSHOT_NAME/_restore?wait_for_completion=true\""
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        217,
+        "curl -s localhost:9200/_cluster/health | jq ."
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        232,
+        "curl -s localhost:9200/_cluster/health | jq ."
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        235,
+        "curl -s localhost:9200/_cat/indices?v"
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        258,
+        "if ! curl -s -f http://localhost:9200/_cluster/health > /dev/null; then"
+      ],
+      [
+        "tasks/elasticsearch.yml",
+        264,
+        "HEALTH=$(curl -s http://localhost:9200/_cluster/health | jq -r .status)"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        408,
+        "curl -s http://localhost:9093/-/healthy"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        418,
+        "curl -X POST http://localhost:9093/-/reload"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        421,
+        "curl -s http://localhost:9093/api/v2/alerts | jq '.'"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        424,
+        "curl -s http://localhost:9093/api/v2/silences | jq '.'"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        428,
+        "curl -X POST http://localhost:9093/api/v2/alerts \\"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        449,
+        "if ! curl -s http://localhost:9093/-/healthy > /dev/null; then"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        455,
+        "if ! curl -s http://localhost:9093/api/v2/status > /dev/null; then"
+      ],
+      [
+        "tasks/alertmanager.yml",
+        461,
+        "if ! curl -s http://localhost:9093/api/v2/status | jq -e '.config' > /dev/null; then"
+      ],
+      [
+        "tasks/promtail.yml",
+        35,
+        "- localhost"
+      ],
+      [
+        "tasks/promtail.yml",
+        44,
+        "- localhost"
+      ],
+      [
+        "tasks/promtail.yml",
+        60,
+        "- localhost"
+      ],
+      [
+        "tasks/promtail.yml",
+        69,
+        "- localhost"
+      ],
+      [
+        "tasks/promtail.yml",
+        100,
+        "curl -s http://localhost:9080/ready"
+      ],
+      [
+        "tasks/promtail.yml",
+        126,
+        "if ! curl -s http://localhost:9080/ready > /dev/null; then"
+      ],
+      [
+        "tasks/promtail.yml",
+        132,
+        "if ! curl -s http://localhost:9080/metrics > /dev/null; then"
+      ],
+      [
+        "tasks/prometheus.yml",
+        53,
+        "test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:9090/-/healthy\"]"
+      ],
+      [
+        "tasks/prometheus.yml",
+        85,
+        "- targets: ['localhost:9090']"
+      ],
+      [
+        "tasks/prometheus.yml",
+        547,
+        "if ! curl -s http://localhost:9090/-/healthy > /dev/null; then"
+      ],
+      [
+        "tasks/prometheus.yml",
+        553,
+        "if ! curl -s http://localhost:9090/api/v1/query?query=up > /dev/null; then"
+      ],
+      [
+        "tasks/prometheus.yml",
+        559,
+        "target_count=$(curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length')"
+      ],
+      [
+        "tasks/prometheus.yml",
+        565,
+        "rule_count=$(curl -s http://localhost:9090/api/v1/rules | jq '.data.groups | length')"
+      ],
+      [
+        "tasks/prometheus.yml",
+        625,
+        "curl -s http://localhost:9090/-/healthy"
+      ],
+      [
+        "tasks/prometheus.yml",
+        634,
+        "curl -X POST http://localhost:9090/-/reload"
+      ],
+      [
+        "tasks/prometheus.yml",
+        788,
+        "- targets: ['localhost:9090']"
+      ],
+      [
+        "tasks/validate_services.yml",
+        63,
+        "url: \"http://localhost:{{ item.port }}{{ item.endpoint | default('/health') }}\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        84,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c \"SELECT version();\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        97,
+        "redis-cli -h localhost -p 6379 -a {{ vault_redis_password }} ping"
+      ],
+      [
+        "tasks/validate_services.yml",
+        115,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        131,
+        "url: \"http://localhost:3000/api/datasources\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        153,
+        "url: \"http://localhost:8080/api/http/routers\""
+      ],
+      [
+        "tasks/validate_services.yml",
+        168,
+        "url: \"http://localhost:9000/if/user/\""
+      ],
+      [
+        "tasks/samba.yml",
+        94,
+        "if ! nc -z localhost 445; then"
+      ],
+      [
+        "tasks/tdarr.yml",
+        130,
+        "if ! curl -s http://localhost:8265/api/v2/status | grep -q \"status\"; then"
+      ],
+      [
+        "tasks/calibre-web.yml",
+        106,
+        "if ! curl -s http://localhost:8083 | grep -q \"Calibre-Web\"; then"
+      ],
+      [
+        "tasks/sonarr.yml",
+        135,
+        "curl -s http://localhost:8989/api/v3/health"
+      ],
+      [
+        "tasks/sonarr.yml",
+        170,
+        "if ! curl -s -f http://localhost:8989/api/v3/health > /dev/null; then"
+      ],
+      [
+        "tasks/sonarr.yml",
+        176,
+        "STATUS=$(curl -s http://localhost:8989/api/v3/health | jq -r .status)"
+      ],
+      [
+        "tasks/validate/infrastructure.yml",
+        193,
+        "url: \"http://localhost:8080/api/health\""
+      ],
+      [
+        "tasks/validate/traefik.yml",
+        5,
+        "url: \"http://localhost:8080/api/health\""
+      ],
+      [
+        "tasks/validate/traefik.yml",
+        22,
+        "url: \"http://localhost:8080/metrics\""
+      ],
+      [
+        "tasks/validate/traefik.yml",
+        31,
+        "url: \"http://localhost:8080/api/http/routers\""
+      ],
+      [
+        "tasks/validate/health_checks.yml",
+        19,
+        "url: \"http://localhost:{{ item.port }}/health\""
+      ],
+      [
+        "tasks/validate/security.yml",
+        82,
+        "url: \"http://localhost:8080/api/rawdata\""
+      ],
+      [
+        "tasks/validate/pihole.yml",
+        13,
+        "url: \"http://localhost:80/admin/api.php?status\""
+      ],
+      [
+        "tasks/validate/pihole.yml",
+        35,
+        "url: \"http://localhost:80/admin/api.php?summaryRaw\""
+      ],
+      [
+        "tasks/validate/databases.yml",
+        76,
+        "url: \"http://localhost:9200/_cluster/health\""
+      ],
+      [
+        "tasks/validate/databases.yml",
+        99,
+        "url: \"http://localhost:5601/api/status\""
+      ],
+      [
+        "tasks/validate/monitoring.yml",
+        9,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "tasks/validate/monitoring.yml",
+        24,
+        "url: \"http://localhost:3000/api/datasources\""
+      ],
+      [
+        "tasks/validate/monitoring.yml",
+        41,
+        "url: \"http://localhost:3100/loki/api/v1/targets\""
+      ],
+      [
+        "tasks/validate/monitoring.yml",
+        56,
+        "url: \"http://localhost:9093/api/v1/status\""
+      ],
+      [
+        "tasks/validate/monitoring.yml",
+        101,
+        "url: \"http://localhost:9090/api/v1/query?query=up\""
+      ],
+      [
+        "group_vars/all/advanced_config.yml",
+        337,
+        "url: \"http://localhost:5432/health\""
+      ],
+      [
+        "homepage/docker-compose.yml",
+        38,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "homepage/docker-compose.yml",
+        65,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "homepage/docker-compose.yml",
+        90,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3001/health\"]"
+      ],
+      [
+        "homepage/config/config.yml",
+        192,
+        "url: http://localhost:3001"
+      ],
+      [
+        "homepage/config/config.yml",
+        202,
+        "url: http://localhost:9000"
+      ],
+      [
+        "homepage/config/config.yml",
+        208,
+        "url: http://localhost:8080"
+      ],
+      [
+        "homepage/config/docker.yml",
+        69,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "tests/tasks/test_integrations.yml",
+        16,
+        "url: \"http://localhost:5432\""
+      ],
+      [
+        "tests/tasks/test_integrations.yml",
+        24,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        35,
+        "url: \"http://localhost:8989/api/v3/health\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        44,
+        "curl -f http://localhost:6767/api/v1/health"
+      ],
+      [
+        "tests/integration/test_services.yml",
+        51,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        82,
+        "url: \"http://localhost:8080/api/http/services\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        109,
+        "url: \"http://localhost:9000/if/user/\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        180,
+        "url: \"http://localhost:9093/api/v1/status\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        189,
+        "url: \"http://localhost:9090/api/v1/rules\""
+      ],
+      [
+        "tests/integration/test_services.yml",
+        206,
+        "curl -X POST http://localhost:9093/api/v1/alerts \\"
+      ],
+      [
+        "tests/integration/test_services.yml",
+        220,
+        "url: \"http://localhost:8080/api/http/services\""
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        160,
+        "host: localhost"
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        167,
+        "host: localhost"
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        174,
+        "host: localhost"
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        195,
+        "url: http://localhost:9090/-/healthy"
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        205,
+        "url: http://localhost:3000/api/health"
+      ],
+      [
+        "tests/integration/test_deployment.yml",
+        215,
+        "url: http://localhost:3100/ready"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        83,
+        "ab -n 200 -c 5 -r http://localhost:8989/api/v3/health"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        90,
+        "ab -n 1000 -c 10 -r http://localhost:9090/api/v1/query?query=up"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        101,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c \""
+      ],
+      [
+        "tests/performance/load_test.yml",
+        117,
+        "redis-benchmark -h localhost -p 6379 -a {{ vault_redis_password }} -n 10000 -c 10"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        125,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user }} -d homelab -c \"SELECT 1;\" &"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        170,
+        "time curl -s \"http://localhost:9090/api/v1/query?query=up\" | jq '.data.result | length'"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        177,
+        "time curl -s \"http://localhost:3000/api/dashboards\" -H \"Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}\""
+      ],
+      [
+        "tests/performance/load_test.yml",
+        184,
+        "time curl -s \"http://localhost:9090/api/v1/rules\" | jq '.data.groups | length'"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        228,
+        "siege -c 10 -t 30S http://localhost:8989/api/v3/health"
+      ],
+      [
+        "tests/performance/load_test.yml",
+        236,
+        "PGPASSWORD={{ vault_postgresql_password }} psql -h localhost -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c \"SELECT pg_sleep(1);\" &"
+      ],
+      [
+        "roles/databases/tasks/cache.yml",
+        396,
+        "curl -X POST \"http://localhost:9091/metrics/job/redis/instance/{{ ansible_hostname }}\" \\"
+      ],
+      [
+        "roles/databases/tasks/monitoring.yml",
+        365,
+        "url: \"http://localhost:9090/api/v1/status/config\""
+      ],
+      [
+        "roles/databases/tasks/monitoring.yml",
+        374,
+        "url: \"http://localhost:3000/api/health\""
+      ],
+      [
+        "roles/databases/tasks/monitoring.yml",
+        417,
+        "- Prometheus: http://localhost:9090"
+      ],
+      [
+        "roles/databases/tasks/monitoring.yml",
+        418,
+        "- Grafana: http://localhost:3000"
+      ],
+      [
+        "roles/databases/tasks/monitoring.yml",
+        419,
+        "- AlertManager: http://localhost:9093"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        145,
+        "curl -X PUT \"localhost:{{ elasticsearch_port }}/_snapshot/backup\" -H 'Content-Type: application/json' -d'"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        154,
+        "curl -X PUT \"localhost:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME?wait_for_completion=true\""
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        180,
+        "if ! curl -s -f \"localhost:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME\" > /dev/null; then"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        186,
+        "curl -X POST \"localhost:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME/_restore?wait_for_completion=true\""
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        219,
+        "curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq ."
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        234,
+        "curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq ."
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        237,
+        "curl -s \"localhost:{{ elasticsearch_port }}/_cat/indices?v\" | jq ."
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        260,
+        "if ! curl -s -f \"localhost:{{ elasticsearch_port }}/_cluster/health\" > /dev/null 2>&1; then"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        266,
+        "STATUS=$(curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq -r .status)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        445,
+        "curl -s -k https://localhost:{{ kibana_port }}/api/status | jq ."
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        454,
+        "curl -s -k https://localhost:{{ kibana_port }}/api/status | jq ."
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        477,
+        "if ! curl -s -k -f https://localhost:{{ kibana_port }}/api/status > /dev/null 2>&1; then"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        483,
+        "STATUS=$(curl -s -k https://localhost:{{ kibana_port }}/api/status | jq -r .status.overall.level)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        606,
+        "HEALTH=$(curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq -r .status)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        609,
+        "NODES=$(curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq -r .number_of_nodes)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        612,
+        "INDICES=$(curl -s \"localhost:{{ elasticsearch_port }}/_cat/indices?v\" | wc -l)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        615,
+        "UNASSIGNED_SHARDS=$(curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\" | jq -r .unassigned_shards)"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        658,
+        "HEALTH=$(curl -s \"localhost:{{ elasticsearch_port }}/_cluster/health\")"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        668,
+        "NODE_STATS=$(curl -s \"localhost:{{ elasticsearch_port }}/_nodes/stats\")"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        677,
+        "curl -X POST \"http://localhost:9091/metrics/job/elasticsearch/instance/{{ ansible_hostname }}\" \\"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        699,
+        "STATUS=$(curl -s -k \"https://localhost:{{ kibana_port }}/api/status\")"
+      ],
+      [
+        "roles/databases/tasks/search.yml",
+        710,
+        "curl -X POST \"http://localhost:9091/metrics/job/kibana/instance/{{ ansible_hostname }}\" \\"
+      ],
+      [
+        "roles/databases/tasks/alerts.yml",
+        53,
+        "url: http://localhost:9090/api/v1/rules"
+      ],
+      [
+        "roles/databases/tasks/alerts.yml",
+        71,
+        "url: http://localhost:9093/api/v1/status"
+      ],
+      [
+        "roles/databases/tasks/prerequisites.yml",
+        209,
+        "- targets: ['localhost:9090']"
+      ],
+      [
+        "roles/databases/search/tasks/kibana.yml",
+        54,
+        "test: [\"CMD\", \"curl\", \"-s\", \"-k\", \"https://localhost:{{ kibana_web_port }}/api/status\"]"
+      ],
+      [
+        "roles/databases/search/tasks/kibana.yml",
+        63,
+        "ansible.builtin.command: docker exec {{ kibana_container_name }} curl -s -k https://localhost:{{ kibana_web_port }}/api/status"
+      ],
+      [
+        "roles/databases/search/tasks/elasticsearch.yml",
+        73,
+        "test: [\"CMD\", \"curl\", \"-s\", \"-k\", \"https://localhost:{{ elasticsearch_web_port }}/_cluster/health\"]"
+      ],
+      [
+        "roles/databases/search/tasks/elasticsearch.yml",
+        82,
+        "ansible.builtin.command: docker exec {{ elasticsearch_container_name }} curl -s -k https://localhost:{{ elasticsearch_web_port }}/_cluster/health"
+      ],
+      [
+        "roles/databases/defaults/main.yml",
+        418,
+        "databases_smtp_host: \"{{ smtp_host | default('localhost') }}\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        7,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        62,
+        "- \"http://localhost:{{ homepage_port }}/api/services\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        63,
+        "- \"http://localhost:{{ homepage_port }}/api/bookmarks\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        64,
+        "- \"http://localhost:{{ homepage_port }}/api/widgets\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        69,
+        "url: \"http://localhost:{{ homepage_port }}/api/metrics\""
+      ],
+      [
+        "roles/homepage/tasks/validation.yml",
+        78,
+        "url: \"http://localhost:{{ homepage_port }}/api/auth/status\""
+      ],
+      [
+        "roles/homepage/tasks/configure.yml",
+        7,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "roles/homepage/tasks/configure.yml",
+        20,
+        "HOMEPAGE_URL: \"http://localhost:{{ homepage_port }}\""
+      ],
+      [
+        "roles/homepage/tasks/configure.yml",
+        34,
+        "url: \"http://localhost:{{ homepage_port }}/api/services\""
+      ],
+      [
+        "roles/homepage/tasks/configure.yml",
+        43,
+        "url: \"http://localhost:{{ homepage_port }}/api/bookmarks\""
+      ],
+      [
+        "roles/homepage/tasks/configure.yml",
+        52,
+        "url: \"http://localhost:{{ homepage_port }}/api/weather\""
+      ],
+      [
+        "roles/homepage/tasks/automation_integration.yml",
+        63,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "roles/homepage/tasks/automation_integration.yml",
+        96,
+        "url: \"http://localhost:{{ homepage_port }}/api/services\""
+      ],
+      [
+        "roles/homepage/tasks/automation_integration.yml",
+        143,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "roles/homepage/tasks/deploy.yml",
+        129,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "roles/homepage/tasks/deploy.yml",
+        157,
+        "Local URL: http://localhost:{{ homepage_port }}"
+      ],
+      [
+        "roles/jellyfin/tasks/validate_deployment.yml",
+        6,
+        "url: \"http://localhost:{{ jellyfin_external_port }}\""
+      ],
+      [
+        "roles/jellyfin/tasks/deploy.yml",
+        33,
+        "url: \"http://localhost:{{ jellyfin_external_port }}\""
+      ],
+      [
+        "roles/jellyfin/defaults/main.yml",
+        23,
+        "jellyfin_domain: \"jellyfin.{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/security/tasks/validate_deployment.yml",
+        19,
+        "url: \"http://localhost:8080/api/rawdata\""
+      ],
+      [
+        "roles/security/proxy/tasks/deploy.yml",
+        251,
+        "curl -s http://localhost:8080/api/rawdata"
+      ],
+      [
+        "roles/security/proxy/tasks/deploy.yml",
+        288,
+        "if ! curl -s http://localhost:8080/api/rawdata > /dev/null; then"
+      ],
+      [
+        "roles/security/firewall/tasks/deploy.yml",
+        246,
+        "metrics) curl -s http://localhost:6060/metrics;;"
+      ],
+      [
+        "roles/security/firewall/tasks/deploy.yml",
+        259,
+        "if ! curl -s http://localhost:6060/metrics > /dev/null; then echo \"CrowdSec metrics are not accessible\"; exit 1; fi"
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        84,
+        "url: \"http://localhost:80/admin/api.php?status\""
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        95,
+        "url: \"http://localhost:80/admin/api.php\""
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        109,
+        "url: \"http://localhost:80/admin/api.php\""
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        122,
+        "url: \"http://localhost:80/admin/api.php?update\""
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        130,
+        "url: \"http://localhost:9090/-/reload\""
+      ],
+      [
+        "roles/security/dns/tasks/deploy.yml",
+        147,
+        "url: \"http://localhost:8080/api/rawdata\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        7,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        69,
+        "- \"http://localhost:{{ security_authentik.port }}/api/v3/core/users/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        70,
+        "- \"http://localhost:{{ security_authentik.port }}/api/v3/core/groups/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        71,
+        "- \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        72,
+        "- \"http://localhost:{{ security_authentik.port }}/api/v3/policies/user/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        73,
+        "- \"http://localhost:{{ security_authentik.port }}/api/v3/core/tokens/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        79,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/users/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        89,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/groups/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        99,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        109,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/policies/user/\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        119,
+        "url: \"http://localhost:{{ security_authentik.port }}/metrics\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        129,
+        "url: \"http://localhost:{{ security_authentik.port }}/health\""
+      ],
+      [
+        "roles/security/authentication/tasks/validation.yml",
+        167,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        83,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        96,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/users/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        157,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        167,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/users/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        177,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/groups/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        187,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/policies/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        239,
+        "url: \"http://localhost:{{ security_authentik.port }}/api/v3/core/applications/\""
+      ],
+      [
+        "roles/security/authentication/tasks/automation_integration.yml",
+        341,
+        "3. API Health Check: curl -v http://localhost:{{ security_authentik.port }}/api/v3/core/applications/"
+      ],
+      [
+        "roles/security/authentication/tasks/deploy.yml",
+        402,
+        "url: \"http://localhost:9000/if/user/\""
+      ],
+      [
+        "roles/security/authentication/tasks/deploy.yml",
+        422,
+        "AUTHENTIK_URL: \"http://localhost:9000\""
+      ],
+      [
+        "roles/immich/defaults/main.yml",
+        475,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3001/api/health\"]"
+      ],
+      [
+        "roles/immich/defaults/main.yml",
+        501,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3003/health\"]"
+      ],
+      [
+        "roles/immich/defaults/main.yml",
+        571,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3005/health\"]"
+      ],
+      [
+        "roles/immich/defaults/main.yml",
+        719,
+        "immich_smtp_host: \"{{ smtp_host | default('localhost') }}\""
+      ],
+      [
+        "roles/fing/tasks/homepage.yml",
+        344,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/homepage.yml",
+        352,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/fing/tasks/security.yml",
+        206,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/security.yml",
+        232,
+        "url: \"http://localhost:{{ fing_web_port }}/security/health\""
+      ],
+      [
+        "roles/fing/tasks/security.yml",
+        243,
+        "url: \"http://localhost:{{ fing_web_port }}/auth/login\""
+      ],
+      [
+        "roles/fing/tasks/security.yml",
+        261,
+        "url: \"http://localhost:{{ fing_web_port }}/api/test\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        19,
+        "url: \"http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        32,
+        "url: \"http://localhost:{{ fing_api_port }}/api/{{ fing_api_version }}/health\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        47,
+        "url: \"http://localhost:{{ fing_metrics_port }}/metrics\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        88,
+        "url: \"http://localhost:{{ fing_web_port }}/auth/login\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        125,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        140,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/fing/tasks/validate_deployment.yml",
+        278,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/deploy.yml",
+        72,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/deploy.yml",
+        80,
+        "url: \"http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}\""
+      ],
+      [
+        "roles/fing/tasks/deploy.yml",
+        190,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/deploy.yml",
+        198,
+        "url: \"http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}\""
+      ],
+      [
+        "roles/fing/tasks/monitoring.yml",
+        193,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/fing/tasks/monitoring.yml",
+        206,
+        "url: \"http://localhost:{{ fing_metrics_port }}/metrics\""
+      ],
+      [
+        "roles/fing/tasks/monitoring.yml",
+        218,
+        "url: \"http://localhost:{{ fing_web_port }}{{ fing_health_check_url }}\""
+      ],
+      [
+        "roles/fing/tasks/monitoring.yml",
+        229,
+        "url: \"http://localhost:{{ fing_api_port }}/api/{{ fing_api_version }}/health\""
+      ],
+      [
+        "roles/fing/defaults/main.yml",
+        31,
+        "fing_database_host: \"{{ postgresql_host | default('localhost') }}\""
+      ],
+      [
+        "roles/fing/defaults/main.yml",
+        183,
+        "fing_smtp_host: \"{{ smtp_host | default('localhost') }}\""
+      ],
+      [
+        "roles/dumbassets/tasks/validate_deployment.yml",
+        32,
+        "url: \"http://localhost:{{ dumbassets_port }}\""
+      ],
+      [
+        "roles/dumbassets/tasks/validate_deployment.yml",
+        40,
+        "url: \"http://localhost:{{ dumbassets_port }}/api/health\""
+      ],
+      [
+        "roles/dumbassets/tasks/validate_deployment.yml",
+        87,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "roles/dumbassets/tasks/validate_deployment.yml",
+        120,
+        "- Local: http://localhost:{{ dumbassets_port }}"
+      ],
+      [
+        "roles/dumbassets/tasks/deploy.yml",
+        86,
+        "url: \"http://localhost:{{ dumbassets_port }}\""
+      ],
+      [
+        "roles/dumbassets/tasks/deploy.yml",
+        104,
+        "- Local URL: http://localhost:{{ dumbassets_port }}"
+      ],
+      [
+        "roles/testservice/tasks/validate_deployment.yml",
+        6,
+        "url: \"http://localhost:{{ testservice_external_port }}\""
+      ],
+      [
+        "roles/testservice/tasks/deploy.yml",
+        33,
+        "url: \"http://localhost:{{ testservice_external_port }}\""
+      ],
+      [
+        "roles/testservice/defaults/main.yml",
+        23,
+        "testservice_domain: \"testservice.{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        67,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:3001/api/healthz\"]"
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        100,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:8080/health\"]"
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        125,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:3002/health\"]"
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        219,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:3567/hello\"]"
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        244,
+        "test: [\"CMD-SHELL\", \"curl -f http://localhost:9981/health\"]"
+      ],
+      [
+        "roles/grafana/tasks/deploy-dashboards.yml",
+        151,
+        "url: \"http://localhost:{{ grafana_port | default(3000) }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/deploy-dashboards.yml",
+        161,
+        "url: \"http://localhost:{{ grafana_port | default(3000) }}/api/dashboards/db/homelab-overview\""
+      ],
+      [
+        "roles/grafana/tasks/deploy-dashboards.yml",
+        172,
+        "url: \"http://localhost:{{ grafana_port | default(3000) }}/api/v1/provisioning/alert-rules\""
+      ],
+      [
+        "roles/grafana/tasks/deploy-dashboards.yml",
+        183,
+        "url: \"http://localhost:{{ grafana_port | default(3000) }}/api/v1/provisioning/notification-policies\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        13,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        22,
+        "url: \"http://localhost:{{ grafana_port }}/api/user\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        34,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        46,
+        "url: \"http://localhost:{{ grafana_port }}/api/search\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        58,
+        "url: \"http://localhost:{{ grafana_port }}/api/folders\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        70,
+        "url: \"http://localhost:{{ grafana_port }}/api/alert-notifications\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        82,
+        "url: \"http://localhost:{{ grafana_port }}/api/admin/users\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        94,
+        "url: \"http://localhost:{{ grafana_port }}/api/teams/search\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        106,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}/health\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        156,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        211,
+        "- \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        212,
+        "- \"http://localhost:{{ grafana_port }}/api/dashboards\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        213,
+        "- \"http://localhost:{{ grafana_port }}/api/folders\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        214,
+        "- \"http://localhost:{{ grafana_port }}/api/alerting/alertmanager/grafana/config\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        219,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        228,
+        "url: \"http://localhost:{{ grafana_port }}/api/search\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        237,
+        "url: \"http://localhost:{{ grafana_port }}/api/alerting/alertmanager/grafana/config\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        246,
+        "url: \"http://localhost:{{ grafana_port }}/api/admin/settings\""
+      ],
+      [
+        "roles/grafana/tasks/validation.yml",
+        280,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/users.yml",
+        7,
+        "url: \"http://localhost:{{ grafana_port }}/api/admin/users\""
+      ],
+      [
+        "roles/grafana/tasks/users.yml",
+        23,
+        "--url http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/users.yml",
+        36,
+        "--url http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/users.yml",
+        48,
+        "url: \"http://localhost:{{ grafana_port }}/api/admin/users\""
+      ],
+      [
+        "roles/grafana/tasks/users.yml",
+        60,
+        "url: \"http://localhost:{{ grafana_port }}/api/teams/search\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        87,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        99,
+        "url: \"http://localhost:{{ grafana_port }}/api/admin/users/1/password\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        162,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        173,
+        "url: \"http://localhost:{{ grafana_port }}/api/search\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        184,
+        "url: \"http://localhost:{{ grafana_port }}/api/v1/provisioning/alert-rules\""
+      ],
+      [
+        "roles/grafana/tasks/automation_integration.yml",
+        233,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        87,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        101,
+        "url: \"http://localhost:{{ grafana_port }}/api/search\""
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        132,
+        "url: \"http://localhost:{{ grafana_port }}/api/v1/provisioning/alert-rules\""
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        158,
+        "url: \"http://localhost:{{ grafana_port }}/api/v1/provisioning/notification-policies\""
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        224,
+        "- Grafana Dashboard: http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        225,
+        "- Alertmanager: http://localhost:9093"
+      ],
+      [
+        "roles/grafana/tasks/dashboards.yml",
+        226,
+        "- Prometheus: http://localhost:9090"
+      ],
+      [
+        "roles/grafana/tasks/deploy.yml",
+        127,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/grafana/tasks/deploy.yml",
+        143,
+        "- URL: http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/alerts.yml",
+        7,
+        "url: \"http://localhost:{{ grafana_port }}/api/alert-notifications\""
+      ],
+      [
+        "roles/grafana/tasks/alerts.yml",
+        23,
+        "--url http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/alerts.yml",
+        36,
+        "--url http://localhost:{{ grafana_port }}"
+      ],
+      [
+        "roles/grafana/tasks/alerts.yml",
+        48,
+        "url: \"http://localhost:{{ grafana_port }}/api/alert-notifications\""
+      ],
+      [
+        "roles/grafana/tasks/alerts.yml",
+        60,
+        "url: \"http://localhost:{{ grafana_port }}/api/alerts\""
+      ],
+      [
+        "roles/grafana/tasks/datasources.yml",
+        38,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "roles/grafana/tasks/datasources.yml",
+        53,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}\""
+      ],
+      [
+        "roles/grafana/tasks/datasources.yml",
+        67,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources/{{ item.key }}/health\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        17,
+        "grafana_domain: \"grafana.{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        21,
+        "grafana_database_host: \"localhost\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        183,
+        "email: \"admin@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        188,
+        "email: \"viewer@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        193,
+        "email: \"editor@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        202,
+        "email: \"admins@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        206,
+        "email: \"viewers@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        210,
+        "email: \"editors@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        231,
+        "addresses: \"admin@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/storage/tasks/monitoring.yml",
+        14,
+        "-m {{ username }}@localhost \\"
+      ],
+      [
+        "roles/storage/tasks/monitoring.yml",
+        60,
+        "if ! nc -z localhost 445; then"
+      ],
+      [
+        "roles/storage/defaults/main.yml",
+        59,
+        "prometheus_pushgateway: http://localhost:9091"
+      ],
+      [
+        "roles/storage/handlers/main.yml",
+        60,
+        "ansible.builtin.command: smbclient -L //localhost"
+      ],
+      [
+        "roles/storage/handlers/main.yml",
+        68,
+        "url: \"http://localhost:8384/rest/system/status\""
+      ],
+      [
+        "roles/storage/handlers/main.yml",
+        76,
+        "url: \"http://localhost:8080/status.php\""
+      ],
+      [
+        "roles/utilities/tasks/validate_deployment.yml",
+        26,
+        "url: \"http://localhost:{{ portainer_port }}\""
+      ],
+      [
+        "roles/utilities/tasks/validate_deployment.yml",
+        36,
+        "url: \"http://localhost:{{ tdarr_port }}\""
+      ],
+      [
+        "roles/utilities/tasks/validate_deployment.yml",
+        46,
+        "url: \"http://localhost:{{ tautulli_port }}\""
+      ],
+      [
+        "roles/utilities/tasks/validate_deployment.yml",
+        56,
+        "url: \"http://localhost:3000\""
+      ],
+      [
+        "roles/utilities/tasks/monitoring.yml",
+        57,
+        "url: \"http://localhost:9090/api/v1/status/config\""
+      ],
+      [
+        "roles/utilities/tasks/monitoring.yml",
+        66,
+        "url: \"http://localhost:3000/api/health\""
+      ],
+      [
+        "roles/utilities/dashboards/tasks/main.yml",
+        61,
+        "url: \"http://localhost:3000\""
+      ],
+      [
+        "roles/utilities/dashboards/tasks/main.yml",
+        114,
+        "url: \"http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info\""
+      ],
+      [
+        "roles/n8n/tasks/homepage.yml",
+        75,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        27,
+        "url: \"http://localhost:{{ n8n_port }}/healthz\""
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        36,
+        "url: \"http://localhost:{{ n8n_port }}\""
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        67,
+        "url: \"http://localhost:{{ n8n_port }}/metrics\""
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        84,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        134,
+        "- Local URL: http://localhost:{{ n8n_port }}"
+      ],
+      [
+        "roles/n8n/tasks/deploy.yml",
+        72,
+        "url: \"http://localhost:{{ n8n_port }}/healthz\""
+      ],
+      [
+        "roles/n8n/tasks/monitoring.yml",
+        95,
+        "- \"http://localhost:{{ n8n_port }}/healthz\""
+      ],
+      [
+        "roles/n8n/tasks/monitoring.yml",
+        96,
+        "- \"http://localhost:{{ n8n_port }}/metrics\""
+      ],
+      [
+        "roles/n8n/tasks/alerts.yml",
+        99,
+        "url: \"http://localhost:9093/api/v1/status\""
+      ],
+      [
+        "roles/n8n/tasks/alerts.yml",
+        109,
+        "url: \"http://localhost:9090/api/v1/rules\""
+      ],
+      [
+        "roles/n8n/defaults/main.yml",
+        72,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:5678/healthz\"]"
+      ],
+      [
+        "roles/reconya/tasks/validate_deployment.yml",
+        22,
+        "url: \"http://localhost:{{ reconya_port }}/api/health\""
+      ],
+      [
+        "roles/reconya/tasks/validate_deployment.yml",
+        43,
+        "url: \"http://localhost:{{ reconya_port }}/api/devices\""
+      ],
+      [
+        "roles/reconya/tasks/validate_deployment.yml",
+        116,
+        "- \"Local: http://localhost:{{ reconya_port }}\""
+      ],
+      [
+        "roles/reconya/defaults/main.yml",
+        67,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3008/api/health\"]"
+      ],
+      [
+        "roles/testservice2/tasks/validate_deployment.yml",
+        6,
+        "url: \"http://localhost:{{ testservice2_external_port }}\""
+      ],
+      [
+        "roles/testservice2/tasks/deploy.yml",
+        33,
+        "url: \"http://localhost:{{ testservice2_external_port }}\""
+      ],
+      [
+        "roles/testservice2/defaults/main.yml",
+        23,
+        "testservice2_domain: \"testservice2.{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/romm/tasks/validate_deployment.yml",
+        6,
+        "url: \"http://localhost:{{ romm_external_port }}\""
+      ],
+      [
+        "roles/romm/tasks/deploy.yml",
+        44,
+        "url: \"http://localhost:{{ romm_external_port }}\""
+      ],
+      [
+        "roles/romm/tasks/deploy.yml",
+        56,
+        "url: \"http://localhost:{{ romm_external_port }}/api/v1/auth/register\""
+      ],
+      [
+        "roles/romm/tasks/deploy.yml",
+        71,
+        "url: \"http://localhost:{{ romm_external_port }}/api/v1/auth/api-key\""
+      ],
+      [
+        "roles/romm/defaults/main.yml",
+        24,
+        "romm_domain: \"romm.{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/romm/defaults/main.yml",
+        43,
+        "romm_database_host: \"{{ postgresql_host | default('localhost') }}\""
+      ],
+      [
+        "roles/vaultwarden/tasks/homepage.yml",
+        54,
+        "url: \"http://localhost:{{ homepage_port }}/api/services\""
+      ],
+      [
+        "roles/vaultwarden/tasks/validate_deployment.yml",
+        37,
+        "url: \"http://localhost:{{ vaultwarden_port }}/alive\""
+      ],
+      [
+        "roles/vaultwarden/tasks/deploy.yml",
+        98,
+        "url: \"http://localhost:{{ vaultwarden_port }}/alive\""
+      ],
+      [
+        "roles/vaultwarden/tasks/deploy.yml",
+        126,
+        "Local URL: http://localhost:{{ vaultwarden_port }}"
+      ],
+      [
+        "roles/vaultwarden/tasks/monitoring.yml",
+        64,
+        "- \"http://localhost:{{ prometheus_port }}/api/v1/targets\""
+      ],
+      [
+        "roles/vaultwarden/tasks/monitoring.yml",
+        65,
+        "- \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "roles/vaultwarden/tasks/monitoring.yml",
+        83,
+        "- URL: http://localhost:{{ vaultwarden_port }}/alive"
+      ],
+      [
+        "roles/vaultwarden/tasks/alerts.yml",
+        78,
+        "url: \"http://localhost:{{ alertmanager_port }}/api/v1/alerts\""
+      ],
+      [
+        "roles/vaultwarden/defaults/main.yml",
+        100,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:80/alive\"]"
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        6,
+        "url: \"http://localhost:{{ home_assistant_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        18,
+        "url: \"http://localhost:{{ zigbee2mqtt_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        30,
+        "url: \"http://localhost:{{ node_red_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        42,
+        "url: \"http://localhost:{{ n8n_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        54,
+        "url: \"http://localhost:9090/api/v1/targets\""
+      ],
+      [
+        "roles/automation/tasks/validate_deployment.yml",
+        87,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/automation/tasks/validate.yml",
+        20,
+        "url: \"http://localhost:{{ node_red_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate.yml",
+        32,
+        "url: \"http://localhost:{{ n8n_port }}\""
+      ],
+      [
+        "roles/automation/tasks/validate.yml",
+        72,
+        "url: \"http://localhost:3000/api/services\""
+      ],
+      [
+        "roles/automation/tasks/monitoring.yml",
+        57,
+        "url: \"http://localhost:9090/api/v1/status/config\""
+      ],
+      [
+        "roles/automation/tasks/monitoring.yml",
+        66,
+        "url: \"http://localhost:3000/api/health\""
+      ],
+      [
+        "roles/automation/container_management/tasks/main.yml",
+        112,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/ping\"]"
+      ],
+      [
+        "roles/linkwarden/tasks/homepage.yml",
+        27,
+        "url: \"http://localhost:{{ homepage_port }}/api/reload\""
+      ],
+      [
+        "roles/linkwarden/tasks/validate_deployment.yml",
+        7,
+        "url: \"http://localhost:{{ linkwarden_port }}/api/health\""
+      ],
+      [
+        "roles/linkwarden/tasks/deploy.yml",
+        91,
+        "url: \"http://localhost:{{ linkwarden_port }}/api/health\""
+      ],
+      [
+        "roles/linkwarden/tasks/deploy.yml",
+        119,
+        "Local URL: http://localhost:{{ linkwarden_port }}"
+      ],
+      [
+        "roles/linkwarden/defaults/main.yml",
+        50,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3002/api/health\"]"
+      ],
+      [
+        "roles/logging/defaults/main.yml",
+        198,
+        "url: \"http://loki.{{ domain | default('localhost') }}:3100\""
+      ],
+      [
+        "roles/logging/defaults/main.yml",
+        203,
+        "url: \"http://grafana.{{ domain | default('localhost') }}:3000/explore\""
+      ],
+      [
+        "roles/logging/handlers/main.yml",
+        45,
+        "url: \"http://localhost:3100/ready\""
+      ],
+      [
+        "roles/logging/handlers/main.yml",
+        53,
+        "url: \"http://localhost:9080/ready\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        27,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        35,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        43,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        74,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/health/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        97,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/health/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        169,
+        "url: \"http://localhost:{{ alertmanager_port | default(9093) }}/api/v1/status\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate.yml",
+        132,
+        "- { host: \"{{ influxdb_host | default('localhost') }}\", port: \"{{ influxdb_port | default(8086) }}\" }"
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate.yml",
+        133,
+        "- { host: \"{{ prometheus_host | default('localhost') }}\", port: \"{{ prometheus_port | default(9090) }}\" }"
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate.yml",
+        134,
+        "- { host: \"{{ loki_host | default('localhost') }}\", port: \"{{ loki_port | default(3100) }}\" }"
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        40,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        64,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        78,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/users/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        89,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/users/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        117,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        133,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        149,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        212,
+        "host: \"localhost\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/deploy.yml",
+        221,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/monitoring.yml",
+        205,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/monitoring.yml",
+        213,
+        "url: \"http://localhost:{{ paperless_ngx_web_port }}/api/health/\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/alerts.yml",
+        186,
+        "url: \"http://localhost:{{ alertmanager_port | default(9093) }}/api/v1/status\""
+      ],
+      [
+        "roles/paperless_ngx/defaults/main.yml",
+        205,
+        "paperless_ngx_smtp_host: \"{{ smtp_host | default('localhost') }}\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        17,
+        "url: \"http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        27,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        37,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        47,
+        "url: \"http://localhost:{{ prometheus_port | default(9090) }}/api/v1/targets\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        88,
+        "url: \"http://localhost:{{ loki_port | default(3100) }}/ready\""
+      ],
+      [
+        "roles/media/tasks/validate_deployment.yml",
+        97,
+        "url: \"http://localhost:{{ prometheus_port | default(9090) }}/api/v1/query?query=up\""
+      ],
+      [
+        "roles/media/tasks/players.yml",
+        31,
+        "url: \"http://localhost:{{ media_players.jellyfin.port }}/health\""
+      ],
+      [
+        "roles/media/tasks/players.yml",
+        45,
+        "url: \"http://localhost:{{ media_players.immich.port }}/health\""
+      ],
+      [
+        "roles/media/tasks/arr_services.yml",
+        14,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "roles/media/tasks/downloaders.yml",
+        21,
+        "url: \"http://localhost:{{ media_ports.sabnzbd }}/api?mode=version\""
+      ],
+      [
+        "roles/media/tasks/downloaders.yml",
+        32,
+        "url: \"http://localhost:{{ media_ports.qbittorrent }}/api/v2/app/version\""
+      ],
+      [
+        "roles/media/players/tasks/main.yml",
+        33,
+        "url: \"http://localhost:{{ media_players.jellyfin.port }}/health\""
+      ],
+      [
+        "roles/media/players/tasks/main.yml",
+        44,
+        "url: \"http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}\""
+      ],
+      [
+        "roles/media/players/tasks/main.yml",
+        171,
+        "url: \"http://localhost:{{ media_players.jellyfin.port }}/System/Info\""
+      ],
+      [
+        "roles/media/players/tasks/main.yml",
+        179,
+        "url: \"http://localhost:{{ media_players.immich.port }}/api/health\""
+      ],
+      [
+        "roles/media/players/tasks/main.yml",
+        187,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "roles/media/downloaders/tasks/main.yml",
+        29,
+        "url: \"http://localhost:{{ media_downloaders.sabnzbd.port }}/api?mode=version\""
+      ],
+      [
+        "roles/media/downloaders/tasks/main.yml",
+        40,
+        "url: \"http://localhost:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version\""
+      ],
+      [
+        "roles/media/downloaders/tasks/main.yml",
+        51,
+        "url: \"http://localhost:{{ media_downloaders.sabnzbd.port }}/api\""
+      ],
+      [
+        "roles/media/downloaders/tasks/main.yml",
+        63,
+        "url: \"http://localhost:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version\""
+      ],
+      [
+        "roles/media/downloaders/tasks/main.yml",
+        139,
+        "url: \"http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}\""
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        89,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8080/api?mode=version\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        117,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8081/api/v2/app/version\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        141,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:9696/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        165,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8989/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        189,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:7878/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        213,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8686/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        237,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8787/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        260,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:6767/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        283,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8088/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        319,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8096/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        353,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3001/api/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        381,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3000/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        430,
+        "test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:3003/health\"]"
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        567,
+        "media_smtp_host: \"{{ smtp_host | default('localhost') }}\""
+      ],
+      [
+        "roles/media/arr_services/tasks/main.yml",
+        79,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "roles/media/arr_services/tasks/main.yml",
+        222,
+        "url: \"http://localhost:{{ item.value.port }}/api/v3/system/status\""
+      ],
+      [
+        "roles/media/arr_services/tasks/main.yml",
+        231,
+        "url: \"http://localhost:{{ item.value.port }}/health\""
+      ],
+      [
+        "playbooks/certificate_management.yml",
+        44,
+        "url: \"http://localhost:8080/api/health\""
+      ],
+      [
+        "playbooks/homepage_grafana_authentik_automation.yml",
+        222,
+        "url: \"http://localhost:{{ authentik_port }}/api/v3/core/applications/\""
+      ],
+      [
+        "playbooks/homepage_grafana_authentik_automation.yml",
+        255,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "playbooks/homepage_grafana_authentik_automation.yml",
+        288,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "playbooks/homepage_grafana_authentik_automation.yml",
+        399,
+        "url: \"http://localhost:{{ grafana_port }}/api/datasources\""
+      ],
+      [
+        "playbooks/homepage_grafana_automation.yml",
+        154,
+        "url: \"http://localhost:{{ homepage_port }}/api/health\""
+      ],
+      [
+        "playbooks/homepage_grafana_automation.yml",
+        190,
+        "url: \"http://localhost:{{ grafana_port }}/api/health\""
+      ],
+      [
+        "playbooks/homepage_grafana_automation.yml",
+        345,
+        "- Homepage API: http://localhost:{{ homepage_port }}/api"
+      ],
+      [
+        "playbooks/homepage_grafana_automation.yml",
+        346,
+        "- Grafana API: http://localhost:{{ grafana_port }}/api"
+      ]
+    ],
+    "127.0.0.1": [
+      [
+        "tasks/postgresql.yml",
+        104,
+        "host    all            all             127.0.0.1/32           md5"
+      ],
+      [
+        "tasks/docker.yml",
+        137,
+        "\"metrics-addr\": \"127.0.0.1:9323\","
+      ],
+      [
+        "tasks/docker.yml",
+        186,
+        "host: 127.0.0.1"
+      ],
+      [
+        "tasks/validate/pihole.yml",
+        21,
+        "dig @127.0.0.1 google.com +short"
+      ],
+      [
+        "group_vars/all/vars.yml",
+        587,
+        "- \"127.0.0.1\""
+      ],
+      [
+        "roles/databases/tasks/relational.yml",
+        106,
+        "host    all            all             127.0.0.1/32           md5"
+      ],
+      [
+        "roles/security/firewall/tasks/deploy.yml",
+        198,
+        "listen_uri: 127.0.0.1:8080"
+      ],
+      [
+        "roles/security/firewall/tasks/deploy.yml",
+        205,
+        "listen_addr: 127.0.0.1"
+      ],
+      [
+        "roles/immich/tasks/validate_deployment.yml",
+        36,
+        "- url: \"http://127.0.0.1:{{ immich_ports.server }}/api/health\""
+      ],
+      [
+        "roles/immich/tasks/validate_deployment.yml",
+        38,
+        "- url: \"http://127.0.0.1:{{ immich_ports.web }}/health\""
+      ],
+      [
+        "roles/immich/tasks/validate_deployment.yml",
+        40,
+        "- url: \"http://127.0.0.1:{{ immich_ports.machine_learning }}/health\""
+      ],
+      [
+        "roles/immich/tasks/validate_deployment.yml",
+        85,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/immich/tasks/deploy.yml",
+        65,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/immich/tasks/deploy.yml",
+        73,
+        "url: \"http://127.0.0.1:{{ immich_ports.server }}/api/health\""
+      ],
+      [
+        "roles/immich/tasks/deploy.yml",
+        85,
+        "url: \"http://127.0.0.1:{{ immich_ports.server }}/api/auth/admin-sign-up\""
+      ],
+      [
+        "roles/dumbassets/tasks/security.yml",
+        21,
+        "loop: \"{{ server_ips | default(['127.0.0.1']) }}\""
+      ],
+      [
+        "roles/pezzo/tasks/validate_deployment.yml",
+        7,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/pezzo/tasks/validate_deployment.yml",
+        44,
+        "url: \"http://127.0.0.1:{{ item.port }}{{ item.path }}\""
+      ],
+      [
+        "roles/pezzo/tasks/validate_deployment.yml",
+        107,
+        "url: \"http://127.0.0.1:3567/hello\""
+      ],
+      [
+        "roles/pezzo/tasks/validate_deployment.yml",
+        124,
+        "url: \"http://127.0.0.1:9981/health\""
+      ],
+      [
+        "roles/pezzo/tasks/validate.yml",
+        103,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/pezzo/tasks/deploy.yml",
+        38,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/pezzo/tasks/deploy.yml",
+        71,
+        "url: \"http://127.0.0.1:{{ item.port }}{{ item.path }}\""
+      ],
+      [
+        "roles/ersatztv/tasks/validate_deployment.yml",
+        7,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/ersatztv/tasks/validate_deployment.yml",
+        40,
+        "url: \"http://127.0.0.1:{{ ersatztv_port }}\""
+      ],
+      [
+        "roles/ersatztv/tasks/validate_deployment.yml",
+        57,
+        "url: \"http://127.0.0.1:{{ ersatztv_port }}/api/health\""
+      ],
+      [
+        "roles/ersatztv/tasks/validate_deployment.yml",
+        191,
+        "ansible.builtin.shell: \"curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ ersatztv_port }}/api/streams\""
+      ],
+      [
+        "roles/ersatztv/tasks/validate_deployment.yml",
+        208,
+        "ansible.builtin.shell: \"curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ ersatztv_port }}{{ ersatztv_prometheus_path }}\""
+      ],
+      [
+        "roles/ersatztv/tasks/deploy.yml",
+        68,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/ersatztv/tasks/deploy.yml",
+        93,
+        "url: \"http://127.0.0.1:{{ ersatztv_port }}\""
+      ],
+      [
+        "roles/ersatztv/tasks/deploy.yml",
+        109,
+        "- URL: http://127.0.0.1:{{ ersatztv_port }}"
+      ],
+      [
+        "roles/ersatztv/tasks/deploy.yml",
+        407,
+        "- Web Interface: http://127.0.0.1:{{ ersatztv_port }}"
+      ],
+      [
+        "roles/n8n/tasks/validate_deployment.yml",
+        8,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/n8n/tasks/deploy.yml",
+        53,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/vaultwarden/tasks/prerequisites.yml",
+        64,
+        "host: \"127.0.0.1\""
+      ],
+      [
+        "roles/paperless_ngx/tasks/validate_deployment.yml",
+        116,
+        "docker exec crowdsec cscli decisions list --ip 127.0.0.1"
+      ]
+    ],
+    "192.168": [
+      [
+        "inventory.yml",
+        10,
+        "ansible_host: \"{{ lookup('env', 'HOMELAB_IP_1') | default('192.168.1.100') }}\""
+      ],
+      [
+        "inventory.yml",
+        13,
+        "ansible_host: \"{{ lookup('env', 'HOMELAB_IP_2') | default('192.168.1.101') }}\""
+      ],
+      [
+        "inventory.yml",
+        16,
+        "ansible_host: \"{{ lookup('env', 'HOMELAB_IP_3') | default('192.168.1.102') }}\""
+      ],
+      [
+        "inventory.yml",
+        19,
+        "ansible_host: \"{{ lookup('env', 'HOMELAB_IP_4') | default('192.168.1.103') }}\""
+      ],
+      [
+        "inventory.yml",
+        36,
+        "ansible_host: \"{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('192.168.1.99') }}\""
+      ],
+      [
+        "inventory.yml",
+        44,
+        "subnet: \"{{ lookup('env', 'HOMELAB_SUBNET') | default('192.168.1.0/24') }}\""
+      ],
+      [
+        "inventory.yml",
+        45,
+        "gateway: \"{{ lookup('env', 'HOMELAB_GATEWAY') | default('192.168.1.1') }}\""
+      ],
+      [
+        "tasks/plex.yml",
+        26,
+        "- url: \"http://192.168.1.41:32400\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        7,
+        "ansible_server_ip: \"{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('192.168.1.99') }}\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        9,
+        "- \"{{ lookup('env', 'HOMELAB_IP_1') | default('192.168.1.100') }}\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        10,
+        "- \"{{ lookup('env', 'HOMELAB_IP_2') | default('192.168.1.101') }}\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        11,
+        "- \"{{ lookup('env', 'HOMELAB_IP_3') | default('192.168.1.102') }}\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        12,
+        "- \"{{ lookup('env', 'HOMELAB_IP_4') | default('192.168.1.103') }}\""
+      ],
+      [
+        "group_vars/all/common.yml",
+        118,
+        "reconya_network_range: \"{{ lookup('env', 'RECONYA_NETWORK_RANGE') | default('192.168.1.0/24') }}\""
+      ],
+      [
+        "group_vars/all/proxmox.yml",
+        26,
+        "vm_ip: \"{{ vm_ip | default('192.168.1.100') }}\""
+      ],
+      [
+        "group_vars/all/proxmox.yml",
+        45,
+        "gateway: \"{{ network_config.gateway | default('192.168.1.1') }}\""
+      ],
+      [
+        "group_vars/all/vars.yml",
+        13,
+        "ip_address: \"{{ lookup('env', 'HOMELAB_IP_ADDRESS') | default('192.168.1.100') }}\""
+      ],
+      [
+        "group_vars/all/vars.yml",
+        17,
+        "plex_server_ip: \"{{ lookup('env', 'PLEX_SERVER_IP') | default('192.168.1.41') }}\"           # IP address of your existing Plex server"
+      ],
+      [
+        "group_vars/all/vars.yml",
+        588,
+        "- \"192.168.1.0/24\""
+      ],
+      [
+        "roles/fing/defaults/main.yml",
+        43,
+        "- \"192.168.1.0/24\""
+      ],
+      [
+        "roles/reconya/tasks/validate.yml",
+        20,
+        "fail_msg: \"Invalid network range format. Expected format: 192.168.1.0/24\""
+      ],
+      [
+        "roles/reconya/defaults/main.yml",
+        33,
+        "reconya_network_range: \"192.168.1.0/24\""
+      ],
+      [
+        "roles/reconya/defaults/main.yml",
+        38,
+        "reconya_network_ranges: [\"192.168.1.0/24\"]"
+      ]
+    ],
+    "admin@": [
+      [
+        "tasks/nginx_proxy_manager.yml",
+        67,
+        "- Username: {{ vault_npm_admin_username | default('admin@' + domain) }}"
+      ],
+      [
+        "group_vars/all/vars.yml",
+        753,
+        "admin_email: \"{{ lookup('env', 'ADMIN_EMAIL') | default('admin@' + domain) }}\""
+      ],
+      [
+        "group_vars/all/vars.yml",
+        992,
+        "ssl_email: \"{{ lookup('env', 'SSL_EMAIL') | default('admin@' + domain) }}\""
+      ],
+      [
+        "group_vars/all/notifications.yml",
+        16,
+        "from_address: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "group_vars/all/notifications.yml",
+        18,
+        "- \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "homepage/config/settings.yml",
+        142,
+        "to: admin@yourdomain.com"
+      ],
+      [
+        "roles/certificate_management/vars/main.yml",
+        25,
+        "notification_recipient: \"admin@{{ domain }}\""
+      ],
+      [
+        "roles/immich/defaults/main.yml",
+        27,
+        "immich_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/fing/defaults/main.yml",
+        26,
+        "fing_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/pezzo/defaults/main.yml",
+        26,
+        "pezzo_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        183,
+        "email: \"admin@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/grafana/defaults/main.yml",
+        231,
+        "addresses: \"admin@{{ domain | default('localhost') }}\""
+      ],
+      [
+        "roles/ersatztv/defaults/main.yml",
+        50,
+        "ersatztv_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/n8n/defaults/main.yml",
+        24,
+        "n8n_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/romm/defaults/main.yml",
+        33,
+        "romm_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/vaultwarden/defaults/main.yml",
+        24,
+        "vaultwarden_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/linkwarden/defaults/main.yml",
+        24,
+        "linkwarden_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/paperless_ngx/defaults/main.yml",
+        26,
+        "paperless_ngx_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/media/defaults/main.yml",
+        58,
+        "media_admin_email: \"{{ admin_email | default('admin@' + domain) }}\""
+      ],
+      [
+        "roles/nginx_proxy_manager/defaults/main.yml",
+        61,
+        "nginx_proxy_manager_api_username: \"{{ vault_npm_admin_username | default('admin@' + domain) }}\""
+      ]
+    ],
+    "changeme": [],
+    "admin123": [],
+    "your_secure_password": [],
+    "default_password": [],
+    "secret_key": [
+      [
+        "tasks/secret_rotation.yml",
+        126,
+        "new_vault_authentik_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        127,
+        "new_vault_grafana_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        128,
+        "new_vault_paperless_secret_key: \"{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/calibre-web.yml",
+        23,
+        "SECRET_KEY = '{{ calibreweb_secret_key }}'"
+      ]
+    ],
+    "api_key": [
+      [
+        "tasks/configure_lidarr.yml",
+        359,
+        "enable: \"{{ vault_jellyfin_api_key | default('') != '' }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        116,
+        "new_vault_sonarr_api_key: \"sonarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        117,
+        "new_vault_radarr_api_key: \"radarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        118,
+        "new_vault_lidarr_api_key: \"lidarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        119,
+        "new_vault_readarr_api_key: \"readarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        120,
+        "new_vault_prowlarr_api_key: \"prowlarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ],
+      [
+        "tasks/secret_rotation.yml",
+        121,
+        "new_vault_bazarr_api_key: \"bazarr_{{ lookup('password', '/dev/null chars=ascii_letters,digits length=64') }}\""
+      ]
+    ],
+    "token": [
+      [
+        "tasks/telegraf.yml",
+        37,
+        "token = \"${INFLUXDB_TOKEN}\""
+      ],
+      [
+        "tasks/configure_lidarr.yml",
+        346,
+        "enable: \"{{ vault_plex_token | default('') != '' }}\""
+      ],
+      [
+        "roles/n8n/tasks/alerts.yml",
+        137,
+        "- Telegram Notifications: {{ 'Enabled' if vault_telegram_bot_token | default('') != '' else 'Disabled' }}"
+      ],
+      [
+        "roles/nginx_proxy_manager/tasks/validate.yml",
+        36,
+        "- (vault_cloudflare_api_token is not defined or vault_cloudflare_api_token == '' or vault_cloudflare_zone_id is not defined or vault_cloudflare_zone_id == '')"
+      ]
+    ]
+  },
+  "vault_vars": {
+    "vault_sonarr_admin_password": "{{ vault_sonarr_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_sonarr_database_password": "{{ vault_sonarr_database_password | password_hash(\"bcrypt\") }}",
+    "vault_sonarr_api_token": "{{ vault_sonarr_api_token | default(\"\") }}",
+    "vault_sonarr_secret_key": "{{ vault_sonarr_secret_key | default(\"\") }}",
+    "vault_sonarr_encryption_key": "{{ vault_sonarr_encryption_key | default(\"\") }}",
+    "vault_sonarr_jwt_secret": "{{ vault_sonarr_jwt_secret | default(\"\") }}",
+    "vault_sonarr_redis_password": "{{ vault_sonarr_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_sonarr_smtp_password": "{{ vault_sonarr_smtp_password | default(\"\") }}",
+    "vault_radarr_admin_password": "{{ vault_radarr_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_radarr_database_password": "{{ vault_radarr_database_password | password_hash(\"bcrypt\") }}",
+    "vault_radarr_api_token": "{{ vault_radarr_api_token | default(\"\") }}",
+    "vault_radarr_secret_key": "{{ vault_radarr_secret_key | default(\"\") }}",
+    "vault_radarr_encryption_key": "{{ vault_radarr_encryption_key | default(\"\") }}",
+    "vault_radarr_jwt_secret": "{{ vault_radarr_jwt_secret | default(\"\") }}",
+    "vault_radarr_redis_password": "{{ vault_radarr_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_radarr_smtp_password": "{{ vault_radarr_smtp_password | default(\"\") }}",
+    "vault_jellyfin_admin_password": "{{ vault_jellyfin_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_jellyfin_database_password": "{{ vault_jellyfin_database_password | password_hash(\"bcrypt\") }}",
+    "vault_jellyfin_api_token": "{{ vault_jellyfin_api_token | default(\"\") }}",
+    "vault_jellyfin_secret_key": "{{ vault_jellyfin_secret_key | default(\"\") }}",
+    "vault_jellyfin_encryption_key": "{{ vault_jellyfin_encryption_key | default(\"\") }}",
+    "vault_jellyfin_jwt_secret": "{{ vault_jellyfin_jwt_secret | default(\"\") }}",
+    "vault_jellyfin_redis_password": "{{ vault_jellyfin_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_jellyfin_smtp_password": "{{ vault_jellyfin_smtp_password | default(\"\") }}",
+    "vault_plex_admin_password": "{{ vault_plex_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_plex_database_password": "{{ vault_plex_database_password | password_hash(\"bcrypt\") }}",
+    "vault_plex_api_token": "{{ vault_plex_api_token | default(\"\") }}",
+    "vault_plex_secret_key": "{{ vault_plex_secret_key | default(\"\") }}",
+    "vault_plex_encryption_key": "{{ vault_plex_encryption_key | default(\"\") }}",
+    "vault_plex_jwt_secret": "{{ vault_plex_jwt_secret | default(\"\") }}",
+    "vault_plex_redis_password": "{{ vault_plex_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_plex_smtp_password": "{{ vault_plex_smtp_password | default(\"\") }}",
+    "vault_emby_admin_password": "{{ vault_emby_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_emby_database_password": "{{ vault_emby_database_password | password_hash(\"bcrypt\") }}",
+    "vault_emby_api_token": "{{ vault_emby_api_token | default(\"\") }}",
+    "vault_emby_secret_key": "{{ vault_emby_secret_key | default(\"\") }}",
+    "vault_emby_encryption_key": "{{ vault_emby_encryption_key | default(\"\") }}",
+    "vault_emby_jwt_secret": "{{ vault_emby_jwt_secret | default(\"\") }}",
+    "vault_emby_redis_password": "{{ vault_emby_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_emby_smtp_password": "{{ vault_emby_smtp_password | default(\"\") }}",
+    "vault_immich_admin_password": "{{ vault_immich_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_immich_database_password": "{{ vault_immich_database_password | password_hash(\"bcrypt\") }}",
+    "vault_immich_api_token": "{{ vault_immich_api_token | default(\"\") }}",
+    "vault_immich_secret_key": "{{ vault_immich_secret_key | default(\"\") }}",
+    "vault_immich_encryption_key": "{{ vault_immich_encryption_key | default(\"\") }}",
+    "vault_immich_jwt_secret": "{{ vault_immich_jwt_secret | default(\"\") }}",
+    "vault_immich_redis_password": "{{ vault_immich_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_immich_smtp_password": "{{ vault_immich_smtp_password | default(\"\") }}",
+    "vault_audiobookshelf_admin_password": "{{ vault_audiobookshelf_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_audiobookshelf_database_password": "{{ vault_audiobookshelf_database_password | password_hash(\"bcrypt\") }}",
+    "vault_audiobookshelf_api_token": "{{ vault_audiobookshelf_api_token | default(\"\") }}",
+    "vault_audiobookshelf_secret_key": "{{ vault_audiobookshelf_secret_key | default(\"\") }}",
+    "vault_audiobookshelf_encryption_key": "{{ vault_audiobookshelf_encryption_key | default(\"\") }}",
+    "vault_audiobookshelf_jwt_secret": "{{ vault_audiobookshelf_jwt_secret | default(\"\") }}",
+    "vault_audiobookshelf_redis_password": "{{ vault_audiobookshelf_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_audiobookshelf_smtp_password": "{{ vault_audiobookshelf_smtp_password | default(\"\") }}",
+    "vault_komga_admin_password": "{{ vault_komga_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_komga_database_password": "{{ vault_komga_database_password | password_hash(\"bcrypt\") }}",
+    "vault_komga_api_token": "{{ vault_komga_api_token | default(\"\") }}",
+    "vault_komga_secret_key": "{{ vault_komga_secret_key | default(\"\") }}",
+    "vault_komga_encryption_key": "{{ vault_komga_encryption_key | default(\"\") }}",
+    "vault_komga_jwt_secret": "{{ vault_komga_jwt_secret | default(\"\") }}",
+    "vault_komga_redis_password": "{{ vault_komga_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_komga_smtp_password": "{{ vault_komga_smtp_password | default(\"\") }}",
+    "vault_calibre_admin_password": "{{ vault_calibre_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_calibre_database_password": "{{ vault_calibre_database_password | password_hash(\"bcrypt\") }}",
+    "vault_calibre_api_token": "{{ vault_calibre_api_token | default(\"\") }}",
+    "vault_calibre_secret_key": "{{ vault_calibre_secret_key | default(\"\") }}",
+    "vault_calibre_encryption_key": "{{ vault_calibre_encryption_key | default(\"\") }}",
+    "vault_calibre_jwt_secret": "{{ vault_calibre_jwt_secret | default(\"\") }}",
+    "vault_calibre_redis_password": "{{ vault_calibre_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_calibre_smtp_password": "{{ vault_calibre_smtp_password | default(\"\") }}",
+    "vault_prometheus_admin_password": "{{ vault_prometheus_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_prometheus_database_password": "{{ vault_prometheus_database_password | password_hash(\"bcrypt\") }}",
+    "vault_prometheus_api_token": "{{ vault_prometheus_api_token | default(\"\") }}",
+    "vault_prometheus_secret_key": "{{ vault_prometheus_secret_key | default(\"\") }}",
+    "vault_prometheus_encryption_key": "{{ vault_prometheus_encryption_key | default(\"\") }}",
+    "vault_prometheus_jwt_secret": "{{ vault_prometheus_jwt_secret | default(\"\") }}",
+    "vault_prometheus_redis_password": "{{ vault_prometheus_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_prometheus_smtp_password": "{{ vault_prometheus_smtp_password | default(\"\") }}",
+    "vault_alertmanager_admin_password": "{{ vault_alertmanager_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_alertmanager_database_password": "{{ vault_alertmanager_database_password | password_hash(\"bcrypt\") }}",
+    "vault_alertmanager_api_token": "{{ vault_alertmanager_api_token | default(\"\") }}",
+    "vault_alertmanager_secret_key": "{{ vault_alertmanager_secret_key | default(\"\") }}",
+    "vault_alertmanager_encryption_key": "{{ vault_alertmanager_encryption_key | default(\"\") }}",
+    "vault_alertmanager_jwt_secret": "{{ vault_alertmanager_jwt_secret | default(\"\") }}",
+    "vault_alertmanager_redis_password": "{{ vault_alertmanager_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_alertmanager_smtp_password": "{{ vault_alertmanager_smtp_password | default(\"\") }}",
+    "vault_loki_admin_password": "{{ vault_loki_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_loki_database_password": "{{ vault_loki_database_password | password_hash(\"bcrypt\") }}",
+    "vault_loki_api_token": "{{ vault_loki_api_token | default(\"\") }}",
+    "vault_loki_secret_key": "{{ vault_loki_secret_key | default(\"\") }}",
+    "vault_loki_encryption_key": "{{ vault_loki_encryption_key | default(\"\") }}",
+    "vault_loki_jwt_secret": "{{ vault_loki_jwt_secret | default(\"\") }}",
+    "vault_loki_redis_password": "{{ vault_loki_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_loki_smtp_password": "{{ vault_loki_smtp_password | default(\"\") }}",
+    "vault_promtail_admin_password": "{{ vault_promtail_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_promtail_database_password": "{{ vault_promtail_database_password | password_hash(\"bcrypt\") }}",
+    "vault_promtail_api_token": "{{ vault_promtail_api_token | default(\"\") }}",
+    "vault_promtail_secret_key": "{{ vault_promtail_secret_key | default(\"\") }}",
+    "vault_promtail_encryption_key": "{{ vault_promtail_encryption_key | default(\"\") }}",
+    "vault_promtail_jwt_secret": "{{ vault_promtail_jwt_secret | default(\"\") }}",
+    "vault_promtail_redis_password": "{{ vault_promtail_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_promtail_smtp_password": "{{ vault_promtail_smtp_password | default(\"\") }}",
+    "vault_blackbox_exporter_admin_password": "{{ vault_blackbox_exporter_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_blackbox_exporter_database_password": "{{ vault_blackbox_exporter_database_password | password_hash(\"bcrypt\") }}",
+    "vault_blackbox_exporter_api_token": "{{ vault_blackbox_exporter_api_token | default(\"\") }}",
+    "vault_blackbox_exporter_secret_key": "{{ vault_blackbox_exporter_secret_key | default(\"\") }}",
+    "vault_blackbox_exporter_encryption_key": "{{ vault_blackbox_exporter_encryption_key | default(\"\") }}",
+    "vault_blackbox_exporter_jwt_secret": "{{ vault_blackbox_exporter_jwt_secret | default(\"\") }}",
+    "vault_blackbox_exporter_redis_password": "{{ vault_blackbox_exporter_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_blackbox_exporter_smtp_password": "{{ vault_blackbox_exporter_smtp_password | default(\"\") }}",
+    "vault_influxdb_admin_password": "{{ vault_influxdb_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_influxdb_database_password": "{{ vault_influxdb_database_password | password_hash(\"bcrypt\") }}",
+    "vault_influxdb_api_token": "{{ vault_influxdb_api_token | default(\"\") }}",
+    "vault_influxdb_secret_key": "{{ vault_influxdb_secret_key | default(\"\") }}",
+    "vault_influxdb_encryption_key": "{{ vault_influxdb_encryption_key | default(\"\") }}",
+    "vault_influxdb_jwt_secret": "{{ vault_influxdb_jwt_secret | default(\"\") }}",
+    "vault_influxdb_redis_password": "{{ vault_influxdb_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_influxdb_smtp_password": "{{ vault_influxdb_smtp_password | default(\"\") }}",
+    "vault_telegraf_admin_password": "{{ vault_telegraf_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_telegraf_database_password": "{{ vault_telegraf_database_password | password_hash(\"bcrypt\") }}",
+    "vault_telegraf_api_token": "{{ vault_telegraf_api_token | default(\"\") }}",
+    "vault_telegraf_secret_key": "{{ vault_telegraf_secret_key | default(\"\") }}",
+    "vault_telegraf_encryption_key": "{{ vault_telegraf_encryption_key | default(\"\") }}",
+    "vault_telegraf_jwt_secret": "{{ vault_telegraf_jwt_secret | default(\"\") }}",
+    "vault_telegraf_redis_password": "{{ vault_telegraf_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_telegraf_smtp_password": "{{ vault_telegraf_smtp_password | default(\"\") }}",
+    "vault_vault_admin_password": "{{ vault_vault_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_vault_database_password": "{{ vault_vault_database_password | password_hash(\"bcrypt\") }}",
+    "vault_vault_api_token": "{{ vault_vault_api_token | default(\"\") }}",
+    "vault_vault_secret_key": "{{ vault_vault_secret_key | default(\"\") }}",
+    "vault_vault_encryption_key": "{{ vault_vault_encryption_key | default(\"\") }}",
+    "vault_vault_jwt_secret": "{{ vault_vault_jwt_secret | default(\"\") }}",
+    "vault_vault_redis_password": "{{ vault_vault_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_vault_smtp_password": "{{ vault_vault_smtp_password | default(\"\") }}",
+    "vault_crowdsec_admin_password": "{{ vault_crowdsec_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_crowdsec_database_password": "{{ vault_crowdsec_database_password | password_hash(\"bcrypt\") }}",
+    "vault_crowdsec_api_token": "{{ vault_crowdsec_api_token | default(\"\") }}",
+    "vault_crowdsec_secret_key": "{{ vault_crowdsec_secret_key | default(\"\") }}",
+    "vault_crowdsec_encryption_key": "{{ vault_crowdsec_encryption_key | default(\"\") }}",
+    "vault_crowdsec_jwt_secret": "{{ vault_crowdsec_jwt_secret | default(\"\") }}",
+    "vault_crowdsec_redis_password": "{{ vault_crowdsec_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_crowdsec_smtp_password": "{{ vault_crowdsec_smtp_password | default(\"\") }}",
+    "vault_fail2ban_admin_password": "{{ vault_fail2ban_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_fail2ban_database_password": "{{ vault_fail2ban_database_password | password_hash(\"bcrypt\") }}",
+    "vault_fail2ban_api_token": "{{ vault_fail2ban_api_token | default(\"\") }}",
+    "vault_fail2ban_secret_key": "{{ vault_fail2ban_secret_key | default(\"\") }}",
+    "vault_fail2ban_encryption_key": "{{ vault_fail2ban_encryption_key | default(\"\") }}",
+    "vault_fail2ban_jwt_secret": "{{ vault_fail2ban_jwt_secret | default(\"\") }}",
+    "vault_fail2ban_redis_password": "{{ vault_fail2ban_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_fail2ban_smtp_password": "{{ vault_fail2ban_smtp_password | default(\"\") }}",
+    "vault_wireguard_admin_password": "{{ vault_wireguard_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_wireguard_database_password": "{{ vault_wireguard_database_password | password_hash(\"bcrypt\") }}",
+    "vault_wireguard_api_token": "{{ vault_wireguard_api_token | default(\"\") }}",
+    "vault_wireguard_secret_key": "{{ vault_wireguard_secret_key | default(\"\") }}",
+    "vault_wireguard_encryption_key": "{{ vault_wireguard_encryption_key | default(\"\") }}",
+    "vault_wireguard_jwt_secret": "{{ vault_wireguard_jwt_secret | default(\"\") }}",
+    "vault_wireguard_redis_password": "{{ vault_wireguard_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_wireguard_smtp_password": "{{ vault_wireguard_smtp_password | default(\"\") }}",
+    "vault_pihole_admin_password": "{{ vault_pihole_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_pihole_database_password": "{{ vault_pihole_database_password | password_hash(\"bcrypt\") }}",
+    "vault_pihole_api_token": "{{ vault_pihole_api_token | default(\"\") }}",
+    "vault_pihole_secret_key": "{{ vault_pihole_secret_key | default(\"\") }}",
+    "vault_pihole_encryption_key": "{{ vault_pihole_encryption_key | default(\"\") }}",
+    "vault_pihole_jwt_secret": "{{ vault_pihole_jwt_secret | default(\"\") }}",
+    "vault_pihole_redis_password": "{{ vault_pihole_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_pihole_smtp_password": "{{ vault_pihole_smtp_password | default(\"\") }}",
+    "vault_gitlab_admin_password": "{{ vault_gitlab_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_gitlab_database_password": "{{ vault_gitlab_database_password | password_hash(\"bcrypt\") }}",
+    "vault_gitlab_api_token": "{{ vault_gitlab_api_token | default(\"\") }}",
+    "vault_gitlab_secret_key": "{{ vault_gitlab_secret_key | default(\"\") }}",
+    "vault_gitlab_encryption_key": "{{ vault_gitlab_encryption_key | default(\"\") }}",
+    "vault_gitlab_jwt_secret": "{{ vault_gitlab_jwt_secret | default(\"\") }}",
+    "vault_gitlab_redis_password": "{{ vault_gitlab_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_gitlab_smtp_password": "{{ vault_gitlab_smtp_password | default(\"\") }}",
+    "vault_harbor_admin_password": "{{ vault_harbor_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_harbor_database_password": "{{ vault_harbor_database_password | password_hash(\"bcrypt\") }}",
+    "vault_harbor_api_token": "{{ vault_harbor_api_token | default(\"\") }}",
+    "vault_harbor_secret_key": "{{ vault_harbor_secret_key | default(\"\") }}",
+    "vault_harbor_encryption_key": "{{ vault_harbor_encryption_key | default(\"\") }}",
+    "vault_harbor_jwt_secret": "{{ vault_harbor_jwt_secret | default(\"\") }}",
+    "vault_harbor_redis_password": "{{ vault_harbor_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_harbor_smtp_password": "{{ vault_harbor_smtp_password | default(\"\") }}",
+    "vault_code_server_admin_password": "{{ vault_code_server_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_code_server_database_password": "{{ vault_code_server_database_password | password_hash(\"bcrypt\") }}",
+    "vault_code_server_api_token": "{{ vault_code_server_api_token | default(\"\") }}",
+    "vault_code_server_secret_key": "{{ vault_code_server_secret_key | default(\"\") }}",
+    "vault_code_server_encryption_key": "{{ vault_code_server_encryption_key | default(\"\") }}",
+    "vault_code_server_jwt_secret": "{{ vault_code_server_jwt_secret | default(\"\") }}",
+    "vault_code_server_redis_password": "{{ vault_code_server_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_code_server_smtp_password": "{{ vault_code_server_smtp_password | default(\"\") }}",
+    "vault_portainer_admin_password": "{{ vault_portainer_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_portainer_database_password": "{{ vault_portainer_database_password | password_hash(\"bcrypt\") }}",
+    "vault_portainer_api_token": "{{ vault_portainer_api_token | default(\"\") }}",
+    "vault_portainer_secret_key": "{{ vault_portainer_secret_key | default(\"\") }}",
+    "vault_portainer_encryption_key": "{{ vault_portainer_encryption_key | default(\"\") }}",
+    "vault_portainer_jwt_secret": "{{ vault_portainer_jwt_secret | default(\"\") }}",
+    "vault_portainer_redis_password": "{{ vault_portainer_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_portainer_smtp_password": "{{ vault_portainer_smtp_password | default(\"\") }}",
+    "vault_nextcloud_admin_password": "{{ vault_nextcloud_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_nextcloud_database_password": "{{ vault_nextcloud_database_password | password_hash(\"bcrypt\") }}",
+    "vault_nextcloud_api_token": "{{ vault_nextcloud_api_token | default(\"\") }}",
+    "vault_nextcloud_secret_key": "{{ vault_nextcloud_secret_key | default(\"\") }}",
+    "vault_nextcloud_encryption_key": "{{ vault_nextcloud_encryption_key | default(\"\") }}",
+    "vault_nextcloud_jwt_secret": "{{ vault_nextcloud_jwt_secret | default(\"\") }}",
+    "vault_nextcloud_redis_password": "{{ vault_nextcloud_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_nextcloud_smtp_password": "{{ vault_nextcloud_smtp_password | default(\"\") }}",
+    "vault_syncthing_admin_password": "{{ vault_syncthing_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_syncthing_database_password": "{{ vault_syncthing_database_password | password_hash(\"bcrypt\") }}",
+    "vault_syncthing_api_token": "{{ vault_syncthing_api_token | default(\"\") }}",
+    "vault_syncthing_secret_key": "{{ vault_syncthing_secret_key | default(\"\") }}",
+    "vault_syncthing_encryption_key": "{{ vault_syncthing_encryption_key | default(\"\") }}",
+    "vault_syncthing_jwt_secret": "{{ vault_syncthing_jwt_secret | default(\"\") }}",
+    "vault_syncthing_redis_password": "{{ vault_syncthing_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_syncthing_smtp_password": "{{ vault_syncthing_smtp_password | default(\"\") }}",
+    "vault_bookstack_admin_password": "{{ vault_bookstack_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_bookstack_database_password": "{{ vault_bookstack_database_password | password_hash(\"bcrypt\") }}",
+    "vault_bookstack_api_token": "{{ vault_bookstack_api_token | default(\"\") }}",
+    "vault_bookstack_secret_key": "{{ vault_bookstack_secret_key | default(\"\") }}",
+    "vault_bookstack_encryption_key": "{{ vault_bookstack_encryption_key | default(\"\") }}",
+    "vault_bookstack_jwt_secret": "{{ vault_bookstack_jwt_secret | default(\"\") }}",
+    "vault_bookstack_redis_password": "{{ vault_bookstack_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_bookstack_smtp_password": "{{ vault_bookstack_smtp_password | default(\"\") }}",
+    "vault_filebrowser_admin_password": "{{ vault_filebrowser_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_filebrowser_database_password": "{{ vault_filebrowser_database_password | password_hash(\"bcrypt\") }}",
+    "vault_filebrowser_api_token": "{{ vault_filebrowser_api_token | default(\"\") }}",
+    "vault_filebrowser_secret_key": "{{ vault_filebrowser_secret_key | default(\"\") }}",
+    "vault_filebrowser_encryption_key": "{{ vault_filebrowser_encryption_key | default(\"\") }}",
+    "vault_filebrowser_jwt_secret": "{{ vault_filebrowser_jwt_secret | default(\"\") }}",
+    "vault_filebrowser_redis_password": "{{ vault_filebrowser_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_filebrowser_smtp_password": "{{ vault_filebrowser_smtp_password | default(\"\") }}",
+    "vault_kopia_admin_password": "{{ vault_kopia_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_kopia_database_password": "{{ vault_kopia_database_password | password_hash(\"bcrypt\") }}",
+    "vault_kopia_api_token": "{{ vault_kopia_api_token | default(\"\") }}",
+    "vault_kopia_secret_key": "{{ vault_kopia_secret_key | default(\"\") }}",
+    "vault_kopia_encryption_key": "{{ vault_kopia_encryption_key | default(\"\") }}",
+    "vault_kopia_jwt_secret": "{{ vault_kopia_jwt_secret | default(\"\") }}",
+    "vault_kopia_redis_password": "{{ vault_kopia_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_kopia_smtp_password": "{{ vault_kopia_smtp_password | default(\"\") }}",
+    "vault_duplicati_admin_password": "{{ vault_duplicati_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_duplicati_database_password": "{{ vault_duplicati_database_password | password_hash(\"bcrypt\") }}",
+    "vault_duplicati_api_token": "{{ vault_duplicati_api_token | default(\"\") }}",
+    "vault_duplicati_secret_key": "{{ vault_duplicati_secret_key | default(\"\") }}",
+    "vault_duplicati_encryption_key": "{{ vault_duplicati_encryption_key | default(\"\") }}",
+    "vault_duplicati_jwt_secret": "{{ vault_duplicati_jwt_secret | default(\"\") }}",
+    "vault_duplicati_redis_password": "{{ vault_duplicati_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_duplicati_smtp_password": "{{ vault_duplicati_smtp_password | default(\"\") }}",
+    "vault_uptime_kuma_admin_password": "{{ vault_uptime_kuma_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_uptime_kuma_database_password": "{{ vault_uptime_kuma_database_password | password_hash(\"bcrypt\") }}",
+    "vault_uptime_kuma_api_token": "{{ vault_uptime_kuma_api_token | default(\"\") }}",
+    "vault_uptime_kuma_secret_key": "{{ vault_uptime_kuma_secret_key | default(\"\") }}",
+    "vault_uptime_kuma_encryption_key": "{{ vault_uptime_kuma_encryption_key | default(\"\") }}",
+    "vault_uptime_kuma_jwt_secret": "{{ vault_uptime_kuma_jwt_secret | default(\"\") }}",
+    "vault_uptime_kuma_redis_password": "{{ vault_uptime_kuma_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_uptime_kuma_smtp_password": "{{ vault_uptime_kuma_smtp_password | default(\"\") }}",
+    "vault_guacamole_admin_password": "{{ vault_guacamole_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_guacamole_database_password": "{{ vault_guacamole_database_password | password_hash(\"bcrypt\") }}",
+    "vault_guacamole_api_token": "{{ vault_guacamole_api_token | default(\"\") }}",
+    "vault_guacamole_secret_key": "{{ vault_guacamole_secret_key | default(\"\") }}",
+    "vault_guacamole_encryption_key": "{{ vault_guacamole_encryption_key | default(\"\") }}",
+    "vault_guacamole_jwt_secret": "{{ vault_guacamole_jwt_secret | default(\"\") }}",
+    "vault_guacamole_redis_password": "{{ vault_guacamole_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_guacamole_smtp_password": "{{ vault_guacamole_smtp_password | default(\"\") }}",
+    "vault_requestrr_admin_password": "{{ vault_requestrr_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_requestrr_database_password": "{{ vault_requestrr_database_password | password_hash(\"bcrypt\") }}",
+    "vault_requestrr_api_token": "{{ vault_requestrr_api_token | default(\"\") }}",
+    "vault_requestrr_secret_key": "{{ vault_requestrr_secret_key | default(\"\") }}",
+    "vault_requestrr_encryption_key": "{{ vault_requestrr_encryption_key | default(\"\") }}",
+    "vault_requestrr_jwt_secret": "{{ vault_requestrr_jwt_secret | default(\"\") }}",
+    "vault_requestrr_redis_password": "{{ vault_requestrr_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_requestrr_smtp_password": "{{ vault_requestrr_smtp_password | default(\"\") }}",
+    "vault_unmanic_admin_password": "{{ vault_unmanic_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_unmanic_database_password": "{{ vault_unmanic_database_password | password_hash(\"bcrypt\") }}",
+    "vault_unmanic_api_token": "{{ vault_unmanic_api_token | default(\"\") }}",
+    "vault_unmanic_secret_key": "{{ vault_unmanic_secret_key | default(\"\") }}",
+    "vault_unmanic_encryption_key": "{{ vault_unmanic_encryption_key | default(\"\") }}",
+    "vault_unmanic_jwt_secret": "{{ vault_unmanic_jwt_secret | default(\"\") }}",
+    "vault_unmanic_redis_password": "{{ vault_unmanic_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_unmanic_smtp_password": "{{ vault_unmanic_smtp_password | default(\"\") }}",
+    "vault_tdarr_admin_password": "{{ vault_tdarr_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_tdarr_database_password": "{{ vault_tdarr_database_password | password_hash(\"bcrypt\") }}",
+    "vault_tdarr_api_token": "{{ vault_tdarr_api_token | default(\"\") }}",
+    "vault_tdarr_secret_key": "{{ vault_tdarr_secret_key | default(\"\") }}",
+    "vault_tdarr_encryption_key": "{{ vault_tdarr_encryption_key | default(\"\") }}",
+    "vault_tdarr_jwt_secret": "{{ vault_tdarr_jwt_secret | default(\"\") }}",
+    "vault_tdarr_redis_password": "{{ vault_tdarr_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_tdarr_smtp_password": "{{ vault_tdarr_smtp_password | default(\"\") }}",
+    "vault_sabnzbd_admin_password": "{{ vault_sabnzbd_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_sabnzbd_database_password": "{{ vault_sabnzbd_database_password | password_hash(\"bcrypt\") }}",
+    "vault_sabnzbd_api_token": "{{ vault_sabnzbd_api_token | default(\"\") }}",
+    "vault_sabnzbd_secret_key": "{{ vault_sabnzbd_secret_key | default(\"\") }}",
+    "vault_sabnzbd_encryption_key": "{{ vault_sabnzbd_encryption_key | default(\"\") }}",
+    "vault_sabnzbd_jwt_secret": "{{ vault_sabnzbd_jwt_secret | default(\"\") }}",
+    "vault_sabnzbd_redis_password": "{{ vault_sabnzbd_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_sabnzbd_smtp_password": "{{ vault_sabnzbd_smtp_password | default(\"\") }}",
+    "vault_qbittorrent_admin_password": "{{ vault_qbittorrent_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_qbittorrent_database_password": "{{ vault_qbittorrent_database_password | password_hash(\"bcrypt\") }}",
+    "vault_qbittorrent_api_token": "{{ vault_qbittorrent_api_token | default(\"\") }}",
+    "vault_qbittorrent_secret_key": "{{ vault_qbittorrent_secret_key | default(\"\") }}",
+    "vault_qbittorrent_encryption_key": "{{ vault_qbittorrent_encryption_key | default(\"\") }}",
+    "vault_qbittorrent_jwt_secret": "{{ vault_qbittorrent_jwt_secret | default(\"\") }}",
+    "vault_qbittorrent_redis_password": "{{ vault_qbittorrent_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_qbittorrent_smtp_password": "{{ vault_qbittorrent_smtp_password | default(\"\") }}",
+    "vault_transmission_admin_password": "{{ vault_transmission_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_transmission_database_password": "{{ vault_transmission_database_password | password_hash(\"bcrypt\") }}",
+    "vault_transmission_api_token": "{{ vault_transmission_api_token | default(\"\") }}",
+    "vault_transmission_secret_key": "{{ vault_transmission_secret_key | default(\"\") }}",
+    "vault_transmission_encryption_key": "{{ vault_transmission_encryption_key | default(\"\") }}",
+    "vault_transmission_jwt_secret": "{{ vault_transmission_jwt_secret | default(\"\") }}",
+    "vault_transmission_redis_password": "{{ vault_transmission_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_transmission_smtp_password": "{{ vault_transmission_smtp_password | default(\"\") }}",
+    "vault_deluge_admin_password": "{{ vault_deluge_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_deluge_database_password": "{{ vault_deluge_database_password | password_hash(\"bcrypt\") }}",
+    "vault_deluge_api_token": "{{ vault_deluge_api_token | default(\"\") }}",
+    "vault_deluge_secret_key": "{{ vault_deluge_secret_key | default(\"\") }}",
+    "vault_deluge_encryption_key": "{{ vault_deluge_encryption_key | default(\"\") }}",
+    "vault_deluge_jwt_secret": "{{ vault_deluge_jwt_secret | default(\"\") }}",
+    "vault_deluge_redis_password": "{{ vault_deluge_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_deluge_smtp_password": "{{ vault_deluge_smtp_password | default(\"\") }}",
+    "vault_rtorrent_admin_password": "{{ vault_rtorrent_admin_password | password_hash(\"bcrypt\") }}",
+    "vault_rtorrent_database_password": "{{ vault_rtorrent_database_password | password_hash(\"bcrypt\") }}",
+    "vault_rtorrent_api_token": "{{ vault_rtorrent_api_token | default(\"\") }}",
+    "vault_rtorrent_secret_key": "{{ vault_rtorrent_secret_key | default(\"\") }}",
+    "vault_rtorrent_encryption_key": "{{ vault_rtorrent_encryption_key | default(\"\") }}",
+    "vault_rtorrent_jwt_secret": "{{ vault_rtorrent_jwt_secret | default(\"\") }}",
+    "vault_rtorrent_redis_password": "{{ vault_rtorrent_redis_password | password_hash(\"bcrypt\") }}",
+    "vault_rtorrent_smtp_password": "{{ vault_rtorrent_smtp_password | default(\"\") }}",
+    "vault_server_ip": "{{ ansible_default_ipv4.address }}",
+    "vault_domain": "{{ domain }}",
+    "vault_admin_email": "{{ admin_email | default(\"admin@\" + domain) }}",
+    "vault_monitoring_email": "{{ monitoring_email | default(\"monitoring@\" + domain) }}",
+    "vault_ssl_email": "{{ ssl_email | default(\"admin@\" + domain) }}"
+  },
+  "replacements": {
+    "localhost": "{{ ansible_default_ipv4.address }}",
+    "127.0.0.1": "{{ ansible_default_ipv4.address }}",
+    "admin@localhost": "{{ admin_email | default(\"admin@\" + domain) }}",
+    "admin@127.0.0.1": "{{ admin_email | default(\"admin@\" + domain) }}",
+    "changeme": "{{ vault_admin_password | password_hash(\"bcrypt\") }}",
+    "admin123": "{{ vault_admin_password | password_hash(\"bcrypt\") }}",
+    "your_secure_password": "{{ vault_admin_password | password_hash(\"bcrypt\") }}",
+    "default_password": "{{ vault_admin_password | password_hash(\"bcrypt\") }}"
+  }
+}

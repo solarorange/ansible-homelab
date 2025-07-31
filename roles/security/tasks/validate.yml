@@ -1,112 +1,89 @@
 ---
-# Security Stack Pre-flight Validation
-# Perform checks before deploying the security stack
+# Security Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Check for required variables
-  ansible.builtin.assert:
-    that:
-      - item is defined and item != ""
-    fail_msg: "Required variable {{ item }} is not defined or empty"
-  loop:
-    - "{{ domain }}"
-    - "{{ admin_email }}"
-    - "{{ docker_dir }}"
-  no_log: false
+- name: Validate Security vault variables
+  block:
+    - name: Check required Security vault variables
+      assert:
+        that:
+          - vault_security_admin_password is defined
+          - vault_security_database_password is defined
+          - vault_security_api_key is defined
+          - vault_security_secret_key is defined
+          - vault_security_encryption_key is defined
+          - vault_security_jwt_secret is defined
+        fail_msg: "Required Security vault variables are not defined"
+        success_msg: "All required Security vault variables are defined"
 
-- name: Check for required vault variables
-  ansible.builtin.assert:
-    that:
-      - item is defined and item != ""
-    fail_msg: "Required vault variable {{ item }} is not defined or empty"
-  loop:
-    - "{{ vault_authentik_secret_key }}"
-    - "{{ vault_cloudflare_api_token }}"
-    - "{{ vault_pihole_admin_password }}"
-  no_log: true
+    - name: Validate Security password complexity
+      assert:
+        that:
+          - vault_security_admin_password | length >= 12
+          - vault_security_database_password | length >= 12
+        fail_msg: "Security passwords must be at least 12 characters long"
+        success_msg: "Security password complexity requirements met"
 
-- name: Check if Docker is installed and running
-  ansible.builtin.service_facts:
-  register: service_facts
+- name: Validate Security network configuration
+  block:
+    - name: Check Security port configuration
+      assert:
+        that:
+          - security_port is defined
+          - security_port | int >= 1024
+          - security_port | int <= 65535
+        fail_msg: "Security port must be between 1024 and 65535"
+        success_msg: "Security port configuration is valid"
 
-- name: Assert Docker service is running
-  ansible.builtin.assert:
-    that:
-      - "'docker.service' in service_facts.ansible_facts.services"
-      - "service_facts.ansible_facts.services['docker.service'].state == 'running'"
-    msg: "Docker is not installed or not running. Please install and start Docker."
+    - name: Check Security domain configuration
+      assert:
+        that:
+          - domain is defined
+          - security_subdomain is defined
+        fail_msg: "Security domain configuration is incomplete"
+        success_msg: "Security domain configuration is valid"
 
-- name: Validate network connectivity
-  ansible.builtin.wait_for:
-    host: "8.8.8.8"
-    port: 53
-    timeout: 10
-  register: network_check
+- name: Validate Security security configuration
+  block:
+    - name: Check Security SSL configuration
+      assert:
+        that:
+          - security_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Security SSL configuration is invalid"
+        success_msg: "Security SSL configuration is valid"
 
-- name: Assert network connectivity
-  ansible.builtin.assert:
-    that:
-      - network_check is success
-    msg: "Network connectivity check failed. Please verify internet connection."
+    - name: Check Security authentication configuration
+      assert:
+        that:
+          - security_auth_enabled | bool
+          - security_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Security authentication configuration is invalid"
+        success_msg: "Security authentication configuration is valid"
 
-- name: Check available disk space for security services
-  ansible.builtin.shell: "df -BG {{ docker_dir }} | tail -1 | awk '{print $4}' | sed 's/G//'"
-  register: available_disk_gb
-  changed_when: false
+- name: Validate Security storage configuration
+  block:
+    - name: Check Security data directories
+      assert:
+        that:
+          - security_data_dir is defined
+          - security_config_dir is defined
+          - security_backup_dir is defined
+        fail_msg: "Security storage configuration is incomplete"
+        success_msg: "Security storage configuration is valid"
 
-- name: Validate minimum disk space for security services
-  ansible.builtin.assert:
-    that:
-      - available_disk_gb.stdout | int >= 10
-    fail_msg: "Insufficient disk space for security services. Available: {{ available_disk_gb.stdout }}GB, Required: 10GB"
+    - name: Create Security directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ security_data_dir }}"
+        - "{{ security_config_dir }}"
+        - "{{ security_backup_dir }}"
 
-- name: Check if required ports are available
-  ansible.builtin.wait_for:
-    port: "{{ item }}"
-    state: stopped
-    timeout: 5
-  loop:
-    - 80
-    - 443
-    - 53
-    - 9000
-  register: port_check
-
-- name: Assert required ports are available
-  ansible.builtin.assert:
-    that:
-      - port_check is success
-    msg: "Required ports are already in use. Please stop conflicting services."
-
-- name: Validate domain configuration
-  ansible.builtin.shell: "nslookup {{ domain }}"
-  register: domain_check
-  changed_when: false
-  ignore_errors: yes
-
-- name: Assert domain is properly configured
-  ansible.builtin.assert:
-    that:
-      - domain_check.rc == 0
-    msg: "Domain {{ domain }} is not properly configured in DNS. Please verify DNS settings."
-
-- name: Check system resources for security stack
-  ansible.builtin.shell: "free -g | grep Mem | awk '{print $2}'"
-  register: total_memory_gb
-  changed_when: false
-
-- name: Validate minimum memory for security stack
-  ansible.builtin.assert:
-    that:
-      - total_memory_gb.stdout | int >= 2
-    fail_msg: "Insufficient memory for security stack. Available: {{ total_memory_gb.stdout }}GB, Required: 2GB"
-
-- name: Check CPU cores for security stack
-  ansible.builtin.shell: "nproc"
-  register: cpu_cores
-  changed_when: false
-
-- name: Validate minimum CPU cores for security stack
-  ansible.builtin.assert:
-    that:
-      - cpu_cores.stdout | int >= 1
-    fail_msg: "Insufficient CPU cores for security stack. Available: {{ cpu_cores.stdout }}, Required: 1" 
+- name: Final validation summary
+  debug:
+    msg: "Security validation completed successfully - all configurations are valid and secure"

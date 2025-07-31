@@ -1,71 +1,259 @@
----
-# Default variables for utilities role
+# Utilities Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Enable/disable utilities stack
-utilities_enabled: true
+# =============================================================================
+# UTILITIES SERVICE CONFIGURATION
+# =============================================================================
 
-# Component enablement
-utilities_container_management_enabled: true
-utilities_media_processing_enabled: true
-utilities_dashboards_enabled: true
+# Service Information
+utilities_service_name: "utilities"
+utilities_container_name: "{{ utilities_service_name }}"
+utilities_image: "ghcr.io/utilities/utilities:latest"
+utilities_version: "latest"
 
-# Directory structure
-utilities_docker_dir: "/home/{{ username }}/docker"
-utilities_data_dir: "/home/{{ username }}/data"
-utilities_config_dir: "/home/{{ username }}/config"
-utilities_backup_dir: "/home/{{ username }}/backups"
-utilities_logs_dir: "/home/{{ username }}/logs"
+# Network Configuration
+utilities_port: 8080
+utilities_external_port: "{{ utilities_port }}"
+utilities_protocol: "http"
+utilities_host: "{{ ansible_default_ipv4.address }}"
+utilities_url: "{{ utilities_protocol }}://{{ utilities_host }}:{{ utilities_port }}"
 
-# Portainer configuration
-portainer_enabled: true
-portainer_port: 9000
-portainer_data_dir: "{{ utilities_docker_dir }}/portainer/data"
-portainer_scripts_dir: "{{ utilities_docker_dir }}/portainer/scripts"
-portainer_logs_dir: "{{ utilities_logs_dir }}/portainer"
+# Domain Configuration
+utilities_subdomain: "utilities"
+utilities_domain: "{{ utilities_subdomain }}.{{ domain }}"
+utilities_external_url: "https://{{ utilities_domain }}"
 
-# Tdarr configuration
-tdarr_enabled: true
-tdarr_port: 8265
-tdarr_data_dir: "{{ utilities_docker_dir }}/tdarr/data"
-tdarr_config_dir: "{{ utilities_docker_dir }}/tdarr/config"
-tdarr_scripts_dir: "{{ utilities_docker_dir }}/tdarr/scripts"
-tdarr_logs_dir: "{{ utilities_logs_dir }}/tdarr"
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
 
-# Tautulli configuration
-tautulli_enabled: true
-tautulli_port: 8181
-tautulli_data_dir: "{{ utilities_docker_dir }}/tautulli/data"
-tautulli_config_dir: "{{ utilities_docker_dir }}/tautulli/config"
-tautulli_logs_dir: "{{ utilities_logs_dir }}/tautulli"
+# Authentication
+utilities_auth_enabled: true
+utilities_auth_method: "authentik"  # Options: basic, authentik, none
+utilities_admin_username: "admin"
+utilities_admin_password: "{{ vault_utilities_admin_password }}"
 
-# Homepage configuration
-homepage_enabled: true
-homepage_dir: "{{ utilities_docker_dir }}/homepage"
-homepage_config_dir: "{{ utilities_docker_dir }}/homepage/config"
-homepage_icons_dir: "{{ utilities_docker_dir }}/homepage/config/icons"
+# API Configuration
+utilities_api_key: "{{ vault_utilities_api_key }}"
+utilities_api_token: "{{ vault_utilities_api_token }}"
 
-# Monitoring integration
-utilities_monitoring_enabled: true
-utilities_grafana_enabled: true
-utilities_prometheus_enabled: true
-utilities_loki_enabled: true
-utilities_alertmanager_enabled: true
+# Encryption & Security
+utilities_secret_key: "{{ vault_utilities_secret_key }}"
+utilities_encryption_key: "{{ vault_utilities_encryption_key }}"
+utilities_jwt_secret: "{{ vault_utilities_jwt_secret }}"
 
-# Backup configuration
-utilities_backup_enabled: true
-utilities_backup_schedule: "0 3 * * *"  # Daily at 3 AM
-utilities_backup_retention: 7
-
-# Security configuration
-utilities_security_enabled: true
-utilities_fail2ban_enabled: true
-utilities_crowdsec_enabled: true
+# SSL/TLS Configuration
 utilities_ssl_enabled: true
-utilities_access_control_enabled: true
+utilities_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+utilities_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+utilities_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
 
-# Homepage integration
-utilities_homepage_enabled: true
-utilities_homepage_category: "Utilities"
-utilities_homepage_description: "Utility Infrastructure & Management"
-utilities_homepage_icon: "utilities.png"
-utilities_homepage_widget_enabled: true 
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+utilities_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+utilities_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+utilities_database_port: "{{ databases_postgresql_port | default(5432) }}"
+utilities_database_name: "utilities"
+utilities_database_username: "utilities"
+utilities_database_password: "{{ vault_utilities_database_password }}"
+
+# Redis Configuration (if using)
+utilities_redis_enabled: false
+utilities_redis_host: "{{ redis_host | default('redis') }}"
+utilities_redis_port: "{{ redis_port | default(6379) }}"
+utilities_redis_password: "{{ vault_utilities_redis_password }}"
+utilities_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+utilities_data_dir: "{{ homelab_data_dir }}/utilities"
+utilities_config_dir: "{{ utilities_data_dir }}/config"
+utilities_backup_dir: "{{ utilities_data_dir }}/backups"
+
+# Volume Mappings
+utilities_volumes:
+  - "{{ utilities_config_dir }}:/config"
+  - "{{ utilities_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+utilities_health_check_enabled: true
+utilities_health_check_path: "/health"
+utilities_health_check_interval: 30
+utilities_health_check_timeout: 10
+utilities_health_check_retries: 3
+
+# Monitoring Integration
+utilities_monitoring_enabled: true
+utilities_prometheus_enabled: true
+utilities_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+utilities_backup_enabled: true
+utilities_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+utilities_backup_retention_days: 30
+utilities_backup_encryption_enabled: true
+utilities_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+utilities_smtp_enabled: false
+utilities_smtp_host: "{{ smtp_host | default('') }}"
+utilities_smtp_port: "{{ smtp_port | default(587) }}"
+utilities_smtp_username: "{{ vault_smtp_username }}"
+utilities_smtp_password: "{{ vault_utilities_smtp_password }}"
+utilities_smtp_from: "{{ utilities_admin_email | default('admin@' + domain) }}"
+utilities_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+utilities_webhook_enabled: false
+utilities_webhook_url: "{{ vault_webhook_url | default('') }}"
+utilities_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+utilities_discovery_enabled: true
+utilities_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+utilities_cpu_limit: "1.0"
+utilities_memory_limit: "1g"
+utilities_memory_reservation: "512m"
+
+# Performance Settings
+utilities_scan_interval: 10
+utilities_parallel_downloads: 3
+utilities_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+utilities_log_level: "info"  # Options: trace, debug, info, warn, error
+utilities_log_rotation_enabled: true
+utilities_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+utilities_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+utilities_rate_limit_enabled: true
+utilities_rate_limit_requests: 100
+utilities_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+utilities_deploy_enabled: true
+utilities_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+utilities_restart_policy: "unless-stopped"
+utilities_auto_update_enabled: true
+
+# Environment Variables
+utilities_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  UTILITIES_API_KEY: "{{ utilities_api_key }}"
+  UTILITIES_SECRET_KEY: "{{ utilities_secret_key }}"
+  UTILITIES_ENCRYPTION_KEY: "{{ utilities_encryption_key }}"
+  UTILITIES_JWT_SECRET: "{{ utilities_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+utilities_validation_enabled: true
+utilities_validation_timeout: 300
+utilities_validation_retries: 3
+
+# Testing Configuration
+utilities_test_enabled: false
+utilities_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+utilities_compliance_enabled: true
+utilities_audit_logging_enabled: true
+utilities_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+utilities_automation_enabled: true
+utilities_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+utilities_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+utilities_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+utilities_fallback_enabled: true
+utilities_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

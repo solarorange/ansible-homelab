@@ -60,7 +60,7 @@
 
 - name: Wait for Homepage API to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -93,7 +93,7 @@
 
 - name: Validate Homepage service configuration
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -140,7 +140,7 @@
 
 - name: Wait for Homepage to be ready after restart
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30

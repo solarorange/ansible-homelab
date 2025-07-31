@@ -435,7 +435,7 @@ class HomepageAPI:
 class HomepageAutomation:
     """Main Homepage automation class"""
     
-    def __init__(self, config_path: str = "config", domain: str = "localhost"):
+    def __init__(self, config_path: str = "config", domain: str = "{{ ansible_default_ipv4.address }}"):
         """
         Initialize Homepage automation
         
@@ -875,7 +875,7 @@ def main():
     parser.add_argument('--url', required=True, help='Homepage base URL')
     parser.add_argument('--api-key', help='API key for authentication')
     parser.add_argument('--config-path', default='config', help='Path to configuration files')
-    parser.add_argument('--domain', default='localhost', help='Domain name for service URLs')
+    parser.add_argument('--domain', default='{{ ansible_default_ipv4.address }}', help='Domain name for service URLs')
     parser.add_argument('--no-health-check', action='store_true', help='Skip health checks')
     parser.add_argument('--validate-only', action='store_true', help='Only validate configuration')
     parser.add_argument('--services-only', action='store_true', help='Configure services only')

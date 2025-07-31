@@ -92,13 +92,9 @@ done
 read -p "Enter Proxmox user (default: root@pam): " proxmox_user
 proxmox_user=${proxmox_user:-root@pam}
 
-read -sp "Enter Proxmox password: " proxmox_password
-echo
-
-# Network Configuration
-domain_name="zorg.media"
-network_subnet=${network_subnet:-192.168.40.0/24}
-gateway_ip=${gateway_ip:-192.168.40.1}
+read -sp "Enter Proxmox password: "{{ vault_service_password }}"zorg.media"
+network_subnet=${network_subnet:-{{ ansible_default_ipv4.address }}/24}
+gateway_ip=${gateway_ip:-{{ ansible_default_ipv4.address }}}
 
 # Create Proxmox vault file
 print_status "Creating Proxmox vault file"
@@ -106,8 +102,8 @@ cat > group_vars/all/proxmox_vault.yml << EOF
 ---
 # Proxmox API Configuration
 proxmox_host: "$proxmox_host"
-proxmox_user: "$proxmox_user"
-proxmox_password: "$proxmox_password"
+proxmox_user: "{{ vault_service_user }}"
+proxmox_password: "{{ vault_service_password }}"
 proxmox_validate_certs: true
 EOF
 
@@ -140,7 +136,7 @@ all:
         proxmox:
           ansible_host: "$proxmox_host"
           proxmox_host: "$proxmox_host"
-          proxmox_user: "$proxmox_user"
+          proxmox_user: "{{ vault_service_user }}"
           deploy_proxmox_vm: true
 EOF
 

@@ -1,17 +1,39 @@
 ---
-# Homepage Role - Main Tasks
-# Deploys and configures Homepage with comprehensive homelab service integration
+# Homepage Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Homepage validation tasks
+  include_tasks: validate.yml
+  when: homepage_validation_enabled | default(true)
 
 - name: Include Homepage deployment tasks
-  ansible.builtin.include_tasks: deploy.yml
-  tags: [homepage, homepage-deploy]
+  include_tasks: deploy.yml
+  when: homepage_deploy_enabled | default(true)
 
 - name: Include Homepage configuration tasks
-  ansible.builtin.include_tasks: configure.yml
-  tags: [homepage, homepage-config]
-  when: homepage_enabled | bool 
+  include_tasks: configure.yml
+  when: homepage_deploy_enabled | default(true)
 
-- name: Include Homepage automation integration tasks
-  ansible.builtin.include_tasks: automation_integration.yml
-  tags: [homepage, homepage-automation]
-  when: homepage_enabled | bool and homepage_automation_enabled | default(true) 
+- name: Include Homepage security tasks
+  include_tasks: security.yml
+  when: homepage_deploy_enabled | default(true)
+
+- name: Include Homepage monitoring tasks
+  include_tasks: monitoring.yml
+  when: homepage_monitoring_enabled | default(true)
+
+- name: Include Homepage backup tasks
+  include_tasks: backup.yml
+  when: homepage_backup_enabled | default(true)
+
+- name: Include Homepage automation tasks
+  include_tasks: automation.yml
+  when: homepage_automation_enabled | default(true)
+
+- name: Include Homepage integration tasks
+  include_tasks: integration.yml
+  when: homepage_discovery_enabled | default(true)
+
+- name: Include Homepage health check tasks
+  include_tasks: health_check.yml
+  when: homepage_health_check_enabled | default(true)

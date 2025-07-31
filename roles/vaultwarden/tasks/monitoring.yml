@@ -61,8 +61,8 @@
     status_code: [200, 302, 401]
     timeout: 10
   loop:
-    - "http://localhost:{{ prometheus_port }}/api/v1/targets"
-    - "http://localhost:{{ grafana_port }}/api/health"
+    - "http://{{ ansible_default_ipv4.address }}:{{ prometheus_port }}/api/v1/targets"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
   when: vaultwarden_monitoring_enabled | default(true)
   tags: [vaultwarden, vaultwarden-monitoring, verify]
 
@@ -80,7 +80,7 @@
       - Telegraf: {{ 'ENABLED' if vaultwarden_telegraf_enabled else 'DISABLED' }}
       
       Health Check:
-      - URL: http://localhost:{{ vaultwarden_port }}/alive
+      - URL: http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}/alive
       - Interval: {{ vaultwarden_health_check_interval }}s
       - Timeout: {{ vaultwarden_health_check_timeout }}s
       

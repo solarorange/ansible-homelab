@@ -1,0 +1,259 @@
+# Blackbox_Exporter Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# BLACKBOX_EXPORTER SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+blackbox_exporter_service_name: "blackbox_exporter"
+blackbox_exporter_container_name: "{{ blackbox_exporter_service_name }}"
+blackbox_exporter_image: "prom/blackbox-exporter:latest"
+blackbox_exporter_version: "latest"
+
+# Network Configuration
+blackbox_exporter_port: 9115
+blackbox_exporter_external_port: "{{ blackbox_exporter_port }}"
+blackbox_exporter_protocol: "http"
+blackbox_exporter_host: "{{ ansible_default_ipv4.address }}"
+blackbox_exporter_url: "{{ blackbox_exporter_protocol }}://{{ blackbox_exporter_host }}:{{ blackbox_exporter_port }}"
+
+# Domain Configuration
+blackbox_exporter_subdomain: "blackbox_exporter"
+blackbox_exporter_domain: "{{ blackbox_exporter_subdomain }}.{{ domain }}"
+blackbox_exporter_external_url: "https://{{ blackbox_exporter_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+blackbox_exporter_auth_enabled: true
+blackbox_exporter_auth_method: "authentik"  # Options: basic, authentik, none
+blackbox_exporter_admin_username: "admin"
+blackbox_exporter_admin_password: "{{ vault_blackbox_exporter_admin_password }}"
+
+# API Configuration
+blackbox_exporter_api_key: "{{ vault_blackbox_exporter_api_key }}"
+blackbox_exporter_api_token: "{{ vault_blackbox_exporter_api_token }}"
+
+# Encryption & Security
+blackbox_exporter_secret_key: "{{ vault_blackbox_exporter_secret_key }}"
+blackbox_exporter_encryption_key: "{{ vault_blackbox_exporter_encryption_key }}"
+blackbox_exporter_jwt_secret: "{{ vault_blackbox_exporter_jwt_secret }}"
+
+# SSL/TLS Configuration
+blackbox_exporter_ssl_enabled: true
+blackbox_exporter_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+blackbox_exporter_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+blackbox_exporter_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+blackbox_exporter_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+blackbox_exporter_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+blackbox_exporter_database_port: "{{ databases_postgresql_port | default(5432) }}"
+blackbox_exporter_database_name: "blackbox_exporter"
+blackbox_exporter_database_username: "blackbox_exporter"
+blackbox_exporter_database_password: "{{ vault_blackbox_exporter_database_password }}"
+
+# Redis Configuration (if using)
+blackbox_exporter_redis_enabled: false
+blackbox_exporter_redis_host: "{{ redis_host | default('redis') }}"
+blackbox_exporter_redis_port: "{{ redis_port | default(6379) }}"
+blackbox_exporter_redis_password: "{{ vault_blackbox_exporter_redis_password }}"
+blackbox_exporter_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+blackbox_exporter_data_dir: "{{ homelab_data_dir }}/blackbox_exporter"
+blackbox_exporter_config_dir: "{{ blackbox_exporter_data_dir }}/config"
+blackbox_exporter_backup_dir: "{{ blackbox_exporter_data_dir }}/backups"
+
+# Volume Mappings
+blackbox_exporter_volumes:
+  - "{{ blackbox_exporter_config_dir }}:/config"
+  - "{{ blackbox_exporter_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+blackbox_exporter_health_check_enabled: true
+blackbox_exporter_health_check_path: "/health"
+blackbox_exporter_health_check_interval: 30
+blackbox_exporter_health_check_timeout: 10
+blackbox_exporter_health_check_retries: 3
+
+# Monitoring Integration
+blackbox_exporter_monitoring_enabled: true
+blackbox_exporter_prometheus_enabled: true
+blackbox_exporter_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+blackbox_exporter_backup_enabled: true
+blackbox_exporter_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+blackbox_exporter_backup_retention_days: 30
+blackbox_exporter_backup_encryption_enabled: true
+blackbox_exporter_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+blackbox_exporter_smtp_enabled: false
+blackbox_exporter_smtp_host: "{{ smtp_host | default('') }}"
+blackbox_exporter_smtp_port: "{{ smtp_port | default(587) }}"
+blackbox_exporter_smtp_username: "{{ vault_smtp_username }}"
+blackbox_exporter_smtp_password: "{{ vault_blackbox_exporter_smtp_password }}"
+blackbox_exporter_smtp_from: "{{ blackbox_exporter_admin_email | default('admin@' + domain) }}"
+blackbox_exporter_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+blackbox_exporter_webhook_enabled: false
+blackbox_exporter_webhook_url: "{{ vault_webhook_url | default('') }}"
+blackbox_exporter_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+blackbox_exporter_discovery_enabled: true
+blackbox_exporter_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+blackbox_exporter_cpu_limit: "1.0"
+blackbox_exporter_memory_limit: "1g"
+blackbox_exporter_memory_reservation: "512m"
+
+# Performance Settings
+blackbox_exporter_scan_interval: 10
+blackbox_exporter_parallel_downloads: 3
+blackbox_exporter_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+blackbox_exporter_log_level: "info"  # Options: trace, debug, info, warn, error
+blackbox_exporter_log_rotation_enabled: true
+blackbox_exporter_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+blackbox_exporter_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+blackbox_exporter_rate_limit_enabled: true
+blackbox_exporter_rate_limit_requests: 100
+blackbox_exporter_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+blackbox_exporter_deploy_enabled: true
+blackbox_exporter_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+blackbox_exporter_restart_policy: "unless-stopped"
+blackbox_exporter_auto_update_enabled: true
+
+# Environment Variables
+blackbox_exporter_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  BLACKBOX_EXPORTER_API_KEY: "{{ blackbox_exporter_api_key }}"
+  BLACKBOX_EXPORTER_SECRET_KEY: "{{ blackbox_exporter_secret_key }}"
+  BLACKBOX_EXPORTER_ENCRYPTION_KEY: "{{ blackbox_exporter_encryption_key }}"
+  BLACKBOX_EXPORTER_JWT_SECRET: "{{ blackbox_exporter_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+blackbox_exporter_validation_enabled: true
+blackbox_exporter_validation_timeout: 300
+blackbox_exporter_validation_retries: 3
+
+# Testing Configuration
+blackbox_exporter_test_enabled: false
+blackbox_exporter_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+blackbox_exporter_compliance_enabled: true
+blackbox_exporter_audit_logging_enabled: true
+blackbox_exporter_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+blackbox_exporter_automation_enabled: true
+blackbox_exporter_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+blackbox_exporter_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+blackbox_exporter_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+blackbox_exporter_fallback_enabled: true
+blackbox_exporter_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

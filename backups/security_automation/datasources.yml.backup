@@ -1,0 +1,102 @@
+---
+# Grafana Data Sources Configuration
+# Configures all data sources for Grafana via provisioning
+
+- name: Create data sources provisioning directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/monitoring/grafana/provisioning/datasources"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  tags: [grafana, datasources, directories]
+
+- name: Create data sources configuration file
+  ansible.builtin.template:
+    src: datasources.yml.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/datasources/datasources.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart grafana
+  tags: [grafana, datasources, config]
+
+- name: Create individual data source configurations
+  ansible.builtin.template:
+    src: "{{ item.key }}.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/datasources/{{ item.key }}.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  loop: "{{ grafana_datasources | dict2items }}"
+  when: item.value.enabled | default(false)
+  notify: restart grafana
+  tags: [grafana, datasources, individual]
+
+- name: Wait for Grafana to reload data sources
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: datasources_check
+  retries: 3
+  delay: 10
+  until: datasources_check.status == 200
+  tags: [grafana, datasources, validation]
+
+- name: Validate data sources via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  loop: "{{ grafana_datasources | dict2items }}"
+  when: item.value.enabled | default(false)
+  register: datasource_validation
+  tags: [grafana, datasources, validation]
+
+- name: Test data source connections
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  loop: "{{ grafana_datasources | dict2items }}"
+  when: item.value.enabled | default(false)
+  register: datasource_health
+  tags: [grafana, datasources, health]
+
+- name: Display data sources configuration status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Data Sources Configuration:
+      
+      Configured Data Sources:
+      {% for name, config in grafana_datasources.items() %}
+      {% if config.enabled | default(false) %}
+      - {{ name }}:
+          Type: {{ config.type }}
+          URL: {{ config.url }}
+          Default: {{ config.is_default | default(false) }}
+          Status: {{ datasource_health.results[loop.index0].status | default('Unknown') }}
+      {% endif %}
+      {% endfor %}
+      
+      Validation Results:
+      - API Access: {{ datasources_check.status == 200 | ternary('OK', 'Failed') }}
+      - Health Checks: {{ datasource_health.results | length }} data sources tested
+      
+      Configuration Files:
+      - Main Config: {{ docker_dir }}/monitoring/grafana/provisioning/datasources/datasources.yml
+      - Individual Configs: {{ docker_dir }}/monitoring/grafana/provisioning/datasources/*.yml
+  tags: [grafana, datasources, summary] 

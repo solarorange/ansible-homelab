@@ -1,0 +1,259 @@
+# Komga Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# KOMGA SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+komga_service_name: "komga"
+komga_container_name: "{{ komga_service_name }}"
+komga_image: "gotson/komga:latest"
+komga_version: "latest"
+
+# Network Configuration
+komga_port: 8080
+komga_external_port: "{{ komga_port }}"
+komga_protocol: "http"
+komga_host: "{{ ansible_default_ipv4.address }}"
+komga_url: "{{ komga_protocol }}://{{ komga_host }}:{{ komga_port }}"
+
+# Domain Configuration
+komga_subdomain: "komga"
+komga_domain: "{{ komga_subdomain }}.{{ domain }}"
+komga_external_url: "https://{{ komga_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+komga_auth_enabled: true
+komga_auth_method: "authentik"  # Options: basic, authentik, none
+komga_admin_username: "admin"
+komga_admin_password: "{{ vault_komga_admin_password }}"
+
+# API Configuration
+komga_api_key: "{{ vault_komga_api_key }}"
+komga_api_token: "{{ vault_komga_api_token }}"
+
+# Encryption & Security
+komga_secret_key: "{{ vault_komga_secret_key }}"
+komga_encryption_key: "{{ vault_komga_encryption_key }}"
+komga_jwt_secret: "{{ vault_komga_jwt_secret }}"
+
+# SSL/TLS Configuration
+komga_ssl_enabled: true
+komga_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+komga_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+komga_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+komga_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+komga_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+komga_database_port: "{{ databases_postgresql_port | default(5432) }}"
+komga_database_name: "komga"
+komga_database_username: "komga"
+komga_database_password: "{{ vault_komga_database_password }}"
+
+# Redis Configuration (if using)
+komga_redis_enabled: false
+komga_redis_host: "{{ redis_host | default('redis') }}"
+komga_redis_port: "{{ redis_port | default(6379) }}"
+komga_redis_password: "{{ vault_komga_redis_password }}"
+komga_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+komga_data_dir: "{{ homelab_data_dir }}/komga"
+komga_config_dir: "{{ komga_data_dir }}/config"
+komga_backup_dir: "{{ komga_data_dir }}/backups"
+
+# Volume Mappings
+komga_volumes:
+  - "{{ komga_config_dir }}:/config"
+  - "{{ komga_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+komga_health_check_enabled: true
+komga_health_check_path: "/health"
+komga_health_check_interval: 30
+komga_health_check_timeout: 10
+komga_health_check_retries: 3
+
+# Monitoring Integration
+komga_monitoring_enabled: true
+komga_prometheus_enabled: true
+komga_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+komga_backup_enabled: true
+komga_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+komga_backup_retention_days: 30
+komga_backup_encryption_enabled: true
+komga_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+komga_smtp_enabled: false
+komga_smtp_host: "{{ smtp_host | default('') }}"
+komga_smtp_port: "{{ smtp_port | default(587) }}"
+komga_smtp_username: "{{ vault_smtp_username }}"
+komga_smtp_password: "{{ vault_komga_smtp_password }}"
+komga_smtp_from: "{{ komga_admin_email | default('admin@' + domain) }}"
+komga_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+komga_webhook_enabled: false
+komga_webhook_url: "{{ vault_webhook_url | default('') }}"
+komga_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+komga_discovery_enabled: true
+komga_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+komga_cpu_limit: "1.0"
+komga_memory_limit: "1g"
+komga_memory_reservation: "512m"
+
+# Performance Settings
+komga_scan_interval: 10
+komga_parallel_downloads: 3
+komga_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+komga_log_level: "info"  # Options: trace, debug, info, warn, error
+komga_log_rotation_enabled: true
+komga_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+komga_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+komga_rate_limit_enabled: true
+komga_rate_limit_requests: 100
+komga_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+komga_deploy_enabled: true
+komga_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+komga_restart_policy: "unless-stopped"
+komga_auto_update_enabled: true
+
+# Environment Variables
+komga_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  KOMGA_API_KEY: "{{ komga_api_key }}"
+  KOMGA_SECRET_KEY: "{{ komga_secret_key }}"
+  KOMGA_ENCRYPTION_KEY: "{{ komga_encryption_key }}"
+  KOMGA_JWT_SECRET: "{{ komga_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+komga_validation_enabled: true
+komga_validation_timeout: 300
+komga_validation_retries: 3
+
+# Testing Configuration
+komga_test_enabled: false
+komga_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+komga_compliance_enabled: true
+komga_audit_logging_enabled: true
+komga_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+komga_automation_enabled: true
+komga_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+komga_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+komga_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+komga_fallback_enabled: true
+komga_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

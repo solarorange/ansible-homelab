@@ -39,7 +39,7 @@
       # Wait for InfluxDB to be ready with proper timeout
       timeout=60
       counter=0
-      until curl -s http://localhost:8086/health > /dev/null 2>&1; do
+      until curl -s http://{{ ansible_default_ipv4.address }}:8086/health > /dev/null 2>&1; do
         echo "Waiting for InfluxDB to be ready... (${counter}/${timeout}s)"
         sleep 1
         counter=$((counter + 1))
@@ -135,7 +135,7 @@
       #!/bin/bash
       
       # Check if InfluxDB is responding
-      if ! curl -s http://localhost:8086/health > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8086/health > /dev/null; then
         echo "InfluxDB is not responding"
         exit 1
       fi
@@ -174,7 +174,7 @@
     job: "logrotate {{ docker_dir }}/monitoring/influxdb/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_influxdb_user }}"
 
 - name: Create InfluxDB backup cron job
   ansible.builtin.cron:
@@ -182,7 +182,7 @@
     job: "{{ docker_dir }}/monitoring/influxdb/scripts/manage.sh backup"
     hour: "1"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_influxdb_user }}"
 
 - name: Ensure InfluxDB is running
   ansible.builtin.docker_container:
@@ -198,7 +198,7 @@
     env:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: "{{ influxdb_admin_user }}"
-      DOCKER_INFLUXDB_INIT_PASSWORD: "{{ influxdb_admin_password }}"
+      DOCKER_INFLUXDB_INIT_password: "{{ vault_influxdb_password }}"
       DOCKER_INFLUXDB_INIT_ORG: "{{ influxdb_org }}"
       DOCKER_INFLUXDB_INIT_BUCKET: "{{ influxdb_bucket }}"
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "{{ influxdb_token }}"
@@ -211,7 +211,7 @@
       - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
       - "traefik.http.routers.influxdb.middlewares=authentik@docker"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:/health"]
       interval: 30s
       timeout: 10s
       retries: 3

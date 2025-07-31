@@ -1,0 +1,544 @@
+---
+# Lidarr Automatic Configuration
+# This task configures Lidarr with all necessary variables and integrations
+
+- name: Wait for Lidarr to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
+    method: GET
+    status_code: 200
+  register: lidarr_health
+  retries: 30
+  delay: 10
+  until: lidarr_health.status == 200
+
+- name: Configure Lidarr download clients via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/downloadclient"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body: "{{ item }}"
+  loop:
+    # SABnzbd Configuration
+    - name: "SABnzbd"
+      implementation: "Sabnzbd"
+      configContract: "SabnzbdSettings"
+      protocol: "http"
+      host: "sabnzbd"
+      port: {{ media_sabnzbd_port | default(8080) }}
+      apiKey: "{{ vault_sabnzbd_api_key }}"
+      category: "music"
+      recentTvPriority: 0
+      olderTvPriority: 0
+      addPaused: false
+      useSsl: false
+      urlBase: ""
+      username: ""
+      password: ""
+      enable: true
+
+    # qBittorrent Configuration
+    - name: "qBittorrent"
+      implementation: "QBittorrent"
+      configContract: "QBittorrentSettings"
+      protocol: "http"
+      host: "qbittorrent"
+      port: {{ media_qbittorrent_port | default(8081) }}
+      username: "{{ media_qbittorrent_username }}"
+      password: "{{ vault_qbittorrent_password }}"
+      category: "music"
+      recentTvPriority: 0
+      olderTvPriority: 0
+      addPaused: false
+      useSsl: false
+      urlBase: ""
+      enable: true
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr indexers via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/indexer"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body: "{{ item }}"
+  loop:
+    # Prowlarr Configuration
+    - name: "Prowlarr"
+      implementation: "Newznab"
+      configContract: "NewznabSettings"
+      protocol: "http"
+      host: "prowlarr"
+      port: {{ media_prowlarr_port | default(9696) }}
+      apiKey: "{{ vault_prowlarr_api_key }}"
+      categories: [3000, 3010, 3020, 3030, 3040, 3050]
+      useSsl: false
+      urlBase: ""
+      username: ""
+      password: ""
+      enable: true
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr quality profiles via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/qualityprofile"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      name: "Standard"
+      cutoff: 1000  # MP3-320
+      items:
+        - quality:
+            id: 1000
+            name: "MP3-320"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1001
+            name: "MP3-256"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1002
+            name: "MP3-192"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1003
+            name: "MP3-128"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1004
+            name: "MP3-V0"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1005
+            name: "MP3-V2"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1006
+            name: "FLAC"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1007
+            name: "ALAC"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1008
+            name: "AAC-320"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1009
+            name: "AAC-256"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1010
+            name: "AAC-192"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1011
+            name: "AAC-128"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1012
+            name: "OGG-Vorbis-Q10"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1013
+            name: "OGG-Vorbis-Q9"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1014
+            name: "OGG-Vorbis-Q8"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1015
+            name: "OGG-Vorbis-Q7"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1016
+            name: "OGG-Vorbis-Q6"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1017
+            name: "OGG-Vorbis-Q5"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1018
+            name: "OGG-Vorbis-Q4"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1019
+            name: "OGG-Vorbis-Q3"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1020
+            name: "OGG-Vorbis-Q2"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1021
+            name: "OGG-Vorbis-Q1"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+        - quality:
+            id: 1022
+            name: "OGG-Vorbis-Q0"
+            source: "encoder"
+            resolution: 0
+          allowed: true
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr metadata profiles via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/metadataprofile"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      name: "Standard"
+      primaryAlbumTypes:
+        - "Album"
+        - "EP"
+        - "Single"
+      secondaryAlbumTypes:
+        - "Compilation"
+        - "Soundtrack"
+        - "Live"
+        - "Remix"
+        - "Mixtape"
+        - "Demo"
+        - "Bootleg"
+        - "Interview"
+        - "Audiobook"
+        - "Other"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr root folders via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/rootfolder"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      path: "{{ data_dir }}/media/music"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr notifications via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/notification"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body: "{{ item }}"
+  loop:
+    # Discord Notification
+    - name: "Discord"
+      implementation: "Discord"
+      configContract: "DiscordSettings"
+      webHookUrl: "{{ vault_discord_webhook | default('') }}"
+      includeHealthWarnings: true
+      includeManualInteractions: true
+      onGrab: true
+      onDownload: true
+      onUpgrade: true
+      onRename: true
+      onHealthIssue: true
+      onApplicationUpdate: true
+      enable: "{{ vault_discord_webhook | default('') != '' }}"
+
+    # Email Notification
+    - name: "Email"
+      implementation: "Email"
+      configContract: "EmailSettings"
+      server: "{{ vault_smtp_server | default('') }}"
+      port: {{ vault_smtp_port | default(587) }}
+      username: "{{ vault_smtp_username | default('') }}"
+      password: "{{ vault_smtp_password | default('') }}"
+      from: "{{ vault_smtp_from | default('lidarr@' + domain) }}"
+      to: "{{ vault_smtp_to | default(admin_email) }}"
+      useSsl: true
+      includeHealthWarnings: true
+      includeManualInteractions: true
+      onGrab: true
+      onDownload: true
+      onUpgrade: true
+      onRename: true
+      onHealthIssue: true
+      onApplicationUpdate: true
+      enable: "{{ vault_smtp_server | default('') != '' }}"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr connections via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/connection"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body: "{{ item }}"
+  loop:
+    # Plex Connection
+    - name: "Plex"
+      implementation: "PlexServer"
+      configContract: "PlexServerSettings"
+      host: "plex"
+      port: {{ media_plex_port | default(32400) }}
+      username: "{{ vault_plex_username | default('') }}"
+      password: "{{ vault_plex_password | default('') }}"
+      updateLibrary: true
+      useSsl: false
+      authToken: "{{ vault_plex_token | default('') }}"
+      enable: "{{ vault_plex_token | default('') != '' }}"
+
+    # Jellyfin Connection
+    - name: "Jellyfin"
+      implementation: "Jellyfin"
+      configContract: "JellyfinSettings"
+      host: "jellyfin"
+      port: {{ media_jellyfin_port | default(8096) }}
+      username: "{{ vault_jellyfin_username | default('') }}"
+      password: "{{ vault_jellyfin_password | default('') }}"
+      updateLibrary: true
+      useSsl: false
+      apiKey: "{{ vault_jellyfin_api_key | default('') }}"
+      enable: "{{ vault_jellyfin_api_key | default('') != '' }}"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr auto tagging via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/autotagging"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      name: "Genre"
+      removeTagsAutomatically: true
+      tags:
+        - "{{ item }}"
+      specifications:
+        - name: "Genre"
+          implementation: "GenreSpecification"
+          negate: false
+          required: false
+          value: ""
+  loop:
+    - "Rock"
+    - "Pop"
+    - "Jazz"
+    - "Classical"
+    - "Electronic"
+    - "Hip-Hop"
+    - "Country"
+    - "Blues"
+    - "Folk"
+    - "Metal"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr system settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/ui"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      firstDayOfWeek: 0
+      calendarWeekColumnHeader: "ddd M/D"
+      shortDateFormat: "MM/DD/YYYY"
+      longDateFormat: "dddd, MMMM DD, YYYY"
+      timeFormat: "h(:mm)a"
+      showRelativeDates: true
+      enableColorImpairedMode: false
+      uiTheme: "Dark"
+      expandAlbumByDefault: false
+      expandSingleByDefault: false
+      expandEPByDefault: false
+      expandBroadcastByDefault: false
+      expandOtherByDefault: false
+      expandSingleByDefault: false
+      expandEPByDefault: false
+      expandBroadcastByDefault: false
+      expandOtherByDefault: false
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr backup settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/backup"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      folder: "{{ docker_dir }}/lidarr/backup"
+      interval: 7
+      retention: 28
+      includeMetadata: true
+      includeLogs: true
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr update settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/update"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      mechanism: "builtIn"
+      automatically: true
+      scriptPath: ""
+      updateTime: "00:00"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr security settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/security"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      authenticationMethod: "forms"
+      authenticationRequired: "enabled"
+      username: "{{ vault_lidarr_username }}"
+      password: "{{ vault_lidarr_password | default('') }}"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr SSL settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/ssl"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      enabled: false
+      port: 9898
+      certPath: ""
+      certPassword: ""
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr proxy settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/proxy"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      enabled: false
+      type: "http"
+      hostname: ""
+      port: 8080
+      username: ""
+      password: ""
+      bypassFilter: ""
+      bypassLocalAddresses: true
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr analytics settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/analytics"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      enabled: true
+      anonymousId: "{{ vault_lidarr_anonymous_id | default('') }}"
+  when: media_enable_lidarr | default(true)
+
+- name: Configure Lidarr instance settings via API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/config/instance"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+    body_format: json
+    body:
+      name: "Lidarr"
+      applicationUrl: "https://lidarr.{{ domain }}"
+      port: {{ media_lidarr_port | default(8686) }}
+      apiKey: "{{ vault_lidarr_api_key }}"
+      branch: "main"
+      logLevel: "info"
+  when: media_enable_lidarr | default(true)
+
+- name: Verify Lidarr configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_lidarr_port | default(8686) }}/api/v1/system/status"
+    method: GET
+    headers:
+      X-Api-Key: "{{ vault_lidarr_api_key }}"
+  register: lidarr_status
+  when: media_enable_lidarr | default(true)
+
+- name: Display Lidarr configuration status
+  ansible.builtin.debug:
+    msg: "Lidarr configuration completed successfully. Status: {{ lidarr_status.json.status }}"
+  when: media_enable_lidarr | default(true) and lidarr_status.status == 200 

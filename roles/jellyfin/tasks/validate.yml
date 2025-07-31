@@ -1,0 +1,89 @@
+---
+# Jellyfin Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Jellyfin vault variables
+  block:
+    - name: Check required Jellyfin vault variables
+      assert:
+        that:
+          - vault_jellyfin_admin_password is defined
+          - vault_jellyfin_database_password is defined
+          - vault_jellyfin_api_key is defined
+          - vault_jellyfin_secret_key is defined
+          - vault_jellyfin_encryption_key is defined
+          - vault_jellyfin_jwt_secret is defined
+        fail_msg: "Required Jellyfin vault variables are not defined"
+        success_msg: "All required Jellyfin vault variables are defined"
+
+    - name: Validate Jellyfin password complexity
+      assert:
+        that:
+          - vault_jellyfin_admin_password | length >= 12
+          - vault_jellyfin_database_password | length >= 12
+        fail_msg: "Jellyfin passwords must be at least 12 characters long"
+        success_msg: "Jellyfin password complexity requirements met"
+
+- name: Validate Jellyfin network configuration
+  block:
+    - name: Check Jellyfin port configuration
+      assert:
+        that:
+          - jellyfin_port is defined
+          - jellyfin_port | int >= 1024
+          - jellyfin_port | int <= 65535
+        fail_msg: "Jellyfin port must be between 1024 and 65535"
+        success_msg: "Jellyfin port configuration is valid"
+
+    - name: Check Jellyfin domain configuration
+      assert:
+        that:
+          - domain is defined
+          - jellyfin_subdomain is defined
+        fail_msg: "Jellyfin domain configuration is incomplete"
+        success_msg: "Jellyfin domain configuration is valid"
+
+- name: Validate Jellyfin security configuration
+  block:
+    - name: Check Jellyfin SSL configuration
+      assert:
+        that:
+          - jellyfin_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Jellyfin SSL configuration is invalid"
+        success_msg: "Jellyfin SSL configuration is valid"
+
+    - name: Check Jellyfin authentication configuration
+      assert:
+        that:
+          - jellyfin_auth_enabled | bool
+          - jellyfin_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Jellyfin authentication configuration is invalid"
+        success_msg: "Jellyfin authentication configuration is valid"
+
+- name: Validate Jellyfin storage configuration
+  block:
+    - name: Check Jellyfin data directories
+      assert:
+        that:
+          - jellyfin_data_dir is defined
+          - jellyfin_config_dir is defined
+          - jellyfin_backup_dir is defined
+        fail_msg: "Jellyfin storage configuration is incomplete"
+        success_msg: "Jellyfin storage configuration is valid"
+
+    - name: Create Jellyfin directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ jellyfin_data_dir }}"
+        - "{{ jellyfin_config_dir }}"
+        - "{{ jellyfin_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Jellyfin validation completed successfully - all configurations are valid and secure"

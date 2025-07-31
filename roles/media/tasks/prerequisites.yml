@@ -169,7 +169,7 @@
         name: "Media stack health check"
         minute: "*/15"
         job: "{{ config_dir }}/media-health.sh"
-        user: "{{ username }}"
+        user: "{{ vault_media_user }}"
 
     - name: Schedule media stack backup
       ansible.builtin.cron:
@@ -177,7 +177,7 @@
         hour: "2"
         minute: "0"
         job: "{{ config_dir }}/media-backup.sh"
-        user: "{{ username }}"
+        user: "{{ vault_media_user }}"
       when: media_backup_enabled | default(true)
 
   tags: [media, setup] 

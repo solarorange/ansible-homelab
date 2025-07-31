@@ -1,203 +1,259 @@
----
-# Linkwarden Configuration
-# Production-ready defaults for Linkwarden bookmark management deployment
+# Linkwarden Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Service Configuration
-linkwarden_enabled: true
+# =============================================================================
+# LINKWARDEN SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+linkwarden_service_name: "linkwarden"
+linkwarden_container_name: "{{ linkwarden_service_name }}"
+linkwarden_image: "ghcr.io/linkwarden/linkwarden:latest"
 linkwarden_version: "latest"
-linkwarden_network_name: "linkwarden"
-linkwarden_network_external: true
 
-# Container Configuration
-linkwarden_container_restart_policy: "unless-stopped"
-linkwarden_container_network_mode: "bridge"
-
-# Port Configuration
-linkwarden_port: 3002
+# Network Configuration
+linkwarden_port: 3000
+linkwarden_external_port: "{{ linkwarden_port }}"
+linkwarden_protocol: "http"
+linkwarden_host: "{{ ansible_default_ipv4.address }}"
+linkwarden_url: "{{ linkwarden_protocol }}://{{ linkwarden_host }}:{{ linkwarden_port }}"
 
 # Domain Configuration
 linkwarden_subdomain: "linkwarden"
+linkwarden_domain: "{{ linkwarden_subdomain }}.{{ domain }}"
+linkwarden_external_url: "https://{{ linkwarden_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 linkwarden_auth_enabled: true
-linkwarden_auth_method: "authentik"  # Options: authentik, basic, none
-linkwarden_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+linkwarden_auth_method: "authentik"  # Options: basic, authentik, none
+linkwarden_admin_username: "admin"
+linkwarden_admin_password: "{{ vault_linkwarden_admin_password }}"
 
-# Database Configuration
-linkwarden_database_type: "postgresql"
-linkwarden_database_host: "linkwarden-postgres"
-linkwarden_database_port: 5432
+# API Configuration
+linkwarden_api_key: "{{ vault_linkwarden_api_key }}"
+linkwarden_api_token: "{{ vault_linkwarden_api_token }}"
+
+# Encryption & Security
+linkwarden_secret_key: "{{ vault_linkwarden_secret_key }}"
+linkwarden_encryption_key: "{{ vault_linkwarden_encryption_key }}"
+linkwarden_jwt_secret: "{{ vault_linkwarden_jwt_secret }}"
+
+# SSL/TLS Configuration
+linkwarden_ssl_enabled: true
+linkwarden_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+linkwarden_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+linkwarden_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+linkwarden_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+linkwarden_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+linkwarden_database_port: "{{ databases_postgresql_port | default(5432) }}"
 linkwarden_database_name: "linkwarden"
-linkwarden_database_user: "postgres"
-linkwarden_database_password: "{{ vault_linkwarden_postgres_password | default('') }}"
+linkwarden_database_username: "linkwarden"
+linkwarden_database_password: "{{ vault_linkwarden_database_password }}"
 
-# Service Components
-linkwarden_components:
-  app:
-    enabled: true
-    image: "ghcr.io/linkwarden/linkwarden:latest"
-    container_name: "linkwarden-app"
-    port: 3002
-    volumes:
-      - "{{ docker_dir }}/linkwarden/app:/app/data"
-      - "{{ logs_dir }}/linkwarden/app:/app/logs"
-    environment:
-      - DATABASE_URL=postgresql://{{ linkwarden_database_user }}:{{ linkwarden_database_password }}@{{ linkwarden_database_host }}:{{ linkwarden_database_port }}/{{ linkwarden_database_name }}
-      - NEXTAUTH_URL=https://{{ linkwarden_subdomain }}.{{ domain }}
-      - NEXTAUTH_SECRET={{ vault_linkwarden_nextauth_secret | default('') }}
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    depends_on:
-      - linkwarden-postgres
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 256M
+# Redis Configuration (if using)
+linkwarden_redis_enabled: false
+linkwarden_redis_host: "{{ redis_host | default('redis') }}"
+linkwarden_redis_port: "{{ redis_port | default(6379) }}"
+linkwarden_redis_password: "{{ vault_linkwarden_redis_password }}"
+linkwarden_redis_database: 0
 
-  postgres:
-    enabled: true
-    image: "postgres:15-alpine"
-    container_name: "linkwarden-postgres"
-    volumes:
-      - "{{ docker_dir }}/linkwarden/postgres:/var/lib/postgresql/data"
-      - "{{ logs_dir }}/linkwarden/postgres:/logs"
-    environment:
-      - POSTGRES_USER={{ linkwarden_database_user }}
-      - POSTGRES_PASSWORD={{ linkwarden_database_password }}
-      - POSTGRES_DB={{ linkwarden_database_name }}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {{ linkwarden_database_user }}"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    resources:
-      limits:
-        cpus: '0.5'
-        memory: 1G
-      reservations:
-        cpus: '0.1'
-        memory: 256M
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+linkwarden_data_dir: "{{ homelab_data_dir }}/linkwarden"
+linkwarden_config_dir: "{{ linkwarden_data_dir }}/config"
+linkwarden_backup_dir: "{{ linkwarden_data_dir }}/backups"
+
+# Volume Mappings
+linkwarden_volumes:
+  - "{{ linkwarden_config_dir }}:/config"
+  - "{{ linkwarden_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+linkwarden_health_check_enabled: true
+linkwarden_health_check_path: "/health"
+linkwarden_health_check_interval: 30
+linkwarden_health_check_timeout: 10
+linkwarden_health_check_retries: 3
 
 # Monitoring Integration
 linkwarden_monitoring_enabled: true
-linkwarden_metrics_enabled: true
-linkwarden_health_check_enabled: true
-linkwarden_health_check_interval: 30
+linkwarden_prometheus_enabled: true
+linkwarden_grafana_enabled: true
 
-# Security Configuration
-linkwarden_security_headers: true
-linkwarden_rate_limiting: true
-linkwarden_rate_limit_requests: 100
-linkwarden_rate_limit_window: 60
-linkwarden_cors_enabled: false
-linkwarden_cors_origins: []
-linkwarden_allow_anonymous_access: false
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 linkwarden_backup_enabled: true
 linkwarden_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-linkwarden_backup_retention: 7  # Keep backups for 7 days
-linkwarden_backup_compression: true
-linkwarden_backup_include_database: true
-linkwarden_backup_include_config: true
-linkwarden_backup_dir: "{{ backup_dir }}/linkwarden"
-linkwarden_backup_retention_days: 7
-linkwarden_backup_log_file: "{{ logs_dir }}/linkwarden/backup/backup.log"
-linkwarden_backup_max_log_size: "10M"
-linkwarden_backup_notifications_enabled: true
+linkwarden_backup_retention_days: 30
+linkwarden_backup_encryption_enabled: true
+linkwarden_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-linkwarden_log_level: "info"  # Options: debug, info, warn, error
-linkwarden_log_format: "json"
-linkwarden_log_retention: 30  # Days
-linkwarden_log_rotation: true
-linkwarden_health_check_log_file: "{{ logs_dir }}/linkwarden/health/health.log"
-linkwarden_health_check_max_log_size: "10M"
-linkwarden_health_check_retention_days: 7
-linkwarden_health_check_timeout: 30
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+linkwarden_smtp_enabled: false
+linkwarden_smtp_host: "{{ smtp_host | default('') }}"
+linkwarden_smtp_port: "{{ smtp_port | default(587) }}"
+linkwarden_smtp_username: "{{ vault_smtp_username }}"
+linkwarden_smtp_password: "{{ vault_linkwarden_smtp_password }}"
+linkwarden_smtp_from: "{{ linkwarden_admin_email | default('admin@' + domain) }}"
+linkwarden_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+linkwarden_webhook_enabled: false
+linkwarden_webhook_url: "{{ vault_webhook_url | default('') }}"
+linkwarden_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+linkwarden_discovery_enabled: true
+linkwarden_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-linkwarden_memory_limit: "2g"
-linkwarden_cpu_limit: "2.0"
-linkwarden_storage_limit: "100g"
+linkwarden_cpu_limit: "1.0"
+linkwarden_memory_limit: "1g"
+linkwarden_memory_reservation: "512m"
 
-# Traefik Configuration
-linkwarden_traefik_enabled: true
-linkwarden_traefik_network: "{{ traefik_network | default('homelab') }}"
-linkwarden_traefik_middleware: "secure-headers,compress"
-linkwarden_traefik_auth_middleware: "authentik@docker"
-linkwarden_traefik_ssl_enabled: true
-linkwarden_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Performance Settings
+linkwarden_scan_interval: 10
+linkwarden_parallel_downloads: 3
+linkwarden_auto_download_enabled: true
 
-# Homepage Integration
-linkwarden_homepage_enabled: true
-linkwarden_homepage_category: "Productivity"
-linkwarden_homepage_description: "Bookmark Management & Organization"
-linkwarden_homepage_icon: "linkwarden.png"
-linkwarden_homepage_widget_enabled: true
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
 
-# Telegraf Integration
-linkwarden_telegraf_enabled: true
-linkwarden_telegraf_metrics: true
-linkwarden_telegraf_logs: true
+# Log Settings
+linkwarden_log_level: "info"  # Options: trace, debug, info, warn, error
+linkwarden_log_rotation_enabled: true
+linkwarden_log_retention_days: 30
 
-# Prometheus Integration
-linkwarden_prometheus_enabled: true
-linkwarden_prometheus_metrics: true
-linkwarden_prometheus_scrape_interval: 30
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Grafana Integration
-linkwarden_grafana_enabled: true
-linkwarden_grafana_dashboard: true
-linkwarden_grafana_datasource: "prometheus"
+# Security Headers
+linkwarden_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Loki Integration
-linkwarden_loki_enabled: true
-linkwarden_loki_logs: true
+# Rate Limiting
+linkwarden_rate_limit_enabled: true
+linkwarden_rate_limit_requests: 100
+linkwarden_rate_limit_window: 60
 
-# Alerting Configuration
-linkwarden_alerting_enabled: true
-linkwarden_alerting_provider: "alertmanager"
-linkwarden_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
 
-# CrowdSec Integration
-linkwarden_crowdsec_enabled: true
-linkwarden_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
+# Deployment Settings
+linkwarden_deploy_enabled: true
+linkwarden_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+linkwarden_restart_policy: "unless-stopped"
+linkwarden_auto_update_enabled: true
 
-# Fail2ban Integration
-linkwarden_fail2ban_enabled: true
-linkwarden_fail2ban_jail: "linkwarden"
-linkwarden_fail2ban_max_retry: 5
-linkwarden_fail2ban_bantime: 3600
+# Environment Variables
+linkwarden_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  LINKWARDEN_API_KEY: "{{ linkwarden_api_key }}"
+  LINKWARDEN_SECRET_KEY: "{{ linkwarden_secret_key }}"
+  LINKWARDEN_ENCRYPTION_KEY: "{{ linkwarden_encryption_key }}"
+  LINKWARDEN_JWT_SECRET: "{{ linkwarden_jwt_secret }}"
 
-# Service Dependencies
-linkwarden_dependencies:
-  - "docker"
-  - "traefik"
-  - "monitoring_infrastructure"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Health Check Configuration
-linkwarden_health_check_url: "/api/health"
-linkwarden_health_check_timeout: 10
-linkwarden_health_check_retries: 3
+# Validation Settings
+linkwarden_validation_enabled: true
+linkwarden_validation_timeout: 300
+linkwarden_validation_retries: 3
 
-# Service configuration directories
-linkwarden_config_dir: "{{ docker_dir }}/linkwarden"
-linkwarden_app_config_dir: "{{ docker_dir }}/linkwarden/app"
-linkwarden_postgres_config_dir: "{{ docker_dir }}/linkwarden/postgres"
+# Testing Configuration
+linkwarden_test_enabled: false
+linkwarden_test_items: 3
 
-# Service container names
-linkwarden_app_container_name: "linkwarden-app"
-linkwarden_postgres_container_name: "linkwarden-postgres"
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
 
-# Service ports
-linkwarden_app_port: 3002 
+# Compliance Settings
+linkwarden_compliance_enabled: true
+linkwarden_audit_logging_enabled: true
+linkwarden_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+linkwarden_automation_enabled: true
+linkwarden_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+linkwarden_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+linkwarden_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+linkwarden_fallback_enabled: true
+linkwarden_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

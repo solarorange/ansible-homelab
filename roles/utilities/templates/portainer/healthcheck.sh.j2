@@ -11,7 +11,7 @@ if ! docker ps -f name=$PORTAINER_CONTAINER -f status=running | grep -q $PORTAIN
 fi
 
 # Check if Portainer API is responsive
-if ! curl -s -f http://localhost:$PORTAINER_PORT/api/status > /dev/null; then
+if ! curl -s -f http://{{ ansible_default_ipv4.address }}:$PORTAINER_PORT/api/status > /dev/null; then
   echo "Portainer API is not responding on port $PORTAINER_PORT"
   exit 1
 fi

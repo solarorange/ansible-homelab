@@ -1,0 +1,89 @@
+---
+# Certificate_Management Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Certificate_Management vault variables
+  block:
+    - name: Check required Certificate_Management vault variables
+      assert:
+        that:
+          - vault_certificate_management_admin_password is defined
+          - vault_certificate_management_database_password is defined
+          - vault_certificate_management_api_key is defined
+          - vault_certificate_management_secret_key is defined
+          - vault_certificate_management_encryption_key is defined
+          - vault_certificate_management_jwt_secret is defined
+        fail_msg: "Required Certificate_Management vault variables are not defined"
+        success_msg: "All required Certificate_Management vault variables are defined"
+
+    - name: Validate Certificate_Management password complexity
+      assert:
+        that:
+          - vault_certificate_management_admin_password | length >= 12
+          - vault_certificate_management_database_password | length >= 12
+        fail_msg: "Certificate_Management passwords must be at least 12 characters long"
+        success_msg: "Certificate_Management password complexity requirements met"
+
+- name: Validate Certificate_Management network configuration
+  block:
+    - name: Check Certificate_Management port configuration
+      assert:
+        that:
+          - certificate_management_port is defined
+          - certificate_management_port | int >= 1024
+          - certificate_management_port | int <= 65535
+        fail_msg: "Certificate_Management port must be between 1024 and 65535"
+        success_msg: "Certificate_Management port configuration is valid"
+
+    - name: Check Certificate_Management domain configuration
+      assert:
+        that:
+          - domain is defined
+          - certificate_management_subdomain is defined
+        fail_msg: "Certificate_Management domain configuration is incomplete"
+        success_msg: "Certificate_Management domain configuration is valid"
+
+- name: Validate Certificate_Management security configuration
+  block:
+    - name: Check Certificate_Management SSL configuration
+      assert:
+        that:
+          - certificate_management_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Certificate_Management SSL configuration is invalid"
+        success_msg: "Certificate_Management SSL configuration is valid"
+
+    - name: Check Certificate_Management authentication configuration
+      assert:
+        that:
+          - certificate_management_auth_enabled | bool
+          - certificate_management_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Certificate_Management authentication configuration is invalid"
+        success_msg: "Certificate_Management authentication configuration is valid"
+
+- name: Validate Certificate_Management storage configuration
+  block:
+    - name: Check Certificate_Management data directories
+      assert:
+        that:
+          - certificate_management_data_dir is defined
+          - certificate_management_config_dir is defined
+          - certificate_management_backup_dir is defined
+        fail_msg: "Certificate_Management storage configuration is incomplete"
+        success_msg: "Certificate_Management storage configuration is valid"
+
+    - name: Create Certificate_Management directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ certificate_management_data_dir }}"
+        - "{{ certificate_management_config_dir }}"
+        - "{{ certificate_management_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Certificate_Management validation completed successfully - all configurations are valid and secure"

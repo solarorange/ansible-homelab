@@ -100,12 +100,10 @@ check_database() {
     local result="{}"
     
     if command -v psql >/dev/null 2>&1; then
-        if PGPASSWORD="{{ immich_postgres_password }}" psql -h immich-postgres -U "{{ immich_postgres_user }}" -d "{{ immich_postgres_db }}" -c "SELECT 1;" >/dev/null 2>&1; then
-            result='{"status": "connected", "connections": 0}'
+        if PGpassword: "{{ vault_immich_admin_password | password_hash("bcrypt") }}"{"status": "connected", "connections": 0}'
             
             # Get connection count
-            local connections=$(PGPASSWORD="{{ immich_postgres_password }}" psql -h immich-postgres -U "{{ immich_postgres_user }}" -d "{{ immich_postgres_db }}" -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname = '{{ immich_postgres_db }}';" 2>/dev/null | tr -d ' ')
-            if [ -n "$connections" ] && [ "$connections" -ge 0 ]; then
+            local connections=$(PGpassword: "{{ vault_immich_admin_password | password_hash("bcrypt") }}"$connections" ] && [ "$connections" -ge 0 ]; then
                 result=$(echo "$result" | jq --arg conn "$connections" '.connections = ($conn | tonumber)')
             fi
         else

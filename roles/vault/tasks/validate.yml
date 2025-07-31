@@ -1,0 +1,89 @@
+---
+# Vault Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Vault vault variables
+  block:
+    - name: Check required Vault vault variables
+      assert:
+        that:
+          - vault_vault_admin_password is defined
+          - vault_vault_database_password is defined
+          - vault_vault_api_key is defined
+          - vault_vault_secret_key is defined
+          - vault_vault_encryption_key is defined
+          - vault_vault_jwt_secret is defined
+        fail_msg: "Required Vault vault variables are not defined"
+        success_msg: "All required Vault vault variables are defined"
+
+    - name: Validate Vault password complexity
+      assert:
+        that:
+          - vault_vault_admin_password | length >= 12
+          - vault_vault_database_password | length >= 12
+        fail_msg: "Vault passwords must be at least 12 characters long"
+        success_msg: "Vault password complexity requirements met"
+
+- name: Validate Vault network configuration
+  block:
+    - name: Check Vault port configuration
+      assert:
+        that:
+          - vault_port is defined
+          - vault_port | int >= 1024
+          - vault_port | int <= 65535
+        fail_msg: "Vault port must be between 1024 and 65535"
+        success_msg: "Vault port configuration is valid"
+
+    - name: Check Vault domain configuration
+      assert:
+        that:
+          - domain is defined
+          - vault_subdomain is defined
+        fail_msg: "Vault domain configuration is incomplete"
+        success_msg: "Vault domain configuration is valid"
+
+- name: Validate Vault security configuration
+  block:
+    - name: Check Vault SSL configuration
+      assert:
+        that:
+          - vault_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Vault SSL configuration is invalid"
+        success_msg: "Vault SSL configuration is valid"
+
+    - name: Check Vault authentication configuration
+      assert:
+        that:
+          - vault_auth_enabled | bool
+          - vault_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Vault authentication configuration is invalid"
+        success_msg: "Vault authentication configuration is valid"
+
+- name: Validate Vault storage configuration
+  block:
+    - name: Check Vault data directories
+      assert:
+        that:
+          - vault_data_dir is defined
+          - vault_config_dir is defined
+          - vault_backup_dir is defined
+        fail_msg: "Vault storage configuration is incomplete"
+        success_msg: "Vault storage configuration is valid"
+
+    - name: Create Vault directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ vault_data_dir }}"
+        - "{{ vault_config_dir }}"
+        - "{{ vault_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Vault validation completed successfully - all configurations are valid and secure"

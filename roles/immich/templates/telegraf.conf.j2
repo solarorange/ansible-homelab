@@ -65,17 +65,14 @@
 
 # PostgreSQL metrics
 [[inputs.postgresql]]
-  address = "host=immich-postgres port=5432 user={{ immich_postgres_user }} password={{ immich_postgres_password }} dbname={{ immich_postgres_db }} sslmode=disable"
-  databases = ["{{ immich_postgres_db }}"]
+  address = "host=immich-postgres port=5432 user={{ immich_postgres_user }} password: "{{ vault_immich_admin_password | password_hash("bcrypt") }}"{{ immich_postgres_db }}"]
   [inputs.postgresql.tags]
     service = "immich"
 
 # Redis metrics
 [[inputs.redis]]
   servers = ["tcp://immich-redis:6379"]
-  password = "{{ immich_redis_password }}"
-  [inputs.redis.tags]
-    service = "immich"
+  password: "{{ vault_immich_admin_password | password_hash("bcrypt") }}"immich"
 
 # Log parsing for Immich
 [[inputs.tail]]

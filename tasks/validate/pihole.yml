@@ -10,7 +10,7 @@
 
 - name: Verify Pi-hole API access
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php?status"
+    url: "http://{{ ansible_default_ipv4.address }}:80/admin/api.php?status"
     return_content: yes
     status_code: 200
   register: pihole_status
@@ -18,7 +18,7 @@
 
 - name: Verify Pi-hole DNS resolution
   ansible.builtin.shell: |
-    dig @127.0.0.1 google.com +short
+    dig @{{ ansible_default_ipv4.address }} google.com +short
   register: dns_test
   failed_when: dns_test.stdout == ""
 
@@ -32,7 +32,7 @@
 
 - name: Verify Pi-hole metrics endpoint
   ansible.builtin.uri:
-    url: "http://localhost:80/admin/api.php?summaryRaw"
+    url: "http://{{ ansible_default_ipv4.address }}:80/admin/api.php?summaryRaw"
     return_content: yes
     status_code: 200
   register: metrics

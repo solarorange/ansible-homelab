@@ -32,7 +32,7 @@
   ansible.builtin.shell:
     cmd: "{{ docker_compose_dir }}/homepage/setup_icons.sh"
     chdir: "{{ docker_compose_dir }}/homepage"
-  become_user: "{{ username }}"
+  become_user: "{{ vault_homepage_user }}"
 
 - name: Generate API keys for services
   ansible.builtin.set_fact:
@@ -86,7 +86,7 @@
 
 - name: Wait for Homepage to be ready
   ansible.builtin.uri:
-    url: "http://localhost:3000"
+    url: "http://{{ ansible_default_ipv4.address }}:3000"
     method: GET
     status_code: 200
   register: homepage_ready

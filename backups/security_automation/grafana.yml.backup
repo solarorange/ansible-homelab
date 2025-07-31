@@ -1,0 +1,653 @@
+---
+# Grafana Configuration
+# Production-ready visualization and dashboard system
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/grafana/config"
+    - "{{ docker_dir }}/monitoring/grafana/data"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/datasources"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards"
+    - "{{ docker_dir }}/monitoring/grafana/scripts"
+    - "{{ logs_dir }}/monitoring/grafana"
+
+- name: Create Grafana docker-compose service
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/docker-compose.yml"
+    content: |
+      version: '3.8'
+      services:
+        grafana:
+          image: grafana/grafana:latest
+          container_name: grafana
+          volumes:
+            - {{ docker_dir }}/monitoring/grafana/config:/etc/grafana
+            - {{ docker_dir }}/monitoring/grafana/data:/var/lib/grafana
+            - {{ docker_dir }}/monitoring/grafana/provisioning:/etc/grafana/provisioning
+            - {{ logs_dir }}/monitoring/grafana:/var/log/grafana
+          environment:
+            - GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
+            - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
+            - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+          ports:
+            - "3000:3000"
+          restart: unless-stopped
+          networks:
+            - monitoring
+            - homelab
+          labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=homelab"
+            - "traefik.http.routers.grafana.rule=Host(`grafana.{{ domain }}`)"
+            - "traefik.http.routers.grafana.entrypoints=https"
+            - "traefik.http.routers.grafana.tls=true"
+            - "traefik.http.routers.grafana.middlewares=authentik@docker"
+            - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+          healthcheck:
+            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:3000/api/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+      networks:
+        monitoring:
+          external: true
+        homelab:
+          external: true
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Grafana configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/config/grafana.ini"
+    content: |
+      # Server
+      [server]
+      protocol = http
+      http_addr = 0.0.0.0
+      http_port = 3000
+      domain = {{ ansible_default_ipv4.address }}
+      root_url = %(protocol)s://%(domain)s:%(http_port)s/
+      serve_from_sub_path = false
+      enable_gzip = true
+      cert_file = /etc/grafana/certs/grafana.crt
+      cert_key = /etc/grafana/certs/grafana.key
+      
+      # Security
+      [security]
+      admin_user = admin
+      admin_password = {{ grafana_admin_password }}
+      secret_key = {{ grafana_secret_key }}
+      disable_initial_admin_creation = false
+      cookie_secure = true
+      allow_embedding = false
+      strict_transport_security = true
+      strict_transport_security_max_age_seconds = 31536000
+      content_security_policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';"
+      
+      # Database
+      [database]
+      type = sqlite3
+      path = /var/lib/grafana/grafana.db
+      max_idle_conn = 100
+      max_open_conn = 100
+      conn_max_lifetime = 14400
+      
+      # Session
+      [session]
+      provider = file
+      provider_config = sessions
+      cookie_name = grafana_sess
+      cookie_secure = true
+      session_life_time = 86400
+      
+      # Logging
+      [log]
+      mode = file
+      level = info
+      format = json
+      output = /var/log/grafana/grafana.log
+      
+      # Metrics
+      [metrics]
+      enabled = true
+      interval_seconds = 10
+      
+      # Alerting
+      [alerting]
+      enabled = true
+      execute_alerts = true
+      error_or_timeout = alerting
+      nodata_or_nullvalues = alerting
+      evaluation_timeout_seconds = 30
+      notification_timeout_seconds = 30
+      max_attempts = 3
+      
+      # SMTP
+      [smtp]
+      enabled = true
+      host = {{ smtp_host }}:{{ smtp_port }}
+      user = {{ smtp_user }}
+      password = {{ smtp_password }}
+      from_address = {{ smtp_from_address }}
+      from_name = Grafana
+      ehlo_identity = localhost
+      startTLS_policy = MandatoryStartTLS
+      
+      # Auth
+      [auth]
+      disable_login_form = false
+      disable_signout_menu = false
+      oauth_auto_login = false
+      
+      [auth.anonymous]
+      enabled = true
+      org_name = Main Org.
+      org_role = Viewer
+      
+      [auth.basic]
+      enabled = true
+      
+      # Security
+      [security]
+      allow_embedding = false
+      cookie_secure = true
+      disable_gravatar = true
+      strict_transport_security = true
+      strict_transport_security_max_age_seconds = 31536000
+      
+      # Paths
+      [paths]
+      data = /var/lib/grafana
+      logs = /var/log/grafana
+      plugins = /var/lib/grafana/plugins
+      provisioning = /etc/grafana/provisioning
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Grafana datasource configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/datasources/datasources.yml"
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          isDefault: true
+          editable: false
+          jsonData:
+            timeInterval: 15s
+            queryTimeout: 30s
+            httpMethod: POST
+            manageAlerts: true
+            alertmanagerUid: alertmanager
+
+        - name: InfluxDB
+          type: influxdb
+          access: proxy
+          url: http://influxdb:8086
+          isDefault: false
+          editable: false
+          jsonData:
+            version: Flux
+            organization: ${INFLUXDB_ORG}
+            defaultBucket: ${INFLUXDB_BUCKET}
+            tlsSkipVerify: true
+          secureJsonData:
+            token: ${INFLUXDB_TOKEN}
+
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://loki:3100
+          isDefault: false
+          editable: false
+          jsonData:
+            maxLines: 1000
+            derivedFields:
+              - datasourceUid: prometheus
+                matcherRegex: "traceID=(\\w+)"
+                name: TraceID
+                url: "$${__value.raw}"
+
+        - name: Alertmanager
+          type: alertmanager
+          access: proxy
+          url: http://alertmanager:9093
+          isDefault: false
+          editable: false
+          jsonData:
+            implementation: prometheus
+            handleGrafanaManagedAlerts: true
+            uid: alertmanager
+
+        - name: Node Exporter
+          type: prometheus
+          access: proxy
+          url: http://node-exporter:9100
+          isDefault: false
+          editable: false
+          jsonData:
+            timeInterval: 15s
+
+        - name: cAdvisor
+          type: prometheus
+          access: proxy
+          url: http://cadvisor:8080
+          isDefault: false
+          editable: false
+          jsonData:
+            timeInterval: 15s
+
+        - name: Blackbox Exporter
+          type: prometheus
+          access: proxy
+          url: http://blackbox-exporter:9115
+          isDefault: false
+          editable: false
+          jsonData:
+            timeInterval: 15s
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Enhanced Grafana dashboard configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/default.yml"
+    content: |
+      apiVersion: 1
+      
+      providers:
+        - name: 'Default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /etc/grafana/provisioning/dashboards
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create SSL Certificate Monitoring Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/ssl-certificates.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "SSL Certificate Monitoring",
+          "tags": ["ssl", "certificates", "security"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "SSL Certificate Expiry",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_ssl_earliest_cert_expiry - time()",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "orange", "value": 604800},
+                      {"color": "green", "value": 2592000}
+                    ]
+                  },
+                  "unit": "s"
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "SSL Validation Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_ssl_validation_success",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Service Availability Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/service-availability.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "Service Availability",
+          "tags": ["availability", "uptime", "services"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "Service Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "Response Time",
+              "type": "timeseries",
+              "targets": [
+                {
+                  "expr": "probe_duration_seconds",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": "s"
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Network Monitoring Dashboard
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/network-monitoring.json"
+    content: |
+      {
+        "dashboard": {
+          "id": null,
+          "title": "Network Monitoring",
+          "tags": ["network", "connectivity", "dns"],
+          "style": "dark",
+          "timezone": "browser",
+          "panels": [
+            {
+              "id": 1,
+              "title": "DNS Resolution Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success{job=\"dns_monitoring\"}",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": 2,
+              "title": "Network Ping Status",
+              "type": "stat",
+              "targets": [
+                {
+                  "expr": "probe_success{job=\"network_ping\"}",
+                  "legendFormat": "{{ "{{" }} instance {{ "}}" }}"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "thresholds": {
+                    "steps": [
+                      {"color": "red", "value": null},
+                      {"color": "green", "value": 1}
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "refresh": "30s"
+        }
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Grafana management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Grafana Management Script
+      
+      function show_help {
+        echo "Grafana Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Grafana status"
+        echo "  logs      - Show Grafana logs"
+        echo "  restart   - Restart Grafana"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          curl -s http://{{ ansible_default_ipv4.address }}:/api/health
+          ;;
+        logs)
+          docker logs grafana --tail 100 -f
+          ;;
+        restart)
+          docker restart grafana
+          ;;
+        backup)
+          {{ docker_dir }}/monitoring/grafana/scripts/backup.sh
+          ;;
+        restore)
+          if [ -z "$2" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          {{ docker_dir }}/monitoring/grafana/scripts/restore.sh "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Grafana health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/health.sh"
+    content: |
+      #!/bin/bash
+      
+      # Grafana Health Check Script
+      
+      # Check if Grafana is running
+      if ! docker ps | grep -q grafana; then
+        echo "Grafana is not running"
+        exit 1
+      fi
+      
+      # Check Grafana API health
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/health | grep -q "ok"; then
+        echo "Grafana API health check failed"
+        exit 1
+      fi
+      
+      # Check disk space
+      if [ $(df -h {{ docker_dir }}/monitoring/grafana/data | awk 'NR==2 {print $5}' | sed 's/%//') -gt 90 ]; then
+        echo "Grafana data directory is running out of space"
+        exit 1
+      fi
+      
+      echo "Grafana is healthy"
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Grafana log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/grafana/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Grafana backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+      
+      # Grafana Backup Script
+      
+      BACKUP_DIR="{{ docker_dir }}/monitoring/grafana/backup"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+      
+      # Backup Grafana data
+      tar -czf "$BACKUP_DIR/grafana_data_$TIMESTAMP.tar.gz" -C {{ docker_dir }}/monitoring/grafana data
+      
+      # Backup Grafana configuration
+      tar -czf "$BACKUP_DIR/grafana_config_$TIMESTAMP.tar.gz" -C {{ docker_dir }}/monitoring/grafana config
+      
+      # Remove backups older than 30 days
+      find "$BACKUP_DIR" -type f -mtime +30 -delete
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Grafana restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+      
+      # Grafana Restore Script
+      
+      if [ -z "$1" ]; then
+        echo "Please specify backup file"
+        exit 1
+      fi
+      
+      BACKUP_FILE="$1"
+      
+      # Stop Grafana
+      docker stop grafana
+      
+      # Restore data
+      tar -xzf "$BACKUP_FILE" -C {{ docker_dir }}/monitoring/grafana
+      
+      # Start Grafana
+      docker start grafana
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Schedule Grafana health checks
+  ansible.builtin.cron:
+    name: "Grafana health check"
+    job: "{{ docker_dir }}/monitoring/grafana/scripts/health.sh >> {{ logs_dir }}/monitoring/grafana/health.log 2>&1"
+    minute: "*/5"
+    hour: "*"
+    user: "{{ username }}" 

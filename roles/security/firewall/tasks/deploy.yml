@@ -165,7 +165,7 @@
     job: "logrotate {{ docker_dir }}/fail2ban/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_security_user }}"
 
 ---
 # CrowdSec Configuration
@@ -195,14 +195,14 @@
         working_dir: /var/lib/crowdsec/data/
       api:
         server:
-          listen_uri: 127.0.0.1:8080
+          listen_uri: {{ ansible_default_ipv4.address }}:8080
           profiles_path: /etc/crowdsec/profiles.yaml
           online_client: 
             credentials_path: /etc/crowdsec/online_api_credentials.yaml
       prometheus:
         enabled: true
         level: full
-        listen_addr: 127.0.0.1
+        listen_addr: {{ ansible_default_ipv4.address }}
         listen_port: 6060
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -243,7 +243,7 @@
         logs) docker logs crowdsec --tail 100 -f;;
         restart) docker restart crowdsec;;
         update) docker exec crowdsec cscli hub update && docker exec crowdsec cscli hub upgrade;;
-        metrics) curl -s http://localhost:6060/metrics;;
+        metrics) curl -s http://{{ ansible_default_ipv4.address }}:6060/metrics;;
         help|*) show_help;;
       esac
     owner: "{{ username }}"
@@ -256,7 +256,7 @@
     content: |
       #!/bin/bash
       if ! docker exec crowdsec cscli status > /dev/null; then echo "CrowdSec is not responding"; exit 1; fi
-      if ! curl -s http://localhost:6060/metrics > /dev/null; then echo "CrowdSec metrics are not accessible"; exit 1; fi
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:6060/metrics > /dev/null; then echo "CrowdSec metrics are not accessible"; exit 1; fi
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -285,7 +285,7 @@
     job: "logrotate {{ docker_dir }}/crowdsec/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_security_user }}"
 
 - name: Add CrowdSec update to crontab
   ansible.builtin.cron:
@@ -293,4 +293,4 @@
     job: "{{ docker_dir }}/crowdsec/scripts/manage.sh update"
     hour: "*/6"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_security_user }}" 

@@ -10,11 +10,11 @@
 username: "{{ lookup('env', 'HOMELAB_USERNAME') | default('homelab') }}"
 puid: "{{ lookup('env', 'HOMELAB_PUID') | default('1000') }}"
 pgid: "{{ lookup('env', 'HOMELAB_PGID') | default('1000') }}"
-ip_address: "{{ lookup('env', 'HOMELAB_IP_ADDRESS') | default('192.168.1.100') }}"
+ip_address: "{{ lookup('env', 'HOMELAB_IP_ADDRESS') | default('{{ ansible_default_ipv4.address }}') }}"
 timezone: "{{ lookup('env', 'HOMELAB_TIMEZONE') | default('America/New_York') }}"
 
 # Plex server configuration
-plex_server_ip: "{{ lookup('env', 'PLEX_SERVER_IP') | default('192.168.1.41') }}"           # IP address of your existing Plex server
+plex_server_ip: "{{ lookup('env', 'PLEX_SERVER_IP') | default('{{ ansible_default_ipv4.address }}') }}"           # IP address of your existing Plex server
 
 # Directory structure
 docker_dir: "/home/{{ username }}/docker"
@@ -85,6 +85,7 @@ subdomains:
   files: "files"
   watchtower: "updates"
   dumbassets: "assets"
+  romm: "romm"
 
 #==============================================================================
 # AUTHENTICATION AND SECURITY
@@ -95,14 +96,14 @@ traefik_basic_auth_hash: "{{ vault_traefik_basic_auth_hash }}"
 
 # Authentik configuration (replaces Authelia for better features)
 authentik_secret_key: "{{ vault_authentik_secret_key }}"     # 64 character random string
-authentik_postgres_password: "{{ vault_authentik_postgres_password }}" # Database password
+authentik_postgres_password: "{{ vault_service_password }}" # Database password
 authentik_admin_email: "{{ vault_authentik_admin_email }}"
-authentik_admin_password: "{{ vault_authentik_admin_password }}"
+authentik_admin_password: "{{ vault_service_password }}"
 
 # Application passwords
-wireguard_password: "{{ vault_wireguard_password | default('') }}"
-codeserver_password: "{{ vault_codeserver_password | default('') }}"
-gitlab_root_password: "{{ vault_gitlab_root_password | default('') }}"
+wireguard_password: "{{ vault_service_password }}"') }}"
+codeserver_password: "{{ vault_service_password }}"') }}"
+gitlab_root_password: "{{ vault_service_password }}"') }}"
 
 # Vault configuration
 vault_root_token: "{{ vault_root_token | default('') }}"
@@ -122,18 +123,18 @@ loki_enabled: true
 alertmanager_enabled: true
 
 # InfluxDB configuration
-influxdb_admin_user: "admin"
-influxdb_admin_password: "{{ vault_influxdb_admin_password }}"
+influxdb_admin_user: "{{ vault_service_user }}"
+influxdb_admin_password: "{{ vault_service_password }}"
 influxdb_org: "homelab"
 influxdb_bucket: "metrics"
 influxdb_token: "{{ vault_influxdb_token }}"
 influxdb_username: "{{ vault_influxdb_username }}"
-influxdb_password: "{{ vault_influxdb_admin_password }}"
+influxdb_password: "{{ vault_service_password }}"
 influxdb_retention: "{{ lookup('env', 'INFLUXDB_RETENTION') | default('30d') }}"
 
 # Grafana configuration
-grafana_admin_user: "admin"
-grafana_admin_password: "{{ vault_grafana_admin_password }}"
+grafana_admin_user: "{{ vault_service_user }}"
+grafana_admin_password: "{{ vault_service_password }}"
 grafana_secret_key: "{{ vault_grafana_secret_key }}"
 
 # Telegram notifications (optional)
@@ -250,21 +251,21 @@ docker_networks:
   - name: homelab
     driver: bridge
     ipam_config:
-      - subnet: "172.20.0.0/16"
-        gateway: "172.20.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/16"
+        gateway: "{{ ansible_default_ipv4.address }}"
   
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.21.0.0/16"
-        gateway: "172.21.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/16"
+        gateway: "{{ ansible_default_ipv4.address }}"
   
   - name: media
     driver: bridge
     ipam_config:
-      - subnet: "172.22.0.0/16"
-        gateway: "172.22.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/16"
+        gateway: "{{ ansible_default_ipv4.address }}"
 
 # Traefik configuration
 traefik_pilot_token: ""  # Optional Traefik Pilot token
@@ -294,9 +295,9 @@ media_directories:
   - "{{ data_dir }}/usenet/complete"
 
 # Database configuration
-postgres_password: "{{ vault_postgresql_password }}"
-redis_password: "{{ vault_redis_password }}"
-mysql_root_password: "{{ vault_mariadb_root_password }}"
+postgres_password: "{{ vault_service_password }}"
+redis_password: "{{ vault_service_password }}"
+mysql_root_password: "{{ vault_service_password }}"
 
 #==============================================================================
 # SYSTEM PACKAGES
@@ -580,23 +581,23 @@ verification_urls:
 #==============================================================================
 
 # Home Assistant configuration
-homeassistant_admin_user: "admin"
-homeassistant_admin_password: "{{ vault_homeassistant_admin_password }}"
+homeassistant_admin_user: "{{ vault_service_user }}"
+homeassistant_admin_password: "{{ vault_service_password }}"
 homeassistant_trusted_proxies:
-  - "127.0.0.1"
-  - "192.168.1.0/24"
+  - "{{ ansible_default_ipv4.address }}"
+  - "{{ ansible_default_ipv4.address }}/24"
 
 # MQTT configuration
-mosquitto_admin_user: "admin"
-mosquitto_admin_password: "{{ vault_mosquitto_admin_password }}"
+mosquitto_admin_user: "{{ vault_service_user }}"
+mosquitto_admin_password: "{{ vault_service_password }}"
 mosquitto_allow_anonymous: false
 mosquitto_max_connections: 100
 mosquitto_max_queued_messages: 1000
 mosquitto_max_packet_size: 0
 
 # Zigbee2MQTT configuration
-zigbee2mqtt_mqtt_user: "zigbee2mqtt"
-zigbee2mqtt_mqtt_password: "{{ vault_zigbee2mqtt_mqtt_password }}"
+zigbee2mqtt_mqtt_user: "{{ vault_service_user }}"
+zigbee2mqtt_mqtt_password: "{{ vault_service_password }}"
 zigbee2mqtt_serial_port: "/dev/ttyACM0"
 zigbee2mqtt_pan_id: 6754
 zigbee2mqtt_channel: 11
@@ -606,10 +607,10 @@ zigbee2mqtt_channel: 11
 #==============================================================================
 
 # Nextcloud configuration
-nextcloud_admin_user: "admin"
-nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
-nextcloud_db_password: "{{ vault_nextcloud_db_password }}"
-nextcloud_db_root_password: "{{ vault_nextcloud_db_root_password }}"
+nextcloud_admin_user: "{{ vault_service_user }}"
+nextcloud_admin_password: "{{ vault_service_password }}"
+nextcloud_db_password: "{{ vault_service_password }}"
+nextcloud_db_root_password: "{{ vault_service_password }}"
 nextcloud_trusted_domains:
   - "{{ domain }}"
   - "nextcloud.{{ domain }}"
@@ -638,8 +639,8 @@ samba_shares:
     guest_ok: "yes"
 
 # Syncthing configuration
-syncthing_gui_user: "admin"
-syncthing_gui_password: "{{ vault_syncthing_gui_password }}"
+syncthing_gui_user: "{{ vault_service_user }}"
+syncthing_gui_password: "{{ vault_service_password }}"
 syncthing_gui_apikey: "{{ vault_syncthing_apikey }}"
 syncthing_folders:
   - id: "documents"
@@ -749,13 +750,13 @@ enabled_services:
 monitoring_enabled: true
 monitoring_data_dir: "/opt/monitoring"
 monitoring_email: "{{ lookup('env', 'MONITORING_EMAIL') | default('monitoring@' + domain) }}"
-admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('admin@' + domain) }}"
+admin_email: "{{ lookup('env', 'ADMIN_EMAIL') | default('{{ admin_email | default("admin@" + domain) }} + domain) }}"
 
 # SMTP Configuration
 smtp_host: "{{ lookup('env', 'SMTP_HOST') | default('smtp.gmail.com') }}"
 smtp_port: "{{ lookup('env', 'SMTP_PORT') | default(587) }}"
 smtp_username: "{{ lookup('env', 'SMTP_USERNAME') | default('your-email@gmail.com') }}"
-smtp_password: "{{ vault_smtp_password }}"
+smtp_password: "{{ vault_service_password }}"
 
 # Slack Integration
 slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('') }}"
@@ -831,7 +832,7 @@ enabled_services:
   - healthcheck
 
 # Docker Configuration
-docker_data_root: "{{ lookup('env', 'DOCKER_DATA_ROOT') | default('/var/lib/docker') }}"
+docker_data_user: "{{ lookup('env', 'DOCKER_DATA_ROOT') | default('/var/lib/docker') }}"
 docker_storage_driver: "{{ lookup('env', 'DOCKER_STORAGE_DRIVER') | default('overlay2') }}"
 
 # Security Configuration
@@ -941,7 +942,7 @@ emergency_contact: ""         # Emergency contact information
 #==============================================================================
 
 # Pi-hole Configuration
-pihole_web_password: "{{ vault_pihole_admin_password }}"  # Web interface password
+pihole_web_password: "{{ vault_service_password }}"  # Web interface password
 pihole_domain: "pihole.{{ domain }}"          # Pi-hole web interface domain
 pihole_upstream_dns:
   - "1.1.1.1"  # Cloudflare DNS
@@ -957,9 +958,9 @@ pihole_rev_server_cidr: ""                    # Your network CIDR
 
 # Database configuration
 vault_postgresql_user: "{{ lookup('env', 'POSTGRESQL_USER') | default('homelab') }}"
-vault_postgresql_password: "{{ vault_postgresql_password }}"
-vault_mariadb_root_password: "{{ vault_mariadb_root_password }}"
-vault_redis_password: "{{ vault_redis_password }}"
+vault_postgresql_password: "{{ vault_service_password }}"
+vault_mariadb_root_password: "{{ vault_service_password }}"
+vault_redis_password: "{{ vault_service_password }}"
 
 # Media service API keys
 vault_sonarr_api_key: "{{ lookup('env', 'SONARR_API_KEY') | default('') }}"
@@ -988,7 +989,7 @@ backup_encryption: "{{ lookup('env', 'BACKUP_ENCRYPTION') | default('false') | b
 # Network configuration
 traefik_network: "{{ lookup('env', 'TRAEFIK_NETWORK') | default('homelab') }}"
 ssl_enabled: "{{ lookup('env', 'SSL_ENABLED') | default('true') | bool }}"
-ssl_email: "{{ lookup('env', 'SSL_EMAIL') | default('admin@' + domain) }}"
+ssl_email: "{{ lookup('env', 'SSL_EMAIL') | default('{{ admin_email | default("admin@" + domain) }} + domain) }}"
 
 # Monitoring configuration
 monitoring_retention_days: "{{ lookup('env', 'MONITORING_RETENTION_DAYS') | default('30') | int }}"

@@ -51,7 +51,7 @@ services:
     # Health check
     {% if grafana_healthcheck_enabled | default(true) %}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:{{ grafana_internal_port }}/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ grafana_internal_port }}/api/health || exit 1"]
       interval: {{ grafana_healthcheck_interval }}
       timeout: {{ grafana_healthcheck_timeout }}
       retries: {{ grafana_healthcheck_retries }}

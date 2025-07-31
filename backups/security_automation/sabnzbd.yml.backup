@@ -1,0 +1,215 @@
+---
+# SABnzbd Configuration
+# Usenet Downloader - TRaSH Guides compatible
+
+- name: Create SABnzbd directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/sabnzbd/config"
+    - "{{ docker_dir }}/sabnzbd/data"
+    - "{{ docker_dir }}/sabnzbd/scripts"
+    - "{{ logs_dir }}/sabnzbd"
+
+- name: Create SABnzbd Docker Compose service
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sabnzbd/docker-compose.yml"
+    content: |
+      version: '3.8'
+      services:
+        sabnzbd:
+          image: linuxserver/sabnzbd:latest
+          container_name: sabnzbd
+          volumes:
+            - {{ docker_dir }}/sabnzbd/config:/config
+            - {{ docker_dir }}/sabnzbd/data:/data
+            - {{ logs_dir }}/sabnzbd:/config/logs
+          ports:
+            - "8080:8080"
+          restart: unless-stopped
+          networks:
+            - homelab
+          labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=homelab"
+            - "traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.{{ domain }}`)"
+            - "traefik.http.routers.sabnzbd.entrypoints=https"
+            - "traefik.http.routers.sabnzbd.tls=true"
+            - "traefik.http.routers.sabnzbd.middlewares=authentik@docker"
+            - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
+          healthcheck:
+            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/api?mode=version"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+      networks:
+        homelab:
+          external: true
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create SABnzbd health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sabnzbd/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if SABnzbd is running
+      if ! docker ps | grep -q sabnzbd; then
+          echo "SABnzbd is not running"
+          exit 1
+      fi
+      
+      # Check if SABnzbd is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api?mode=version | grep -q "version"; then
+          echo "SABnzbd is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Add SABnzbd log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate SABnzbd logs"
+    job: "logrotate {{ logs_dir }}/sabnzbd/*.log"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Create SABnzbd configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sabnzbd/config/sabnzbd.ini"
+    content: |
+      [misc]
+      host = 0.0.0.0
+      port = 8080
+      username = {{ sabnzbd_username }}
+      password = {{ sabnzbd_password }}
+      api_key = {{ sabnzbd_api_key }}
+      download_dir = /downloads
+      complete_dir = /complete
+      incomplete_dir = /incomplete
+      log_dir = /config/logs
+      log_level = info
+      max_log_size = 5M
+      max_log_files = 5
+      enable_https = False
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create SABnzbd management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sabnzbd/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # SABnzbd Management Script
+      
+      function show_help {
+          echo "SABnzbd Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check SABnzbd status"
+          echo "  logs      - View SABnzbd logs"
+          echo "  restart   - Restart SABnzbd"
+          echo "  backup    - Backup SABnzbd data"
+          echo "  restore   - Restore SABnzbd data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up SABnzbd data..."
+          tar -czf "{{ docker_dir }}/sabnzbd/backup/sabnzbd_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/sabnzbd" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring SABnzbd data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/sabnzbd"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep sabnzbd
+              ;;
+          logs)
+              docker logs -f sabnzbd
+              ;;
+          restart)
+              docker restart sabnzbd
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create SABnzbd log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/sabnzbd/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/sabnzbd/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add SABnzbd log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate SABnzbd logs"
+    job: "logrotate {{ docker_dir }}/sabnzbd/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add SABnzbd backup cron job
+  ansible.builtin.cron:
+    name: "Backup SABnzbd data"
+    job: "{{ docker_dir }}/sabnzbd/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Ensure SABnzbd directories and files have correct permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/sabnzbd/config"
+    - "{{ docker_dir }}/sabnzbd/data"
+    - "{{ docker_dir }}/sabnzbd/scripts"
+    - "{{ logs_dir }}/sabnzbd" 

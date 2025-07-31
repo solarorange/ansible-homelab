@@ -285,7 +285,7 @@ class LoggingInfrastructureTester:
         
         try:
             # Test if Loki is accessible
-            response = requests.get('http://localhost:3100/ready', timeout=5)
+            response = requests.get('http://{{ ansible_default_ipv4.address }}:3100/ready', timeout=5)
             if response.status_code == 200:
                 self.test_results['loki_scraping'].append({
                     'component': 'Loki',
@@ -295,7 +295,7 @@ class LoggingInfrastructureTester:
                 
                 # Test log query
                 query_response = requests.get(
-                    'http://localhost:3100/loki/api/v1/query_range',
+                    'http://{{ ansible_default_ipv4.address }}:3100/loki/api/v1/query_range',
                     params={
                         'query': '{job="system_logs"}',
                         'start': int((datetime.now() - timedelta(hours=1)).timestamp()),

@@ -5,7 +5,7 @@
 - name: Wait for n8n services to be fully ready
   ansible.builtin.wait_for:
     port: "{{ n8n_port }}"
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     delay: 30
     timeout: 600
   tags: [n8n, validation]
@@ -24,7 +24,7 @@
 
 - name: Check n8n app health endpoint
   ansible.builtin.uri:
-    url: "http://localhost:{{ n8n_port }}/healthz"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
     method: GET
     status_code: 200
     timeout: 30
@@ -33,7 +33,7 @@
 
 - name: Check n8n web interface
   ansible.builtin.uri:
-    url: "http://localhost:{{ n8n_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}"
     method: GET
     status_code: [200, 302]
     timeout: 30
@@ -64,7 +64,7 @@
 
 - name: Verify n8n monitoring integration
   ansible.builtin.uri:
-    url: "http://localhost:{{ n8n_port }}/metrics"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/metrics"
     method: GET
     status_code: [200, 401, 403]
     timeout: 10
@@ -81,7 +81,7 @@
 
 - name: Verify n8n Homepage integration
   ansible.builtin.uri:
-    url: "http://localhost:3000/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/services"
     method: GET
     status_code: 200
     timeout: 10
@@ -131,7 +131,7 @@
       - Logs Directory: {{ 'Exists' if n8n_config_files.results[2].stat.exists else 'Missing' }}
       
       Access Information:
-      - Local URL: http://localhost:{{ n8n_port }}
+      - Local URL: http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}
       - External URL: https://{{ n8n_subdomain }}.{{ domain }}
       - Admin Email: {{ n8n_admin_email }}
   tags: [n8n, validation]

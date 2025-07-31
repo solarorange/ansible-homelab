@@ -1,0 +1,423 @@
+---
+# Jellyfin Configuration
+# Media Server
+
+- name: Create Jellyfin directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/jellyfin/config"
+    - "{{ docker_dir }}/jellyfin/data"
+    - "{{ docker_dir }}/jellyfin/scripts"
+    - "{{ logs_dir }}/jellyfin"
+
+- name: Create Jellyfin configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/config/system.xml"
+    content: |
+      <?xml version="1.0" encoding="utf-8"?>
+      <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <EnableDebugLevelLogging>false</EnableDebugLevelLogging>
+        <EnableAutoUpdate>true</EnableAutoUpdate>
+        <LogFileRetentionDays>7</LogFileRetentionDays>
+        <RunAtStartup>true</RunAtStartup>
+        <IsStartupWizardCompleted>true</IsStartupWizardCompleted>
+        <EnableUPnP>false</EnableUPnP>
+        <PublicPort>8096</PublicPort>
+        <PublicHttpsPort>8920</PublicHttpsPort>
+        <HttpServerPortNumber>8096</HttpServerPortNumber>
+        <HttpsPortNumber>8920</HttpsPortNumber>
+        <EnableHttps>false</EnableHttps>
+        <CertificatePath></CertificatePath>
+        <CertificatePassword></CertificatePassword>
+        <IsPortAuthorized>true</IsPortAuthorized>
+        <AutoDiscoveryTracing>false</AutoDiscoveryTracing>
+        <AutoDiscovery>false</AutoDiscovery>
+        <RemoteIPFilter></RemoteIPFilter>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Book</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Movie</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>3</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Disc</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Thumb</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Series</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>2</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Thumb</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>MusicAlbum</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Disc</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>MusicArtist</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+        </MetadataOptions>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <SkipDeserialization>false</SkipDeserialization>
+        <EnableCaseSensitiveItemIds>true</EnableCaseSensitiveItemIds>
+        <DisableLiveTvChannelUserDataName>false</DisableLiveTvChannelUserDataName>
+        <PreferredMetadataLanguage>en</PreferredMetadataLanguage>
+        <MetadataCountryCode>US</MetadataCountryCode>
+        <SortRemoveWords>
+          <string>a</string>
+          <string>an</string>
+          <string>the</string>
+        </SortRemoveWords>
+        <LibraryMonitorDelay>60</LibraryMonitorDelay>
+        <EnableDashboardResponseCaching>true</EnableDashboardResponseCaching>
+        <DashboardSourcePath></DashboardSourcePath>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <CollectionFolderIds></CollectionFolderIds>
+        <EnableCollectionFolderCreation>true</EnableCollectionFolderCreation>
+        <EnableLocalizedGuids>true</EnableLocalizedGuids>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <LocalNetworkAddresses></LocalNetworkAddresses>
+        <EnableHttps>false</EnableHttps>
+        <EnableUserPreferenceAccess>true</EnableUserPreferenceAccess>
+        <EnableRemoteControlOfOtherUsers>false</EnableRemoteControlOfOtherUsers>
+        <EnableSharedDeviceControl>true</EnableSharedDeviceControl>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <RemoteIPFilter></RemoteIPFilter>
+        <EnableIPV6>false</EnableIPV6>
+        <EnableIPV4>true</EnableIPV4>
+        <EnableSSDPTracing>false</EnableSSDPTracing>
+        <SSDPTracingFilter></SSDPTracingFilter>
+        <UDPSendCount>2</UDPSendCount>
+        <UDPSendDelay>100</UDPSendDelay>
+        <EnableUdpServer>true</EnableUdpServer>
+        <EnableSSDP>true</EnableSSDP>
+        <ReservedSSDPPorts></ReservedSSDPPorts>
+        <SSDPClientInterface></SSDPClientInterface>
+        <SSDPServerInterface></SSDPServerInterface>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <EnableCaseSensitiveItemIds>true</EnableCaseSensitiveItemIds>
+        <DisableLiveTvChannelUserDataName>false</DisableLiveTvChannelUserDataName>
+        <PreferredMetadataLanguage>en</PreferredMetadataLanguage>
+        <MetadataCountryCode>US</MetadataCountryCode>
+        <SortRemoveWords>
+          <string>a</string>
+          <string>an</string>
+          <string>the</string>
+        </SortRemoveWords>
+        <LibraryMonitorDelay>60</LibraryMonitorDelay>
+        <EnableDashboardResponseCaching>true</EnableDashboardResponseCaching>
+        <DashboardSourcePath></DashboardSourcePath>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <CollectionFolderIds></CollectionFolderIds>
+        <EnableCollectionFolderCreation>true</EnableCollectionFolderCreation>
+        <EnableLocalizedGuids>true</EnableLocalizedGuids>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <LocalNetworkAddresses></LocalNetworkAddresses>
+        <EnableHttps>false</EnableHttps>
+        <EnableUserPreferenceAccess>true</EnableUserPreferenceAccess>
+        <EnableRemoteControlOfOtherUsers>false</EnableRemoteControlOfOtherUsers>
+        <EnableSharedDeviceControl>true</EnableSharedDeviceControl>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <RemoteIPFilter></RemoteIPFilter>
+        <EnableIPV6>false</EnableIPV6>
+        <EnableIPV4>true</EnableIPV4>
+        <EnableSSDPTracing>false</EnableSSDPTracing>
+        <SSDPTracingFilter></SSDPTracingFilter>
+        <UDPSendCount>2</UDPSendCount>
+        <UDPSendDelay>100</UDPSendDelay>
+        <EnableUdpServer>true</EnableUdpServer>
+        <EnableSSDP>true</EnableSSDP>
+        <ReservedSSDPPorts></ReservedSSDPPorts>
+        <SSDPClientInterface></SSDPClientInterface>
+        <SSDPServerInterface></SSDPServerInterface>
+      </ServerConfiguration>
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Jellyfin configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/config/config.env"
+    content: |
+      JELLYFIN_PORT=8096
+      JELLYFIN_LOG_LEVEL=info
+      JELLYFIN_LOG_PATH={{ logs_dir }}/jellyfin/app.log
+      JELLYFIN_MAX_LOG_SIZE=5
+      JELLYFIN_MAX_LOG_FILES=5
+      JELLYFIN_ADMIN_USER={{ jellyfin_username }}
+      JELLYFIN_ADMIN_PASSWORD={{ jellyfin_password }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Jellyfin management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Jellyfin Management Script
+      
+      function show_help {
+          echo "Jellyfin Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Jellyfin status"
+          echo "  logs      - View Jellyfin logs"
+          echo "  restart   - Restart Jellyfin"
+          echo "  backup    - Backup Jellyfin data"
+          echo "  restore   - Restore Jellyfin data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Jellyfin data..."
+          tar -czf "{{ docker_dir }}/jellyfin/backup/jellyfin_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/jellyfin" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Jellyfin data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/jellyfin"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep jellyfin
+              ;;
+          logs)
+              docker logs -f jellyfin
+              ;;
+          restart)
+              docker restart jellyfin
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Jellyfin health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Jellyfin is running
+      if ! docker ps | grep -q jellyfin; then
+          echo "Jellyfin is not running"
+          exit 1
+      fi
+      
+      # Check if Jellyfin is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8096 | grep -q "Jellyfin"; then
+          echo "Jellyfin is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Jellyfin log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/jellyfin/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Jellyfin log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Jellyfin logs"
+    job: "logrotate {{ docker_dir }}/jellyfin/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Jellyfin backup cron job
+  ansible.builtin.cron:
+    name: "Backup Jellyfin data"
+    job: "{{ docker_dir }}/jellyfin/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

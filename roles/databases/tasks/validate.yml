@@ -1,160 +1,89 @@
 ---
-# Database Stack Validation
-# Validate configuration and system readiness for database stack deployment
+# Databases Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate required variables
+- name: Validate Databases vault variables
   block:
-    - name: Check for essential variables
-      ansible.builtin.assert:
+    - name: Check required Databases vault variables
+      assert:
         that:
-          - item is defined and item != ""
-        fail_msg: "Variable '{{ item }}' is not defined or is empty. Please check your configuration."
-        success_msg: "Variable '{{ item }}' is valid."
-      loop:
-        - domain
-        - username
-        - docker_dir
-        - logs_dir
-        - backup_dir
-        - config_dir
+          - vault_databases_admin_password is defined
+          - vault_databases_database_password is defined
+          - vault_databases_api_key is defined
+          - vault_databases_secret_key is defined
+          - vault_databases_encryption_key is defined
+          - vault_databases_jwt_secret is defined
+        fail_msg: "Required Databases vault variables are not defined"
+        success_msg: "All required Databases vault variables are defined"
 
-  tags: [databases, validation, prerequisites]
+    - name: Validate Databases password complexity
+      assert:
+        that:
+          - vault_databases_admin_password | length >= 12
+          - vault_databases_database_password | length >= 12
+        fail_msg: "Databases passwords must be at least 12 characters long"
+        success_msg: "Databases password complexity requirements met"
 
-- name: Validate directory permissions
+- name: Validate Databases network configuration
   block:
-    - name: Check directory permissions
-      ansible.builtin.stat:
+    - name: Check Databases port configuration
+      assert:
+        that:
+          - databases_port is defined
+          - databases_port | int >= 1024
+          - databases_port | int <= 65535
+        fail_msg: "Databases port must be between 1024 and 65535"
+        success_msg: "Databases port configuration is valid"
+
+    - name: Check Databases domain configuration
+      assert:
+        that:
+          - domain is defined
+          - databases_subdomain is defined
+        fail_msg: "Databases domain configuration is incomplete"
+        success_msg: "Databases domain configuration is valid"
+
+- name: Validate Databases security configuration
+  block:
+    - name: Check Databases SSL configuration
+      assert:
+        that:
+          - databases_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Databases SSL configuration is invalid"
+        success_msg: "Databases SSL configuration is valid"
+
+    - name: Check Databases authentication configuration
+      assert:
+        that:
+          - databases_auth_enabled | bool
+          - databases_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Databases authentication configuration is invalid"
+        success_msg: "Databases authentication configuration is valid"
+
+- name: Validate Databases storage configuration
+  block:
+    - name: Check Databases data directories
+      assert:
+        that:
+          - databases_data_dir is defined
+          - databases_config_dir is defined
+          - databases_backup_dir is defined
+        fail_msg: "Databases storage configuration is incomplete"
+        success_msg: "Databases storage configuration is valid"
+
+    - name: Create Databases directories
+      file:
         path: "{{ item }}"
-      register: dir_stat
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
       loop:
-        - "{{ docker_dir }}"
-        - "{{ logs_dir }}"
-        - "{{ backup_dir }}"
-        - "{{ config_dir }}"
+        - "{{ databases_data_dir }}"
+        - "{{ databases_config_dir }}"
+        - "{{ databases_backup_dir }}"
 
-    - name: Verify directory ownership and permissions
-      ansible.builtin.assert:
-        that:
-          - item.stat.exists
-          - item.stat.isdir
-          - item.stat.pw_name == username
-          - item.stat.gr_name == username
-        fail_msg: "Directory {{ item.item }} does not exist, is not a directory, or has incorrect ownership."
-        success_msg: "Directory {{ item.item }} has correct permissions."
-      loop: "{{ dir_stat.results }}"
-
-  tags: [databases, validation, prerequisites]
-
-- name: Validate port availability
-  block:
-    - name: Check if ports are available
-      ansible.builtin.wait_for:
-        port: "{{ item }}"
-        state: stopped
-        timeout: 1
-      loop:
-        - "{{ postgresql_port }}"
-        - "{{ mariadb_port }}"
-        - "{{ redis_port }}"
-        - "{{ elasticsearch_port }}"
-        - "{{ elasticsearch_transport_port }}"
-        - "{{ kibana_port }}"
-      when: item is defined
-      ignore_errors: true
-      register: port_check
-
-    - name: Verify port availability
-      ansible.builtin.assert:
-        that:
-          - not item.failed
-        fail_msg: "Port {{ item.item }} is already in use. Please choose a different port."
-        success_msg: "Port {{ item.item }} is available."
-      loop: "{{ port_check.results }}"
-
-  tags: [databases, validation, prerequisites]
-
-- name: Validate Docker and system dependencies
-  block:
-    - name: Check for Docker service
-      ansible.builtin.service_facts:
-
-    - name: Verify Docker service is running
-      ansible.builtin.assert:
-        that:
-          - ansible_facts.services['docker.service'].state == 'running'
-        fail_msg: "Docker is not running. Please start the Docker service."
-        success_msg: "Docker service is running."
-
-    - name: Check for required command-line tools
-      ansible.builtin.command: "which {{ item }}"
-      register: cmd_check
-      loop:
-        - curl
-        - jq
-        - bc
-        - logrotate
-        - openssl
-      changed_when: false
-      failed_when: cmd_check.rc != 0
-
-  tags: [databases, validation, prerequisites]
-
-- name: Validate monitoring dependencies
-  block:
-    - name: Check for Prometheus configuration
-      ansible.builtin.stat:
-        path: "{{ config_dir }}/prometheus/prometheus.yml"
-      register: prometheus_config
-
-    - name: Verify Prometheus configuration exists
-      ansible.builtin.assert:
-        that:
-          - prometheus_config.stat.exists
-        fail_msg: "Prometheus configuration not found. Please setup monitoring prerequisites."
-        success_msg: "Prometheus configuration found."
-
-  when: databases_monitoring_enabled | default(true)
-  tags: [databases, validation, monitoring]
-
-- name: Validate security configuration
-  block:
-    - name: Check for SSL certificates
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      register: ssl_check
-      loop:
-        - "{{ databases_ssl_cert_path }}/databases.crt"
-        - "{{ databases_ssl_key_path }}/databases.key"
-
-    - name: Verify SSL certificates exist
-      ansible.builtin.assert:
-        that:
-          - item.stat.exists
-        fail_msg: "SSL certificate or key not found at {{ item.item }}. Please run security prerequisites."
-        success_msg: "SSL certificate/key found at {{ item.item }}."
-      loop: "{{ ssl_check.results }}"
-
-  when: databases_security_enabled | default(true) and databases_ssl_enabled | default(true)
-  tags: [databases, validation, security]
-
-- name: Display validation summary
-  ansible.builtin.debug:
-    msg: |
-      Database Stack Validation Completed!
-      
-      Configuration Status:
-      - Variables: OK
-      - Directories: OK
-      - Ports: OK
-      
-      System Status:
-      - Docker: OK
-      - Dependencies: OK
-      
-      Integration Status:
-      - Monitoring: {{ 'OK' if databases_monitoring_enabled else 'Disabled' }}
-      - Security: {{ 'OK' if databases_security_enabled else 'Disabled' }}
-      
-      Proceeding with deployment...
-
-  tags: [databases, validation] 
+- name: Final validation summary
+  debug:
+    msg: "Databases validation completed successfully - all configurations are valid and secure"

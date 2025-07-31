@@ -1,0 +1,445 @@
+---
+# Emby Configuration
+# Media Server
+
+- name: Create Emby directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/emby/config"
+    - "{{ docker_dir }}/emby/data"
+    - "{{ docker_dir }}/emby/scripts"
+    - "{{ docker_dir }}/emby/cache"
+    - "{{ docker_dir }}/emby/metadata"
+    - "{{ logs_dir }}/emby"
+
+- name: Create Emby configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/emby/config/system.xml"
+    content: |
+      <?xml version="1.0" encoding="utf-8"?>
+      <ServerConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <EnableDebugLevelLogging>false</EnableDebugLevelLogging>
+        <EnableAutoUpdate>true</EnableAutoUpdate>
+        <LogFileRetentionDays>7</LogFileRetentionDays>
+        <RunAtStartup>true</RunAtStartup>
+        <IsStartupWizardCompleted>true</IsStartupWizardCompleted>
+        <EnableUPnP>false</EnableUPnP>
+        <PublicPort>8096</PublicPort>
+        <PublicHttpsPort>8920</PublicHttpsPort>
+        <HttpServerPortNumber>8096</HttpServerPortNumber>
+        <HttpsPortNumber>8920</HttpsPortNumber>
+        <EnableHttps>false</EnableHttps>
+        <CertificatePath></CertificatePath>
+        <CertificatePassword></CertificatePassword>
+        <IsPortAuthorized>true</IsPortAuthorized>
+        <AutoDiscoveryTracing>false</AutoDiscoveryTracing>
+        <AutoDiscovery>false</AutoDiscovery>
+        <RemoteIPFilter></RemoteIPFilter>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Book</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Movie</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>3</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Disc</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Thumb</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>Series</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>2</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Thumb</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>MusicAlbum</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Disc</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+          <MetadataOptions>
+            <ItemType>MusicArtist</ItemType>
+            <ImageOptions>
+              <ImageOption>
+                <Type>Backdrop</Type>
+                <Limit>1</Limit>
+                <MinWidth>1280</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Banner</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Art</Type>
+                <Limit>0</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Primary</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+              <ImageOption>
+                <Type>Logo</Type>
+                <Limit>1</Limit>
+                <MinWidth>0</MinWidth>
+              </ImageOption>
+            </ImageOptions>
+            <DisabledMetadataSavers></DisabledMetadataSavers>
+            <LocalMetadataReaderOrder></LocalMetadataReaderOrder>
+            <DisabledMetadataFetchers></DisabledMetadataFetchers>
+            <DisabledImageFetchers></DisabledImageFetchers>
+            <LocalMetadataFetcherOrder></LocalMetadataFetcherOrder>
+            <LocalImageFetcherOrder></LocalImageFetcherOrder>
+          </MetadataOptions>
+        </MetadataOptions>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <SkipDeserialization>false</SkipDeserialization>
+        <EnableCaseSensitiveItemIds>true</EnableCaseSensitiveItemIds>
+        <DisableLiveTvChannelUserDataName>false</DisableLiveTvChannelUserDataName>
+        <PreferredMetadataLanguage>en</PreferredMetadataLanguage>
+        <MetadataCountryCode>US</MetadataCountryCode>
+        <SortRemoveWords>
+          <string>a</string>
+          <string>an</string>
+          <string>the</string>
+        </SortRemoveWords>
+        <LibraryMonitorDelay>60</LibraryMonitorDelay>
+        <EnableDashboardResponseCaching>true</EnableDashboardResponseCaching>
+        <DashboardSourcePath></DashboardSourcePath>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <CollectionFolderIds></CollectionFolderIds>
+        <EnableCollectionFolderCreation>true</EnableCollectionFolderCreation>
+        <EnableLocalizedGuids>true</EnableLocalizedGuids>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <LocalNetworkAddresses></LocalNetworkAddresses>
+        <EnableHttps>false</EnableHttps>
+        <EnableUserPreferenceAccess>true</EnableUserPreferenceAccess>
+        <EnableRemoteControlOfOtherUsers>false</EnableRemoteControlOfOtherUsers>
+        <EnableSharedDeviceControl>true</EnableSharedDeviceControl>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <RemoteIPFilter></RemoteIPFilter>
+        <EnableIPV6>false</EnableIPV6>
+        <EnableIPV4>true</EnableIPV4>
+        <EnableSSDPTracing>false</EnableSSDPTracing>
+        <SSDPTracingFilter></SSDPTracingFilter>
+        <UDPSendCount>2</UDPSendCount>
+        <UDPSendDelay>100</UDPSendDelay>
+        <EnableUdpServer>true</EnableUdpServer>
+        <EnableSSDP>true</EnableSSDP>
+        <ReservedSSDPPorts></ReservedSSDPPorts>
+        <SSDPClientInterface></SSDPClientInterface>
+        <SSDPServerInterface></SSDPServerInterface>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <EnableCaseSensitiveItemIds>true</EnableCaseSensitiveItemIds>
+        <DisableLiveTvChannelUserDataName>false</DisableLiveTvChannelUserDataName>
+        <PreferredMetadataLanguage>en</PreferredMetadataLanguage>
+        <MetadataCountryCode>US</MetadataCountryCode>
+        <SortRemoveWords>
+          <string>a</string>
+          <string>an</string>
+          <string>the</string>
+        </SortRemoveWords>
+        <LibraryMonitorDelay>60</LibraryMonitorDelay>
+        <EnableDashboardResponseCaching>true</EnableDashboardResponseCaching>
+        <DashboardSourcePath></DashboardSourcePath>
+        <ImageSavingConvention>Compatible</ImageSavingConvention>
+        <EnableAutomaticRestart>true</EnableAutomaticRestart>
+        <CollectionFolderIds></CollectionFolderIds>
+        <EnableCollectionFolderCreation>true</EnableCollectionFolderCreation>
+        <EnableLocalizedGuids>true</EnableLocalizedGuids>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <LocalNetworkAddresses></LocalNetworkAddresses>
+        <EnableHttps>false</EnableHttps>
+        <EnableUserPreferenceAccess>true</EnableUserPreferenceAccess>
+        <EnableRemoteControlOfOtherUsers>false</EnableRemoteControlOfOtherUsers>
+        <EnableSharedDeviceControl>true</EnableSharedDeviceControl>
+        <EnableRemoteAccess>true</EnableRemoteAccess>
+        <IsRemoteIPFilterBlacklist>false</IsRemoteIPFilterBlacklist>
+        <RemoteIPFilter></RemoteIPFilter>
+        <EnableIPV6>false</EnableIPV6>
+        <EnableIPV4>true</EnableIPV4>
+        <EnableSSDPTracing>false</EnableSSDPTracing>
+        <SSDPTracingFilter></SSDPTracingFilter>
+        <UDPSendCount>2</UDPSendCount>
+        <UDPSendDelay>100</UDPSendDelay>
+        <EnableUdpServer>true</EnableUdpServer>
+        <EnableSSDP>true</EnableSSDP>
+        <ReservedSSDPPorts></ReservedSSDPPorts>
+        <SSDPClientInterface></SSDPClientInterface>
+        <SSDPServerInterface></SSDPServerInterface>
+      </ServerConfiguration>
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Emby management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/emby/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Emby Management Script
+      
+      function show_help {
+        echo "Emby Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Emby status"
+        echo "  logs      - Show Emby logs"
+        echo "  restart   - Restart Emby"
+        echo "  backup    - Backup Emby data"
+        echo "  restore   - Restore Emby data"
+        echo "  help      - Show this help"
+      }
+      
+      function backup_data {
+        local backup_dir="{{ docker_dir }}/emby/backup"
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local backup_file="$backup_dir/emby_backup_$timestamp.tar.gz"
+        
+        # Create backup directory if it doesn't exist
+        mkdir -p "$backup_dir"
+        
+        # Stop Emby
+        docker stop emby
+        
+        # Create backup
+        tar -czf "$backup_file" -C "{{ docker_dir }}/emby" config/ data/ cache/ metadata/
+        
+        # Start Emby
+        docker start emby
+        
+        echo "Backup created: $backup_file"
+      }
+      
+      function restore_data {
+        if [ -z "$1" ]; then
+          echo "Please specify backup file"
+          exit 1
+        fi
+      
+        local backup_file="$1"
+        if [ ! -f "$backup_file" ]; then
+          echo "Backup file not found: $backup_file"
+          exit 1
+        fi
+      
+        # Stop Emby
+        docker stop emby
+      
+        # Restore backup
+        tar -xzf "$backup_file" -C "{{ docker_dir }}/emby"
+      
+        # Start Emby
+        docker start emby
+      
+        echo "Backup restored from: $backup_file"
+      }
+      
+      case "$1" in
+        status)
+          docker ps -f name=emby
+          curl -s http://{{ ansible_default_ipv4.address }}:8096/System/Info/Public
+          ;;
+        logs)
+          docker logs emby --tail 100 -f
+          ;;
+        restart)
+          docker restart emby
+          ;;
+        backup)
+          backup_data
+          ;;
+        restore)
+          restore_data "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Emby health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/emby/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Emby is running
+      if ! docker ps -f name=emby -f status=running | grep -q emby; then
+        echo "Emby is not running"
+        exit 1
+      fi
+      
+      # Check if Emby is responding
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8096/System/Info/Public > /dev/null; then
+        echo "Emby is not responding"
+        exit 1
+      fi
+      
+      # Check Emby status
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/System/Info/Public | jq -r .ServerName)
+      if [ -z "$STATUS" ]; then
+        echo "Emby status check failed"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Emby log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/emby/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/emby/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Emby log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Emby logs"
+    job: "logrotate {{ docker_dir }}/emby/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Emby backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Emby data"
+    job: "{{ docker_dir }}/emby/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

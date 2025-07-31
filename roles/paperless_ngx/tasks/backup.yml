@@ -38,7 +38,7 @@
         hour: "{{ paperless_ngx_backup_schedule.split()[1] }}"
         minute: "{{ paperless_ngx_backup_schedule.split()[0] }}"
         job: "{{ docker_dir }}/paperless-ngx/backup.sh daily >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
     - name: Add Paperless-ngx weekly backup to crontab
@@ -48,7 +48,7 @@
         hour: "3"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/backup.sh weekly >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
     - name: Add Paperless-ngx monthly backup to crontab
@@ -58,7 +58,7 @@
         hour: "4"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/backup.sh monthly >> {{ logs_dir }}/paperless-ngx/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
     - name: Add Paperless-ngx backup verification to crontab
@@ -67,7 +67,7 @@
         hour: "6"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/backup-verify.sh >> {{ logs_dir }}/paperless-ngx/backup-verify.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, backup]
@@ -88,7 +88,7 @@
         hour: "5"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/backup-retention.sh >> {{ logs_dir }}/paperless-ngx/backup-retention.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, backup]
@@ -109,7 +109,7 @@
         hour: "1"
         minute: "30"
         job: "{{ docker_dir }}/paperless-ngx/db-backup.sh >> {{ logs_dir }}/paperless-ngx/db-backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   when: paperless_ngx_backup_include_database | default(true)
@@ -131,7 +131,7 @@
         hour: "2"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/media-backup.sh >> {{ logs_dir }}/paperless-ngx/media-backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   when: paperless_ngx_backup_include_media | default(true)
@@ -153,7 +153,7 @@
         hour: "1"
         minute: "0"
         job: "{{ docker_dir }}/paperless-ngx/config-backup.sh >> {{ logs_dir }}/paperless-ngx/config-backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, backup]
@@ -173,7 +173,7 @@
         name: "Paperless-ngx backup monitoring"
         minute: "*/30"
         job: "{{ docker_dir }}/paperless-ngx/backup-monitor.sh >> {{ logs_dir }}/paperless-ngx/backup-monitor.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_paperless_ngx_user }}"
         state: present
 
   tags: [paperless-ngx, backup]

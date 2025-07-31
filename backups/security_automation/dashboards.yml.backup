@@ -1,0 +1,237 @@
+---
+# Grafana Dashboard and Alert Configuration Deployment
+# Deploy comprehensive monitoring dashboards and alert rules
+
+- name: Create Grafana dashboard directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/alerting"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/notifiers"
+  tags: [grafana, dashboards, setup]
+
+- name: Deploy Grafana dashboards
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  loop:
+    - { src: "dashboards/homelab-overview.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/homelab-overview.json" }
+    - { src: "dashboards/docker-services.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/docker-services.json" }
+    - { src: "dashboards/media-stack.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/media-stack.json" }
+    - { src: "dashboards/security-monitoring.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/security-monitoring.json" }
+    - { src: "dashboards/network-infrastructure.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/network-infrastructure.json" }
+    - { src: "dashboards/backup-storage.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/backup-storage.json" }
+  notify: restart grafana
+  tags: [grafana, dashboards, deploy]
+
+- name: Deploy Grafana alert rules
+  ansible.builtin.template:
+    src: "alert-rules.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/alerting/alert-rules.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+  tags: [grafana, alerts, deploy]
+
+- name: Deploy Grafana notification channels
+  ansible.builtin.template:
+    src: "notification-channels.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/notifiers/notification-channels.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+  tags: [grafana, notifications, deploy]
+
+- name: Create Grafana dashboard provisioning configuration
+  ansible.builtin.template:
+    src: "dashboard-provisioning.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/dashboard-provisioning.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+  tags: [grafana, dashboards, config]
+
+- name: Create Grafana alerting provisioning configuration
+  ansible.builtin.template:
+    src: "alerting-provisioning.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/alerting/alerting-provisioning.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+  tags: [grafana, alerts, config]
+
+- name: Create Grafana notifier provisioning configuration
+  ansible.builtin.template:
+    src: "notifier-provisioning.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/notifiers/notifier-provisioning.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+  tags: [grafana, notifications, config]
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_health
+  until: grafana_health.status == 200
+  retries: 10
+  delay: 10
+  tags: [grafana, validation]
+
+- name: Validate dashboard deployment
+  block:
+    - name: Check dashboard API
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
+        method: GET
+        user: "{{ grafana_admin_user }}"
+        password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        status_code: 200
+        timeout: 30
+      register: dashboard_validation
+      until: dashboard_validation.status == 200
+      retries: 5
+      delay: 10
+
+    - name: Verify dashboards are deployed
+      ansible.builtin.assert:
+        that:
+          - "'Homelab Overview' in dashboard_validation.json | map(attribute='title') | list"
+          - "'Docker Services' in dashboard_validation.json | map(attribute='title') | list"
+          - "'Media Stack' in dashboard_validation.json | map(attribute='title') | list"
+          - "'Security Monitoring' in dashboard_validation.json | map(attribute='title') | list"
+          - "'Network & Infrastructure' in dashboard_validation.json | map(attribute='title') | list"
+          - "'Backup & Storage' in dashboard_validation.json | map(attribute='title') | list"
+        fail_msg: "One or more dashboards are missing from Grafana."
+        success_msg: "All dashboards have been successfully deployed to Grafana."
+
+  when: grafana_health.status == 200
+  tags: [grafana, validation, dashboards]
+
+- name: Validate alert rules deployment
+  block:
+    - name: Check alert rules API
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/alert-rules"
+        method: GET
+        user: "{{ grafana_admin_user }}"
+        password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        status_code: 200
+        timeout: 30
+      register: alert_validation
+      until: alert_validation.status == 200
+      retries: 5
+      delay: 10
+
+    - name: Verify alert rules are deployed
+      ansible.builtin.assert:
+        that:
+          - "alert_validation.json | length > 0"
+        fail_msg: "No alert rules found in Grafana."
+        success_msg: "Alert rules have been successfully deployed to Grafana."
+
+  when: grafana_health.status == 200
+  tags: [grafana, validation, alerts]
+
+- name: Validate notification channels deployment
+  block:
+    - name: Check notification channels API
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/notification-policies"
+        method: GET
+        user: "{{ grafana_admin_user }}"
+        password: "{{ grafana_admin_password }}"
+        force_basic_auth: true
+        status_code: 200
+        timeout: 30
+      register: notification_validation
+      until: notification_validation.status == 200
+      retries: 5
+      delay: 10
+
+    - name: Verify notification channels are deployed
+      ansible.builtin.assert:
+        that:
+          - "notification_validation.json | length > 0"
+        fail_msg: "No notification policies found in Grafana."
+        success_msg: "Notification channels have been successfully deployed to Grafana."
+
+  when: grafana_health.status == 200
+  tags: [grafana, validation, notifications]
+
+- name: Create dashboard documentation
+  ansible.builtin.template:
+    src: "dashboard-documentation.md.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/docs/dashboard-documentation.md"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [grafana, documentation]
+
+- name: Create alert documentation
+  ansible.builtin.template:
+    src: "alert-documentation.md.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/docs/alert-documentation.md"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [grafana, documentation]
+
+- name: Display deployment summary
+  ansible.builtin.debug:
+    msg: |
+      🎉 Grafana Dashboard and Alert Configuration Deployment Complete!
+      
+      📊 Dashboards Deployed:
+      - Homelab Overview
+      - Docker Services
+      - Media Stack
+      - Security Monitoring
+      - Network & Infrastructure
+      - Backup & Storage
+      
+      🚨 Alert Rules Configured:
+      - Critical Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'critical') | list | length) if alert_validation.status == 200 else 'N/A' }}
+      - Warning Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'warning') | list | length) if alert_validation.status == 200 else 'N/A' }}
+      - Info Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'info') | list | length) if alert_validation.status == 200 else 'N/A' }}
+      
+      📧 Notification Channels:
+      - Email: {{ 'Enabled' if grafana_email_addresses else 'Disabled' }}
+      - Discord: {{ 'Enabled' if grafana_discord_webhook_url else 'Disabled' }}
+      - Slack: {{ 'Enabled' if grafana_slack_webhook_url else 'Disabled' }}
+      - Telegram: {{ 'Enabled' if (grafana_telegram_bot_token and grafana_telegram_chat_id) else 'Disabled' }}
+      - Webhook: {{ 'Enabled' if grafana_webhook_url else 'Disabled' }}
+      
+      🔗 Access URLs:
+      - Grafana Dashboard: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
+      - Alertmanager: http://{{ ansible_default_ipv4.address }}:
+      - Prometheus: http://{{ ansible_default_ipv4.address }}:
+      
+      📚 Documentation:
+      - Dashboard Guide: {{ docker_dir }}/monitoring/grafana/docs/dashboard-documentation.md
+      - Alert Guide: {{ docker_dir }}/monitoring/grafana/docs/alert-documentation.md
+      
+      ✅ Validation Results:
+      - Grafana Health: {{ 'OK' if grafana_health.status == 200 else 'Failed' }}
+      - Dashboards: {{ 'OK' if dashboard_validation.status == 200 else 'Failed' }}
+      - Alert Rules: {{ 'OK' if alert_validation.status == 200 else 'Failed' }}
+      - Notifications: {{ 'OK' if notification_validation.status == 200 else 'Failed' }}
+  tags: [grafana, summary] 

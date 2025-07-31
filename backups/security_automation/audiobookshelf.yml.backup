@@ -1,0 +1,163 @@
+---
+# Audiobookshelf Configuration Tasks
+
+- name: Create Audiobookshelf directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/audiobookshelf/config"
+    - "{{ docker_dir }}/audiobookshelf/data"
+    - "{{ docker_dir }}/audiobookshelf/scripts"
+    - "{{ logs_dir }}/audiobookshelf"
+
+- name: Create Audiobookshelf config.json
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/config/config.json"
+    content: |
+      {
+        "port": 13378,
+        "host": "0.0.0.0",
+        "logDir": "{{ logs_dir }}/audiobookshelf",
+        "audiobooksDir": "{{ docker_dir }}/audiobookshelf/audiobooks",
+        "dataDir": "{{ docker_dir }}/audiobookshelf/data"
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Audiobookshelf management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Audiobookshelf Management Script
+      
+      function show_help {
+          echo "Audiobookshelf Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Audiobookshelf status"
+          echo "  logs      - View Audiobookshelf logs"
+          echo "  restart   - Restart Audiobookshelf"
+          echo "  backup    - Backup Audiobookshelf data"
+          echo "  restore   - Restore Audiobookshelf data"
+          echo "  help      - Show this help message"
+      }
+      
+      function backup_data {
+          echo "Backing up Audiobookshelf data..."
+          tar -czf "{{ docker_dir }}/audiobookshelf/backup/audiobookshelf_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/audiobookshelf" config data
+          echo "Backup completed."
+      }
+      
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Audiobookshelf data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/audiobookshelf"
+          echo "Restore completed."
+      }
+      
+      case "$1" in
+          status)
+              docker ps | grep audiobookshelf
+              ;;
+          logs)
+              docker logs -f audiobookshelf
+              ;;
+          restart)
+              docker restart audiobookshelf
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Audiobookshelf health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Audiobookshelf is running
+      if ! docker ps | grep -q audiobookshelf; then
+          echo "Audiobookshelf is not running"
+          exit 1
+      fi
+      
+      # Check if Audiobookshelf is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:13378 | grep -q "Audiobookshelf"; then
+          echo "Audiobookshelf is not responding"
+          exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Audiobookshelf log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/audiobookshelf/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Audiobookshelf log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Audiobookshelf logs"
+    job: "logrotate {{ docker_dir }}/audiobookshelf/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Add Audiobookshelf backup cron job
+  ansible.builtin.cron:
+    name: "Backup Audiobookshelf data"
+    job: "{{ docker_dir }}/audiobookshelf/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Create Audiobookshelf configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/config/config.env"
+    content: |
+      AUDIOBOOKSHELF_PORT=13378
+      AUDIOBOOKSHELF_LOG_LEVEL=info
+      AUDIOBOOKSHELF_LOG_PATH={{ logs_dir }}/audiobookshelf/app.log
+      AUDIOBOOKSHELF_MAX_LOG_SIZE=5
+      AUDIOBOOKSHELF_MAX_LOG_FILES=5
+      AUDIOBOOKSHELF_ADMIN_USER={{ audiobookshelf_username }}
+      AUDIOBOOKSHELF_ADMIN_PASSWORD={{ audiobookshelf_password }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640" 

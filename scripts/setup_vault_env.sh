@@ -97,8 +97,8 @@ fi
 print_section "Interactive Configuration"
 
 # Get admin email
-read -p "Enter admin email address (default: admin@zorg.media): " admin_email
-admin_email=${admin_email:-admin@zorg.media}
+read -p "Enter admin email address (default: {{ admin_email | default("admin@" + domain) }} " admin_email
+admin_email=${admin_email:-{{ admin_email | default("admin@" + domain) }}
 
 if ! validate_email "$admin_email"; then
     print_error "Invalid email format: $admin_email"
@@ -115,11 +115,7 @@ read -p "SMTP Host: " smtp_host
 read -p "SMTP Port (default: 587): " smtp_port
 smtp_port=${smtp_port:-587}
 read -p "SMTP Username: " smtp_username
-read -s -p "SMTP Password: " smtp_password
-echo
-
-# Get Cloudflare configuration (optional)
-print_status "Cloudflare Configuration (optional - press Enter to skip)"
+read -s -p "SMTP password: "{{ vault_vault_password }}"Cloudflare Configuration (optional - press Enter to skip)"
 read -p "Cloudflare Email: " cloudflare_email
 read -s -p "Cloudflare API Token: " cloudflare_token
 echo
@@ -149,57 +145,55 @@ cat > .env << EOF
 # DATABASE PASSWORDS
 #==============================================================================
 
-# Core Database Passwords
-export VAULT_POSTGRESQL_PASSWORD="$(generate_password)"
-export VAULT_MEDIA_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_PAPERLESS_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_FING_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_REDIS_PASSWORD="$(generate_password)"
-export VAULT_N8N_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_LINKWARDEN_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_PEZZO_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_PEZZO_REDIS_PASSWORD="$(generate_password)"
-export VAULT_PEZZO_CLICKHOUSE_PASSWORD="$(generate_password)"
-export VAULT_VAULTWARDEN_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_RECONYA_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_IMMICH_DATABASE_PASSWORD="$(generate_password)"
-export VAULT_IMMICH_REDIS_PASSWORD="$(generate_password)"
+# Database Passwords
+export VAULT_POSTGRESQL_password: "{{ vault_vault_password }}"
+export VAULT_MEDIA_DATABASE_password: "{{ vault_vault_password }}"
+export VAULT_PAPERLESS_DATABASE_password: "{{ vault_vault_password }}"
+export VAULT_FING_DATABASE_password: "{{ vault_vault_password }}"
+export VAULT_ROMM_DATABASE_password: "{{ vault_vault_password }}"
+export VAULT_REDIS_password: "{{ vault_vault_password }}"
+export VAULT_MARIADB_ROOT_password: "{{ vault_vault_password }}"
+export VAULT_INFLUXDB_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_IMMICH_DB_password: "{{ vault_vault_password }}"
+export VAULT_IMMICH_POSTGRES_password: "{{ vault_vault_password }}"
+export VAULT_NEXTCLOUD_DB_password: "{{ vault_vault_password }}"
+export VAULT_NEXTCLOUD_DB_ROOT_password: "{{ vault_vault_password }}"
+export VAULT_LINKWARDEN_POSTGRES_password: "{{ vault_vault_password }}"
+export VAULT_N8N_POSTGRES_password: "{{ vault_vault_password }}"
+export VAULT_PEZZO_POSTGRES_password: "{{ vault_vault_password }}"
+export VAULT_AUTHENTIK_POSTGRES_password: "{{ vault_vault_password }}"
+export VAULT_VAULTWARDEN_POSTGRES_password: "{{ vault_vault_password }}"
 
-# NextCloud Database Passwords
-export VAULT_NEXTCLOUD_DB_PASSWORD="$(generate_password)"
-export VAULT_NEXTCLOUD_DB_ROOT_PASSWORD="$(generate_password)"
-export VAULT_NEXTCLOUD_ADMIN_PASSWORD="$(generate_password)"
-
-#==============================================================================
-# SERVICE ADMIN PASSWORDS
-#==============================================================================
-
-# Core Service Admin Passwords
-export VAULT_GRAFANA_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_AUTHENTIK_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_PORTAINER_ADMIN_PASSWORD="$(generate_password)"
-
-# Service-Specific Admin Passwords
-export VAULT_PAPERLESS_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_FING_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_N8N_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_RECONYA_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_IMMICH_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_VAULTWARDEN_ADMIN_PASSWORD="$(generate_password)"
+# Service Admin Passwords
+export VAULT_AUTHENTIK_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_GRAFANA_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_PAPERLESS_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_FING_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_ROMM_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_HOMEASSISTANT_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_MOSQUITTO_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_NEXTCLOUD_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_SYNCTHING_GUI_password: "{{ vault_vault_password }}"
+export VAULT_PIHOLE_ADMIN_password: "{{ vault_vault_password }}"
+export VAULT_MARIADB_ROOT_password: "{{ vault_vault_password }}"
+export VAULT_PROXMOX_password: "{{ vault_vault_password }}"
 
 # Media Service Passwords
-export VAULT_JELLYFIN_PASSWORD="$(generate_password)"
-export VAULT_CALIBRE_WEB_PASSWORD="$(generate_password)"
-export VAULT_AUDIOBOOKSHELF_PASSWORD="$(generate_password)"
-export VAULT_SABNZBD_PASSWORD="$(generate_password)"
-export VAULT_TDARR_PASSWORD="$(generate_password)"
-export VAULT_QBITTORRENT_PASSWORD="$(generate_password)"
+export VAULT_JELLYFIN_password: "{{ vault_vault_password }}"
+export VAULT_CALIBRE_WEB_password: "{{ vault_vault_password }}"
+export VAULT_AUDIOBOOKSHELF_password: "{{ vault_vault_password }}"
+export VAULT_SABNZBD_password: "{{ vault_vault_password }}"
+export VAULT_TDARR_password: "{{ vault_vault_password }}"
+export VAULT_QBITTORRENT_password: "{{ vault_vault_password }}"
 
 # Infrastructure Passwords
-export VAULT_INFLUXDB_ADMIN_PASSWORD="$(generate_password)"
-export VAULT_MARIADB_ROOT_PASSWORD="$(generate_password)"
-export VAULT_PROXMOX_PASSWORD="$(generate_password)"
-export VAULT_PIHOLE_ADMIN_PASSWORD="$(generate_password)"
+export VAULT_INFLUXDB_TOKEN="$(generate_secret_key)"
+export VAULT_TRANSIT_TOKEN="$(generate_secret_key)"
+
+# Notification Tokens
+export VAULT_IMMICH_PUSH_TOKEN="${telegram_token:-}"
+export VAULT_IMMICH_TELEGRAM_BOT_TOKEN="${telegram_token:-}"
+export VAULT_TELEGRAM_BOT_TOKEN="${telegram_token:-}"
 
 #==============================================================================
 # SERVICE SECRET KEYS
@@ -216,11 +210,13 @@ export VAULT_IMMICH_JWT_SECRET="$(generate_secret_key)"
 export VAULT_LINKWARDEN_NEXTAUTH_SECRET="$(generate_secret_key)"
 export VAULT_RECONYA_JWT_SECRET="$(generate_secret_key)"
 export VAULT_CALIBREWEB_SECRET_KEY="$(generate_secret_key)"
+export VAULT_ROMM_SECRET_KEY="$(generate_secret_key)"
 
 # OAuth and API Secrets
 export VAULT_IMMICH_OAUTH_CLIENT_SECRET="$(generate_secret_key)"
 export VAULT_IMMICH_PUSH_APP_SECRET="$(generate_secret_key)"
 export VAULT_VAULTWARDEN_ADMIN_TOKEN="$(generate_secret_key)"
+export VAULT_ROMM_API_KEY="$(generate_secret_key)"
 
 #==============================================================================
 # API KEYS
@@ -280,21 +276,21 @@ export VAULT_CLOUDFLARE_EMAIL="${cloudflare_email:-}"
 
 # SMTP Configuration
 export VAULT_SMTP_USERNAME="${smtp_username:-}"
-export VAULT_SMTP_PASSWORD="${smtp_password:-}"
+export VAULT_SMTP_password: "{{ vault_vault_password }}"
 export VAULT_SMTP_HOST="${smtp_host:-}"
 export VAULT_SMTP_PORT="${smtp_port:-587}"
 export VAULT_SMTP_FROM_ADDRESS="${admin_email}"
 
 # Service-Specific SMTP
-export VAULT_IMMICH_SMTP_PASSWORD="${smtp_password:-}"
-export VAULT_VAULTWARDEN_SMTP_PASSWORD="${smtp_password:-}"
-export VAULT_FING_SMTP_PASSWORD="${smtp_password:-}"
+export VAULT_IMMICH_SMTP_password: "{{ vault_vault_password }}"
+export VAULT_VAULTWARDEN_SMTP_password: "{{ vault_vault_password }}"
+export VAULT_FING_SMTP_password: "{{ vault_vault_password }}"
 
 # LDAP Configuration
-export VAULT_AUTHENTIK_LDAP_PASSWORD=""
+export VAULT_AUTHENTIK_LDAP_password: "{{ vault_vault_password }}"
 
 # MQTT Configuration
-export VAULT_ZIGBEE2MQTT_MQTT_PASSWORD="$(generate_password)"
+export VAULT_ZIGBEE2MQTT_MQTT_password: "{{ vault_vault_password }}"
 
 #==============================================================================
 # NOTIFICATION WEBHOOKS

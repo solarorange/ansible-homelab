@@ -1,0 +1,214 @@
+#!/bin/bash
+
+# Homelab Environment Variables Setup Script
+# This script helps configure all necessary environment variables for deployment
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to prompt for input with default value
+prompt_with_default() {
+    local var_name="$1"
+    local default_value="$2"
+    local prompt_text="$3"
+    
+    echo -e "${BLUE}$prompt_text${NC}"
+    echo -e "${YELLOW}Default: $default_value${NC}"
+    read -p "Enter value (or press Enter for default): " input_value
+    
+    if [ -z "$input_value" ]; then
+        echo "$var_name=$default_value" >> .env
+        echo -e "${GREEN}✓ Set $var_name to default value: $default_value${NC}"
+    else
+        echo "$var_name=$input_value" >> .env
+        echo -e "${GREEN}✓ Set $var_name to: $input_value${NC}"
+    fi
+    echo
+}
+
+# Function to prompt for required input
+prompt_required() {
+    local var_name="$1"
+    local prompt_text="$2"
+    
+    while true; do
+        echo -e "${BLUE}$prompt_text${NC}"
+        read -p "Enter value: " input_value
+        
+        if [ -n "$input_value" ]; then
+            echo "$var_name=$input_value" >> .env
+            echo -e "${GREEN}✓ Set $var_name${NC}"
+            echo
+            break
+        else
+            echo -e "${RED}This field is required. Please enter a value.${NC}"
+        fi
+    done
+}
+
+# Function to generate secure password
+generate_password() {
+    openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
+}
+
+# Function to print error messages
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}  Homelab Environment Setup Script${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo
+
+# Check if .env file exists
+if [[ ! -f .env ]]; then
+    print_error ".env file not found. Please run setup_environment.sh first."
+    exit 1
+fi
+
+echo -e "${BLUE}Creating .env file...${NC}"
+echo
+
+# Basic Configuration
+echo -e "${GREEN}=== Basic Configuration ===${NC}"
+prompt_with_default "HOMELAB_DOMAIN" "yourdomain.com" "Enter your domain name:"
+prompt_with_default "HOMELAB_TIMEZONE" "America/New_York" "Enter your timezone:"
+prompt_with_default "HOMELAB_USERNAME" "homelab" "Enter the username for the homelab user:"
+prompt_with_default "HOMELAB_PUID" "1000" "Enter the user ID (PUID):"
+prompt_with_default "HOMELAB_PGID" "1000" "Enter the group ID (PGID):"
+
+# Network Configuration
+echo -e "${GREEN}=== Network Configuration ===${NC}"
+prompt_with_default "HOMELAB_SUBNET" "192.168.1.0/24" "Enter your network subnet:"
+prompt_with_default "HOMELAB_GATEWAY" "192.168.1.1" "Enter your gateway IP:"
+prompt_with_default "HOMELAB_IP_1" "192.168.1.100" "Enter IP for core1:"
+prompt_with_default "HOMELAB_IP_2" "192.168.1.101" "Enter IP for core2:"
+prompt_with_default "HOMELAB_IP_3" "192.168.1.102" "Enter IP for core3:"
+prompt_with_default "HOMELAB_IP_4" "192.168.1.103" "Enter IP for core4:"
+prompt_with_default "ANSIBLE_SERVER_IP" "192.168.1.99" "Enter Ansible control server IP:"
+prompt_with_default "PLEX_SERVER_IP" "192.168.1.41" "Enter your Plex server IP (if different):"
+
+# DNS Configuration
+echo -e "${GREEN}=== DNS Configuration ===${NC}"
+prompt_with_default "UPSTREAM_DNS_1" "8.8.8.8" "Enter primary DNS server:"
+prompt_with_default "UPSTREAM_DNS_2" "8.8.4.4" "Enter secondary DNS server:"
+
+# Docker Configuration
+echo -e "${GREEN}=== Docker Configuration ===${NC}"
+prompt_with_default "DOCKER_ROOT" "/opt/docker" "Enter Docker root directory:"
+prompt_with_default "TRAEFIK_NETWORK" "homelab" "Enter Traefik network name:"
+
+# Cloudflare Configuration (Optional)
+echo -e "${GREEN}=== Cloudflare Configuration (Optional) ===${NC}"
+prompt_with_default "CLOUDFLARE_ENABLED" "false" "Enable Cloudflare integration? (true/false):"
+if [[ "$(grep 'CLOUDFLARE_ENABLED=true' .env)" ]]; then
+    prompt_required "CLOUDFLARE_EMAIL" "Enter your Cloudflare email:"
+    prompt_required "CLOUDFLARE_API_TOKEN" "Enter your Cloudflare API token:"
+fi
+
+# Database Passwords
+echo -e "${GREEN}=== Database Configuration ===${NC}"
+echo -e "${YELLOW}Generating secure passwords for databases...${NC}"
+echo "POSTGRESQL_USER=homelab" >> .env
+echo "POSTGRESQL_PASSWORD=$(generate_password)" >> .env
+echo "MARIADB_ROOT_PASSWORD=$(generate_password)" >> .env
+echo "REDIS_PASSWORD=$(generate_password)" >> .env
+echo -e "${GREEN}✓ Generated secure database passwords${NC}"
+echo
+
+# Media Service API Keys
+echo -e "${GREEN}=== Media Service Configuration ===${NC}"
+echo -e "${YELLOW}Generating API keys for media services...${NC}"
+echo "SONARR_API_KEY=$(generate_password)" >> .env
+echo "RADARR_API_KEY=$(generate_password)" >> .env
+echo "PROWLARR_API_KEY=$(generate_password)" >> .env
+echo "BAZARR_API_KEY=$(generate_password)" >> .env
+echo "LIDARR_API_KEY=$(generate_password)" >> .env
+echo "READARR_API_KEY=$(generate_password)" >> .env
+echo "SABNZBD_API_KEY=$(generate_password)" >> .env
+echo -e "${GREEN}✓ Generated API keys for media services${NC}"
+echo
+
+# RomM Configuration
+echo -e "${GREEN}=== RomM Configuration ===${NC}"
+echo -e "${YELLOW}Generating RomM credentials...${NC}"
+echo "ROMM_ADMIN_PASSWORD=$(generate_password)" >> .env
+echo "ROMM_SECRET_KEY=$(generate_password)" >> .env
+echo "ROMM_DATABASE_PASSWORD=$(generate_password)" >> .env
+echo "ROMM_API_KEY=$(generate_password)" >> .env
+echo -e "${GREEN}✓ Generated RomM credentials${NC}"
+echo
+
+# Notification Configuration (Optional)
+echo -e "${GREEN}=== Notification Configuration (Optional) ===${NC}"
+prompt_with_default "SLACK_WEBHOOK" "" "Enter Slack webhook URL (or press Enter to skip):"
+prompt_with_default "DISCORD_WEBHOOK" "" "Enter Discord webhook URL (or press Enter to skip):"
+prompt_with_default "TELEGRAM_BOT_TOKEN" "" "Enter Telegram bot token (or press Enter to skip):"
+prompt_with_default "TELEGRAM_CHAT_ID" "" "Enter Telegram chat ID (or press Enter to skip):"
+prompt_with_default "PAGERDUTY_ROUTING_KEY" "" "Enter PagerDuty routing key (or press Enter to skip):"
+
+# Backup Configuration
+echo -e "${GREEN}=== Backup Configuration ===${NC}"
+prompt_with_default "BACKUP_RETENTION_DAYS" "7" "Enter backup retention days:"
+prompt_with_default "BACKUP_COMPRESSION" "true" "Enable backup compression? (true/false):"
+prompt_with_default "BACKUP_ENCRYPTION" "false" "Enable backup encryption? (true/false):"
+
+# Monitoring Configuration
+echo -e "${GREEN}=== Monitoring Configuration ===${NC}"
+prompt_with_default "MONITORING_RETENTION_DAYS" "30" "Enter monitoring data retention days:"
+prompt_with_default "ALERTING_ENABLED" "true" "Enable alerting? (true/false):"
+
+# Security Configuration
+echo -e "${GREEN}=== Security Configuration ===${NC}"
+prompt_with_default "SECURITY_ENHANCED" "true" "Enable enhanced security? (true/false):"
+prompt_with_default "FAIL2BAN_ENABLED" "true" "Enable Fail2ban? (true/false):"
+prompt_with_default "CROWDSEC_ENABLED" "true" "Enable CrowdSec? (true/false):"
+prompt_with_default "SSL_ENABLED" "true" "Enable SSL/TLS? (true/false):"
+
+# System Configuration
+echo -e "${GREEN}=== System Configuration ===${NC}"
+prompt_with_default "SYSTEM_UPDATES_ENABLED" "true" "Enable automatic system updates? (true/false):"
+prompt_with_default "LOG_RETENTION_DAYS" "30" "Enter log retention days:"
+
+# Feature Toggles
+echo -e "${GREEN}=== Feature Toggles ===${NC}"
+prompt_with_default "MONITORING_ENABLED" "true" "Enable monitoring stack? (true/false):"
+prompt_with_default "MEDIA_ENABLED" "true" "Enable media stack? (true/false):"
+prompt_with_default "SECURITY_ENHANCED" "true" "Enable security stack? (true/false):"
+prompt_with_default "AUTOMATION_ENABLED" "true" "Enable automation stack? (true/false):"
+
+# Resource Limits
+echo -e "${GREEN}=== Resource Limits ===${NC}"
+prompt_with_default "CPU_SHARES" "1024" "Enter CPU shares limit:"
+prompt_with_default "MEMORY_LIMIT" "2G" "Enter memory limit:"
+prompt_with_default "MEMORY_SWAP" "4G" "Enter memory swap limit:"
+prompt_with_default "MEMORY_RESERVATION" "1G" "Enter memory reservation:"
+prompt_with_default "CPU_LIMIT" "2" "Enter CPU limit:"
+
+# Rollback Configuration
+echo -e "${GREEN}=== Rollback Configuration ===${NC}"
+prompt_with_default "MAX_ROLLBACK_POINTS" "10" "Enter maximum rollback points to keep:"
+prompt_with_default "AUTO_ROLLBACK_ON_FAILURE" "true" "Enable auto rollback on failure? (true/false):"
+prompt_with_default "ROLLBACK_TIMEOUT" "300" "Enter rollback timeout in seconds:"
+
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}  Environment Setup Complete!${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo
+echo -e "${BLUE}Next steps:${NC}"
+echo "1. Review the generated .env file"
+echo "2. Update any values as needed"
+echo "3. Run: source .env"
+echo "4. Run: ansible-playbook site.yml"
+echo
+echo -e "${YELLOW}Important: Keep your .env file secure and backed up!${NC}"
+echo -e "${YELLOW}It contains sensitive information like passwords and API keys.${NC}"
+echo
+echo -e "${GREEN}Environment file created: .env${NC}" 

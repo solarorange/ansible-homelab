@@ -1,0 +1,89 @@
+---
+# Audiobookshelf Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Audiobookshelf vault variables
+  block:
+    - name: Check required Audiobookshelf vault variables
+      assert:
+        that:
+          - vault_audiobookshelf_admin_password is defined
+          - vault_audiobookshelf_database_password is defined
+          - vault_audiobookshelf_api_key is defined
+          - vault_audiobookshelf_secret_key is defined
+          - vault_audiobookshelf_encryption_key is defined
+          - vault_audiobookshelf_jwt_secret is defined
+        fail_msg: "Required Audiobookshelf vault variables are not defined"
+        success_msg: "All required Audiobookshelf vault variables are defined"
+
+    - name: Validate Audiobookshelf password complexity
+      assert:
+        that:
+          - vault_audiobookshelf_admin_password | length >= 12
+          - vault_audiobookshelf_database_password | length >= 12
+        fail_msg: "Audiobookshelf passwords must be at least 12 characters long"
+        success_msg: "Audiobookshelf password complexity requirements met"
+
+- name: Validate Audiobookshelf network configuration
+  block:
+    - name: Check Audiobookshelf port configuration
+      assert:
+        that:
+          - audiobookshelf_port is defined
+          - audiobookshelf_port | int >= 1024
+          - audiobookshelf_port | int <= 65535
+        fail_msg: "Audiobookshelf port must be between 1024 and 65535"
+        success_msg: "Audiobookshelf port configuration is valid"
+
+    - name: Check Audiobookshelf domain configuration
+      assert:
+        that:
+          - domain is defined
+          - audiobookshelf_subdomain is defined
+        fail_msg: "Audiobookshelf domain configuration is incomplete"
+        success_msg: "Audiobookshelf domain configuration is valid"
+
+- name: Validate Audiobookshelf security configuration
+  block:
+    - name: Check Audiobookshelf SSL configuration
+      assert:
+        that:
+          - audiobookshelf_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Audiobookshelf SSL configuration is invalid"
+        success_msg: "Audiobookshelf SSL configuration is valid"
+
+    - name: Check Audiobookshelf authentication configuration
+      assert:
+        that:
+          - audiobookshelf_auth_enabled | bool
+          - audiobookshelf_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Audiobookshelf authentication configuration is invalid"
+        success_msg: "Audiobookshelf authentication configuration is valid"
+
+- name: Validate Audiobookshelf storage configuration
+  block:
+    - name: Check Audiobookshelf data directories
+      assert:
+        that:
+          - audiobookshelf_data_dir is defined
+          - audiobookshelf_config_dir is defined
+          - audiobookshelf_backup_dir is defined
+        fail_msg: "Audiobookshelf storage configuration is incomplete"
+        success_msg: "Audiobookshelf storage configuration is valid"
+
+    - name: Create Audiobookshelf directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ audiobookshelf_data_dir }}"
+        - "{{ audiobookshelf_config_dir }}"
+        - "{{ audiobookshelf_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Audiobookshelf validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,89 @@
+---
+# Authentik Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Authentik vault variables
+  block:
+    - name: Check required Authentik vault variables
+      assert:
+        that:
+          - vault_authentik_admin_password is defined
+          - vault_authentik_database_password is defined
+          - vault_authentik_api_key is defined
+          - vault_authentik_secret_key is defined
+          - vault_authentik_encryption_key is defined
+          - vault_authentik_jwt_secret is defined
+        fail_msg: "Required Authentik vault variables are not defined"
+        success_msg: "All required Authentik vault variables are defined"
+
+    - name: Validate Authentik password complexity
+      assert:
+        that:
+          - vault_authentik_admin_password | length >= 12
+          - vault_authentik_database_password | length >= 12
+        fail_msg: "Authentik passwords must be at least 12 characters long"
+        success_msg: "Authentik password complexity requirements met"
+
+- name: Validate Authentik network configuration
+  block:
+    - name: Check Authentik port configuration
+      assert:
+        that:
+          - authentik_port is defined
+          - authentik_port | int >= 1024
+          - authentik_port | int <= 65535
+        fail_msg: "Authentik port must be between 1024 and 65535"
+        success_msg: "Authentik port configuration is valid"
+
+    - name: Check Authentik domain configuration
+      assert:
+        that:
+          - domain is defined
+          - authentik_subdomain is defined
+        fail_msg: "Authentik domain configuration is incomplete"
+        success_msg: "Authentik domain configuration is valid"
+
+- name: Validate Authentik security configuration
+  block:
+    - name: Check Authentik SSL configuration
+      assert:
+        that:
+          - authentik_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Authentik SSL configuration is invalid"
+        success_msg: "Authentik SSL configuration is valid"
+
+    - name: Check Authentik authentication configuration
+      assert:
+        that:
+          - authentik_auth_enabled | bool
+          - authentik_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Authentik authentication configuration is invalid"
+        success_msg: "Authentik authentication configuration is valid"
+
+- name: Validate Authentik storage configuration
+  block:
+    - name: Check Authentik data directories
+      assert:
+        that:
+          - authentik_data_dir is defined
+          - authentik_config_dir is defined
+          - authentik_backup_dir is defined
+        fail_msg: "Authentik storage configuration is incomplete"
+        success_msg: "Authentik storage configuration is valid"
+
+    - name: Create Authentik directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ authentik_data_dir }}"
+        - "{{ authentik_config_dir }}"
+        - "{{ authentik_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Authentik validation completed successfully - all configurations are valid and secure"

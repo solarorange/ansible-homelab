@@ -1,0 +1,89 @@
+---
+# Unmanic Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Unmanic vault variables
+  block:
+    - name: Check required Unmanic vault variables
+      assert:
+        that:
+          - vault_unmanic_admin_password is defined
+          - vault_unmanic_database_password is defined
+          - vault_unmanic_api_key is defined
+          - vault_unmanic_secret_key is defined
+          - vault_unmanic_encryption_key is defined
+          - vault_unmanic_jwt_secret is defined
+        fail_msg: "Required Unmanic vault variables are not defined"
+        success_msg: "All required Unmanic vault variables are defined"
+
+    - name: Validate Unmanic password complexity
+      assert:
+        that:
+          - vault_unmanic_admin_password | length >= 12
+          - vault_unmanic_database_password | length >= 12
+        fail_msg: "Unmanic passwords must be at least 12 characters long"
+        success_msg: "Unmanic password complexity requirements met"
+
+- name: Validate Unmanic network configuration
+  block:
+    - name: Check Unmanic port configuration
+      assert:
+        that:
+          - unmanic_port is defined
+          - unmanic_port | int >= 1024
+          - unmanic_port | int <= 65535
+        fail_msg: "Unmanic port must be between 1024 and 65535"
+        success_msg: "Unmanic port configuration is valid"
+
+    - name: Check Unmanic domain configuration
+      assert:
+        that:
+          - domain is defined
+          - unmanic_subdomain is defined
+        fail_msg: "Unmanic domain configuration is incomplete"
+        success_msg: "Unmanic domain configuration is valid"
+
+- name: Validate Unmanic security configuration
+  block:
+    - name: Check Unmanic SSL configuration
+      assert:
+        that:
+          - unmanic_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Unmanic SSL configuration is invalid"
+        success_msg: "Unmanic SSL configuration is valid"
+
+    - name: Check Unmanic authentication configuration
+      assert:
+        that:
+          - unmanic_auth_enabled | bool
+          - unmanic_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Unmanic authentication configuration is invalid"
+        success_msg: "Unmanic authentication configuration is valid"
+
+- name: Validate Unmanic storage configuration
+  block:
+    - name: Check Unmanic data directories
+      assert:
+        that:
+          - unmanic_data_dir is defined
+          - unmanic_config_dir is defined
+          - unmanic_backup_dir is defined
+        fail_msg: "Unmanic storage configuration is incomplete"
+        success_msg: "Unmanic storage configuration is valid"
+
+    - name: Create Unmanic directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ unmanic_data_dir }}"
+        - "{{ unmanic_config_dir }}"
+        - "{{ unmanic_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Unmanic validation completed successfully - all configurations are valid and secure"

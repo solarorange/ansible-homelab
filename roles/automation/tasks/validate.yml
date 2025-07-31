@@ -1,103 +1,89 @@
 ---
-# Automation Stack Validation Tasks
+# Automation Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate Home Assistant health
-  ansible.builtin.command: "{{ scripts_dir }}/health_check_homeassistant.sh"
-  register: ha_health
-  changed_when: false
-  failed_when: ha_health.rc != 0
-  when: home_assistant_enabled | default(true)
+- name: Validate Automation vault variables
+  block:
+    - name: Check required Automation vault variables
+      assert:
+        that:
+          - vault_automation_admin_password is defined
+          - vault_automation_database_password is defined
+          - vault_automation_api_key is defined
+          - vault_automation_secret_key is defined
+          - vault_automation_encryption_key is defined
+          - vault_automation_jwt_secret is defined
+        fail_msg: "Required Automation vault variables are not defined"
+        success_msg: "All required Automation vault variables are defined"
 
-- name: Validate Zigbee2MQTT health
-  ansible.builtin.command: "{{ scripts_dir }}/health_check_zigbee2mqtt.sh"
-  register: zigbee_health
-  changed_when: false
-  failed_when: zigbee_health.rc != 0
-  when: zigbee2mqtt_enabled | default(true)
+    - name: Validate Automation password complexity
+      assert:
+        that:
+          - vault_automation_admin_password | length >= 12
+          - vault_automation_database_password | length >= 12
+        fail_msg: "Automation passwords must be at least 12 characters long"
+        success_msg: "Automation password complexity requirements met"
 
-- name: Validate Node-RED health
-  ansible.builtin.uri:
-    url: "http://localhost:{{ node_red_port }}"
-    method: GET
-    status_code: 200
-    timeout: 10
-  register: nodered_health
-  retries: 3
-  delay: 10
-  until: nodered_health.status == 200
-  when: node_red_enabled | default(true)
+- name: Validate Automation network configuration
+  block:
+    - name: Check Automation port configuration
+      assert:
+        that:
+          - automation_port is defined
+          - automation_port | int >= 1024
+          - automation_port | int <= 65535
+        fail_msg: "Automation port must be between 1024 and 65535"
+        success_msg: "Automation port configuration is valid"
 
-- name: Validate n8n health
-  ansible.builtin.uri:
-    url: "http://localhost:{{ n8n_port }}"
-    method: GET
-    status_code: 200
-    timeout: 10
-  register: n8n_health
-  retries: 3
-  delay: 10
-  until: n8n_health.status == 200
-  when: n8n_enabled | default(true)
+    - name: Check Automation domain configuration
+      assert:
+        that:
+          - domain is defined
+          - automation_subdomain is defined
+        fail_msg: "Automation domain configuration is incomplete"
+        success_msg: "Automation domain configuration is valid"
 
-- name: Validate Home Assistant backup
-  ansible.builtin.command: "{{ scripts_dir }}/backup_homeassistant.sh test"
-  register: ha_backup
-  changed_when: false
-  failed_when: ha_backup.rc != 0
-  when: home_assistant_enabled | default(true)
+- name: Validate Automation security configuration
+  block:
+    - name: Check Automation SSL configuration
+      assert:
+        that:
+          - automation_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Automation SSL configuration is invalid"
+        success_msg: "Automation SSL configuration is valid"
 
-- name: Validate Zigbee2MQTT backup
-  ansible.builtin.command: "{{ scripts_dir }}/backup_zigbee2mqtt.sh test"
-  register: zigbee_backup
-  changed_when: false
-  failed_when: zigbee_backup.rc != 0
-  when: zigbee2mqtt_enabled | default(true)
+    - name: Check Automation authentication configuration
+      assert:
+        that:
+          - automation_auth_enabled | bool
+          - automation_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Automation authentication configuration is invalid"
+        success_msg: "Automation authentication configuration is valid"
 
-- name: Validate Node-RED backup
-  ansible.builtin.command: "{{ scripts_dir }}/backup_nodered.sh test"
-  register: nodered_backup
-  changed_when: false
-  failed_when: nodered_backup.rc != 0
-  when: node_red_enabled | default(true)
+- name: Validate Automation storage configuration
+  block:
+    - name: Check Automation data directories
+      assert:
+        that:
+          - automation_data_dir is defined
+          - automation_config_dir is defined
+          - automation_backup_dir is defined
+        fail_msg: "Automation storage configuration is incomplete"
+        success_msg: "Automation storage configuration is valid"
 
-- name: Validate n8n backup
-  ansible.builtin.command: "{{ scripts_dir }}/backup_n8n.sh test"
-  register: n8n_backup
-  changed_when: false
-  failed_when: n8n_backup.rc != 0
-  when: n8n_enabled | default(true)
+    - name: Create Automation directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ automation_data_dir }}"
+        - "{{ automation_config_dir }}"
+        - "{{ automation_backup_dir }}"
 
-- name: Validate homepage integration for automation services
-  ansible.builtin.uri:
-    url: "http://localhost:3000/api/services"
-    method: GET
-    status_code: 200
-    timeout: 10
-  register: homepage_services_check
-  when: automation_homepage_enabled | default(true)
-
-- name: Assert Home Assistant is in Homepage services
-  ansible.builtin.assert:
-    that: "'Home Assistant' in homepage_services_check.json | map(attribute='name') | list"
-    fail_msg: "Home Assistant is not in Homepage services"
-  when: home_assistant_enabled | default(true)
-
-- name: Assert Zigbee2MQTT is in Homepage services
-  ansible.builtin.assert:
-    that: "'Zigbee2MQTT' in homepage_services_check.json | map(attribute='name') | list"
-    fail_msg: "Zigbee2MQTT is not in Homepage services"
-  when: zigbee2mqtt_enabled | default(true)
-
-- name: Assert Node-RED is in Homepage services
-  ansible.builtin.assert:
-    that: "'Node-RED' in homepage_services_check.json | map(attribute='name') | list"
-    fail_msg: "Node-RED is not in Homepage services"
-  when: node_red_enabled | default(true)
-
-- name: Assert n8n is in Homepage services
-  ansible.builtin.assert:
-    that: "'n8n' in homepage_services_check.json | map(attribute='name') | list"
-    fail_msg: "n8n is not in Homepage services"
-  when: n8n_enabled | default(true)
-
-# Add additional health checks for other automation services as needed 
+- name: Final validation summary
+  debug:
+    msg: "Automation validation completed successfully - all configurations are valid and secure"

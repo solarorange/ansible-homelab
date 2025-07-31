@@ -1,48 +1,39 @@
 ---
-# n8n Deployment
-# Production-ready Ansible tasks for n8n workflow automation deployment
+# N8N Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Include n8n deployment tasks
-  block:
-    - name: Validate n8n configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [n8n, validation]
+- name: Include N8N validation tasks
+  include_tasks: validate.yml
+  when: n8n_validation_enabled | default(true)
 
-    - name: Setup n8n prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [n8n, setup]
+- name: Include N8N deployment tasks
+  include_tasks: deploy.yml
+  when: n8n_deploy_enabled | default(true)
 
-    - name: Deploy n8n services
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [n8n, deploy]
+- name: Include N8N configuration tasks
+  include_tasks: configure.yml
+  when: n8n_deploy_enabled | default(true)
 
-    - name: Configure n8n monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: n8n_monitoring_enabled | default(true)
-      tags: [n8n, monitoring]
+- name: Include N8N security tasks
+  include_tasks: security.yml
+  when: n8n_deploy_enabled | default(true)
 
-    - name: Configure n8n security
-      ansible.builtin.include_tasks: security.yml
-      tags: [n8n, security]
+- name: Include N8N monitoring tasks
+  include_tasks: monitoring.yml
+  when: n8n_monitoring_enabled | default(true)
 
-    - name: Configure n8n backup
-      ansible.builtin.include_tasks: backup.yml
-      when: n8n_backup_enabled | default(true)
-      tags: [n8n, backup]
+- name: Include N8N backup tasks
+  include_tasks: backup.yml
+  when: n8n_backup_enabled | default(true)
 
-    - name: Configure n8n homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: n8n_homepage_enabled | default(true)
-      tags: [n8n, homepage]
+- name: Include N8N automation tasks
+  include_tasks: automation.yml
+  when: n8n_automation_enabled | default(true)
 
-    - name: Configure n8n alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: n8n_alerting_enabled | default(true)
-      tags: [n8n, alerts]
+- name: Include N8N integration tasks
+  include_tasks: integration.yml
+  when: n8n_discovery_enabled | default(true)
 
-    - name: Validate n8n deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [n8n, validation]
-
-  when: n8n_enabled | default(true)
-  tags: [n8n, always] 
+- name: Include N8N health check tasks
+  include_tasks: health_check.yml
+  when: n8n_health_check_enabled | default(true)

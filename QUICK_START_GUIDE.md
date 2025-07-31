@@ -67,12 +67,12 @@ cd ansible_homelab
 chmod +x scripts/*.sh
 ```
 
-### 2.2 Run the Seamless One-Touch Setup Wizard
+### 2.2 Run the Seamless Setup Wizard
 ```bash
 # Run the seamless setup script
 ./scripts/seamless_setup.sh
 ```
-> **Recommended:** `seamless_setup.sh` is the preferred, all-in-one interactive setup wizard. It will prompt you for all required values, generate secure credentials, configure everything, and deploy your stack in one go.
+> **Recommended:** `seamless_setup.sh` is the complete, all-in-one interactive setup wizard. It will prompt you for all required values, generate secure credentials, configure everything, and deploy your stack in one go.
 
 This script will:
 - ✅ Generate secure passwords for all services
@@ -85,10 +85,10 @@ This script will:
 ### 2.3 Review Configuration
 ```bash
 # View your configuration
-cat .env
+cat group_vars/all/common.yml
 
 # Edit if needed
-nano .env
+nano group_vars/all/common.yml
 ```
 
 ## 🎯 **Step 3: Domain & DNS Setup (5 minutes)**
@@ -105,7 +105,10 @@ nano .env
    Type: A     Name: radarr       Value: YOUR_SERVER_IP
    Type: A     Name: jellyfin     Value: YOUR_SERVER_IP
    Type: A     Name: overseerr    Value: YOUR_SERVER_IP
-   Type: A     NameL homepage     Value: YOUR_SERVER_IP   
+   Type: A     Name: dash         Value: YOUR_SERVER_IP
+   Type: A     Name: reconya      Value: YOUR_SERVER_IP
+   Type: A     Name: pezzo        Value: YOUR_SERVER_IP
+   Type: A     Name: n8n          Value: YOUR_SERVER_IP
    ```
 
 ### 3.2 Cloudflare Setup (Recommended)
@@ -116,9 +119,9 @@ nano .env
      - Zone:Zone:Read
      - Zone:DNS:Edit
      - Zone:Zone Settings:Edit
-3. **Update your .env file**:
+3. **Update your configuration**:
    ```bash
-   nano .env
+   nano group_vars/all/common.yml
    # Add your Cloudflare API token and email
    ```
 
@@ -159,13 +162,13 @@ vault_smtp_password: "{{ lookup('env', 'SMTP_PASSWORD', default='') }}"
 ### 5.1 Pre-flight Check
 ```bash
 # Test your configuration
-ansible-playbook site.yml --check --ask-vault-pass
+ansible-playbook main.yml --check --ask-vault-pass
 ```
 
 ### 5.2 Deploy Everything
 ```bash
 # Deploy the complete infrastructure
-ansible-playbook site.yml --ask-vault-pass
+ansible-playbook main.yml --ask-vault-pass
 ```
 
 **What happens during deployment:**
@@ -177,7 +180,10 @@ ansible-playbook site.yml --ask-vault-pass
 6. 🗄️ **Databases** - PostgreSQL, Redis
 7. 📺 **Media Services** - Sonarr, Radarr, Jellyfin
 8. 🔧 **Utilities** - Portainer, Homepage
-9. ✅ **Validation** - Health checks and testing
+9. 🤖 **Automation** - n8n, Node-RED
+10. 🔍 **Network Monitoring** - Reconya
+11. 🎯 **AI Development** - Pezzo
+12. ✅ **Validation** - Health checks and testing
 
 ### 5.3 Monitor Deployment
 ```bash
@@ -201,6 +207,10 @@ Once deployment completes, access your services:
 | **Sonarr** | https://sonarr.your-domain.com | (no auth by default) |
 | **Radarr** | https://radarr.your-domain.com | (no auth by default) |
 | **Jellyfin** | https://jellyfin.your-domain.com | (create during setup) |
+| **Reconya** | https://reconya.your-domain.com | admin / (from vault) |
+| **Pezzo** | https://pezzo.your-domain.com | admin / (from vault) |
+| **n8n** | https://n8n.your-domain.com | admin / (from vault) |
+| **Homepage** | https://dash.your-domain.com | admin / (from vault) |
 
 ### 6.2 Initial Configuration
 
@@ -221,6 +231,24 @@ Once deployment completes, access your services:
 1. **Configure Sonarr**: Add download clients and indexers
 2. **Configure Radarr**: Add download clients and indexers
 3. **Configure Jellyfin**: Add media libraries
+
+#### Network Monitoring & Security Setup
+1. **Reconya**: Configure network scanning ranges and device discovery
+   - Set up network ranges to monitor
+   - Configure device discovery settings
+   - Set up alerts for new devices
+
+#### Automation & Development Setup
+1. **n8n**: Configure automation workflows and integrations
+   - Create automation workflows
+   - Set up API integrations
+   - Configure webhook endpoints
+
+#### AI & Development Platform Setup
+1. **Pezzo**: Set up AI prompt management and API integrations
+   - Configure AI model connections
+   - Set up prompt templates
+   - Configure API integrations
 
 ## 🎯 **Step 7: Validation & Testing**
 
@@ -300,12 +328,14 @@ docker logs redis
 - **Grafana**: https://grafana.your-domain.com
 - **Prometheus**: https://prometheus.your-domain.com
 - **Traefik**: https://traefik.your-domain.com
+- **Reconya**: https://reconya.your-domain.com
 
 ### Key Metrics to Monitor
 - **System Resources**: CPU, Memory, Disk Usage
 - **Service Health**: All services should show "healthy"
 - **Network Traffic**: Incoming requests and bandwidth
 - **Error Rates**: Check for any service errors
+- **Network Devices**: Monitor device discovery in Reconya
 
 ## 🔄 **Maintenance & Updates**
 
@@ -376,13 +406,19 @@ Your Ansible Homelab is now fully deployed and ready to use! You have:
 - ✅ **Monitoring Stack** for system health and performance
 - ✅ **Backup System** for data protection
 - ✅ **Automated Maintenance** for ongoing operations
+- ✅ **Network Monitoring** with Reconya
+- ✅ **AI Development Platform** with Pezzo
+- ✅ **Automation Platform** with n8n
 
 **Next Steps:**
 1. **Configure your media services** (Sonarr, Radarr, Jellyfin)
 2. **Set up your media libraries** and download clients
 3. **Customize your dashboards** in Grafana
-4. **Explore additional services** as needed
-5. **Join the community** for support and updates
+4. **Set up network monitoring** with Reconya for device discovery
+5. **Configure automation workflows** in n8n for task automation
+6. **Set up AI development platform** with Pezzo for prompt management
+7. **Explore additional services** as needed
+8. **Join the community** for support and updates
 
 ---
 

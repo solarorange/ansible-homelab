@@ -1,0 +1,39 @@
+---
+# Jellyfin Deployment Tasks
+
+- name: Create Jellyfin directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/jellyfin"
+    - "{{ docker_config_root }}/jellyfin"
+    - "{{ docker_logs_root }}/jellyfin"
+  tags: [jellyfin, deploy]
+
+- name: Deploy Jellyfin Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_root }}/jellyfin/docker-compose.yml"
+    mode: '0644'
+  notify: restart jellyfin
+  tags: [jellyfin, deploy]
+
+- name: Start Jellyfin services
+  community.docker.docker_compose:
+    project_src: "{{ docker_root }}/jellyfin"
+    state: present
+  tags: [jellyfin, deploy]
+
+- name: Wait for Jellyfin to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ jellyfin_external_port }}"
+    status_code: [200, 302, 401, 403]
+  register: result
+  until: result.status in [200, 302, 401, 403]
+  retries: 30
+  delay: 10
+  tags: [jellyfin, deploy]

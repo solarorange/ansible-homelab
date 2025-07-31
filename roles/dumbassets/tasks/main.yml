@@ -1,48 +1,39 @@
 ---
-# DumbAssets Asset Tracking Service Deployment
-# Production-ready Ansible tasks for homelab deployment
+# Dumbassets Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Include DumbAssets deployment tasks
-  block:
-    - name: Validate DumbAssets configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [dumbassets, validation]
+- name: Include Dumbassets validation tasks
+  include_tasks: validate.yml
+  when: dumbassets_validation_enabled | default(true)
 
-    - name: Setup DumbAssets prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [dumbassets, setup]
+- name: Include Dumbassets deployment tasks
+  include_tasks: deploy.yml
+  when: dumbassets_deploy_enabled | default(true)
 
-    - name: Deploy DumbAssets service
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [dumbassets, deploy]
+- name: Include Dumbassets configuration tasks
+  include_tasks: configure.yml
+  when: dumbassets_deploy_enabled | default(true)
 
-    - name: Configure DumbAssets monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: dumbassets_monitoring_enabled | default(true)
-      tags: [dumbassets, monitoring]
+- name: Include Dumbassets security tasks
+  include_tasks: security.yml
+  when: dumbassets_deploy_enabled | default(true)
 
-    - name: Configure DumbAssets security
-      ansible.builtin.include_tasks: security.yml
-      tags: [dumbassets, security]
+- name: Include Dumbassets monitoring tasks
+  include_tasks: monitoring.yml
+  when: dumbassets_monitoring_enabled | default(true)
 
-    - name: Configure DumbAssets backup
-      ansible.builtin.include_tasks: backup.yml
-      when: dumbassets_backup_enabled | default(true)
-      tags: [dumbassets, backup]
+- name: Include Dumbassets backup tasks
+  include_tasks: backup.yml
+  when: dumbassets_backup_enabled | default(true)
 
-    - name: Configure DumbAssets homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: dumbassets_homepage_enabled | default(true)
-      tags: [dumbassets, homepage]
+- name: Include Dumbassets automation tasks
+  include_tasks: automation.yml
+  when: dumbassets_automation_enabled | default(true)
 
-    - name: Configure DumbAssets alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: dumbassets_alerting_enabled | default(true)
-      tags: [dumbassets, alerts]
+- name: Include Dumbassets integration tasks
+  include_tasks: integration.yml
+  when: dumbassets_discovery_enabled | default(true)
 
-    - name: Validate DumbAssets deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [dumbassets, validation]
-
-  when: dumbassets_enabled | default(true)
-  tags: [dumbassets, always] 
+- name: Include Dumbassets health check tasks
+  include_tasks: health_check.yml
+  when: dumbassets_health_check_enabled | default(true)

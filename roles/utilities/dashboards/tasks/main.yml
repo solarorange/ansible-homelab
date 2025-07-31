@@ -32,7 +32,7 @@
   ansible.builtin.shell:
     cmd: "{{ homepage_dir }}/setup_icons.sh"
     chdir: "{{ homepage_dir }}"
-  become_user: "{{ username }}"
+  become_user: "{{ vault_utilities_user }}"
 
 - name: Generate API keys for dashboard services
   ansible.builtin.set_fact:
@@ -58,7 +58,7 @@
 
 - name: Wait for Homepage to be ready
   ansible.builtin.uri:
-    url: "http://localhost:3000"
+    url: "http://{{ ansible_default_ipv4.address }}:3000"
     method: GET
     status_code: 200
   register: homepage_ready
@@ -111,7 +111,7 @@
 
 - name: Wait for Tautulli to be ready
   ansible.builtin.uri:
-    url: "http://localhost:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
     method: GET
     status_code: 200
     timeout: 30

@@ -1,0 +1,89 @@
+---
+# Plex Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Plex vault variables
+  block:
+    - name: Check required Plex vault variables
+      assert:
+        that:
+          - vault_plex_admin_password is defined
+          - vault_plex_database_password is defined
+          - vault_plex_api_key is defined
+          - vault_plex_secret_key is defined
+          - vault_plex_encryption_key is defined
+          - vault_plex_jwt_secret is defined
+        fail_msg: "Required Plex vault variables are not defined"
+        success_msg: "All required Plex vault variables are defined"
+
+    - name: Validate Plex password complexity
+      assert:
+        that:
+          - vault_plex_admin_password | length >= 12
+          - vault_plex_database_password | length >= 12
+        fail_msg: "Plex passwords must be at least 12 characters long"
+        success_msg: "Plex password complexity requirements met"
+
+- name: Validate Plex network configuration
+  block:
+    - name: Check Plex port configuration
+      assert:
+        that:
+          - plex_port is defined
+          - plex_port | int >= 1024
+          - plex_port | int <= 65535
+        fail_msg: "Plex port must be between 1024 and 65535"
+        success_msg: "Plex port configuration is valid"
+
+    - name: Check Plex domain configuration
+      assert:
+        that:
+          - domain is defined
+          - plex_subdomain is defined
+        fail_msg: "Plex domain configuration is incomplete"
+        success_msg: "Plex domain configuration is valid"
+
+- name: Validate Plex security configuration
+  block:
+    - name: Check Plex SSL configuration
+      assert:
+        that:
+          - plex_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Plex SSL configuration is invalid"
+        success_msg: "Plex SSL configuration is valid"
+
+    - name: Check Plex authentication configuration
+      assert:
+        that:
+          - plex_auth_enabled | bool
+          - plex_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Plex authentication configuration is invalid"
+        success_msg: "Plex authentication configuration is valid"
+
+- name: Validate Plex storage configuration
+  block:
+    - name: Check Plex data directories
+      assert:
+        that:
+          - plex_data_dir is defined
+          - plex_config_dir is defined
+          - plex_backup_dir is defined
+        fail_msg: "Plex storage configuration is incomplete"
+        success_msg: "Plex storage configuration is valid"
+
+    - name: Create Plex directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ plex_data_dir }}"
+        - "{{ plex_config_dir }}"
+        - "{{ plex_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Plex validation completed successfully - all configurations are valid and secure"

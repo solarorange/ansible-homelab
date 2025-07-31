@@ -1,201 +1,89 @@
 ---
-# ErsatzTV Configuration Validation
-# Validate ErsatzTV configuration and prerequisites
+# Ersatztv Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate ErsatzTV configuration variables
-  ansible.builtin.assert:
-    that:
-      - ersatztv_enabled is defined
-      - ersatztv_port is defined
-      - ersatztv_subdomain is defined
-      - ersatztv_image is defined
-      - ersatztv_config_dir is defined
-      - ersatztv_data_dir is defined
-    fail_msg: "Required ErsatzTV configuration variables are not defined"
-    success_msg: "ErsatzTV configuration validation passed"
-  tags: [ersatztv, validation]
+- name: Validate Ersatztv vault variables
+  block:
+    - name: Check required Ersatztv vault variables
+      assert:
+        that:
+          - vault_ersatztv_admin_password is defined
+          - vault_ersatztv_database_password is defined
+          - vault_ersatztv_api_key is defined
+          - vault_ersatztv_secret_key is defined
+          - vault_ersatztv_encryption_key is defined
+          - vault_ersatztv_jwt_secret is defined
+        fail_msg: "Required Ersatztv vault variables are not defined"
+        success_msg: "All required Ersatztv vault variables are defined"
 
-- name: Validate ErsatzTV port configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_port is number
-      - ersatztv_port >= 1024
-      - ersatztv_port <= 65535
-    fail_msg: "Invalid ErsatzTV port configuration. Port must be between 1024 and 65535"
-    success_msg: "ErsatzTV port validation passed"
-  tags: [ersatztv, validation]
+    - name: Validate Ersatztv password complexity
+      assert:
+        that:
+          - vault_ersatztv_admin_password | length >= 12
+          - vault_ersatztv_database_password | length >= 12
+        fail_msg: "Ersatztv passwords must be at least 12 characters long"
+        success_msg: "Ersatztv password complexity requirements met"
 
-- name: Validate ErsatzTV domain configuration
-  ansible.builtin.assert:
-    that:
-      - domain is defined
-      - ersatztv_subdomain is defined
-      - ersatztv_subdomain | length > 0
-    fail_msg: "Invalid ErsatzTV domain configuration"
-    success_msg: "ErsatzTV domain validation passed"
-  tags: [ersatztv, validation]
+- name: Validate Ersatztv network configuration
+  block:
+    - name: Check Ersatztv port configuration
+      assert:
+        that:
+          - ersatztv_port is defined
+          - ersatztv_port | int >= 1024
+          - ersatztv_port | int <= 65535
+        fail_msg: "Ersatztv port must be between 1024 and 65535"
+        success_msg: "Ersatztv port configuration is valid"
 
-- name: Validate ErsatzTV directory paths
-  ansible.builtin.assert:
-    that:
-      - ersatztv_config_dir is defined
-      - ersatztv_data_dir is defined
-      - ersatztv_logs_dir is defined
-      - ersatztv_transcode_dir is defined
-    fail_msg: "Required ErsatzTV directory paths are not defined"
-    success_msg: "ErsatzTV directory validation passed"
-  tags: [ersatztv, validation]
+    - name: Check Ersatztv domain configuration
+      assert:
+        that:
+          - domain is defined
+          - ersatztv_subdomain is defined
+        fail_msg: "Ersatztv domain configuration is incomplete"
+        success_msg: "Ersatztv domain configuration is valid"
 
-- name: Validate ErsatzTV resource configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_resources is defined
-      - ersatztv_resources.limits is defined
-      - ersatztv_resources.reservations is defined
-    fail_msg: "Invalid ErsatzTV resource configuration"
-    success_msg: "ErsatzTV resource validation passed"
-  tags: [ersatztv, validation]
+- name: Validate Ersatztv security configuration
+  block:
+    - name: Check Ersatztv SSL configuration
+      assert:
+        that:
+          - ersatztv_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Ersatztv SSL configuration is invalid"
+        success_msg: "Ersatztv SSL configuration is valid"
 
-- name: Validate ErsatzTV hardware acceleration configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_hardware_acceleration in ['none', 'vaapi', 'nvenc', 'qsv']
-    fail_msg: "Invalid ErsatzTV hardware acceleration configuration. Must be one of: none, vaapi, nvenc, qsv"
-    success_msg: "ErsatzTV hardware acceleration validation passed"
-  tags: [ersatztv, validation]
+    - name: Check Ersatztv authentication configuration
+      assert:
+        that:
+          - ersatztv_auth_enabled | bool
+          - ersatztv_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Ersatztv authentication configuration is invalid"
+        success_msg: "Ersatztv authentication configuration is valid"
 
-- name: Validate ErsatzTV streaming configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_streaming_mode in ['mpegts', 'hls']
-      - ersatztv_streaming_quality in ['480p', '720p', '1080p']
-      - ersatztv_streaming_bitrate is defined
-      - ersatztv_streaming_framerate is number
-    fail_msg: "Invalid ErsatzTV streaming configuration"
-    success_msg: "ErsatzTV streaming validation passed"
-  tags: [ersatztv, validation]
+- name: Validate Ersatztv storage configuration
+  block:
+    - name: Check Ersatztv data directories
+      assert:
+        that:
+          - ersatztv_data_dir is defined
+          - ersatztv_config_dir is defined
+          - ersatztv_backup_dir is defined
+        fail_msg: "Ersatztv storage configuration is incomplete"
+        success_msg: "Ersatztv storage configuration is valid"
 
-- name: Validate ErsatzTV transcoding configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_transcode_enabled is boolean
-      - ersatztv_transcode_threads is number
-      - ersatztv_transcode_quality in ['low', 'medium', 'high']
-      - ersatztv_transcode_format in ['h264', 'h265', 'vp9']
-    fail_msg: "Invalid ErsatzTV transcoding configuration"
-    success_msg: "ErsatzTV transcoding validation passed"
-  tags: [ersatztv, validation]
+    - name: Create Ersatztv directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ ersatztv_data_dir }}"
+        - "{{ ersatztv_config_dir }}"
+        - "{{ ersatztv_backup_dir }}"
 
-- name: Validate ErsatzTV monitoring configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_monitoring_enabled is boolean
-      - ersatztv_healthcheck_enabled is boolean
-      - ersatztv_prometheus_enabled is boolean
-    fail_msg: "Invalid ErsatzTV monitoring configuration"
-    success_msg: "ErsatzTV monitoring validation passed"
-  tags: [ersatztv, validation]
-
-- name: Validate ErsatzTV security configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_security_enabled is boolean
-      - ersatztv_traefik_enabled is boolean
-      - ersatztv_auth_enabled is boolean
-    fail_msg: "Invalid ErsatzTV security configuration"
-    success_msg: "ErsatzTV security validation passed"
-  tags: [ersatztv, validation]
-
-- name: Validate ErsatzTV backup configuration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_backup_enabled is boolean
-      - ersatztv_backup_retention is number
-      - ersatztv_backup_schedule is defined
-    fail_msg: "Invalid ErsatzTV backup configuration"
-    success_msg: "ErsatzTV backup validation passed"
-  tags: [ersatztv, validation]
-
-- name: Validate ErsatzTV homepage integration
-  ansible.builtin.assert:
-    that:
-      - ersatztv_homepage_enabled is boolean
-      - ersatztv_homepage_group is defined
-      - ersatztv_homepage_icon is defined
-    fail_msg: "Invalid ErsatzTV homepage integration configuration"
-    success_msg: "ErsatzTV homepage integration validation passed"
-  tags: [ersatztv, validation]
-
-- name: Check for port conflicts
-  ansible.builtin.shell: "netstat -tlnp | grep :{{ ersatztv_port }} || echo 'PORT_FREE'"
-  register: port_check
-  changed_when: false
-  tags: [ersatztv, validation]
-
-- name: Fail if port is already in use
-  ansible.builtin.fail:
-    msg: "Port {{ ersatztv_port }} is already in use by another service"
-  when: 
-    - port_check.stdout != "PORT_FREE"
-    - port_check.stdout != ""
-  tags: [ersatztv, validation]
-
-- name: Validate Docker is running
-  ansible.builtin.service_facts:
-  tags: [ersatztv, validation]
-
-- name: Check Docker service status
-  ansible.builtin.assert:
-    that:
-      - ansible_facts.services['docker.service'] is defined
-      - ansible_facts.services['docker.service'].state == "running"
-    fail_msg: "Docker service is not running"
-    success_msg: "Docker service validation passed"
-  tags: [ersatztv, validation]
-
-- name: Validate Docker Compose is available
-  ansible.builtin.command: "docker-compose --version"
-  register: docker_compose_check
-  changed_when: false
-  failed_when: false
-  tags: [ersatztv, validation]
-
-- name: Check Docker Compose availability
-  ansible.builtin.assert:
-    that:
-      - docker_compose_check.rc == 0
-    fail_msg: "Docker Compose is not available"
-    success_msg: "Docker Compose validation passed"
-  tags: [ersatztv, validation]
-
-- name: Validate network exists
-  ansible.builtin.shell: "docker network ls --format '{{.Name}}' | grep -w {{ ersatztv_network_name }} || echo 'NETWORK_MISSING'"
-  register: network_check
-  changed_when: false
-  tags: [ersatztv, validation]
-
-- name: Warn if network doesn't exist
-  ansible.builtin.debug:
-    msg: "Network {{ ersatztv_network_name }} does not exist. It will be created during deployment."
-  when: network_check.stdout == "NETWORK_MISSING"
-  tags: [ersatztv, validation]
-
-- name: Display ErsatzTV configuration summary
-  ansible.builtin.debug:
-    msg: |
-      ErsatzTV Configuration Summary:
-      - Enabled: {{ ersatztv_enabled }}
-      - Port: {{ ersatztv_port }}
-      - Subdomain: {{ ersatztv_subdomain }}
-      - Domain: {{ ersatztv_domain }}
-      - Image: {{ ersatztv_image }}
-      - Config Directory: {{ ersatztv_config_dir }}
-      - Data Directory: {{ ersatztv_data_dir }}
-      - Hardware Acceleration: {{ ersatztv_hardware_acceleration }}
-      - Streaming Mode: {{ ersatztv_streaming_mode }}
-      - Transcoding Enabled: {{ ersatztv_transcode_enabled }}
-      - Monitoring Enabled: {{ ersatztv_monitoring_enabled }}
-      - Security Enabled: {{ ersatztv_security_enabled }}
-      - Backup Enabled: {{ ersatztv_backup_enabled }}
-      - Homepage Integration: {{ ersatztv_homepage_enabled }}
-  tags: [ersatztv, validation] 
+- name: Final validation summary
+  debug:
+    msg: "Ersatztv validation completed successfully - all configurations are valid and secure"

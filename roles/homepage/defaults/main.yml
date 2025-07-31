@@ -1,195 +1,259 @@
----
-# Homepage Role Defaults
+# Homepage Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Homepage Configuration
-homepage_enabled: true
-homepage_container_name: homepage
-homepage_image: ghcr.io/benphelps/homepage:latest
-homepage_port: 3000
-homepage_restart_policy: unless-stopped
+# =============================================================================
+# HOMEPAGE SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+homepage_service_name: "homepage"
+homepage_container_name: "{{ homepage_service_name }}"
+homepage_image: "ghcr.io/benphelps/homepage:latest"
+homepage_version: "latest"
 
 # Network Configuration
-homepage_network: homelab
-homepage_subdomain: "{{ subdomains.homepage | default('homepage') }}"
+homepage_port: 3000
+homepage_external_port: "{{ homepage_port }}"
+homepage_protocol: "http"
+homepage_host: "{{ ansible_default_ipv4.address }}"
+homepage_url: "{{ homepage_protocol }}://{{ homepage_host }}:{{ homepage_port }}"
 
-# Directory Configuration
-homepage_docker_dir: "{{ docker_dir }}/homepage"
-homepage_config_dir: "{{ homepage_docker_dir }}/config"
-homepage_data_dir: "{{ data_dir }}/homepage"
-homepage_backup_dir: "{{ backup_dir }}/homepage"
-homepage_logs_dir: "{{ logs_dir }}/homepage"
+# Domain Configuration
+homepage_subdomain: "homepage"
+homepage_domain: "{{ homepage_subdomain }}.{{ domain }}"
+homepage_external_url: "https://{{ homepage_domain }}"
 
-# Theme Configuration
-homepage_theme: dark
-homepage_language: en
-homepage_units: metric
-homepage_timezone: "{{ timezone | default('America/New_York') }}"
-homepage_title: "Homelab Dashboard"
-homepage_description: "Enhanced Homelab Infrastructure Dashboard"
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
 
-# Weather Configuration
-homepage_weather_enabled: true
-homepage_weather_lat: "{{ weather_lat | default('40.7128') }}"
-homepage_weather_lon: "{{ weather_lon | default('-74.0060') }}"
-homepage_weather_api_key: "{{ weather_api_key | default('') }}"
-
-# Background and Icons
-homepage_background: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop"
-homepage_favicon: "https://raw.githubusercontent.com/gethomepage/homepage/main/public/favicon.ico"
-homepage_icons: "https://raw.githubusercontent.com/gethomepage/homepage/main/public/icons"
-
-# Widget Configuration
-homepage_widgets:
-  - resources
-  - search
-  - weather
-  - calendar
-  - system
-  - kubernetes
-  - docker
-  - pihole
-  - traefik
-  - authentik
-  - portainer
-  - grafana
-  - prometheus
-  - influxdb
-  - loki
-  - homeassistant
-  - zigbee2mqtt
-  - nodered
-  - n8n
-  - jellyfin
-  - sonarr
-  - radarr
-  - lidarr
-  - readarr
-  - prowlarr
-  - bazarr
-  - tautulli
-  - overseerr
-  - nextcloud
-  - vaultwarden
-  - gitlab
-  - harbor
-  - minio
-  - paperless
-  - bookstack
-  - immich
-  - filebrowser
-  - kopia
-  - duplicati
-  - uptime_kuma
-  - dashdot
-  - code_server
-  - guacamole
-  - heimdall
-  - homarr
-  - requestrr
-  - unmanic
-
-# Service Groups
-homepage_service_groups:
-  - name: "Infrastructure"
-    icon: "infrastructure"
-    services:
-      - "Traefik"
-      - "Authentik"
-      - "Portainer"
-  - name: "Monitoring"
-    icon: "monitoring"
-    services:
-      - "Grafana"
-      - "Prometheus"
-      - "AlertManager"
-      - "Loki"
-      - "Uptime Kuma"
-      - "Dashdot"
-  - name: "Media"
-    icon: "media"
-    services:
-      - "Jellyfin"
-      - "Sonarr"
-      - "Radarr"
-      - "Lidarr"
-      - "Readarr"
-      - "Prowlarr"
-      - "Bazarr"
-      - "Tautulli"
-      - "Overseerr"
-      - "Requestrr"
-      - "Unmanic"
-  - name: "Storage"
-    icon: "storage"
-    services:
-      - "Nextcloud"
-      - "FileBrowser"
-      - "MinIO"
-      - "Paperless"
-      - "BookStack"
-      - "Immich"
-      - "Kopia"
-      - "Duplicati"
-  - name: "Security"
-    icon: "security"
-    services:
-      - "CrowdSec"
-      - "Fail2ban"
-      - "Vaultwarden"
-  - name: "Development"
-    icon: "development"
-    services:
-      - "GitLab"
-      - "Harbor"
-      - "Code Server"
-      - "Guacamole"
-  - name: "Automation"
-    icon: "automation"
-    services:
-      - "Home Assistant"
-      - "Zigbee2MQTT"
-      - "Node-RED"
-      - "n8n"
-  - name: "Utilities"
-    icon: "utilities"
-    services:
-      - "Homepage"
-      - "Watchtower"
-      - "Heimdall"
-      - "Homarr"
+# Authentication
+homepage_auth_enabled: true
+homepage_auth_method: "authentik"  # Options: basic, authentik, none
+homepage_admin_username: "admin"
+homepage_admin_password: "{{ vault_homepage_admin_password }}"
 
 # API Configuration
-homepage_api_enabled: true
-homepage_api_port: 3001
-homepage_api_secret: "{{ vault_homepage_api_secret | default('') }}"
+homepage_api_key: "{{ vault_homepage_api_key }}"
+homepage_api_token: "{{ vault_homepage_api_token }}"
+
+# Encryption & Security
+homepage_secret_key: "{{ vault_homepage_secret_key }}"
+homepage_encryption_key: "{{ vault_homepage_encryption_key }}"
+homepage_jwt_secret: "{{ vault_homepage_jwt_secret }}"
+
+# SSL/TLS Configuration
+homepage_ssl_enabled: true
+homepage_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+homepage_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+homepage_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+homepage_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+homepage_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+homepage_database_port: "{{ databases_postgresql_port | default(5432) }}"
+homepage_database_name: "homepage"
+homepage_database_username: "homepage"
+homepage_database_password: "{{ vault_homepage_database_password }}"
+
+# Redis Configuration (if using)
+homepage_redis_enabled: false
+homepage_redis_host: "{{ redis_host | default('redis') }}"
+homepage_redis_port: "{{ redis_port | default(6379) }}"
+homepage_redis_password: "{{ vault_homepage_redis_password }}"
+homepage_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+homepage_data_dir: "{{ homelab_data_dir }}/homepage"
+homepage_config_dir: "{{ homepage_data_dir }}/config"
+homepage_backup_dir: "{{ homepage_data_dir }}/backups"
+
+# Volume Mappings
+homepage_volumes:
+  - "{{ homepage_config_dir }}:/config"
+  - "{{ homepage_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
 
 # Health Check Configuration
 homepage_health_check_enabled: true
-homepage_health_check_interval: 300
+homepage_health_check_path: "/health"
+homepage_health_check_interval: 30
 homepage_health_check_timeout: 10
+homepage_health_check_retries: 3
+
+# Monitoring Integration
+homepage_monitoring_enabled: true
+homepage_prometheus_enabled: true
+homepage_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 homepage_backup_enabled: true
+homepage_backup_schedule: "0 2 * * *"  # Daily at 2 AM
 homepage_backup_retention_days: 30
-homepage_backup_schedule: "0 2 * * *"
+homepage_backup_encryption_enabled: true
+homepage_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-homepage_log_level: info
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+homepage_smtp_enabled: false
+homepage_smtp_host: "{{ smtp_host | default('') }}"
+homepage_smtp_port: "{{ smtp_port | default(587) }}"
+homepage_smtp_username: "{{ vault_smtp_username }}"
+homepage_smtp_password: "{{ vault_homepage_smtp_password }}"
+homepage_smtp_from: "{{ homepage_admin_email | default('admin@' + domain) }}"
+homepage_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+homepage_webhook_enabled: false
+homepage_webhook_url: "{{ vault_webhook_url | default('') }}"
+homepage_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+homepage_discovery_enabled: true
+homepage_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+homepage_cpu_limit: "1.0"
+homepage_memory_limit: "1g"
+homepage_memory_reservation: "512m"
+
+# Performance Settings
+homepage_scan_interval: 10
+homepage_parallel_downloads: 3
+homepage_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+homepage_log_level: "info"  # Options: trace, debug, info, warn, error
 homepage_log_rotation_enabled: true
-homepage_log_retention_days: 7
+homepage_log_retention_days: 30
 
-# Security Configuration
-homepage_security_headers_enabled: true
-homepage_cors_enabled: false
-homepage_rate_limiting_enabled: true
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Performance Configuration
-homepage_cache_enabled: true
-homepage_cache_ttl: 300
-homepage_compression_enabled: true
+# Security Headers
+homepage_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Integration Configuration
-homepage_traefik_integration: true
-homepage_authentik_integration: true
-homepage_monitoring_integration: true
-homepage_backup_integration: true 
+# Rate Limiting
+homepage_rate_limit_enabled: true
+homepage_rate_limit_requests: 100
+homepage_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+homepage_deploy_enabled: true
+homepage_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+homepage_restart_policy: "unless-stopped"
+homepage_auto_update_enabled: true
+
+# Environment Variables
+homepage_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  HOMEPAGE_API_KEY: "{{ homepage_api_key }}"
+  HOMEPAGE_SECRET_KEY: "{{ homepage_secret_key }}"
+  HOMEPAGE_ENCRYPTION_KEY: "{{ homepage_encryption_key }}"
+  HOMEPAGE_JWT_SECRET: "{{ homepage_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+homepage_validation_enabled: true
+homepage_validation_timeout: 300
+homepage_validation_retries: 3
+
+# Testing Configuration
+homepage_test_enabled: false
+homepage_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+homepage_compliance_enabled: true
+homepage_audit_logging_enabled: true
+homepage_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+homepage_automation_enabled: true
+homepage_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+homepage_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+homepage_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+homepage_fallback_enabled: true
+homepage_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

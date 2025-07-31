@@ -1,0 +1,259 @@
+# Syncthing Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# SYNCTHING SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+syncthing_service_name: "syncthing"
+syncthing_container_name: "{{ syncthing_service_name }}"
+syncthing_image: "linuxserver/syncthing:latest"
+syncthing_version: "latest"
+
+# Network Configuration
+syncthing_port: 8384
+syncthing_external_port: "{{ syncthing_port }}"
+syncthing_protocol: "http"
+syncthing_host: "{{ ansible_default_ipv4.address }}"
+syncthing_url: "{{ syncthing_protocol }}://{{ syncthing_host }}:{{ syncthing_port }}"
+
+# Domain Configuration
+syncthing_subdomain: "syncthing"
+syncthing_domain: "{{ syncthing_subdomain }}.{{ domain }}"
+syncthing_external_url: "https://{{ syncthing_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+syncthing_auth_enabled: true
+syncthing_auth_method: "authentik"  # Options: basic, authentik, none
+syncthing_admin_username: "admin"
+syncthing_admin_password: "{{ vault_syncthing_admin_password }}"
+
+# API Configuration
+syncthing_api_key: "{{ vault_syncthing_api_key }}"
+syncthing_api_token: "{{ vault_syncthing_api_token }}"
+
+# Encryption & Security
+syncthing_secret_key: "{{ vault_syncthing_secret_key }}"
+syncthing_encryption_key: "{{ vault_syncthing_encryption_key }}"
+syncthing_jwt_secret: "{{ vault_syncthing_jwt_secret }}"
+
+# SSL/TLS Configuration
+syncthing_ssl_enabled: true
+syncthing_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+syncthing_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+syncthing_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+syncthing_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+syncthing_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+syncthing_database_port: "{{ databases_postgresql_port | default(5432) }}"
+syncthing_database_name: "syncthing"
+syncthing_database_username: "syncthing"
+syncthing_database_password: "{{ vault_syncthing_database_password }}"
+
+# Redis Configuration (if using)
+syncthing_redis_enabled: false
+syncthing_redis_host: "{{ redis_host | default('redis') }}"
+syncthing_redis_port: "{{ redis_port | default(6379) }}"
+syncthing_redis_password: "{{ vault_syncthing_redis_password }}"
+syncthing_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+syncthing_data_dir: "{{ homelab_data_dir }}/syncthing"
+syncthing_config_dir: "{{ syncthing_data_dir }}/config"
+syncthing_backup_dir: "{{ syncthing_data_dir }}/backups"
+
+# Volume Mappings
+syncthing_volumes:
+  - "{{ syncthing_config_dir }}:/config"
+  - "{{ syncthing_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+syncthing_health_check_enabled: true
+syncthing_health_check_path: "/health"
+syncthing_health_check_interval: 30
+syncthing_health_check_timeout: 10
+syncthing_health_check_retries: 3
+
+# Monitoring Integration
+syncthing_monitoring_enabled: true
+syncthing_prometheus_enabled: true
+syncthing_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+syncthing_backup_enabled: true
+syncthing_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+syncthing_backup_retention_days: 30
+syncthing_backup_encryption_enabled: true
+syncthing_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+syncthing_smtp_enabled: false
+syncthing_smtp_host: "{{ smtp_host | default('') }}"
+syncthing_smtp_port: "{{ smtp_port | default(587) }}"
+syncthing_smtp_username: "{{ vault_smtp_username }}"
+syncthing_smtp_password: "{{ vault_syncthing_smtp_password }}"
+syncthing_smtp_from: "{{ syncthing_admin_email | default('admin@' + domain) }}"
+syncthing_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+syncthing_webhook_enabled: false
+syncthing_webhook_url: "{{ vault_webhook_url | default('') }}"
+syncthing_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+syncthing_discovery_enabled: true
+syncthing_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+syncthing_cpu_limit: "1.0"
+syncthing_memory_limit: "1g"
+syncthing_memory_reservation: "512m"
+
+# Performance Settings
+syncthing_scan_interval: 10
+syncthing_parallel_downloads: 3
+syncthing_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+syncthing_log_level: "info"  # Options: trace, debug, info, warn, error
+syncthing_log_rotation_enabled: true
+syncthing_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+syncthing_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+syncthing_rate_limit_enabled: true
+syncthing_rate_limit_requests: 100
+syncthing_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+syncthing_deploy_enabled: true
+syncthing_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+syncthing_restart_policy: "unless-stopped"
+syncthing_auto_update_enabled: true
+
+# Environment Variables
+syncthing_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  SYNCTHING_API_KEY: "{{ syncthing_api_key }}"
+  SYNCTHING_SECRET_KEY: "{{ syncthing_secret_key }}"
+  SYNCTHING_ENCRYPTION_KEY: "{{ syncthing_encryption_key }}"
+  SYNCTHING_JWT_SECRET: "{{ syncthing_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+syncthing_validation_enabled: true
+syncthing_validation_timeout: 300
+syncthing_validation_retries: 3
+
+# Testing Configuration
+syncthing_test_enabled: false
+syncthing_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+syncthing_compliance_enabled: true
+syncthing_audit_logging_enabled: true
+syncthing_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+syncthing_automation_enabled: true
+syncthing_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+syncthing_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+syncthing_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+syncthing_fallback_enabled: true
+syncthing_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

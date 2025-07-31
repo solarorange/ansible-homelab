@@ -44,7 +44,7 @@ services:
       - "traefik.http.middlewares.prometheus-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.routers.prometheus.middlewares=prometheus-auth"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9090/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3

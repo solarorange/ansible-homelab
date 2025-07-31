@@ -1,0 +1,659 @@
+#!/usr/bin/env python3
+"""
+Comprehensive Security Automation Script
+Systematically replaces hardcoded values with vault variables and implements security hardening
+"""
+
+import os
+import re
+import json
+import logging
+import subprocess
+from pathlib import Path
+from typing import Dict, List, Tuple, Set, Any
+import argparse
+import yaml
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('security_automation.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class ComprehensiveSecurityAutomation:
+    def __init__(self, root_path: str):
+        self.root_path = Path(root_path)
+        self.backup_dir = self.root_path / "backups" / "security_automation"
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Comprehensive replacement patterns
+        self.replacement_patterns = {
+            'localhost': {
+                'patterns': [
+                    r'localhost',
+                    r'127\.0\.0\.1',
+                    r'0\.0\.0\.0',
+                ],
+                'replacement': '{{ ansible_default_ipv4.address }}',
+                'description': 'Replace localhost with dynamic IP'
+            },
+            'admin_email': {
+                'patterns': [
+                    r'admin@[^"\s]+',
+                    r'admin@localhost',
+                    r'admin@127\.0\.0\.1',
+                ],
+                'replacement': '{{ admin_email | default("admin@" + domain) }}',
+                'description': 'Replace hardcoded admin emails'
+            },
+            'password': {
+                'patterns': [
+                    r'password\s*=\s*["\'][^"\']*["\']',
+                    r'password\s*:\s*["\'][^"\']*["\']',
+                    r'PASSWORD\s*=\s*["\'][^"\']*["\']',
+                    r'PASSWORD\s*:\s*["\'][^"\']*["\']',
+                ],
+                'replacement': 'password: "{{ vault_service_password }}"',
+                'description': 'Replace hardcoded passwords'
+            },
+            'changeme': {
+                'patterns': [
+                    r'changeme',
+                    r'CHANGEME',
+                    r'change_me',
+                    r'CHANGE_ME',
+                ],
+                'replacement': '{{ vault_service_secret }}',
+                'description': 'Replace changeme placeholders'
+            },
+            'admin123': {
+                'patterns': [
+                    r'admin123',
+                    r'ADMIN123',
+                    r'password123',
+                    r'PASSWORD123',
+                ],
+                'replacement': '{{ vault_admin_password | password_hash("bcrypt") }}',
+                'description': 'Replace weak passwords'
+            },
+            'your_secure_password': {
+                'patterns': [
+                    r'your_secure_password',
+                    r'YOUR_SECURE_PASSWORD',
+                    r'your_password',
+                    r'YOUR_PASSWORD',
+                ],
+                'replacement': '{{ vault_service_password | password_hash("bcrypt") }}',
+                'description': 'Replace password placeholders'
+            },
+            '192.168': {
+                'patterns': [
+                    r'192\.168\.\d+\.\d+',
+                    r'10\.\d+\.\d+\.\d+',
+                    r'172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+',
+                ],
+                'replacement': '{{ ansible_default_ipv4.address }}',
+                'description': 'Replace hardcoded IP addresses'
+            },
+            'default_credentials': {
+                'patterns': [
+                    r'root\s*:\s*["\'][^"\']*["\']',
+                    r'user\s*:\s*["\'][^"\']*["\']',
+                    r'default\s*:\s*["\'][^"\']*["\']',
+                ],
+                'replacement': 'user: "{{ vault_service_user }}"',
+                'description': 'Replace default credentials'
+            }
+        }
+        
+        # Service-specific vault variables to generate
+        self.services = [
+            'sonarr', 'radarr', 'jellyfin', 'plex', 'emby', 'immich',
+            'audiobookshelf', 'komga', 'calibre', 'prometheus', 'alertmanager',
+            'loki', 'promtail', 'blackbox_exporter', 'influxdb', 'telegraf',
+            'vault', 'crowdsec', 'fail2ban', 'wireguard', 'pihole',
+            'gitlab', 'harbor', 'code_server', 'portainer', 'nextcloud',
+            'syncthing', 'bookstack', 'filebrowser', 'kopia', 'duplicati',
+            'uptime_kuma', 'guacamole', 'requestrr', 'unmanic', 'tdarr',
+            'sabnzbd', 'qbittorrent', 'transmission', 'deluge', 'rtorrent',
+            'nginx_proxy_manager', 'authentik', 'grafana', 'homepage',
+            'paperless_ngx', 'reconya', 'romm', 'vaultwarden', 'linkwarden',
+            'pezzo', 'n8n', 'fing', 'ersatztv', 'dumbassets', 'media',
+            'databases', 'storage', 'security', 'utilities', 'automation',
+            'logging', 'certificate_management'
+        ]
+
+    def backup_file(self, file_path: Path) -> Path:
+        """Create a backup of the file before modification"""
+        backup_path = self.backup_dir / f"{file_path.name}.backup"
+        if not backup_path.exists():
+            backup_path.write_text(file_path.read_text())
+            logger.info(f"Backed up: {file_path} -> {backup_path}")
+        return backup_path
+
+    def replace_patterns_in_file(self, file_path: Path) -> Dict[str, int]:
+        """Replace hardcoded patterns in a single file"""
+        if not file_path.exists():
+            return {}
+        
+        # Skip certain files
+        if any(pattern in str(file_path) for pattern in [
+            'vault.yml', 'vault_template.yml', '.git', '__pycache__',
+            'node_modules', '.vscode', '.idea', '*.log', '*.tmp'
+        ]):
+            return {}
+        
+        try:
+            content = file_path.read_text(encoding='utf-8')
+            original_content = content
+            replacements = {}
+            
+            for category, config in self.replacement_patterns.items():
+                category_replacements = 0
+                
+                for pattern in config['patterns']:
+                    matches = list(re.finditer(pattern, content, re.IGNORECASE))
+                    
+                    for match in reversed(matches):  # Reverse to maintain positions
+                        start, end = match.span()
+                        old_value = content[start:end]
+                        
+                        # Generate appropriate replacement based on context
+                        replacement = self.generate_replacement(
+                            old_value, category, config['replacement'], file_path
+                        )
+                        
+                        if replacement and replacement != old_value:
+                            content = content[:start] + replacement + content[end:]
+                            category_replacements += 1
+                
+                if category_replacements > 0:
+                    replacements[category] = category_replacements
+            
+            # Only write if changes were made
+            if content != original_content:
+                self.backup_file(file_path)
+                file_path.write_text(content, encoding='utf-8')
+                logger.info(f"Updated {file_path}: {replacements}")
+            
+            return replacements
+            
+        except Exception as e:
+            logger.error(f"Error processing {file_path}: {e}")
+            return {}
+
+    def generate_replacement(self, old_value: str, category: str, template: str, file_path: Path) -> str:
+        """Generate appropriate replacement based on context"""
+        # Extract service name from file path
+        service_name = self.extract_service_name(file_path)
+        
+        if category == 'password':
+            if 'database' in str(file_path).lower():
+                return f'password: "{{{{ vault_{service_name}_database_password }}}}"'
+            elif 'admin' in str(file_path).lower():
+                return f'password: "{{{{ vault_{service_name}_admin_password }}}}"'
+            else:
+                return f'password: "{{{{ vault_{service_name}_password }}}}"'
+        
+        elif category == 'localhost':
+            if 'health' in str(file_path).lower() or 'check' in str(file_path).lower():
+                return '{{ ansible_default_ipv4.address }}'
+            else:
+                return '{{ ansible_default_ipv4.address }}'
+        
+        elif category == 'admin_email':
+            return '{{ admin_email | default("admin@" + domain) }}'
+        
+        elif category == 'changeme':
+            return f'{{{{ vault_{service_name}_secret }}}}'
+        
+        elif category == 'admin123':
+            return f'{{{{ vault_{service_name}_admin_password | password_hash("bcrypt") }}}}'
+        
+        elif category == 'your_secure_password':
+            return f'{{{{ vault_{service_name}_password | password_hash("bcrypt") }}}}'
+        
+        elif category == '192.168':
+            return '{{ ansible_default_ipv4.address }}'
+        
+        elif category == 'default_credentials':
+            return f'user: "{{{{ vault_{service_name}_user }}}}"'
+        
+        return template
+
+    def extract_service_name(self, file_path: Path) -> str:
+        """Extract service name from file path"""
+        # Look for service name in path
+        path_str = str(file_path)
+        
+        # Check for roles/service_name pattern
+        roles_match = re.search(r'roles/([^/]+)/', path_str)
+        if roles_match:
+            return roles_match.group(1)
+        
+        # Check for other patterns
+        for service in self.services:
+            if service in path_str.lower():
+                return service
+        
+        return 'service'
+
+    def generate_comprehensive_vault_variables(self) -> str:
+        """Generate comprehensive vault variables for all services"""
+        vault_content = []
+        vault_content.append("# ==============================================================================")
+        vault_content.append("# COMPREHENSIVE SERVICE STACK VAULT VARIABLES")
+        vault_content.append("# ==============================================================================")
+        vault_content.append("")
+        
+        for service in sorted(self.services):
+            vault_content.append(f"# {service.title()} Variables")
+            vault_content.append(f"vault_{service}_admin_password: {{{{ vault_{service}_admin_password | password_hash('bcrypt') }}}}")
+            vault_content.append(f"vault_{service}_database_password: {{{{ vault_{service}_database_password | password_hash('bcrypt') }}}}")
+            vault_content.append(f"vault_{service}_api_token: {{{{ vault_{service}_api_token | default('') }}}}")
+            vault_content.append(f"vault_{service}_secret_key: {{{{ vault_{service}_secret_key | default('') }}}}")
+            vault_content.append(f"vault_{service}_encryption_key: {{{{ vault_{service}_encryption_key | default('') }}}}")
+            vault_content.append(f"vault_{service}_jwt_secret: {{{{ vault_{service}_jwt_secret | default('') }}}}")
+            vault_content.append(f"vault_{service}_redis_password: {{{{ vault_{service}_redis_password | password_hash('bcrypt') }}}}")
+            vault_content.append(f"vault_{service}_smtp_password: {{{{ vault_{service}_smtp_password | default('') }}}}")
+            vault_content.append("")
+        
+        # Add dynamic configuration variables
+        vault_content.append("# Dynamic Configuration Variables")
+        vault_content.append("vault_server_ip: {{ ansible_default_ipv4.address }}")
+        vault_content.append("vault_domain: {{ domain }}")
+        vault_content.append("vault_admin_email: {{ admin_email | default('admin@' + domain) }}")
+        vault_content.append("vault_monitoring_email: {{ monitoring_email | default('monitoring@' + domain) }}")
+        vault_content.append("vault_ssl_email: {{ ssl_email | default('admin@' + domain) }}")
+        vault_content.append("")
+        
+        return "\n".join(vault_content)
+
+    def update_vault_file(self):
+        """Update the vault.yml file with comprehensive variables"""
+        vault_file = self.root_path / "group_vars" / "all" / "vault.yml"
+        
+        if not vault_file.exists():
+            logger.error(f"Vault file not found: {vault_file}")
+            return
+        
+        try:
+            # Backup existing vault file
+            self.backup_file(vault_file)
+            
+            # Read existing content
+            content = vault_file.read_text(encoding='utf-8')
+            
+            # Generate new vault variables
+            new_vars = self.generate_comprehensive_vault_variables()
+            
+            # Check if comprehensive section already exists
+            if "COMPREHENSIVE SERVICE STACK VAULT VARIABLES" not in content:
+                # Append new variables
+                content += "\n" + new_vars
+                
+                # Write updated content
+                vault_file.write_text(content, encoding='utf-8')
+                logger.info(f"Updated vault file with comprehensive variables")
+            else:
+                logger.info("Comprehensive vault variables already exist")
+                
+        except Exception as e:
+            logger.error(f"Error updating vault file: {e}")
+
+    def create_service_discovery_scripts(self):
+        """Create service discovery scripts for all services"""
+        scripts_dir = self.root_path / "scripts" / "service_discovery"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        
+        for service in self.services:
+            script_content = self.generate_service_discovery_script(service)
+            script_path = scripts_dir / f"{service}_discovery.py"
+            
+            if not script_path.exists():
+                script_path.write_text(script_content)
+                script_path.chmod(0o755)
+                logger.info(f"Created service discovery script: {script_path}")
+
+    def generate_service_discovery_script(self, service_name: str) -> str:
+        """Generate service discovery script for a specific service"""
+        return f'''#!/usr/bin/env python3
+"""
+Service Discovery Script for {service_name.title()}
+Automatically discovers and configures {service_name} service
+"""
+
+import requests
+import json
+import time
+import logging
+from typing import Dict, Any
+from pathlib import Path
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class {service_name.title()}Discovery:
+    def __init__(self, host: str, port: int, api_key: str = None):
+        self.host = host
+        self.port = port
+        self.api_key = api_key
+        self.base_url = f"http://{{host}}:{{port}}"
+        
+    def discover_service(self) -> Dict[str, Any]:
+        """Discover {service_name} service configuration"""
+        try:
+            # Health check
+            health_url = f"{{self.base_url}}/health"
+            response = requests.get(health_url, timeout=10)
+            
+            if response.status_code == 200:
+                return {{
+                    "status": "healthy",
+                    "url": self.base_url,
+                    "version": self.get_version(),
+                    "configuration": self.get_configuration()
+                }}
+            else:
+                return {{
+                    "status": "unhealthy",
+                    "url": self.base_url,
+                    "error": f"HTTP {{response.status_code}}"
+                }}
+                
+        except Exception as e:
+            return {{
+                "status": "error",
+                "url": self.base_url,
+                "error": str(e)
+            }}
+    
+    def get_version(self) -> str:
+        """Get {service_name} version"""
+        try:
+            version_url = f"{{self.base_url}}/api/system/status"
+            response = requests.get(version_url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("version", "unknown")
+        except:
+            pass
+        return "unknown"
+    
+    def get_configuration(self) -> Dict[str, Any]:
+        """Get {service_name} configuration"""
+        try:
+            config_url = f"{{self.base_url}}/api/config"
+            response = requests.get(config_url, timeout=5)
+            if response.status_code == 200:
+                return response.json()
+        except:
+            pass
+        return {{}}
+
+if __name__ == "__main__":
+    # Example usage
+    discovery = {service_name.title()}Discovery("localhost", 8080)
+    result = discovery.discover_service()
+    print(json.dumps(result, indent=2))
+'''
+
+    def create_security_validation_script(self):
+        """Create comprehensive security validation script"""
+        script_content = '''#!/usr/bin/env python3
+"""
+Comprehensive Security Validation Script
+Validates security configuration across all services
+"""
+
+import requests
+import json
+import logging
+import subprocess
+from pathlib import Path
+from typing import Dict, List, Any
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class SecurityValidator:
+    def __init__(self):
+        self.validation_results = {}
+    
+    def validate_ssl_configuration(self, service_url: str) -> Dict[str, Any]:
+        """Validate SSL configuration for a service"""
+        try:
+            if service_url.startswith('https'):
+                response = requests.get(service_url, timeout=10, verify=True)
+                return {
+                    'status': 'valid',
+                    'ssl_enabled': True,
+                    'certificate_valid': True
+                }
+            else:
+                return {
+                    'status': 'warning',
+                    'ssl_enabled': False,
+                    'message': 'HTTPS not enabled'
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'ssl_enabled': False,
+                'error': str(e)
+            }
+    
+    def validate_password_strength(self, password: str) -> Dict[str, Any]:
+        """Validate password strength"""
+        score = 0
+        issues = []
+        
+        if len(password) >= 12:
+            score += 1
+        else:
+            issues.append('Password too short')
+        
+        if any(c.isupper() for c in password):
+            score += 1
+        else:
+            issues.append('No uppercase letters')
+        
+        if any(c.islower() for c in password):
+            score += 1
+        else:
+            issues.append('No lowercase letters')
+        
+        if any(c.isdigit() for c in password):
+            score += 1
+        else:
+            issues.append('No numbers')
+        
+        if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+            score += 1
+        else:
+            issues.append('No special characters')
+        
+        if score >= 4:
+            return {'status': 'strong', 'score': score}
+        elif score >= 3:
+            return {'status': 'medium', 'score': score, 'issues': issues}
+        else:
+            return {'status': 'weak', 'score': score, 'issues': issues}
+    
+    def validate_vault_integration(self, file_path: str) -> Dict[str, Any]:
+        """Validate vault integration in a file"""
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+            
+            vault_patterns = [
+                r'vault_.*_password',
+                r'vault_.*_secret',
+                r'vault_.*_token',
+                r'vault_.*_key'
+            ]
+            
+            vault_vars = []
+            for pattern in vault_patterns:
+                matches = re.findall(pattern, content)
+                vault_vars.extend(matches)
+            
+            hardcoded_patterns = [
+                r'password\s*=\s*["\'][^"\']*["\']',
+                r'localhost',
+                r'admin@[^"\s]+',
+                r'changeme'
+            ]
+            
+            hardcoded_issues = []
+            for pattern in hardcoded_patterns:
+                matches = re.findall(pattern, content)
+                if matches:
+                    hardcoded_issues.extend(matches)
+            
+            return {
+                'vault_variables': len(set(vault_vars)),
+                'hardcoded_issues': len(hardcoded_issues),
+                'status': 'valid' if not hardcoded_issues else 'issues_found'
+            }
+            
+        except Exception as e:
+            return {'status': 'error', 'error': str(e)}
+    
+    def run_comprehensive_validation(self) -> Dict[str, Any]:
+        """Run comprehensive security validation"""
+        results = {
+            'ssl_validation': {},
+            'password_validation': {},
+            'vault_validation': {},
+            'overall_status': 'unknown'
+        }
+        
+        # Validate SSL for common services
+        services = [
+            'https://grafana.localhost',
+            'https://prometheus.localhost',
+            'https://sonarr.localhost',
+            'https://radarr.localhost'
+        ]
+        
+        for service in services:
+            results['ssl_validation'][service] = self.validate_ssl_configuration(service)
+        
+        # Validate vault integration in key files
+        key_files = [
+            'group_vars/all/vault.yml',
+            'roles/sonarr/defaults/main.yml',
+            'roles/radarr/defaults/main.yml'
+        ]
+        
+        for file_path in key_files:
+            if Path(file_path).exists():
+                results['vault_validation'][file_path] = self.validate_vault_integration(file_path)
+        
+        # Determine overall status
+        all_valid = all(
+            result.get('status') in ['valid', 'strong'] 
+            for result in results['ssl_validation'].values()
+        )
+        
+        results['overall_status'] = 'secure' if all_valid else 'needs_attention'
+        
+        return results
+
+if __name__ == "__main__":
+    validator = SecurityValidator()
+    results = validator.run_comprehensive_validation()
+    print(json.dumps(results, indent=2))
+'''
+        
+        script_path = self.root_path / "scripts" / "security_validation.py"
+        script_path.write_text(script_content)
+        script_path.chmod(0o755)
+        logger.info(f"Created security validation script: {script_path}")
+
+    def run_comprehensive_automation(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Run comprehensive security automation"""
+        logger.info("🔒 Starting Comprehensive Security Automation")
+        logger.info("=" * 60)
+        
+        results = {
+            'files_processed': 0,
+            'replacements_made': 0,
+            'vault_variables_added': 0,
+            'scripts_created': 0,
+            'errors': []
+        }
+        
+        try:
+            # Step 1: Process all files
+            logger.info("1. Processing files for hardcoded values...")
+            for file_path in self.root_path.rglob('*'):
+                if file_path.is_file() and file_path.suffix in ['.yml', '.yaml', '.py', '.sh']:
+                    if not any(pattern in str(file_path) for pattern in ['.git', '__pycache__', 'node_modules']):
+                        if not dry_run:
+                            file_replacements = self.replace_patterns_in_file(file_path)
+                            if file_replacements:
+                                results['files_processed'] += 1
+                                results['replacements_made'] += sum(file_replacements.values())
+                        else:
+                            # Count potential replacements in dry run
+                            results['files_processed'] += 1
+            
+            # Step 2: Update vault file
+            logger.info("2. Updating vault file with comprehensive variables...")
+            if not dry_run:
+                self.update_vault_file()
+                results['vault_variables_added'] = len(self.services) * 8  # 8 variables per service
+            
+            # Step 3: Create service discovery scripts
+            logger.info("3. Creating service discovery scripts...")
+            if not dry_run:
+                self.create_service_discovery_scripts()
+                results['scripts_created'] = len(self.services)
+            
+            # Step 4: Create security validation script
+            logger.info("4. Creating security validation script...")
+            if not dry_run:
+                self.create_security_validation_script()
+                results['scripts_created'] += 1
+            
+            logger.info("✅ Comprehensive Security Automation Complete!")
+            logger.info(f"   - Files processed: {results['files_processed']}")
+            logger.info(f"   - Replacements made: {results['replacements_made']}")
+            logger.info(f"   - Vault variables added: {results['vault_variables_added']}")
+            logger.info(f"   - Scripts created: {results['scripts_created']}")
+            
+        except Exception as e:
+            logger.error(f"Error during automation: {e}")
+            results['errors'].append(str(e))
+        
+        return results
+
+def main():
+    parser = argparse.ArgumentParser(description='Comprehensive Security Automation')
+    parser.add_argument('--path', default='.', help='Path to process (default: current directory)')
+    parser.add_argument('--dry-run', action='store_true', help='Dry run without making changes')
+    parser.add_argument('--output', help='Output file for results')
+    
+    args = parser.parse_args()
+    
+    automation = ComprehensiveSecurityAutomation(args.path)
+    results = automation.run_comprehensive_automation(dry_run=args.dry_run)
+    
+    # Save results
+    if args.output:
+        with open(args.output, 'w') as f:
+            json.dump(results, f, indent=2)
+        logger.info(f"Results saved to: {args.output}")
+    else:
+        print(json.dumps(results, indent=2))
+
+if __name__ == "__main__":
+    main() 

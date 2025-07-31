@@ -359,7 +359,7 @@
       case "$1" in
         status)
           docker ps -f name=emby
-          curl -s http://localhost:8096/System/Info/Public
+          curl -s http://{{ ansible_default_ipv4.address }}:8096/System/Info/Public
           ;;
         logs)
           docker logs emby --tail 100 -f
@@ -394,13 +394,13 @@
       fi
       
       # Check if Emby is responding
-      if ! curl -s -f http://localhost:8096/System/Info/Public > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8096/System/Info/Public > /dev/null; then
         echo "Emby is not responding"
         exit 1
       fi
       
       # Check Emby status
-      STATUS=$(curl -s http://localhost:8096/System/Info/Public | jq -r .ServerName)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/System/Info/Public | jq -r .ServerName)
       if [ -z "$STATUS" ]; then
         echo "Emby status check failed"
         exit 1
@@ -434,7 +434,7 @@
     job: "logrotate {{ docker_dir }}/emby/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_emby_user }}"
 
 - name: Add Emby backup to crontab
   ansible.builtin.cron:
@@ -442,4 +442,4 @@
     job: "{{ docker_dir }}/emby/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_emby_user }}" 

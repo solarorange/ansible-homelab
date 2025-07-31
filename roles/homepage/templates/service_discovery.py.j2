@@ -224,10 +224,10 @@ class ServiceDiscovery:
             if pattern in name.lower():
                 return f"https://{subdomain}.{{ domain }}"
         
-        # Fallback to localhost with port
+        # Fallback to {{ ansible_default_ipv4.address }} with port
         if ports:
             port = ports[0].split(':')[0]
-            return f"http://localhost:{port}"
+            return f"http://{{ ansible_default_ipv4.address }}:{port}"
         
         return None
     

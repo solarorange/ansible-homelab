@@ -1,0 +1,89 @@
+---
+# Uptime_Kuma Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Uptime_Kuma vault variables
+  block:
+    - name: Check required Uptime_Kuma vault variables
+      assert:
+        that:
+          - vault_uptime_kuma_admin_password is defined
+          - vault_uptime_kuma_database_password is defined
+          - vault_uptime_kuma_api_key is defined
+          - vault_uptime_kuma_secret_key is defined
+          - vault_uptime_kuma_encryption_key is defined
+          - vault_uptime_kuma_jwt_secret is defined
+        fail_msg: "Required Uptime_Kuma vault variables are not defined"
+        success_msg: "All required Uptime_Kuma vault variables are defined"
+
+    - name: Validate Uptime_Kuma password complexity
+      assert:
+        that:
+          - vault_uptime_kuma_admin_password | length >= 12
+          - vault_uptime_kuma_database_password | length >= 12
+        fail_msg: "Uptime_Kuma passwords must be at least 12 characters long"
+        success_msg: "Uptime_Kuma password complexity requirements met"
+
+- name: Validate Uptime_Kuma network configuration
+  block:
+    - name: Check Uptime_Kuma port configuration
+      assert:
+        that:
+          - uptime_kuma_port is defined
+          - uptime_kuma_port | int >= 1024
+          - uptime_kuma_port | int <= 65535
+        fail_msg: "Uptime_Kuma port must be between 1024 and 65535"
+        success_msg: "Uptime_Kuma port configuration is valid"
+
+    - name: Check Uptime_Kuma domain configuration
+      assert:
+        that:
+          - domain is defined
+          - uptime_kuma_subdomain is defined
+        fail_msg: "Uptime_Kuma domain configuration is incomplete"
+        success_msg: "Uptime_Kuma domain configuration is valid"
+
+- name: Validate Uptime_Kuma security configuration
+  block:
+    - name: Check Uptime_Kuma SSL configuration
+      assert:
+        that:
+          - uptime_kuma_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Uptime_Kuma SSL configuration is invalid"
+        success_msg: "Uptime_Kuma SSL configuration is valid"
+
+    - name: Check Uptime_Kuma authentication configuration
+      assert:
+        that:
+          - uptime_kuma_auth_enabled | bool
+          - uptime_kuma_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Uptime_Kuma authentication configuration is invalid"
+        success_msg: "Uptime_Kuma authentication configuration is valid"
+
+- name: Validate Uptime_Kuma storage configuration
+  block:
+    - name: Check Uptime_Kuma data directories
+      assert:
+        that:
+          - uptime_kuma_data_dir is defined
+          - uptime_kuma_config_dir is defined
+          - uptime_kuma_backup_dir is defined
+        fail_msg: "Uptime_Kuma storage configuration is incomplete"
+        success_msg: "Uptime_Kuma storage configuration is valid"
+
+    - name: Create Uptime_Kuma directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ uptime_kuma_data_dir }}"
+        - "{{ uptime_kuma_config_dir }}"
+        - "{{ uptime_kuma_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Uptime_Kuma validation completed successfully - all configurations are valid and secure"

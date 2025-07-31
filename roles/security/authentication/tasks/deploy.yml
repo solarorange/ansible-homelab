@@ -291,7 +291,7 @@
     job: "logrotate {{ docker_dir }}/authentik/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_security_user }}"
   register: cron_creation
 
 - name: Verify Authentik configuration
@@ -399,7 +399,7 @@ always:
 
 - name: Wait for Authentik to be ready
   uri:
-    url: "http://localhost:9000/if/user/"
+    url: "http://{{ ansible_default_ipv4.address }}:9000/if/user/"
     method: GET
     status_code: [200, 302, 401]
   register: authentik_health
@@ -419,8 +419,8 @@ always:
 - name: Run Authentik configuration script
   command: "{{ config_dir }}/authentik/setup_authentik.py"
   environment:
-    AUTHENTIK_URL: "http://localhost:9000"
-    AUTHENTIK_ADMIN_PASSWORD: "{{ vault_authentik_admin_password }}"
+    AUTHENTIK_URL: "http://{{ ansible_default_ipv4.address }}:9000"
+    AUTHENTIK_ADMIN_password: "{{ vault_security_password }}"
     DOMAIN: "{{ domain }}"
   register: authentik_setup_result
   retries: 3

@@ -65,7 +65,7 @@
 
 - name: Wait for ErsatzTV service to start
   ansible.builtin.wait_for:
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ ersatztv_port }}"
     delay: 10
     timeout: 300
@@ -90,7 +90,7 @@
 
 - name: Verify ErsatzTV web interface
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ ersatztv_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
     method: GET
     status_code: [200, 302, 404]
     timeout: 30
@@ -106,7 +106,7 @@
       ErsatzTV Web Interface Status:
       - Status Code: {{ ersatztv_web_check.status }}
       - Response Time: {{ ersatztv_web_check.elapsed }}s
-      - URL: http://127.0.0.1:{{ ersatztv_port }}
+      - URL: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}
   tags: [ersatztv, deploy]
 
 - name: Create ErsatzTV service health check
@@ -404,7 +404,7 @@
       - Container: {{ ersatztv_container_name }}
       - Status: {{ ersatztv_container_info.container.State.Status }}
       - Port: {{ ersatztv_port }}
-      - Web Interface: http://127.0.0.1:{{ ersatztv_port }}
+      - Web Interface: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}
       - Domain: https://{{ ersatztv_domain }}
       - Config Directory: {{ ersatztv_config_dir }}
       - Data Directory: {{ ersatztv_data_dir }}

@@ -4,12 +4,12 @@ domain: "{{ lookup('env', 'HOMELAB_DOMAIN') | default('yourdomain.com') }}"  # M
 timezone: "{{ lookup('env', 'HOMELAB_TIMEZONE') | default('America/New_York') }}"  # Server timezone
 
 # Network Configuration
-ansible_server_ip: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('192.168.1.99') }}"
+ansible_server_ip: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('{{ ansible_default_ipv4.address }}') }}"
 server_ips:
-  - "{{ lookup('env', 'HOMELAB_IP_1') | default('192.168.1.100') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_2') | default('192.168.1.101') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_3') | default('192.168.1.102') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_4') | default('192.168.1.103') }}"
+  - "{{ lookup('env', 'HOMELAB_IP_1') | default('{{ ansible_default_ipv4.address }}') }}"
+  - "{{ lookup('env', 'HOMELAB_IP_2') | default('{{ ansible_default_ipv4.address }}') }}"
+  - "{{ lookup('env', 'HOMELAB_IP_3') | default('{{ ansible_default_ipv4.address }}') }}"
+  - "{{ lookup('env', 'HOMELAB_IP_4') | default('{{ ansible_default_ipv4.address }}') }}"
 
 # DNS Configuration
 pihole_domain: "pihole.{{ domain }}"
@@ -22,10 +22,10 @@ pihole_upstream_dns:
 # /opt/docker - Main Docker root (requires 100GB+ space)
 # /var/lib/docker - Docker daemon data (system managed)
 # /mnt/docker - Alternative for large storage arrays
-docker_root: "{{ lookup('env', 'DOCKER_ROOT') | default('/opt/docker') }}"
-docker_data_root: "{{ docker_root }}/data"
-docker_config_root: "{{ docker_root }}/config"
-docker_logs_root: "{{ docker_root }}/logs"
+docker_user: "{{ lookup('env', 'DOCKER_ROOT') | default('/opt/docker') }}"
+docker_data_user: "{{ vault_service_user }}"
+docker_config_user: "{{ vault_service_user }}"
+docker_logs_user: "{{ vault_service_user }}"
 
 # Docker networks with proper segmentation
 docker_networks:
@@ -33,38 +33,38 @@ docker_networks:
     driver: bridge
     internal: false
     ipam_config:
-      - subnet: "172.20.0.0/24"
-        gateway: "172.20.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
   - name: backend
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.21.0.0/24"
-        gateway: "172.21.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
   - name: database
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.22.0.0/24"
-        gateway: "172.22.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.23.0.0/24"
-        gateway: "172.23.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
   - name: security
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.24.0.0/24"
-        gateway: "172.24.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
   - name: media
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "172.25.0.0/24"
-        gateway: "172.25.0.1"
+      - subnet: "{{ ansible_default_ipv4.address }}/24"
+        gateway: "{{ ansible_default_ipv4.address }}"
 
 # Service network assignments for security
 service_network_assignments:
@@ -115,7 +115,7 @@ cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}
 
 # Reconya Configuration
 reconya_enabled: "{{ lookup('env', 'RECONYA_ENABLED') | default('false') | bool }}"
-reconya_network_range: "{{ lookup('env', 'RECONYA_NETWORK_RANGE') | default('192.168.1.0/24') }}"
+reconya_network_range: "{{ lookup('env', 'RECONYA_NETWORK_RANGE') | default('{{ ansible_default_ipv4.address }}/24') }}"
 reconya_scan_interval: "{{ lookup('env', 'RECONYA_SCAN_INTERVAL') | default(300) | int }}"
 reconya_max_devices: "{{ lookup('env', 'RECONYA_MAX_DEVICES') | default(1000) | int }}"
 reconya_subdomain: "{{ lookup('env', 'RECONYA_SUBDOMAIN') | default('reconya') }}" 

@@ -8,9 +8,9 @@
 authentik:
   # API Configuration
   api:
-    url: "http://localhost:{{ authentik_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ authentik_port }}"
     admin_user: "{{ authentik_admin_user | default('admin') }}"
-    admin_password: "{{ authentik_admin_password | default('changeme') }}"
+    admin_password: "{{ authentik_admin_password | default('{{ vault_admin_password | password_hash("bcrypt") }}') }}"
     token: "{{ authentik_api_token | default('') }}"
     timeout: 30
     verify_ssl: false
@@ -155,14 +155,14 @@ users:
       name: "Administrator"
       is_superuser: true
       is_active: true
-      password: "{{ authentik_admin_password | default('changeme') }}"
+      password: "{{ vault_authentik_admin_password }}"
       
     - username: "{{ username }}"
       email: "{{ username }}@{{ domain }}"
       name: "{{ username | title }}"
       is_superuser: true
       is_active: true
-      password: "{{ user_password | default('changeme') }}"
+      password: "{{ vault_user_password | default('{{ vault_admin_password | password_hash("bcrypt") }}') }}"
       
   # Regular Users
   regular_users:
@@ -171,14 +171,14 @@ users:
       name: "User One"
       is_superuser: false
       is_active: true
-      password: "changeme"
+      password: "{{ vault_user1_password | default('changeme') }}"
       
     - username: "user2"
       email: "user2@{{ domain }}"
       name: "User Two"
       is_superuser: false
       is_active: true
-      password: "changeme"
+      password: "{{ vault_user2_password | default('changeme') }}"
       
 # =============================================================================
 # GROUP MANAGEMENT
@@ -402,7 +402,7 @@ notifications:
   # Email Notifications
   email:
     enabled: true
-    host: "{{ smtp_host | default('localhost') }}"
+    host: "{{ smtp_host | default('{{ ansible_default_ipv4.address }}') }}"
     port: "{{ smtp_port | default(587) }}"
     username: "{{ smtp_username | default('') }}"
     password: "{{ smtp_password | default('') }}"

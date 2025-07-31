@@ -1,45 +1,39 @@
 ---
-- name: Run storage prerequisites
-  ansible.builtin.include_tasks: prerequisites.yml
+# Storage Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Configure filesystems
-  ansible.builtin.include_tasks: filesystems/main.yml
-  when: storage_filesystems_enabled | default(true)
+- name: Include Storage validation tasks
+  include_tasks: validate.yml
+  when: storage_validation_enabled | default(true)
 
-- name: Configure Samba
-  ansible.builtin.include_tasks: samba.yml
-  when: samba_enabled | default(true)
+- name: Include Storage deployment tasks
+  include_tasks: deploy.yml
+  when: storage_deploy_enabled | default(true)
 
-- name: Configure Syncthing
-  ansible.builtin.include_tasks: syncthing.yml
-  when: syncthing_enabled | default(true)
+- name: Include Storage configuration tasks
+  include_tasks: configure.yml
+  when: storage_deploy_enabled | default(true)
 
-- name: Configure Nextcloud
-  ansible.builtin.include_tasks: nextcloud.yml
-  when: nextcloud_enabled | default(true)
+- name: Include Storage security tasks
+  include_tasks: security.yml
+  when: storage_deploy_enabled | default(true)
 
-- name: Apply backup procedures
-  ansible.builtin.include_tasks: backup.yml
-  when: storage_backup_enabled | default(true)
-
-- name: Integrate monitoring
-  ansible.builtin.include_tasks: monitoring.yml
+- name: Include Storage monitoring tasks
+  include_tasks: monitoring.yml
   when: storage_monitoring_enabled | default(true)
 
-- name: Apply security hardening
-  ansible.builtin.include_tasks: security.yml
-  when: storage_security_enabled | default(true)
+- name: Include Storage backup tasks
+  include_tasks: backup.yml
+  when: storage_backup_enabled | default(true)
 
-- name: Integrate with homepage
-  ansible.builtin.include_tasks: homepage.yml
-  when: storage_homepage_enabled | default(true)
+- name: Include Storage automation tasks
+  include_tasks: automation.yml
+  when: storage_automation_enabled | default(true)
 
-- name: Configure alerts
-  ansible.builtin.include_tasks: alerts.yml
-  when: storage_alerting_enabled | default(true)
+- name: Include Storage integration tasks
+  include_tasks: integration.yml
+  when: storage_discovery_enabled | default(true)
 
-- name: Validate storage stack
-  ansible.builtin.include_tasks: validate.yml
-
-- name: Validate storage deployment
-  ansible.builtin.include_tasks: validate_deployment.yml 
+- name: Include Storage health check tasks
+  include_tasks: health_check.yml
+  when: storage_health_check_enabled | default(true)

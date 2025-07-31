@@ -248,7 +248,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:8080/api/rawdata
+          curl -s http://{{ ansible_default_ipv4.address }}:8080/api/rawdata
           ;;
         logs)
           docker logs traefik --tail 100 -f
@@ -285,7 +285,7 @@
       #!/bin/bash
       
       # Check if Traefik is responding
-      if ! curl -s http://localhost:8080/api/rawdata > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api/rawdata > /dev/null; then
         echo "Traefik is not responding"
         exit 1
       fi
@@ -338,7 +338,7 @@
     job: "logrotate {{ docker_dir }}/traefik/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_security_user }}"
   register: cron_creation
 
 - name: Verify Traefik configuration

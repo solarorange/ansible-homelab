@@ -313,21 +313,21 @@ documentation:
         description: "Media service APIs"
         services:
           - name: "Plex"
-            base_url: "http://localhost:32400"
+            base_url: "http://{{ ansible_default_ipv4.address }}:32400"
             endpoints:
               - path: "/library/sections"
                 method: "GET"
                 description: "Get library sections"
                 
           - name: "Sonarr"
-            base_url: "http://localhost:8989"
+            base_url: "http://{{ ansible_default_ipv4.address }}:8989"
             endpoints:
               - path: "/api/v3/series"
                 method: "GET"
                 description: "Get series list"
                 
           - name: "Radarr"
-            base_url: "http://localhost:7878"
+            base_url: "http://{{ ansible_default_ipv4.address }}:"
             endpoints:
               - path: "/api/v3/movie"
                 method: "GET"
@@ -337,14 +337,14 @@ documentation:
         description: "Monitoring service APIs"
         services:
           - name: "Prometheus"
-            base_url: "http://localhost:9090"
+            base_url: "http://{{ ansible_default_ipv4.address }}:"
             endpoints:
               - path: "/api/v1/query"
                 method: "GET"
                 description: "Query metrics"
                 
           - name: "Grafana"
-            base_url: "http://localhost:3000"
+            base_url: "http://{{ ansible_default_ipv4.address }}:"
             endpoints:
               - path: "/api/dashboards"
                 method: "GET"
@@ -440,7 +440,7 @@ documentation:
         - name: "Communication Plan"
           description: "Communication during security incidents"
           contacts:
-            - "Primary admin: {{ admin_email | default('admin@localhost') }}"
+            - "Primary admin: {{ admin_email | default('{{ admin_email | default("admin@" + domain) }}') }}"
             - "Backup admin: {{ backup_admin_email | default('') }}"
             - "Emergency contact: {{ emergency_contact | default('') }}"
   

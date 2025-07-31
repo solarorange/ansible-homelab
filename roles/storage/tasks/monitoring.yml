@@ -11,7 +11,7 @@
     backup: true
     content: |
       DEVICESCAN -a -o on -S on -s (S/../.././02|L/../../6/03) \
-        -m {{ username }}@localhost \
+        -m {{ username }}@{{ ansible_default_ipv4.address }} \
         -M exec /usr/share/smartmontools/smartd-runner
 
 - name: Create disk usage monitoring script
@@ -57,7 +57,7 @@
     mode: '0755'
     content: |
       #!/bin/bash
-      if ! nc -z localhost 445; then
+      if ! nc -z {{ ansible_default_ipv4.address }} 445; then
         echo "Samba is not responding on port 445"
         exit 1
       fi

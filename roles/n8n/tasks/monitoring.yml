@@ -57,7 +57,7 @@
     name: "n8n health check"
     minute: "*/{{ n8n_health_check_interval | default(30) }}"
     job: "{{ n8n_config_dir }}/healthcheck.sh >> {{ n8n_health_check_log_file }} 2>&1"
-    user: "{{ username }}"
+    user: "{{ vault_n8n_user }}"
   when: n8n_health_check_enabled | default(true)
   tags: [n8n, monitoring]
 
@@ -92,8 +92,8 @@
     status_code: [200, 401, 403]
     timeout: 10
   loop:
-    - "http://localhost:{{ n8n_port }}/healthz"
-    - "http://localhost:{{ n8n_port }}/metrics"
+    - "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
+    - "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/metrics"
   register: n8n_monitoring_endpoints
   tags: [n8n, monitoring]
 

@@ -1,143 +1,39 @@
 ---
-# Centralized Logging Configuration
-# Handles Loki integration for all services
+# Logging Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Log start of logging configuration
-  ansible.builtin.debug:
-    msg: "Starting logging infrastructure configuration"
-  when: logging_enabled | default(true)
+- name: Include Logging validation tasks
+  include_tasks: validate.yml
+  when: logging_validation_enabled | default(true)
 
-- name: Create logging directories
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ username }}"
-    group: "{{ username }}"
-    mode: "0755"
-  loop:
-    - "{{ docker_dir }}/monitoring/logging/config"
-    - "{{ docker_dir }}/monitoring/logging/scripts"
-    - "{{ logs_dir }}/monitoring/logging"
-    - "{{ logs_dir }}/applications"
-    - "{{ logs_dir }}/system"
-    - "{{ logs_dir }}/containers"
-    - "{{ logs_dir }}/security"
-  when: logging_enabled | default(true)
-  register: logging_dirs_result
-  failed_when: logging_dirs_result.failed
+- name: Include Logging deployment tasks
+  include_tasks: deploy.yml
+  when: logging_deploy_enabled | default(true)
 
-- name: Log logging directories creation result
-  ansible.builtin.debug:
-    msg: "Created {{ logging_dirs_result.results | length }} logging directories"
-  when: logging_enabled | default(true) and logging_dirs_result is defined
+- name: Include Logging configuration tasks
+  include_tasks: configure.yml
+  when: logging_deploy_enabled | default(true)
 
-- name: Create Promtail configuration for all services
-  ansible.builtin.template:
-    src: promtail.yml.j2
-    dest: "{{ docker_dir }}/monitoring/promtail/config/promtail.yml"
-    mode: "0640"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  notify: restart promtail
-  when: promtail_enabled | default(true)
-  register: promtail_config_result
+- name: Include Logging security tasks
+  include_tasks: security.yml
+  when: logging_deploy_enabled | default(true)
 
-- name: Log Promtail configuration result
-  ansible.builtin.debug:
-    msg: "Promtail configuration {{ 'created' if promtail_config_result.changed else 'already exists' }}"
-  when: promtail_enabled | default(true) and promtail_config_result is defined
+- name: Include Logging monitoring tasks
+  include_tasks: monitoring.yml
+  when: logging_monitoring_enabled | default(true)
 
-- name: Create log rotation configuration
-  ansible.builtin.template:
-    src: logrotate.conf.j2
-    dest: /etc/logrotate.d/watchtower-logs
-    mode: "0644"
-  notify: restart logrotate
-  when: logrotate_enabled | default(true)
-  register: logrotate_config_result
+- name: Include Logging backup tasks
+  include_tasks: backup.yml
+  when: logging_backup_enabled | default(true)
 
-- name: Log log rotation configuration result
-  ansible.builtin.debug:
-    msg: "Log rotation configuration {{ 'created' if logrotate_config_result.changed else 'already exists' }}"
-  when: logrotate_enabled | default(true) and logrotate_config_result is defined
+- name: Include Logging automation tasks
+  include_tasks: automation.yml
+  when: logging_automation_enabled | default(true)
 
-- name: Configure Docker logging driver
-  ansible.builtin.template:
-    src: daemon.json.j2
-    dest: /etc/docker/daemon.json
-    mode: "0644"
-  notify: restart docker
-  when: docker_enabled | default(true)
-  register: docker_config_result
+- name: Include Logging integration tasks
+  include_tasks: integration.yml
+  when: logging_discovery_enabled | default(true)
 
-- name: Log Docker logging configuration result
-  ansible.builtin.debug:
-    msg: "Docker logging configuration {{ 'created' if docker_config_result.changed else 'already exists' }}"
-  when: docker_enabled | default(true) and docker_config_result is defined
-
-- name: Create logging health check script
-  ansible.builtin.template:
-    src: healthcheck.sh.j2
-    dest: "{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh"
-    mode: "0755"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  when: logging_enabled | default(true)
-  register: healthcheck_script_result
-
-- name: Log health check script creation result
-  ansible.builtin.debug:
-    msg: "Health check script {{ 'created' if healthcheck_script_result.changed else 'already exists' }}"
-  when: logging_enabled | default(true) and healthcheck_script_result is defined
-
-- name: Create logging management script
-  ansible.builtin.template:
-    src: manage.sh.j2
-    dest: "{{ docker_dir }}/monitoring/logging/scripts/manage.sh"
-    mode: "0755"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  when: logging_enabled | default(true)
-  register: manage_script_result
-
-- name: Log management script creation result
-  ansible.builtin.debug:
-    msg: "Management script {{ 'created' if manage_script_result.changed else 'already exists' }}"
-  when: logging_enabled | default(true) and manage_script_result is defined
-
-- name: Setup logging monitoring
-  ansible.builtin.template:
-    src: monitoring.yml.j2
-    dest: "{{ docker_dir }}/monitoring/prometheus/rules/logging.yml"
-    mode: "0640"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  notify: restart prometheus
-  when: logging_prometheus_enabled | default(true)
-  register: monitoring_config_result
-
-- name: Log monitoring configuration result
-  ansible.builtin.debug:
-    msg: "Logging monitoring configuration {{ 'created' if monitoring_config_result.changed else 'already exists' }}"
-  when: logging_prometheus_enabled | default(true) and monitoring_config_result is defined
-
-- name: Create logging dashboard
-  ansible.builtin.template:
-    src: dashboard.json.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/logging.json"
-    mode: "0640"
-    owner: "{{ username }}"
-    group: "{{ username }}"
-  notify: restart grafana
-  when: logging_grafana_enabled | default(true)
-  register: dashboard_config_result
-
-- name: Log dashboard configuration result
-  ansible.builtin.debug:
-    msg: "Logging dashboard configuration {{ 'created' if dashboard_config_result.changed else 'already exists' }}"
-  when: logging_grafana_enabled | default(true) and dashboard_config_result is defined
-
-- name: Log completion of logging configuration
-  ansible.builtin.debug:
-    msg: "Logging infrastructure configuration completed successfully"
-  when: logging_enabled | default(true) 
+- name: Include Logging health check tasks
+  include_tasks: health_check.yml
+  when: logging_health_check_enabled | default(true)

@@ -116,7 +116,7 @@
       fi
       
       # Check if Portainer is responding
-      if ! curl -s -f http://localhost:9000/api/status > /dev/null; then
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:9000/api/status > /dev/null; then
         echo "Portainer is not responding"
         exit 1
       fi
@@ -149,7 +149,7 @@
     job: "logrotate {{ docker_dir }}/portainer/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_portainer_user }}"
 
 - name: Create Portainer backup cron job
   ansible.builtin.cron:
@@ -157,4 +157,4 @@
     job: "{{ docker_dir }}/portainer/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_portainer_user }}" 

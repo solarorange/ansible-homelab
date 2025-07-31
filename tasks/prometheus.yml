@@ -50,7 +50,7 @@
             - "traefik.http.routers.prometheus.middlewares=authentik@docker"
             - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
           healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9090/-/healthy"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -82,7 +82,7 @@
         # Self-monitoring
         - job_name: 'prometheus'
           static_configs:
-            - targets: ['localhost:9090']
+            - targets: ['{{ ansible_default_ipv4.address }}:9090']
               labels:
                 service: 'prometheus'
                 instance: '{{ inventory_hostname }}'
@@ -544,25 +544,25 @@
       # Enhanced Prometheus Health Check Script
       
       # Check if Prometheus is responding
-      if ! curl -s http://localhost:9090/-/healthy > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
         echo "Prometheus is not responding"
         exit 1
       fi
       
       # Check if we can query the API
-      if ! curl -s http://localhost:9090/api/v1/query?query=up > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up > /dev/null; then
         echo "Prometheus API is not responding"
         exit 1
       fi
       
       # Check if targets are being scraped
-      target_count=$(curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length')
+      target_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/targets | jq '.data.activeTargets | length')
       if [ "$target_count" -lt 5 ]; then
         echo "Warning: Only $target_count targets are active"
       fi
       
       # Check if rules are loaded
-      rule_count=$(curl -s http://localhost:9090/api/v1/rules | jq '.data.groups | length')
+      rule_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/rules | jq '.data.groups | length')
       if [ "$rule_count" -eq 0 ]; then
         echo "Warning: No alerting rules are loaded"
       fi
@@ -596,7 +596,7 @@
     job: "logrotate {{ docker_dir }}/monitoring/prometheus/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_prometheus_user }}"
 
 - name: Create Prometheus management script
   ansible.builtin.copy:
@@ -622,7 +622,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:9090/-/healthy
+          curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy
           ;;
         logs)
           docker logs prometheus --tail 100 -f
@@ -631,7 +631,7 @@
           docker restart prometheus
           ;;
         reload)
-          curl -X POST http://localhost:9090/-/reload
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/-/reload
           ;;
         backup)
           {{ docker_dir }}/monitoring/prometheus/scripts/backup.sh
@@ -747,7 +747,7 @@
     job: "{{ docker_dir }}/monitoring/prometheus/scripts/backup.sh"
     hour: "1"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_prometheus_user }}"
 
 - name: Create Prometheus storage configuration
   ansible.builtin.copy:
@@ -785,7 +785,7 @@
       scrape_configs:
         - job_name: 'prometheus'
           static_configs:
-            - targets: ['localhost:9090']
+            - targets: ['{{ ansible_default_ipv4.address }}:']
 
         - job_name: 'node'
           static_configs:

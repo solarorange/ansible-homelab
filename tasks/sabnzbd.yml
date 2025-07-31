@@ -42,7 +42,7 @@
             - "traefik.http.routers.sabnzbd.middlewares=authentik@docker"
             - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
           healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8080/api?mode=version"]
+            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/api?mode=version"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -66,7 +66,7 @@
       fi
       
       # Check if SABnzbd is responding
-      if ! curl -s http://localhost:8080/api?mode=version | grep -q "version"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api?mode=version | grep -q "version"; then
           echo "SABnzbd is not responding"
           exit 1
       fi
@@ -82,14 +82,14 @@
     job: "logrotate {{ logs_dir }}/sabnzbd/*.log"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_sabnzbd_user }}"
 
 - name: Create SABnzbd configuration file
   ansible.builtin.copy:
     dest: "{{ docker_dir }}/sabnzbd/config/sabnzbd.ini"
     content: |
       [misc]
-      host = 0.0.0.0
+      host = {{ ansible_default_ipv4.address }}
       port = 8080
       username = {{ sabnzbd_username }}
       password = {{ sabnzbd_password }}
@@ -191,7 +191,7 @@
     job: "logrotate {{ docker_dir }}/sabnzbd/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_sabnzbd_user }}"
 
 - name: Add SABnzbd backup cron job
   ansible.builtin.cron:
@@ -199,7 +199,7 @@
     job: "{{ docker_dir }}/sabnzbd/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_sabnzbd_user }}"
 
 - name: Ensure SABnzbd directories and files have correct permissions
   ansible.builtin.file:

@@ -9,19 +9,19 @@ monitoring:
 # Health check endpoints
 endpoints:
   - name: "homepage-web"
-    url: "http://localhost:{{ homepage_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}"
     method: "GET"
     expected_status: [200, 302]
     timeout: {{ homepage_health_check_timeout | default(10) }}
     
   - name: "homepage-api-health"
-    url: "http://localhost:{{ homepage_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
     method: "GET"
     expected_status: [200, 302, 401]
     timeout: {{ homepage_health_check_timeout | default(10) }}
     
   - name: "homepage-api-services"
-    url: "http://localhost:{{ homepage_port }}/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
     method: "GET"
     expected_status: [200, 302]
     timeout: {{ homepage_health_check_timeout | default(10) }}
@@ -77,7 +77,7 @@ thresholds:
 # Service dependencies
 dependencies:
   - name: "traefik"
-    url: "http://localhost:8080/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
     
   - name: "docker"
     check: "docker ps | grep {{ homepage_container_name }}"

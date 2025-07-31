@@ -8,32 +8,32 @@ services:
       status: "{{ 'enabled' if security_proxy_enabled | default(false) else 'disabled' }}"
       port: "80,443"
       subdomain: "traefik"
-      health_check: "http://localhost:8080/ping"
+      health_check: "http://{{ ansible_default_ipv4.address }}:8080/ping"
     
     - name: "authentik"
       status: "{{ 'enabled' if security_authentication_enabled | default(false) else 'disabled' }}"
       port: "9000"
       subdomain: "auth"
-      health_check: "http://localhost:9000/if/user/#/"
+      health_check: "http://{{ ansible_default_ipv4.address }}:9000/if/user/#/"
     
     - name: "portainer"
       status: "{{ 'enabled' if portainer_enabled | default(false) else 'disabled' }}"
       port: "9000"
       subdomain: "portainer"
-      health_check: "http://localhost:9000/api/status"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/api/status"
 
   monitoring:
     - name: "prometheus"
       status: "{{ 'enabled' if prometheus_enabled | default(false) else 'disabled' }}"
       port: "9090"
       subdomain: "prometheus"
-      health_check: "http://localhost:9090/-/healthy"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
     
     - name: "grafana"
       status: "{{ 'enabled' if grafana_enabled | default(false) else 'disabled' }}"
       port: "3000"
       subdomain: "grafana"
-      health_check: "http://localhost:3000/api/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/api/health"
     
     - name: "loki"
       status: "{{ 'enabled' if loki_enabled | default(false) else 'disabled' }}"
@@ -45,7 +45,7 @@ services:
       status: "{{ 'enabled' if alertmanager_enabled | default(false) else 'disabled' }}"
       port: "9093"
       subdomain: "alerts"
-      health_check: "http://localhost:9093/-/healthy"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
 
   databases:
     - name: "postgresql"
@@ -68,38 +68,38 @@ services:
       status: "{{ 'enabled' if plex_enabled | default(false) else 'disabled' }}"
       port: "32400"
       subdomain: "plex"
-      health_check: "http://localhost:32400/web/index.html"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/web/index.html"
     
     - name: "jellyfin"
       status: "{{ 'enabled' if jellyfin_enabled | default(false) else 'disabled' }}"
       port: "8096"
       subdomain: "jellyfin"
-      health_check: "http://localhost:8096/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
     
     - name: "sonarr"
       status: "{{ 'enabled' if sonarr_enabled | default(false) else 'disabled' }}"
       port: "8989"
       subdomain: "sonarr"
-      health_check: "http://localhost:8989/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
     
     - name: "radarr"
       status: "{{ 'enabled' if radarr_enabled | default(false) else 'disabled' }}"
       port: "7878"
       subdomain: "radarr"
-      health_check: "http://localhost:7878/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
     
     - name: "prowlarr"
       status: "{{ 'enabled' if prowlarr_enabled | default(false) else 'disabled' }}"
       port: "9696"
       subdomain: "prowlarr"
-      health_check: "http://localhost:9696/health"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
 
   storage:
     - name: "nextcloud"
       status: "{{ 'enabled' if nextcloud_enabled | default(false) else 'disabled' }}"
       port: "8080"
       subdomain: "cloud"
-      health_check: "http://localhost:8080/status.php"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/status.php"
     
     - name: "samba"
       status: "{{ 'enabled' if samba_enabled | default(false) else 'disabled' }}"
@@ -110,7 +110,7 @@ services:
       status: "{{ 'enabled' if syncthing_enabled | default(false) else 'disabled' }}"
       port: "8384"
       subdomain: "sync"
-      health_check: "http://localhost:8384/rest/system/status"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/rest/system/status"
 
   security:
     - name: "pihole"

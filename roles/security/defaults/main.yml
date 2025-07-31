@@ -1,187 +1,259 @@
----
-# Security Stack Defaults
-# Production-ready defaults for the complete homelab security stack
+# Security Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Main switch for the entire security role
-security_enabled: true
+# =============================================================================
+# SECURITY SERVICE CONFIGURATION
+# =============================================================================
 
-# Switches for individual security components
-security_authentication_enabled: true
-security_proxy_enabled: true
-security_dns_enabled: true
-security_firewall_enabled: true
-security_vpn_enabled: true
+# Service Information
+security_service_name: "security"
+security_container_name: "{{ security_service_name }}"
+security_image: "ghcr.io/security/security:latest"
+security_version: "latest"
 
-# Integration switches
-security_monitoring_enabled: true
-security_backup_enabled: true
-security_homepage_enabled: true
-security_alerting_enabled: true
+# Network Configuration
+security_port: 8080
+security_external_port: "{{ security_port }}"
+security_protocol: "http"
+security_host: "{{ ansible_default_ipv4.address }}"
+security_url: "{{ security_protocol }}://{{ security_host }}:{{ security_port }}"
 
-# --- Service Configurations ---
+# Domain Configuration
+security_subdomain: "security"
+security_domain: "{{ security_subdomain }}.{{ domain }}"
+security_external_url: "https://{{ security_domain }}"
 
-# Authentik (Authentication)
-security_authentik:
-  enabled: true
-  image: "ghcr.io/goauthentik/server:latest"
-  container_name: "authentik"
-  subdomain: "auth"
-  # Authentik requires a unique secret key
-  secret_key: "{{ vault_authentik_secret_key }}"
-  # Postgres password for Authentik
-  postgres_password: "{{ vault_authentik_postgres_password }}"
-  # Authentik admin password
-  admin_password: "{{ vault_authentik_admin_password }}"
-  # Authentik automation configuration
-  automation_enabled: true
-  automation_admin_user: "admin"
-  automation_admin_email: "{{ admin_email }}"
-  automation_admin_password: "{{ vault_authentik_admin_password }}"
-  automation_bootstrap_token: "{{ vault_authentik_bootstrap_token | default('') }}"
-  automation_api_timeout: 30
-  automation_retry_attempts: 3
-  automation_retry_delay: 30
-  # Authentik service configuration
-  port: 9000
-  postgres_port: 5432
-  redis_port: 6379
-  # Authentik application provisioning
-  applications:
-    - name: "Homepage"
-      client_id: "homepage"
-      client_secret: "{{ vault_homepage_oauth_secret }}"
-      redirect_uris: ["https://homepage.{{ domain }}/oauth/callback"]
-      provider_type: "oauth2"
-    - name: "Grafana"
-      client_id: "grafana"
-      client_secret: "{{ vault_grafana_oauth_secret }}"
-      redirect_uris: ["https://grafana.{{ domain }}/login/generic_oauth"]
-      provider_type: "oauth2"
-  # Authentik user management
-  users:
-    - username: "admin"
-      email: "{{ admin_email }}"
-      password: "{{ vault_authentik_admin_password }}"
-      is_superuser: true
-      is_active: true
-  # Authentik groups
-  groups:
-    - name: "Administrators"
-      description: "System administrators"
-      users: ["admin"]
-    - name: "Users"
-      description: "Regular users"
-      users: []
-  # Authentik policies
-  policies:
-    - name: "Admin Access"
-      type: "policy_admin"
-      group: "Administrators"
-    - name: "User Access"
-      type: "policy_user"
-      group: "Users"
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
 
-# Traefik (Reverse Proxy)
-security_traefik:
-  enabled: true
-  image: "traefik:latest"
-  container_name: "traefik"
-  # Traefik should not have a subdomain, it is the entrypoint
-  # Cloudflare API Token for DNS challenge
-  cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
+# Authentication
+security_auth_enabled: true
+security_auth_method: "authentik"  # Options: basic, authentik, none
+security_admin_username: "admin"
+security_admin_password: "{{ vault_security_admin_password }}"
 
-# Pi-hole (DNS)
-security_pihole:
-  enabled: true
-  image: "pihole/pihole:latest"
-  container_name: "pihole"
-  subdomain: "pihole"
-  # Pi-hole admin password
-  admin_password: "{{ vault_pihole_admin_password }}"
+# API Configuration
+security_api_key: "{{ vault_security_api_key }}"
+security_api_token: "{{ vault_security_api_token }}"
 
-# Fail2ban (Firewall)
-security_fail2ban:
-  enabled: true
-  # Fail2ban is typically installed on the host, not in a container
-  # Configuration for jails, bantime, etc.
-  bantime: "1h"
-  maxretry: 5
-  destemail: "{{ admin_email }}"
+# Encryption & Security
+security_secret_key: "{{ vault_security_secret_key }}"
+security_encryption_key: "{{ vault_security_encryption_key }}"
+security_jwt_secret: "{{ vault_security_jwt_secret }}"
 
-# CrowdSec (Firewall)
-security_crowdsec:
-  enabled: true
-  image: "crowdsecurity/crowdsec:latest"
-  container_name: "crowdsec"
-  # No subdomain needed, runs as an agent
+# SSL/TLS Configuration
+security_ssl_enabled: true
+security_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+security_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+security_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
 
-# WireGuard (VPN)
-security_wireguard:
-  enabled: true
-  image: "linuxserver/wireguard:latest"
-  container_name: "wireguard"
-  subdomain: "vpn" # For management UI if any
-  # Peers configuration would be a list of dicts
-  peers: []
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
 
-# --- Integration Defaults ---
+# Database Settings
+security_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+security_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+security_database_port: "{{ databases_postgresql_port | default(5432) }}"
+security_database_name: "security"
+security_database_username: "security"
+security_database_password: "{{ vault_security_database_password }}"
 
-# Homepage Integration
-security_homepage_category: "Security"
-security_homepage_description: "Security Infrastructure"
-security_homepage_icon: "security.png"
+# Redis Configuration (if using)
+security_redis_enabled: false
+security_redis_host: "{{ redis_host | default('redis') }}"
+security_redis_port: "{{ redis_port | default(6379) }}"
+security_redis_password: "{{ vault_security_redis_password }}"
+security_redis_database: 0
 
-# Backup Configuration
-security_backup_schedule: "0 3 * * *" # Daily at 3 AM
-security_backup_retention: 14
-security_backup_include_config: true
-security_backup_encryption_passphrase: "{{ vault_backup_encryption_passphrase }}"
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
 
-# Monitoring Configuration
-security_prometheus_scrape_interval: 60
-security_grafana_dashboard: true
+# Data Directories
+security_data_dir: "{{ homelab_data_dir }}/security"
+security_config_dir: "{{ security_data_dir }}/config"
+security_backup_dir: "{{ security_data_dir }}/backups"
 
-# Alerting Configuration
-security_alerting_provider: "alertmanager"
-security_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# Volume Mappings
+security_volumes:
+  - "{{ security_config_dir }}:/config"
+  - "{{ security_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
 
-# General
-security_stack_enabled: true
-security_stack_services:
-  - authentication
-  - proxy
-  - dns
-  - firewall
-  - vpn
-
-# Homepage Integration
-security_homepage_widget_enabled: true
-
-# Monitoring Integration
-security_prometheus_enabled: true
-security_grafana_enabled: true
-security_loki_enabled: true
-
-# Backup
-security_backup_compression: true
-
-# Vault Integration
-security_vault_enabled: true
-security_vault_path: "secret/security"
-security_vault_secrets:
-  - "authentik_admin_password"
-  - "traefik_api_key"
-  - "pihole_web_password"
-  - "fail2ban_secret_key"
-  - "crowdsec_api_key"
-  - "wireguard_private_key"
-
-# Service dependencies
-security_dependencies:
-  - "docker"
-  - "monitoring_infrastructure"
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
 
 # Health Check Configuration
+security_health_check_enabled: true
+security_health_check_path: "/health"
+security_health_check_interval: 30
 security_health_check_timeout: 10
 security_health_check_retries: 3
-security_health_check_interval: 30 
+
+# Monitoring Integration
+security_monitoring_enabled: true
+security_prometheus_enabled: true
+security_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+security_backup_enabled: true
+security_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+security_backup_retention_days: 30
+security_backup_encryption_enabled: true
+security_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+security_smtp_enabled: false
+security_smtp_host: "{{ smtp_host | default('') }}"
+security_smtp_port: "{{ smtp_port | default(587) }}"
+security_smtp_username: "{{ vault_smtp_username }}"
+security_smtp_password: "{{ vault_security_smtp_password }}"
+security_smtp_from: "{{ security_admin_email | default('admin@' + domain) }}"
+security_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+security_webhook_enabled: false
+security_webhook_url: "{{ vault_webhook_url | default('') }}"
+security_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+security_discovery_enabled: true
+security_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+security_cpu_limit: "1.0"
+security_memory_limit: "1g"
+security_memory_reservation: "512m"
+
+# Performance Settings
+security_scan_interval: 10
+security_parallel_downloads: 3
+security_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+security_log_level: "info"  # Options: trace, debug, info, warn, error
+security_log_rotation_enabled: true
+security_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+security_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+security_rate_limit_enabled: true
+security_rate_limit_requests: 100
+security_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+security_deploy_enabled: true
+security_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+security_restart_policy: "unless-stopped"
+security_auto_update_enabled: true
+
+# Environment Variables
+security_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  SECURITY_API_KEY: "{{ security_api_key }}"
+  SECURITY_SECRET_KEY: "{{ security_secret_key }}"
+  SECURITY_ENCRYPTION_KEY: "{{ security_encryption_key }}"
+  SECURITY_JWT_SECRET: "{{ security_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+security_validation_enabled: true
+security_validation_timeout: 300
+security_validation_retries: 3
+
+# Testing Configuration
+security_test_enabled: false
+security_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+security_compliance_enabled: true
+security_audit_logging_enabled: true
+security_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+security_automation_enabled: true
+security_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+security_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+security_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+security_fallback_enabled: true
+security_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

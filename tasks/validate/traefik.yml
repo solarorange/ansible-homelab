@@ -2,7 +2,7 @@
 # Traefik-specific validation tasks
 - name: Check Traefik API health
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:8080/api/health"
     method: GET
     status_code: [200]
     timeout: 30
@@ -19,7 +19,7 @@
 
 - name: Check Traefik metrics
   ansible.builtin.uri:
-    url: "http://localhost:8080/metrics"
+    url: "http://{{ ansible_default_ipv4.address }}:8080/metrics"
     method: GET
     status_code: [200]
     timeout: 30
@@ -28,7 +28,7 @@
 
 - name: Validate Traefik routes
   ansible.builtin.uri:
-    url: "http://localhost:8080/api/http/routers"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
     method: GET
     status_code: [200]
     timeout: 30

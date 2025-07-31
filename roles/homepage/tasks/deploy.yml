@@ -126,7 +126,7 @@
 
 - name: Wait for Homepage to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ homepage_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -154,7 +154,7 @@
       
       Status: {{ 'SUCCESS' if homepage_verification.status == 200 or homepage_verification.status == 302 else 'FAILED' }}
       URL: https://{{ homepage_subdomain }}.{{ domain }}
-      Local URL: http://localhost:{{ homepage_port }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}
       
       Configuration:
       - Theme: {{ homepage_theme }}

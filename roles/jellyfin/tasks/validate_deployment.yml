@@ -1,0 +1,14 @@
+---
+# Jellyfin Deployment Validation
+
+- name: Check Jellyfin service health
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ jellyfin_external_port }}"
+    status_code: [200, 302, 401, 403]
+  register: health_check
+  tags: [jellyfin, validation]
+
+- name: Display Jellyfin health status
+  debug:
+    msg: "Jellyfin is { 'healthy' if health_check.status in [200, 302, 401, 403] else 'unhealthy' }"
+  tags: [jellyfin, validation]

@@ -1,0 +1,198 @@
+# Nginx Proxy Manager Automation Configuration
+# Comprehensive configuration for automated NPM management
+
+# =============================================================================
+# API CONFIGURATION
+# =============================================================================
+
+api:
+  url: "{{ nginx_proxy_manager_api_url }}"
+  token: "{{ vault_npm_api_token | default('') }}"
+  timeout: {{ nginx_proxy_manager_api_timeout | default(30) }}
+  retry_attempts: 3
+  retry_delay: 5
+
+# =============================================================================
+# DOMAIN CONFIGURATION
+# =============================================================================
+
+domain: "{{ domain }}"
+admin_email: "{{ admin_email }}"
+
+# =============================================================================
+# SSL CONFIGURATION
+# =============================================================================
+
+ssl:
+  provider: "{{ nginx_proxy_manager_ssl_provider | default('letsencrypt') }}"
+  email: "{{ nginx_proxy_manager_ssl_email }}"
+  staging: {{ nginx_proxy_manager_ssl_staging | default(false) }}
+  force_renewal: false
+  auto_renewal: true
+  renewal_threshold_days: 30
+
+# =============================================================================
+# SERVICE DISCOVERY CONFIGURATION
+# =============================================================================
+
+services:
+{% for service in nginx_proxy_manager_discovery_services %}
+  - name: "{{ service.name }}"
+    subdomain: "{{ service.subdomain }}"
+    port: {{ service.port }}
+    ssl: {{ service.ssl | default(true) }}
+    auth: {{ service.auth | default(false) }}
+    health_check_path: "/health"
+    health_check_timeout: 5
+    retry_attempts: 3
+{% endfor %}
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+security:
+  rate_limiting:
+    enabled: {{ nginx_proxy_manager_rate_limiting_enabled | default(true) }}
+    requests_per_second: {{ nginx_proxy_manager_rate_limit.requests_per_second | default(10) }}
+    burst: {{ nginx_proxy_manager_rate_limit.burst | default(20) }}
+    nodelay: {{ nginx_proxy_manager_rate_limit.nodelay | default(false) }}
+  
+  waf:
+    enabled: {{ nginx_proxy_manager_waf_enabled | default(true) }}
+    rules: {{ nginx_proxy_manager_waf_rules | to_json }}
+  
+  security_headers:
+    enabled: true
+    headers: {{ nginx_proxy_manager_security_headers | to_json }}
+
+# =============================================================================
+# PERFORMANCE CONFIGURATION
+# =============================================================================
+
+performance:
+  caching:
+    enabled: {{ nginx_proxy_manager_caching_enabled | default(true) }}
+    cache_path: "{{ nginx_proxy_manager_cache_path | default('/var/cache/nginx') }}"
+    cache_size: "{{ nginx_proxy_manager_cache_size | default('1G') }}"
+    cache_inactive: "{{ nginx_proxy_manager_cache_inactive | default('7d') }}"
+  
+  compression:
+    enabled: {{ nginx_proxy_manager_compression_enabled | default(true) }}
+    gzip_types: "{{ nginx_proxy_manager_gzip_types | default('text/plain text/css text/xml application/json application/javascript application/xml+rss application/atom+xml image/svg+xml') }}"
+  
+  worker_processes: "{{ nginx_proxy_manager_worker_processes | default('auto') }}"
+  worker_connections: {{ nginx_proxy_manager_worker_connections | default(1024) }}
+  keepalive_timeout: {{ nginx_proxy_manager_keepalive_timeout | default(65) }}
+  client_max_body_size: "{{ nginx_proxy_manager_client_max_body_size | default('100M') }}"
+
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+
+monitoring:
+  enabled: {{ nginx_proxy_manager_monitoring_enabled | default(true) }}
+  metrics_enabled: {{ nginx_proxy_manager_metrics_enabled | default(true) }}
+  metrics_port: {{ nginx_proxy_manager_metrics_port | default(8080) }}
+  metrics_path: "{{ nginx_proxy_manager_metrics_path | default('/metrics') }}"
+  logging_enabled: {{ nginx_proxy_manager_logging_enabled | default(true) }}
+  log_level: "{{ nginx_proxy_manager_log_level | default('info') }}"
+  health_check_interval: "{{ nginx_proxy_manager_health_check_interval | default('30s') }}"
+  health_check_timeout: "{{ nginx_proxy_manager_health_check_timeout | default('10s') }}"
+  health_check_retries: {{ nginx_proxy_manager_health_check_retries | default(3) }}
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+alerting:
+  enabled: {{ nginx_proxy_manager_alerting_enabled | default(true) }}
+  channels: {{ nginx_proxy_manager_alert_channels | to_json }}
+  thresholds: {{ nginx_proxy_manager_alert_thresholds | to_json }}
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+
+backup:
+  enabled: {{ nginx_proxy_manager_backup_enabled | default(true) }}
+  schedule: "{{ nginx_proxy_manager_backup_schedule | default('0 2 * * *') }}"
+  retention: {{ nginx_proxy_manager_backup_retention | default(30) }}
+  encryption: {{ nginx_proxy_manager_backup_encryption | default(true) }}
+  paths: {{ nginx_proxy_manager_backup_paths | to_json }}
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+automation:
+  service_discovery:
+    enabled: {{ nginx_proxy_manager_service_discovery_enabled | default(true) }}
+    interval: {{ nginx_proxy_manager_discovery_interval | default(300) }}
+    auto_create_proxy_hosts: true
+    auto_ssl: {{ nginx_proxy_manager_auto_ssl_enabled | default(true) }}
+  
+  ssl_management:
+    enabled: {{ nginx_proxy_manager_auto_ssl_enabled | default(true) }}
+    auto_renewal: true
+    renewal_threshold_days: 30
+  
+  health_monitoring:
+    enabled: {{ nginx_proxy_manager_health_check_enabled | default(true) }}
+    check_interval: "5m"
+    alert_on_failure: true
+  
+  backup_automation:
+    enabled: {{ nginx_proxy_manager_backup_enabled | default(true) }}
+    schedule: "{{ nginx_proxy_manager_backup_schedule | default('0 2 * * *') }}"
+    encryption: {{ nginx_proxy_manager_backup_encryption | default(true) }}
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+integrations:
+  authentik:
+    enabled: true
+    auth_url: "https://{{ authentik_subdomain }}.{{ domain }}/outpost.goauthentik.io/auth/traefik"
+    auth_response_headers:
+      - "X-User"
+      - "X-Email"
+      - "X-Groups"
+      - "X-Name"
+  
+  grafana:
+    enabled: {{ nginx_proxy_manager_monitoring_enabled | default(true) }}
+    url: "https://{{ grafana_subdomain }}.{{ domain }}"
+    api_key: "{{ vault_grafana_api_key | default('') }}"
+  
+  prometheus:
+    enabled: {{ nginx_proxy_manager_metrics_enabled | default(true) }}
+    url: "https://{{ prometheus_subdomain }}.{{ domain }}"
+    metrics_path: "{{ nginx_proxy_manager_metrics_path | default('/metrics') }}"
+  
+  alertmanager:
+    enabled: {{ nginx_proxy_manager_alerting_enabled | default(true) }}
+    url: "https://{{ alertmanager_subdomain }}.{{ domain }}"
+    webhook_url: "{{ nginx_proxy_manager_alert_channels | selectattr('type', 'equalto', 'slack') | map(attribute='webhook_url') | first | default('') }}"
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+logging:
+  level: "{{ nginx_proxy_manager_log_level | default('info') }}"
+  file: "{{ logs_dir }}/nginx-proxy-manager/automation.log"
+  max_size: "10M"
+  max_files: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# =============================================================================
+# RESOURCE LIMITS
+# =============================================================================
+
+resources:
+  memory: "{{ nginx_proxy_manager_resource_limits.memory | default('512M') }}"
+  memory_swap: "{{ nginx_proxy_manager_resource_limits.memory_swap | default('1G') }}"
+  cpus: "{{ nginx_proxy_manager_resource_limits.cpus | default('1.0') }}"
+  cpu_shares: {{ nginx_proxy_manager_resource_limits.cpu_shares | default(1024) }} 

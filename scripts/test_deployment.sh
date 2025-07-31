@@ -228,7 +228,7 @@ echo "================"
 # Test PostgreSQL connectivity
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing PostgreSQL connectivity... "
-if timeout 10 bash -c "</dev/tcp/localhost/5432" 2>/dev/null; then
+if timeout 10 bash -c "</dev/tcp/{{ ansible_default_ipv4.address }}/5432" 2>/dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -239,7 +239,7 @@ fi
 # Test Redis connectivity
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing Redis connectivity... "
-if timeout 10 bash -c "</dev/tcp/localhost/6379" 2>/dev/null; then
+if timeout 10 bash -c "</dev/tcp/{{ ansible_default_ipv4.address }}/6379" 2>/dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -250,7 +250,7 @@ fi
 # Test MariaDB connectivity
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing MariaDB connectivity... "
-if timeout 10 bash -c "</dev/tcp/localhost/3306" 2>/dev/null; then
+if timeout 10 bash -c "</dev/tcp/{{ ansible_default_ipv4.address }}/3306" 2>/dev/null; then
     echo -e "${GREEN}PASS${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -270,22 +270,22 @@ echo "=================="
 # Test Prometheus accessibility
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing Prometheus accessibility... "
-test_http_endpoint "Prometheus" "http://localhost:9090/-/healthy" "200"
+test_http_endpoint "Prometheus" "http://{{ ansible_default_ipv4.address }}:9090/-/healthy" "200"
 
 # Test Grafana accessibility
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing Grafana accessibility... "
-test_http_endpoint "Grafana" "http://localhost:3000/api/health" "200"
+test_http_endpoint "Grafana" "http://{{ ansible_default_ipv4.address }}:3000/api/health" "200"
 
 # Test Loki accessibility
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing Loki accessibility... "
-test_http_endpoint "Loki" "http://localhost:3100/ready" "200"
+test_http_endpoint "Loki" "http://{{ ansible_default_ipv4.address }}:3100/ready" "200"
 
 # Test AlertManager accessibility
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 echo -n "Testing AlertManager accessibility... "
-test_http_endpoint "AlertManager" "http://localhost:9093/-/healthy" "200"
+test_http_endpoint "AlertManager" "http://{{ ansible_default_ipv4.address }}:9093/-/healthy" "200"
 
 echo ""
 

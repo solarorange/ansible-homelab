@@ -837,8 +837,8 @@ def create_sample_configurations():
     users = [
         {
             "login": "admin",
-            "email": "admin@example.com",
-            "password": "admin123",
+            "email": "{{ admin_email | default("admin@" + domain) }}",
+            "password": "{{ vault_grafana_admin_password | password_hash("bcrypt") }}",
             "name": "Administrator"
         },
         {
@@ -859,7 +859,7 @@ def create_sample_configurations():
             "type": "email",
             "isDefault": True,
             "settings": {
-                "addresses": "admin@example.com"
+                "addresses": "{{ admin_email | default("admin@" + domain) }}"
             }
         },
         {
@@ -943,7 +943,7 @@ Examples:
     
     # Create configuration
     config = GrafanaConfig(
-        url=args.url or "http://localhost:3000",
+        url=args.url or "http://{{ ansible_default_ipv4.address }}:3000",
         username=args.username or "admin",
         password=args.password or "admin",
         timeout=args.timeout,

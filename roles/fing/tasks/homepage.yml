@@ -341,7 +341,7 @@
 
 - name: Wait for Homepage to be ready
   ansible.builtin.wait_for:
-    host: "localhost"
+    host: "{{ ansible_default_ipv4.address }}"
     port: 3000
     delay: 10
     timeout: 300
@@ -349,7 +349,7 @@
 
 - name: Verify Fing service in Homepage
   ansible.builtin.uri:
-    url: "http://localhost:3000/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:3000/api/services"
     method: GET
     status_code: 200
     timeout: 10

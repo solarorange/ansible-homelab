@@ -1,0 +1,96 @@
+---
+# Homepage Dashboard Deployment Tasks
+
+- name: Create Homepage directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_compose_dir }}/homepage"
+    - "{{ docker_compose_dir }}/homepage/config"
+    - "{{ docker_compose_dir }}/homepage/config/icons"
+
+- name: Copy Homepage configuration files
+  ansible.builtin.template:
+    src: "templates/homepage/{{ item.src }}"
+    dest: "{{ docker_compose_dir }}/homepage/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: 'config.yml.j2', dest: 'config/config.yml' }
+    - { src: 'services.yml.j2', dest: 'config/services.yml' }
+    - { src: 'bookmarks.yml.j2', dest: 'config/bookmarks.yml' }
+    - { src: 'docker-compose.yml.j2', dest: 'docker-compose.yml' }
+
+- name: Copy Homepage icon setup script
+  ansible.builtin.template:
+    src: "scripts/setup_homepage_icons.sh"
+    dest: "{{ docker_compose_dir }}/homepage/setup_icons.sh"
+    mode: '0755'
+
+- name: Setup Homepage icons
+  ansible.builtin.shell:
+    cmd: "{{ docker_compose_dir }}/homepage/setup_icons.sh"
+    chdir: "{{ docker_compose_dir }}/homepage"
+  become_user: "{{ username }}"
+
+- name: Generate API keys for services
+  ansible.builtin.set_fact:
+    homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({item: vault_homepage_api_key}) }}"
+  loop:
+    - traefik
+    - authentik
+    - portainer
+    - grafana
+    - jellyfin
+    - sonarr
+    - radarr
+    - lidarr
+    - readarr
+    - prowlarr
+    - bazarr
+    - tautulli
+    - overseerr
+    - homeassistant
+    - nextcloud
+    - gitlab
+    - harbor
+    - minio
+    - paperless
+    - bookstack
+    - immich
+    - filebrowser
+    - kopia
+    - duplicati
+    - uptimekuma
+    - guacamole
+    - requestrr
+    - unmanic
+    - pihole
+    - vaultwarden
+    - promtail
+
+- name: Store API keys in vault
+  ansible.builtin.set_fact:
+    vault_homepage_api_keys: "{{ homepage_api_keys }}"
+  no_log: true
+
+- name: Deploy Homepage container
+  community.docker.docker_compose:
+    project_src: "{{ docker_compose_dir }}/homepage"
+    state: present
+    build: false
+    remove_orphans: true
+    pull: true
+  register: homepage_deploy
+
+- name: Wait for Homepage to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:3000"
+    method: GET
+    status_code: 200
+  register: homepage_ready
+  until: homepage_ready.status == 200
+  retries: 30
+  delay: 10
+  when: homepage_deploy.changed 

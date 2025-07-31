@@ -4,7 +4,7 @@
 
 - name: Wait for ErsatzTV service to be ready
   ansible.builtin.wait_for:
-    host: "127.0.0.1"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ ersatztv_port }}"
     delay: 10
     timeout: 300
@@ -37,7 +37,7 @@
 
 - name: Test ErsatzTV web interface
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ ersatztv_port }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
     method: GET
     status_code: [200, 302, 404]
     timeout: 30
@@ -54,7 +54,7 @@
 
 - name: Test ErsatzTV API endpoint
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ ersatztv_port }}/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health"
     method: GET
     status_code: [200, 401, 404]
     timeout: 30
@@ -188,7 +188,7 @@
   tags: [ersatztv, validation]
 
 - name: Validate ErsatzTV streaming
-  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ ersatztv_port }}/api/streams"
+  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/streams"
   register: ersatztv_stream_test
   changed_when: false
   failed_when: false
@@ -205,7 +205,7 @@
   tags: [ersatztv, validation]
 
 - name: Validate ErsatzTV monitoring
-  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ ersatztv_port }}{{ ersatztv_prometheus_path }}"
+  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}{{ ersatztv_prometheus_path }}"
   register: ersatztv_monitoring_test
   changed_when: false
   failed_when: false

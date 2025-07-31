@@ -30,13 +30,13 @@ check_docker_service() {
     # Check service-specific health endpoints
     case $service in
         "traefik")
-            curl -s -f http://localhost:8080/api/rawdata > /dev/null || return 1
+            curl -s -f http://{{ ansible_default_ipv4.address }}:8080/api/rawdata > /dev/null || return 1
             ;;
         "prometheus")
-            curl -s -f http://localhost:9090/-/healthy > /dev/null || return 1
+            curl -s -f http://{{ ansible_default_ipv4.address }}:9090/-/healthy > /dev/null || return 1
             ;;
         "grafana")
-            curl -s -f http://localhost:3000/api/health > /dev/null || return 1
+            curl -s -f http://{{ ansible_default_ipv4.address }}:/api/health > /dev/null || return 1
             ;;
         *)
             # Generic health check for other services

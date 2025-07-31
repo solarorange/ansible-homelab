@@ -24,7 +24,7 @@ check_service_ready() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if nc -z localhost $port 2>/dev/null; then
+        if nc -z {{ ansible_default_ipv4.address }} $port 2>/dev/null; then
             log "Service $service is ready on port $port"
             return 0
         fi

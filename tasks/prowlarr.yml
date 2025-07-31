@@ -121,7 +121,7 @@
       fi
       
       # Check if Prowlarr is responding
-      if ! curl -s http://localhost:9696/health | grep -q "ok"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9696/health | grep -q "ok"; then
           echo "Prowlarr is not responding"
           exit 1
       fi
@@ -154,7 +154,7 @@
     job: "logrotate {{ docker_dir }}/prowlarr/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add Prowlarr backup cron job
   ansible.builtin.cron:
@@ -162,4 +162,4 @@
     job: "{{ docker_dir }}/prowlarr/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

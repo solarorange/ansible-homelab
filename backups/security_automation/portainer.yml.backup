@@ -1,0 +1,160 @@
+---
+# Portainer Configuration
+# Production-ready container management solution
+
+- name: Create Portainer directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/portainer/data"
+    - "{{ docker_dir }}/portainer/scripts"
+    - "{{ logs_dir }}/portainer"
+
+- name: Create Portainer management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/portainer/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # Portainer Management Script
+      
+      function show_help {
+        echo "Portainer Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Portainer status"
+        echo "  logs      - Show Portainer logs"
+        echo "  restart   - Restart Portainer"
+        echo "  backup    - Backup Portainer data"
+        echo "  restore   - Restore Portainer data"
+        echo "  help      - Show this help"
+      }
+      
+      function backup_data {
+        local backup_dir="{{ docker_dir }}/portainer/backups"
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local backup_file="$backup_dir/portainer_backup_$timestamp.tar.gz"
+        
+        # Create backup directory if it doesn't exist
+        mkdir -p "$backup_dir"
+        
+        # Stop Portainer
+        docker stop portainer
+        
+        # Create backup
+        tar -czf "$backup_file" -C "{{ docker_dir }}/portainer" data/
+        
+        # Start Portainer
+        docker start portainer
+        
+        echo "Backup created: $backup_file"
+      }
+      
+      function restore_data {
+        if [ -z "$1" ]; then
+          echo "Please specify backup file"
+          exit 1
+        fi
+      
+        local backup_file="$1"
+        if [ ! -f "$backup_file" ]; then
+          echo "Backup file not found: $backup_file"
+          exit 1
+        fi
+      
+        # Stop Portainer
+        docker stop portainer
+      
+        # Restore backup
+        tar -xzf "$backup_file" -C "{{ docker_dir }}/portainer"
+      
+        # Start Portainer
+        docker start portainer
+      
+        echo "Backup restored from: $backup_file"
+      }
+      
+      case "$1" in
+        status)
+          docker ps -f name=portainer
+          ;;
+        logs)
+          docker logs portainer --tail 100 -f
+          ;;
+        restart)
+          docker restart portainer
+          ;;
+        backup)
+          backup_data
+          ;;
+        restore)
+          restore_data "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Portainer health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/portainer/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if Portainer is running
+      if ! docker ps -f name=portainer -f status=running | grep -q portainer; then
+        echo "Portainer is not running"
+        exit 1
+      fi
+      
+      # Check if Portainer is responding
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:9000/api/status > /dev/null; then
+        echo "Portainer is not responding"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Portainer log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/portainer/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/portainer/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Portainer log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Portainer logs"
+    job: "logrotate {{ docker_dir }}/portainer/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Create Portainer backup cron job
+  ansible.builtin.cron:
+    name: "Backup Portainer data"
+    job: "{{ docker_dir }}/portainer/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ username }}" 

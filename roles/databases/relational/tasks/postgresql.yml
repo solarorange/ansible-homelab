@@ -64,8 +64,8 @@
     published_ports:
       - "{{ postgresql_web_port }}:5432"
     env:
-      POSTGRES_USER: "{{ postgresql_admin_user }}"
-      POSTGRES_PASSWORD: "{{ postgresql_admin_password }}"
+      POSTGRES_user: "{{ vault_databases_user }}"
+      POSTGRES_password: "{{ vault_databases_database_password }}"
     volumes:
       - "{{ docker_dir }}/postgresql/data:/var/lib/postgresql/data"
       - "{{ docker_dir }}/postgresql/config:/etc/postgresql"
@@ -93,7 +93,7 @@
     job: "{{ docker_dir }}/postgresql/scripts/backup.sh >> {{ logs_dir }}/postgresql/backup.log 2>&1"
     minute: "0"
     hour: "2"
-    user: "{{ username }}"
+    user: "{{ vault_databases_user }}"
     state: present
 
 - name: Integrate PostgreSQL with homepage

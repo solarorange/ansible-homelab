@@ -30,7 +30,7 @@
 
     - name: Wait for Jellyfin to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_players.jellyfin.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.jellyfin.port }}/health"
         method: GET
         status_code: 200
       register: jellyfin_health
@@ -41,7 +41,7 @@
 
     - name: Wait for Immich components to be ready
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
         method: GET
         status_code: 200
       register: immich_health
@@ -168,7 +168,7 @@
 
     - name: Configure Jellyfin API key
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_players.jellyfin.port }}/System/Info"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.jellyfin.port }}/System/Info"
         method: GET
         status_code: 200
       register: jellyfin_api_key
@@ -176,7 +176,7 @@
 
     - name: Configure Immich API key
       ansible.builtin.uri:
-        url: "http://localhost:{{ media_players.immich.port }}/api/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.immich.port }}/api/health"
         method: GET
         status_code: 200
       register: immich_api_key
@@ -184,7 +184,7 @@
 
     - name: Verify media player deployment
       ansible.builtin.uri:
-        url: "http://localhost:{{ item.value.port }}/health"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
         method: GET
         status_code: 200
       loop: "{{ media_players | dict2items }}"

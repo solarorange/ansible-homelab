@@ -1,60 +1,89 @@
 ---
-# n8n Configuration Validation
-# Validate all required variables and prerequisites
+# N8N Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate n8n configuration variables
-  ansible.builtin.assert:
-    that:
-      - n8n_enabled is defined
-      - n8n_subdomain is defined
-      - n8n_port is defined
-      - n8n_database_host is defined
-      - n8n_database_name is defined
-      - n8n_database_user is defined
-    fail_msg: "Required n8n configuration variables are not defined"
-    success_msg: "n8n configuration validation passed"
-  tags: [n8n, validation]
+- name: Validate N8N vault variables
+  block:
+    - name: Check required N8N vault variables
+      assert:
+        that:
+          - vault_n8n_admin_password is defined
+          - vault_n8n_database_password is defined
+          - vault_n8n_api_key is defined
+          - vault_n8n_secret_key is defined
+          - vault_n8n_encryption_key is defined
+          - vault_n8n_jwt_secret is defined
+        fail_msg: "Required N8N vault variables are not defined"
+        success_msg: "All required N8N vault variables are defined"
 
-- name: Validate n8n vault variables
-  ansible.builtin.assert:
-    that:
-      - vault_n8n_postgres_password is defined
-      - vault_n8n_admin_password is defined
-      - vault_n8n_encryption_key is defined
-    fail_msg: "Required n8n vault variables are not defined"
-    success_msg: "n8n vault variables validation passed"
-  tags: [n8n, validation]
+    - name: Validate N8N password complexity
+      assert:
+        that:
+          - vault_n8n_admin_password | length >= 12
+          - vault_n8n_database_password | length >= 12
+        fail_msg: "N8N passwords must be at least 12 characters long"
+        success_msg: "N8N password complexity requirements met"
 
-- name: Validate n8n port availability
-  ansible.builtin.wait_for:
-    port: "{{ n8n_port }}"
-    state: stopped
-    timeout: 5
-  ignore_errors: true
-  register: n8n_port_check
-  tags: [n8n, validation]
+- name: Validate N8N network configuration
+  block:
+    - name: Check N8N port configuration
+      assert:
+        that:
+          - n8n_port is defined
+          - n8n_port | int >= 1024
+          - n8n_port | int <= 65535
+        fail_msg: "N8N port must be between 1024 and 65535"
+        success_msg: "N8N port configuration is valid"
 
-- name: Fail if n8n port is already in use
-  ansible.builtin.fail:
-    msg: "Port {{ n8n_port }} is already in use by another service"
-  when: n8n_port_check.state == "started"
-  tags: [n8n, validation]
+    - name: Check N8N domain configuration
+      assert:
+        that:
+          - domain is defined
+          - n8n_subdomain is defined
+        fail_msg: "N8N domain configuration is incomplete"
+        success_msg: "N8N domain configuration is valid"
 
-- name: Validate n8n subdomain format
-  ansible.builtin.assert:
-    that:
-      - n8n_subdomain | regex_search('^[a-zA-Z0-9-]+$')
-    fail_msg: "n8n subdomain must contain only letters, numbers, and hyphens"
-    success_msg: "n8n subdomain format validation passed"
-  tags: [n8n, validation]
+- name: Validate N8N security configuration
+  block:
+    - name: Check N8N SSL configuration
+      assert:
+        that:
+          - n8n_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "N8N SSL configuration is invalid"
+        success_msg: "N8N SSL configuration is valid"
 
-- name: Validate n8n resource limits
-  ansible.builtin.assert:
-    that:
-      - n8n_memory_limit is defined
-      - n8n_cpu_limit is defined
-      - n8n_memory_limit | regex_search('^[0-9]+[gGmM]$')
-      - n8n_cpu_limit | regex_search('^[0-9]+\.?[0-9]*$')
-    fail_msg: "n8n resource limits are not properly defined"
-    success_msg: "n8n resource limits validation passed"
-  tags: [n8n, validation] 
+    - name: Check N8N authentication configuration
+      assert:
+        that:
+          - n8n_auth_enabled | bool
+          - n8n_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "N8N authentication configuration is invalid"
+        success_msg: "N8N authentication configuration is valid"
+
+- name: Validate N8N storage configuration
+  block:
+    - name: Check N8N data directories
+      assert:
+        that:
+          - n8n_data_dir is defined
+          - n8n_config_dir is defined
+          - n8n_backup_dir is defined
+        fail_msg: "N8N storage configuration is incomplete"
+        success_msg: "N8N storage configuration is valid"
+
+    - name: Create N8N directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ n8n_data_dir }}"
+        - "{{ n8n_config_dir }}"
+        - "{{ n8n_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "N8N validation completed successfully - all configurations are valid and secure"

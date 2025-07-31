@@ -101,9 +101,9 @@
       # TYPE  DATABASE        USER            ADDRESS                 METHOD
       local   all            postgres                                peer
       local   all            all                                     md5
-      host    all            all             127.0.0.1/32           md5
+      host    all            all             {{ ansible_default_ipv4.address }}/32           md5
       host    all            all             ::1/128                 md5
-      host    all            all             0.0.0.0/0              md5
+      host    all            all             {{ ansible_default_ipv4.address }}/0              md5
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -257,7 +257,7 @@
     job: "logrotate {{ docker_dir }}/postgresql/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add PostgreSQL backup to crontab
   ansible.builtin.cron:
@@ -265,7 +265,7 @@
     job: "{{ docker_dir }}/postgresql/scripts/backup.sh"
     hour: "3"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add PostgreSQL vacuum to crontab
   ansible.builtin.cron:
@@ -273,4 +273,4 @@
     job: "{{ docker_dir }}/postgresql/scripts/manage.sh vacuum"
     hour: "4"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

@@ -4,10 +4,10 @@
 
 - name: Wait for Grafana alerting API to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/alert-notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alert-notifications"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -20,7 +20,7 @@
 - name: Create notification channels via Python script
   ansible.builtin.command: >
     python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
-    --url http://localhost:{{ grafana_port }}
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
     --username {{ grafana_admin_user }}
     --password {{ grafana_admin_password }}
     --config-dir {{ docker_dir }}/monitoring/grafana/config
@@ -33,7 +33,7 @@
 - name: Create alert rules via Python script
   ansible.builtin.command: >
     python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
-    --url http://localhost:{{ grafana_port }}
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
     --username {{ grafana_admin_user }}
     --password {{ grafana_admin_password }}
     --config-dir {{ docker_dir }}/monitoring/grafana/config
@@ -45,10 +45,10 @@
 
 - name: Validate notification channels
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/alert-notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alert-notifications"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30
@@ -57,10 +57,10 @@
 
 - name: Validate alert rules
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/alerts"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alerts"
     method: GET
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
     force_basic_auth: true
     status_code: 200
     timeout: 30

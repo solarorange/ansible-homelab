@@ -107,7 +107,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:3100/ready
+          curl -s http://{{ ansible_default_ipv4.address }}:3100/ready
           ;;
         logs)
           docker logs loki --tail 100 -f
@@ -145,13 +145,13 @@
       #!/bin/bash
       
       # Check if Loki is responding
-      if ! curl -s http://localhost:3100/ready > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:3100/ready > /dev/null; then
         echo "Loki is not responding"
         exit 1
       fi
       
       # Check if we can query logs
-      if ! curl -s "http://localhost:3100/loki/api/v1/query?query={}" > /dev/null; then
+      if ! curl -s "http://{{ ansible_default_ipv4.address }}:/loki/api/v1/query?query={}" > /dev/null; then
         echo "Loki query API is not responding"
         exit 1
       fi
@@ -184,4 +184,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/loki/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_loki_user }}" 

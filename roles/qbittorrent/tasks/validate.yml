@@ -1,0 +1,89 @@
+---
+# Qbittorrent Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Qbittorrent vault variables
+  block:
+    - name: Check required Qbittorrent vault variables
+      assert:
+        that:
+          - vault_qbittorrent_admin_password is defined
+          - vault_qbittorrent_database_password is defined
+          - vault_qbittorrent_api_key is defined
+          - vault_qbittorrent_secret_key is defined
+          - vault_qbittorrent_encryption_key is defined
+          - vault_qbittorrent_jwt_secret is defined
+        fail_msg: "Required Qbittorrent vault variables are not defined"
+        success_msg: "All required Qbittorrent vault variables are defined"
+
+    - name: Validate Qbittorrent password complexity
+      assert:
+        that:
+          - vault_qbittorrent_admin_password | length >= 12
+          - vault_qbittorrent_database_password | length >= 12
+        fail_msg: "Qbittorrent passwords must be at least 12 characters long"
+        success_msg: "Qbittorrent password complexity requirements met"
+
+- name: Validate Qbittorrent network configuration
+  block:
+    - name: Check Qbittorrent port configuration
+      assert:
+        that:
+          - qbittorrent_port is defined
+          - qbittorrent_port | int >= 1024
+          - qbittorrent_port | int <= 65535
+        fail_msg: "Qbittorrent port must be between 1024 and 65535"
+        success_msg: "Qbittorrent port configuration is valid"
+
+    - name: Check Qbittorrent domain configuration
+      assert:
+        that:
+          - domain is defined
+          - qbittorrent_subdomain is defined
+        fail_msg: "Qbittorrent domain configuration is incomplete"
+        success_msg: "Qbittorrent domain configuration is valid"
+
+- name: Validate Qbittorrent security configuration
+  block:
+    - name: Check Qbittorrent SSL configuration
+      assert:
+        that:
+          - qbittorrent_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Qbittorrent SSL configuration is invalid"
+        success_msg: "Qbittorrent SSL configuration is valid"
+
+    - name: Check Qbittorrent authentication configuration
+      assert:
+        that:
+          - qbittorrent_auth_enabled | bool
+          - qbittorrent_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Qbittorrent authentication configuration is invalid"
+        success_msg: "Qbittorrent authentication configuration is valid"
+
+- name: Validate Qbittorrent storage configuration
+  block:
+    - name: Check Qbittorrent data directories
+      assert:
+        that:
+          - qbittorrent_data_dir is defined
+          - qbittorrent_config_dir is defined
+          - qbittorrent_backup_dir is defined
+        fail_msg: "Qbittorrent storage configuration is incomplete"
+        success_msg: "Qbittorrent storage configuration is valid"
+
+    - name: Create Qbittorrent directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ qbittorrent_data_dir }}"
+        - "{{ qbittorrent_config_dir }}"
+        - "{{ qbittorrent_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Qbittorrent validation completed successfully - all configurations are valid and secure"

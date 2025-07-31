@@ -267,7 +267,7 @@
     job: "logrotate {{ docker_dir }}/mariadb/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add MariaDB backup to crontab
   ansible.builtin.cron:
@@ -275,7 +275,7 @@
     job: "{{ docker_dir }}/mariadb/scripts/backup.sh"
     hour: "3"
     minute: "0"
-    user: "{{ username }}"
+    user: "{{ vault_service_user }}"
 
 - name: Add MariaDB optimization to crontab
   ansible.builtin.cron:
@@ -283,4 +283,4 @@
     job: "{{ docker_dir }}/mariadb/scripts/manage.sh optimize"
     hour: "4"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_service_user }}" 

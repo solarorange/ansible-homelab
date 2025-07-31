@@ -1,48 +1,39 @@
 ---
-# Fing Network Monitoring Service Deployment
-# Production-ready Ansible tasks for homelab deployment
+# Fing Role Tasks
+# Enhanced with comprehensive security, automation, and validation
+
+- name: Include Fing validation tasks
+  include_tasks: validate.yml
+  when: fing_validation_enabled | default(true)
 
 - name: Include Fing deployment tasks
-  block:
-    - name: Validate Fing configuration
-      ansible.builtin.include_tasks: validate.yml
-      tags: [fing, validation]
+  include_tasks: deploy.yml
+  when: fing_deploy_enabled | default(true)
 
-    - name: Setup Fing prerequisites
-      ansible.builtin.include_tasks: prerequisites.yml
-      tags: [fing, setup]
+- name: Include Fing configuration tasks
+  include_tasks: configure.yml
+  when: fing_deploy_enabled | default(true)
 
-    - name: Deploy Fing service
-      ansible.builtin.include_tasks: deploy.yml
-      tags: [fing, deploy]
+- name: Include Fing security tasks
+  include_tasks: security.yml
+  when: fing_deploy_enabled | default(true)
 
-    - name: Configure Fing monitoring
-      ansible.builtin.include_tasks: monitoring.yml
-      when: fing_monitoring_enabled | default(true)
-      tags: [fing, monitoring]
+- name: Include Fing monitoring tasks
+  include_tasks: monitoring.yml
+  when: fing_monitoring_enabled | default(true)
 
-    - name: Configure Fing security
-      ansible.builtin.include_tasks: security.yml
-      tags: [fing, security]
+- name: Include Fing backup tasks
+  include_tasks: backup.yml
+  when: fing_backup_enabled | default(true)
 
-    - name: Configure Fing backup
-      ansible.builtin.include_tasks: backup.yml
-      when: fing_backup_enabled | default(true)
-      tags: [fing, backup]
+- name: Include Fing automation tasks
+  include_tasks: automation.yml
+  when: fing_automation_enabled | default(true)
 
-    - name: Configure Fing homepage integration
-      ansible.builtin.include_tasks: homepage.yml
-      when: fing_homepage_enabled | default(true)
-      tags: [fing, homepage]
+- name: Include Fing integration tasks
+  include_tasks: integration.yml
+  when: fing_discovery_enabled | default(true)
 
-    - name: Configure Fing alerts
-      ansible.builtin.include_tasks: alerts.yml
-      when: fing_alerting_enabled | default(true)
-      tags: [fing, alerts]
-
-    - name: Validate Fing deployment
-      ansible.builtin.include_tasks: validate_deployment.yml
-      tags: [fing, validation]
-
-  when: fing_enabled | default(true)
-  tags: [fing, always] 
+- name: Include Fing health check tasks
+  include_tasks: health_check.yml
+  when: fing_health_check_enabled | default(true)

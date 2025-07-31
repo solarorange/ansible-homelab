@@ -13,7 +13,7 @@
 
 - name: Test database connectivity
   ansible.builtin.uri:
-    url: "http://localhost:5432"
+    url: "http://{{ ansible_default_ipv4.address }}:5432"
     method: GET
     status_code: [200, 400]
   register: postgres_test
@@ -21,7 +21,7 @@
 
 - name: Test monitoring stack integration
   ansible.builtin.uri:
-    url: "http://localhost:9090/api/v1/targets"
+    url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/targets"
     method: GET
     status_code: 200
   register: prometheus_test

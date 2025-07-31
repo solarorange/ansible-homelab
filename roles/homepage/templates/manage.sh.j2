@@ -198,7 +198,7 @@ case "$1" in
         
         # Check API health
         print_status "Checking API health..."
-        if curl -s -f "http://localhost:{{ homepage_port }}/api/health" >/dev/null; then
+        if curl -s -f "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health" >/dev/null; then
             print_status "✅ API is responding"
         else
             print_error "❌ API is not responding"
@@ -207,7 +207,7 @@ case "$1" in
         
         # Check web interface
         print_status "Checking web interface..."
-        if curl -s -f "http://localhost:{{ homepage_port }}" >/dev/null; then
+        if curl -s -f "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}" >/dev/null; then
             print_status "✅ Web interface is accessible"
         else
             print_error "❌ Web interface is not accessible"
@@ -220,7 +220,7 @@ case "$1" in
     api)
         print_header "Homepage API Test"
         
-        API_BASE="http://localhost:{{ homepage_port }}/api"
+        API_BASE="http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api"
         
         print_status "Testing API endpoints..."
         

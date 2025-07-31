@@ -1,0 +1,230 @@
+---
+# InfluxDB Configuration
+# Production-ready time series database setup with proper security and monitoring
+
+- name: Create InfluxDB directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/influxdb/config"
+    - "{{ docker_dir }}/monitoring/influxdb/scripts"
+    - "{{ logs_dir }}/monitoring/influxdb"
+
+- name: Create InfluxDB configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/influxdb/config/config.yml"
+    content: |
+      bolt-path: "/var/lib/influxdb2/influxd.bolt"
+      engine-path: "/var/lib/influxdb2/engine"
+      http-bind-address: ":8086"
+      log-level: "info"
+      metrics-disabled: false
+      reporting-disabled: true
+      store: "bolt"
+      tracing-type: "log"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create InfluxDB initialization script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/influxdb/scripts/init.sh"
+    content: |
+      #!/bin/bash
+      
+      # Wait for InfluxDB to be ready with proper timeout
+      timeout=60
+      counter=0
+      until curl -s http://{{ ansible_default_ipv4.address }}:8086/health > /dev/null 2>&1; do
+        echo "Waiting for InfluxDB to be ready... (${counter}/${timeout}s)"
+        sleep 1
+        counter=$((counter + 1))
+        if [ $counter -ge $timeout ]; then
+          echo "Timeout waiting for InfluxDB to be ready"
+          exit 1
+        fi
+      done
+      
+      # Create initial setup if not already done
+      if ! influx setup --force \
+        --username "${INFLUXDB_ADMIN_USER}" \
+        --password "${INFLUXDB_ADMIN_PASSWORD}" \
+        --org "${INFLUXDB_ORG}" \
+        --bucket "${INFLUXDB_BUCKET}" \
+        --token "${INFLUXDB_TOKEN}"; then
+        echo "InfluxDB setup completed"
+      fi
+      
+      # Create additional buckets if needed
+      influx bucket create --name "system_metrics" --retention 30d
+      influx bucket create --name "application_metrics" --retention 90d
+      influx bucket create --name "security_events" --retention 365d
+      
+      # Create read/write tokens for services
+      influx auth create \
+        --org "${INFLUXDB_ORG}" \
+        --bucket "${INFLUXDB_BUCKET}" \
+        --description "Telegraf token" \
+        --write-bucket "${INFLUXDB_BUCKET}" \
+        --read-bucket "${INFLUXDB_BUCKET}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create InfluxDB management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/influxdb/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+      
+      # InfluxDB Management Script
+      
+      function show_help {
+        echo "InfluxDB Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show InfluxDB status"
+        echo "  logs      - Show InfluxDB logs"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  restart   - Restart InfluxDB"
+        echo "  help      - Show this help"
+      }
+      
+      case "$1" in
+        status)
+          docker exec influxdb influx ping
+          ;;
+        logs)
+          docker logs influxdb --tail 100 -f
+          ;;
+        backup)
+          BACKUP_DIR="{{ backup_dir }}/influxdb"
+          mkdir -p "$BACKUP_DIR"
+          BACKUP_FILE="$BACKUP_DIR/influxdb_$(date +%Y%m%d_%H%M%S).backup"
+          docker exec influxdb influx backup "$BACKUP_FILE"
+          echo "Backup created: $BACKUP_FILE"
+          ;;
+        restore)
+          if [ -z "$2" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          docker exec influxdb influx restore "$2"
+          ;;
+        restart)
+          docker restart influxdb
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create InfluxDB health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/influxdb/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+      
+      # Check if InfluxDB is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8086/health > /dev/null; then
+        echo "InfluxDB is not responding"
+        exit 1
+      fi
+      
+      # Check if we can query the database
+      if ! docker exec influxdb influx ping > /dev/null; then
+        echo "InfluxDB is not accepting queries"
+        exit 1
+      fi
+      
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create InfluxDB log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/influxdb/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/influxdb/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add InfluxDB log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate InfluxDB logs"
+    job: "logrotate {{ docker_dir }}/monitoring/influxdb/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Create InfluxDB backup cron job
+  ansible.builtin.cron:
+    name: "Backup InfluxDB"
+    job: "{{ docker_dir }}/monitoring/influxdb/scripts/manage.sh backup"
+    hour: "1"
+    minute: "0"
+    user: "{{ username }}"
+
+- name: Ensure InfluxDB is running
+  ansible.builtin.docker_container:
+    name: influxdb
+    state: started
+    image: influxdb:2.7-alpine
+    networks:
+      - monitoring
+      - homelab
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - "{{ docker_dir }}/monitoring/influxdb/config:/etc/influxdb2"
+    env:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: "{{ influxdb_admin_user }}"
+      DOCKER_INFLUXDB_INIT_PASSWORD: "{{ influxdb_admin_password }}"
+      DOCKER_INFLUXDB_INIT_ORG: "{{ influxdb_org }}"
+      DOCKER_INFLUXDB_INIT_BUCKET: "{{ influxdb_bucket }}"
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "{{ influxdb_token }}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.influxdb.rule=Host(`influxdb.{{ domain }}`)"
+      - "traefik.http.routers.influxdb.entrypoints=https"
+      - "traefik.http.routers.influxdb.tls=true"
+      - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
+      - "traefik.http.routers.influxdb.middlewares=authentik@docker"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart_policy: unless-stopped
+    # Resource limits
+    memory: "2g"
+    memory_swap: "4g"
+    memory_reservation: "1g"
+    cpu_shares: 1024
+    cpu_period: 100000
+    cpu_quota: 100000
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536 

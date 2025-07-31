@@ -1,0 +1,89 @@
+---
+# Guacamole Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Guacamole vault variables
+  block:
+    - name: Check required Guacamole vault variables
+      assert:
+        that:
+          - vault_guacamole_admin_password is defined
+          - vault_guacamole_database_password is defined
+          - vault_guacamole_api_key is defined
+          - vault_guacamole_secret_key is defined
+          - vault_guacamole_encryption_key is defined
+          - vault_guacamole_jwt_secret is defined
+        fail_msg: "Required Guacamole vault variables are not defined"
+        success_msg: "All required Guacamole vault variables are defined"
+
+    - name: Validate Guacamole password complexity
+      assert:
+        that:
+          - vault_guacamole_admin_password | length >= 12
+          - vault_guacamole_database_password | length >= 12
+        fail_msg: "Guacamole passwords must be at least 12 characters long"
+        success_msg: "Guacamole password complexity requirements met"
+
+- name: Validate Guacamole network configuration
+  block:
+    - name: Check Guacamole port configuration
+      assert:
+        that:
+          - guacamole_port is defined
+          - guacamole_port | int >= 1024
+          - guacamole_port | int <= 65535
+        fail_msg: "Guacamole port must be between 1024 and 65535"
+        success_msg: "Guacamole port configuration is valid"
+
+    - name: Check Guacamole domain configuration
+      assert:
+        that:
+          - domain is defined
+          - guacamole_subdomain is defined
+        fail_msg: "Guacamole domain configuration is incomplete"
+        success_msg: "Guacamole domain configuration is valid"
+
+- name: Validate Guacamole security configuration
+  block:
+    - name: Check Guacamole SSL configuration
+      assert:
+        that:
+          - guacamole_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Guacamole SSL configuration is invalid"
+        success_msg: "Guacamole SSL configuration is valid"
+
+    - name: Check Guacamole authentication configuration
+      assert:
+        that:
+          - guacamole_auth_enabled | bool
+          - guacamole_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Guacamole authentication configuration is invalid"
+        success_msg: "Guacamole authentication configuration is valid"
+
+- name: Validate Guacamole storage configuration
+  block:
+    - name: Check Guacamole data directories
+      assert:
+        that:
+          - guacamole_data_dir is defined
+          - guacamole_config_dir is defined
+          - guacamole_backup_dir is defined
+        fail_msg: "Guacamole storage configuration is incomplete"
+        success_msg: "Guacamole storage configuration is valid"
+
+    - name: Create Guacamole directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ guacamole_data_dir }}"
+        - "{{ guacamole_config_dir }}"
+        - "{{ guacamole_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Guacamole validation completed successfully - all configurations are valid and secure"

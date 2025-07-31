@@ -1,0 +1,259 @@
+# Guacamole Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# GUACAMOLE SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+guacamole_service_name: "guacamole"
+guacamole_container_name: "{{ guacamole_service_name }}"
+guacamole_image: "guacamole/guacamole:latest"
+guacamole_version: "latest"
+
+# Network Configuration
+guacamole_port: 8080
+guacamole_external_port: "{{ guacamole_port }}"
+guacamole_protocol: "http"
+guacamole_host: "{{ ansible_default_ipv4.address }}"
+guacamole_url: "{{ guacamole_protocol }}://{{ guacamole_host }}:{{ guacamole_port }}"
+
+# Domain Configuration
+guacamole_subdomain: "guacamole"
+guacamole_domain: "{{ guacamole_subdomain }}.{{ domain }}"
+guacamole_external_url: "https://{{ guacamole_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+guacamole_auth_enabled: true
+guacamole_auth_method: "authentik"  # Options: basic, authentik, none
+guacamole_admin_username: "admin"
+guacamole_admin_password: "{{ vault_guacamole_admin_password }}"
+
+# API Configuration
+guacamole_api_key: "{{ vault_guacamole_api_key }}"
+guacamole_api_token: "{{ vault_guacamole_api_token }}"
+
+# Encryption & Security
+guacamole_secret_key: "{{ vault_guacamole_secret_key }}"
+guacamole_encryption_key: "{{ vault_guacamole_encryption_key }}"
+guacamole_jwt_secret: "{{ vault_guacamole_jwt_secret }}"
+
+# SSL/TLS Configuration
+guacamole_ssl_enabled: true
+guacamole_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+guacamole_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+guacamole_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+guacamole_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+guacamole_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+guacamole_database_port: "{{ databases_postgresql_port | default(5432) }}"
+guacamole_database_name: "guacamole"
+guacamole_database_username: "guacamole"
+guacamole_database_password: "{{ vault_guacamole_database_password }}"
+
+# Redis Configuration (if using)
+guacamole_redis_enabled: false
+guacamole_redis_host: "{{ redis_host | default('redis') }}"
+guacamole_redis_port: "{{ redis_port | default(6379) }}"
+guacamole_redis_password: "{{ vault_guacamole_redis_password }}"
+guacamole_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+guacamole_data_dir: "{{ homelab_data_dir }}/guacamole"
+guacamole_config_dir: "{{ guacamole_data_dir }}/config"
+guacamole_backup_dir: "{{ guacamole_data_dir }}/backups"
+
+# Volume Mappings
+guacamole_volumes:
+  - "{{ guacamole_config_dir }}:/config"
+  - "{{ guacamole_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+guacamole_health_check_enabled: true
+guacamole_health_check_path: "/health"
+guacamole_health_check_interval: 30
+guacamole_health_check_timeout: 10
+guacamole_health_check_retries: 3
+
+# Monitoring Integration
+guacamole_monitoring_enabled: true
+guacamole_prometheus_enabled: true
+guacamole_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+guacamole_backup_enabled: true
+guacamole_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+guacamole_backup_retention_days: 30
+guacamole_backup_encryption_enabled: true
+guacamole_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+guacamole_smtp_enabled: false
+guacamole_smtp_host: "{{ smtp_host | default('') }}"
+guacamole_smtp_port: "{{ smtp_port | default(587) }}"
+guacamole_smtp_username: "{{ vault_smtp_username }}"
+guacamole_smtp_password: "{{ vault_guacamole_smtp_password }}"
+guacamole_smtp_from: "{{ guacamole_admin_email | default('admin@' + domain) }}"
+guacamole_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+guacamole_webhook_enabled: false
+guacamole_webhook_url: "{{ vault_webhook_url | default('') }}"
+guacamole_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+guacamole_discovery_enabled: true
+guacamole_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+guacamole_cpu_limit: "1.0"
+guacamole_memory_limit: "1g"
+guacamole_memory_reservation: "512m"
+
+# Performance Settings
+guacamole_scan_interval: 10
+guacamole_parallel_downloads: 3
+guacamole_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+guacamole_log_level: "info"  # Options: trace, debug, info, warn, error
+guacamole_log_rotation_enabled: true
+guacamole_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+guacamole_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+guacamole_rate_limit_enabled: true
+guacamole_rate_limit_requests: 100
+guacamole_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+guacamole_deploy_enabled: true
+guacamole_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+guacamole_restart_policy: "unless-stopped"
+guacamole_auto_update_enabled: true
+
+# Environment Variables
+guacamole_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  GUACAMOLE_API_KEY: "{{ guacamole_api_key }}"
+  GUACAMOLE_SECRET_KEY: "{{ guacamole_secret_key }}"
+  GUACAMOLE_ENCRYPTION_KEY: "{{ guacamole_encryption_key }}"
+  GUACAMOLE_JWT_SECRET: "{{ guacamole_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+guacamole_validation_enabled: true
+guacamole_validation_timeout: 300
+guacamole_validation_retries: 3
+
+# Testing Configuration
+guacamole_test_enabled: false
+guacamole_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+guacamole_compliance_enabled: true
+guacamole_audit_logging_enabled: true
+guacamole_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+guacamole_automation_enabled: true
+guacamole_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+guacamole_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+guacamole_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+guacamole_fallback_enabled: true
+guacamole_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

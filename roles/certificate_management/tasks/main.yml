@@ -1,131 +1,39 @@
 ---
-# Tasks for certificate management role
+# Certificate_Management Role Tasks
+# Enhanced with comprehensive security, automation, and validation
 
-- name: Create certificate management directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: '0755'
-  loop:
-    - "{{ docker_dir }}/certificate_management"
-    - "{{ docker_dir }}/certificate_management/config"
-    - "{{ docker_dir }}/certificate_management/scripts"
-    - "{{ docker_dir }}/certificate_management/logs"
-    - "{{ docker_dir }}/certificate_management/reports"
-  register: dir_creation
+- name: Include Certificate_Management validation tasks
+  include_tasks: validate.yml
+  when: certificate_management_validation_enabled | default(true)
 
-- name: Create certificate monitoring script
-  template:
-    src: monitor_certs.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/monitor_certs.sh"
-    mode: '0755'
-  register: monitor_script_creation
+- name: Include Certificate_Management deployment tasks
+  include_tasks: deploy.yml
+  when: certificate_management_deploy_enabled | default(true)
 
-- name: Create notification script
-  template:
-    src: send_notification.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/send_notification.sh"
-    mode: '0755'
-  register: notification_script_creation
+- name: Include Certificate_Management configuration tasks
+  include_tasks: configure.yml
+  when: certificate_management_deploy_enabled | default(true)
 
-- name: Create certificate pinning configuration
-  template:
-    src: pinning.yml.j2
-    dest: "{{ docker_dir }}/certificate_management/config/pinning.yml"
-  register: pinning_config_creation
+- name: Include Certificate_Management security tasks
+  include_tasks: security.yml
+  when: certificate_management_deploy_enabled | default(true)
 
-- name: Create OCSP stapling configuration
-  template:
-    src: ocsp.yml.j2
-    dest: "{{ docker_dir }}/certificate_management/config/ocsp.yml"
-  register: ocsp_config_creation
+- name: Include Certificate_Management monitoring tasks
+  include_tasks: monitoring.yml
+  when: certificate_management_monitoring_enabled | default(true)
 
-- name: Create mTLS configuration
-  template:
-    src: mtls.yml.j2
-    dest: "{{ docker_dir }}/certificate_management/config/mtls.yml"
-  register: mtls_config_creation
+- name: Include Certificate_Management backup tasks
+  include_tasks: backup.yml
+  when: certificate_management_backup_enabled | default(true)
 
-- name: Create automated certificate management script
-  template:
-    src: automate_certs.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/automate_certs.sh"
-    mode: '0755'
-  register: automation_script_creation
+- name: Include Certificate_Management automation tasks
+  include_tasks: automation.yml
+  when: certificate_management_automation_enabled | default(true)
 
-- name: Create Loki integration script
-  template:
-    src: log_to_loki.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/log_to_loki.sh"
-    mode: '0755'
-  register: loki_script_creation
+- name: Include Certificate_Management integration tasks
+  include_tasks: integration.yml
+  when: certificate_management_discovery_enabled | default(true)
 
-- name: Create certificate report viewer script
-  template:
-    src: view_reports.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/view_reports.sh"
-    mode: '0755'
-  register: report_viewer_creation
-
-- name: Create certificate management dashboard script
-  template:
-    src: dashboard.sh.j2
-    dest: "{{ docker_dir }}/certificate_management/scripts/dashboard.sh"
-    mode: '0755'
-  register: dashboard_creation
-
-- name: Add cron job for certificate monitoring
-  cron:
-    name: "Certificate monitoring"
-    job: "{{ docker_dir }}/certificate_management/scripts/automate_certs.sh >> {{ docker_dir }}/certificate_management/logs/automation.log 2>&1"
-    hour: "0"
-    minute: "0"
-    state: present
-  register: cron_monitoring
-
-- name: Add cron job for Loki log forwarding
-  cron:
-    name: "Forward certificate logs to Loki"
-    job: "{{ docker_dir }}/certificate_management/scripts/log_to_loki.sh >> {{ docker_dir }}/certificate_management/logs/loki_forwarder.log 2>&1"
-    hour: "*/1"
-    minute: "0"
-    state: present
-  register: cron_loki
-
-- name: Create logrotate configuration for certificate logs
-  template:
-    src: logrotate.conf.j2
-    dest: /etc/logrotate.d/certificate_management
-  register: logrotate_creation
-
-- name: Create Grafana dashboard for certificate monitoring
-  template:
-    src: certificate_dashboard.json.j2
-    dest: "{{ docker_dir }}/grafana/provisioning/dashboards/certificate_management.json"
-  register: grafana_dashboard_creation
-
-- name: Create Grafana datasource for certificate metrics
-  template:
-    src: certificate_datasource.yml.j2
-    dest: "{{ docker_dir }}/grafana/provisioning/datasources/certificate_metrics.yml"
-  register: grafana_datasource_creation
-
-- name: Create Prometheus certificate monitoring rules
-  template:
-    src: certificate_rules.yml.j2
-    dest: "{{ docker_dir }}/prometheus/rules/certificate_alerts.yml"
-  register: prometheus_rules_creation
-
-- name: Create certificate monitoring service
-  template:
-    src: certificate_monitor.service.j2
-    dest: /etc/systemd/system/certificate-monitor.service
-  register: service_creation
-
-- name: Enable and start certificate monitoring service
-  systemd:
-    name: certificate-monitor
-    state: started
-    enabled: yes
-    daemon_reload: yes
-  register: service_start 
+- name: Include Certificate_Management health check tasks
+  include_tasks: health_check.yml
+  when: certificate_management_health_check_enabled | default(true)

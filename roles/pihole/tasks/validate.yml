@@ -1,0 +1,89 @@
+---
+# Pihole Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Pihole vault variables
+  block:
+    - name: Check required Pihole vault variables
+      assert:
+        that:
+          - vault_pihole_admin_password is defined
+          - vault_pihole_database_password is defined
+          - vault_pihole_api_key is defined
+          - vault_pihole_secret_key is defined
+          - vault_pihole_encryption_key is defined
+          - vault_pihole_jwt_secret is defined
+        fail_msg: "Required Pihole vault variables are not defined"
+        success_msg: "All required Pihole vault variables are defined"
+
+    - name: Validate Pihole password complexity
+      assert:
+        that:
+          - vault_pihole_admin_password | length >= 12
+          - vault_pihole_database_password | length >= 12
+        fail_msg: "Pihole passwords must be at least 12 characters long"
+        success_msg: "Pihole password complexity requirements met"
+
+- name: Validate Pihole network configuration
+  block:
+    - name: Check Pihole port configuration
+      assert:
+        that:
+          - pihole_port is defined
+          - pihole_port | int >= 1024
+          - pihole_port | int <= 65535
+        fail_msg: "Pihole port must be between 1024 and 65535"
+        success_msg: "Pihole port configuration is valid"
+
+    - name: Check Pihole domain configuration
+      assert:
+        that:
+          - domain is defined
+          - pihole_subdomain is defined
+        fail_msg: "Pihole domain configuration is incomplete"
+        success_msg: "Pihole domain configuration is valid"
+
+- name: Validate Pihole security configuration
+  block:
+    - name: Check Pihole SSL configuration
+      assert:
+        that:
+          - pihole_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Pihole SSL configuration is invalid"
+        success_msg: "Pihole SSL configuration is valid"
+
+    - name: Check Pihole authentication configuration
+      assert:
+        that:
+          - pihole_auth_enabled | bool
+          - pihole_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Pihole authentication configuration is invalid"
+        success_msg: "Pihole authentication configuration is valid"
+
+- name: Validate Pihole storage configuration
+  block:
+    - name: Check Pihole data directories
+      assert:
+        that:
+          - pihole_data_dir is defined
+          - pihole_config_dir is defined
+          - pihole_backup_dir is defined
+        fail_msg: "Pihole storage configuration is incomplete"
+        success_msg: "Pihole storage configuration is valid"
+
+    - name: Create Pihole directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ pihole_data_dir }}"
+        - "{{ pihole_config_dir }}"
+        - "{{ pihole_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Pihole validation completed successfully - all configurations are valid and secure"

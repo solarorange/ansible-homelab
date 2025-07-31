@@ -95,7 +95,7 @@
 
 - name: Wait for Vaultwarden to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ vaultwarden_port }}/alive"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}/alive"
     method: GET
     status_code: [200, 302, 401]
     timeout: 30
@@ -123,7 +123,7 @@
       
       Status: {{ 'SUCCESS' if vaultwarden_verification.status == 200 or vaultwarden_verification.status == 302 else 'FAILED' }}
       URL: https://{{ vaultwarden_subdomain }}.{{ domain }}
-      Local URL: http://localhost:{{ vaultwarden_port }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}
       
       Configuration:
       - Database Type: {{ vaultwarden_database_type }}

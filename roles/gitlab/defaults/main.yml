@@ -1,0 +1,259 @@
+# Gitlab Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# GITLAB SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+gitlab_service_name: "gitlab"
+gitlab_container_name: "{{ gitlab_service_name }}"
+gitlab_image: "gitlab/gitlab-ce:latest"
+gitlab_version: "latest"
+
+# Network Configuration
+gitlab_port: 80
+gitlab_external_port: "{{ gitlab_port }}"
+gitlab_protocol: "http"
+gitlab_host: "{{ ansible_default_ipv4.address }}"
+gitlab_url: "{{ gitlab_protocol }}://{{ gitlab_host }}:{{ gitlab_port }}"
+
+# Domain Configuration
+gitlab_subdomain: "gitlab"
+gitlab_domain: "{{ gitlab_subdomain }}.{{ domain }}"
+gitlab_external_url: "https://{{ gitlab_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+gitlab_auth_enabled: true
+gitlab_auth_method: "authentik"  # Options: basic, authentik, none
+gitlab_admin_username: "admin"
+gitlab_admin_password: "{{ vault_gitlab_admin_password }}"
+
+# API Configuration
+gitlab_api_key: "{{ vault_gitlab_api_key }}"
+gitlab_api_token: "{{ vault_gitlab_api_token }}"
+
+# Encryption & Security
+gitlab_secret_key: "{{ vault_gitlab_secret_key }}"
+gitlab_encryption_key: "{{ vault_gitlab_encryption_key }}"
+gitlab_jwt_secret: "{{ vault_gitlab_jwt_secret }}"
+
+# SSL/TLS Configuration
+gitlab_ssl_enabled: true
+gitlab_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+gitlab_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+gitlab_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+gitlab_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+gitlab_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+gitlab_database_port: "{{ databases_postgresql_port | default(5432) }}"
+gitlab_database_name: "gitlab"
+gitlab_database_username: "gitlab"
+gitlab_database_password: "{{ vault_gitlab_database_password }}"
+
+# Redis Configuration (if using)
+gitlab_redis_enabled: false
+gitlab_redis_host: "{{ redis_host | default('redis') }}"
+gitlab_redis_port: "{{ redis_port | default(6379) }}"
+gitlab_redis_password: "{{ vault_gitlab_redis_password }}"
+gitlab_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+gitlab_data_dir: "{{ homelab_data_dir }}/gitlab"
+gitlab_config_dir: "{{ gitlab_data_dir }}/config"
+gitlab_backup_dir: "{{ gitlab_data_dir }}/backups"
+
+# Volume Mappings
+gitlab_volumes:
+  - "{{ gitlab_config_dir }}:/config"
+  - "{{ gitlab_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+gitlab_health_check_enabled: true
+gitlab_health_check_path: "/health"
+gitlab_health_check_interval: 30
+gitlab_health_check_timeout: 10
+gitlab_health_check_retries: 3
+
+# Monitoring Integration
+gitlab_monitoring_enabled: true
+gitlab_prometheus_enabled: true
+gitlab_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+gitlab_backup_enabled: true
+gitlab_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+gitlab_backup_retention_days: 30
+gitlab_backup_encryption_enabled: true
+gitlab_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+gitlab_smtp_enabled: false
+gitlab_smtp_host: "{{ smtp_host | default('') }}"
+gitlab_smtp_port: "{{ smtp_port | default(587) }}"
+gitlab_smtp_username: "{{ vault_smtp_username }}"
+gitlab_smtp_password: "{{ vault_gitlab_smtp_password }}"
+gitlab_smtp_from: "{{ gitlab_admin_email | default('admin@' + domain) }}"
+gitlab_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+gitlab_webhook_enabled: false
+gitlab_webhook_url: "{{ vault_webhook_url | default('') }}"
+gitlab_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+gitlab_discovery_enabled: true
+gitlab_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+gitlab_cpu_limit: "1.0"
+gitlab_memory_limit: "1g"
+gitlab_memory_reservation: "512m"
+
+# Performance Settings
+gitlab_scan_interval: 10
+gitlab_parallel_downloads: 3
+gitlab_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+gitlab_log_level: "info"  # Options: trace, debug, info, warn, error
+gitlab_log_rotation_enabled: true
+gitlab_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+gitlab_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+gitlab_rate_limit_enabled: true
+gitlab_rate_limit_requests: 100
+gitlab_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+gitlab_deploy_enabled: true
+gitlab_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+gitlab_restart_policy: "unless-stopped"
+gitlab_auto_update_enabled: true
+
+# Environment Variables
+gitlab_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  GITLAB_API_KEY: "{{ gitlab_api_key }}"
+  GITLAB_SECRET_KEY: "{{ gitlab_secret_key }}"
+  GITLAB_ENCRYPTION_KEY: "{{ gitlab_encryption_key }}"
+  GITLAB_JWT_SECRET: "{{ gitlab_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+gitlab_validation_enabled: true
+gitlab_validation_timeout: 300
+gitlab_validation_retries: 3
+
+# Testing Configuration
+gitlab_test_enabled: false
+gitlab_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+gitlab_compliance_enabled: true
+gitlab_audit_logging_enabled: true
+gitlab_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+gitlab_automation_enabled: true
+gitlab_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+gitlab_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+gitlab_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+gitlab_fallback_enabled: true
+gitlab_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

@@ -259,8 +259,7 @@ verify_restore() {
         # Check database connectivity
         log "Checking database connectivity..."
         if command -v psql >/dev/null 2>&1; then
-            if PGPASSWORD="{{ immich_postgres_password }}" psql -h immich-postgres -U "{{ immich_postgres_user }}" -d "{{ immich_postgres_db }}" -c "SELECT 1;" >/dev/null 2>&1; then
-                log "Database connectivity check passed"
+            if PGpassword: "{{ vault_immich_admin_password | password_hash("bcrypt") }}"Database connectivity check passed"
             else
                 log "WARNING: Database connectivity check failed"
             fi

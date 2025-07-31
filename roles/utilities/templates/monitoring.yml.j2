@@ -5,12 +5,12 @@ scrape_configs:
   - job_name: 'portainer'
     metrics_path: /api/status
     static_configs:
-      - targets: ['localhost:{{ portainer_port | default(9000) }}']
+      - targets: ['{{ ansible_default_ipv4.address }}:{{ portainer_port | default(9000) }}']
 
   - job_name: 'tdarr'
     metrics_path: /api/v2/status
     static_configs:
-      - targets: ['localhost:{{ tdarr_port | default(8265) }}']
+      - targets: ['{{ ansible_default_ipv4.address }}:{{ tdarr_port | default(8265) }}']
 
   - job_name: 'tautulli'
     metrics_path: /api/v2?cmd=get_server_info

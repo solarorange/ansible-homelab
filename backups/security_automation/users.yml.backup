@@ -1,0 +1,94 @@
+---
+# Grafana User Management
+# Configures users, teams, and permissions
+
+- name: Wait for Grafana API to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: users_api_check
+  retries: 3
+  delay: 10
+  until: users_api_check.status == 200
+  tags: [grafana, users, api]
+
+- name: Create Grafana users via Python script
+  ansible.builtin.command: >
+    python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
+    --username {{ grafana_admin_user }}
+    --password {{ grafana_admin_password }}
+    --config-dir {{ docker_dir }}/monitoring/grafana/config
+    users
+  register: users_setup
+  changed_when: users_setup.rc == 0
+  failed_when: users_setup.rc != 0
+  tags: [grafana, users, setup]
+
+- name: Create Grafana teams via Python script
+  ansible.builtin.command: >
+    python3 {{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py
+    --url http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
+    --username {{ grafana_admin_user }}
+    --password {{ grafana_admin_password }}
+    --config-dir {{ docker_dir }}/monitoring/grafana/config
+    teams
+  register: teams_setup
+  changed_when: teams_setup.rc == 0
+  failed_when: teams_setup.rc != 0
+  tags: [grafana, users, teams]
+
+- name: Validate users configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: users_validation
+  tags: [grafana, users, validation]
+
+- name: Validate teams configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/teams/search"
+    method: GET
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: teams_validation
+  tags: [grafana, users, validation]
+
+- name: Display users configuration status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Users Configuration:
+      
+      Users Created:
+      {% for user in grafana_default_users %}
+      - {{ user.username }} ({{ user.role }})
+      {% endfor %}
+      
+      Teams Created:
+      {% for team in grafana_teams %}
+      - {{ team.name }} ({{ team.members | length }} members)
+      {% endfor %}
+      
+      Validation Results:
+      - Users API: {{ users_validation.status == 200 | ternary('OK', 'Failed') }}
+      - Teams API: {{ teams_validation.status == 200 | ternary('OK', 'Failed') }}
+      - Total Users: {{ users_validation.json | length }}
+      - Total Teams: {{ teams_validation.json | length }}
+      
+      Configuration Files:
+      - Users Config: {{ docker_dir }}/monitoring/grafana/config/users.json
+      - Teams Config: {{ docker_dir }}/monitoring/grafana/config/teams.json
+  tags: [grafana, users, summary] 

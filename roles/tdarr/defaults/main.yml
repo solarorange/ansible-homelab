@@ -1,0 +1,259 @@
+# Tdarr Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# TDARR SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+tdarr_service_name: "tdarr"
+tdarr_container_name: "{{ tdarr_service_name }}"
+tdarr_image: "haveagitgat/tdarr:latest"
+tdarr_version: "latest"
+
+# Network Configuration
+tdarr_port: 8265
+tdarr_external_port: "{{ tdarr_port }}"
+tdarr_protocol: "http"
+tdarr_host: "{{ ansible_default_ipv4.address }}"
+tdarr_url: "{{ tdarr_protocol }}://{{ tdarr_host }}:{{ tdarr_port }}"
+
+# Domain Configuration
+tdarr_subdomain: "tdarr"
+tdarr_domain: "{{ tdarr_subdomain }}.{{ domain }}"
+tdarr_external_url: "https://{{ tdarr_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+tdarr_auth_enabled: true
+tdarr_auth_method: "authentik"  # Options: basic, authentik, none
+tdarr_admin_username: "admin"
+tdarr_admin_password: "{{ vault_tdarr_admin_password }}"
+
+# API Configuration
+tdarr_api_key: "{{ vault_tdarr_api_key }}"
+tdarr_api_token: "{{ vault_tdarr_api_token }}"
+
+# Encryption & Security
+tdarr_secret_key: "{{ vault_tdarr_secret_key }}"
+tdarr_encryption_key: "{{ vault_tdarr_encryption_key }}"
+tdarr_jwt_secret: "{{ vault_tdarr_jwt_secret }}"
+
+# SSL/TLS Configuration
+tdarr_ssl_enabled: true
+tdarr_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+tdarr_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+tdarr_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+tdarr_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+tdarr_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+tdarr_database_port: "{{ databases_postgresql_port | default(5432) }}"
+tdarr_database_name: "tdarr"
+tdarr_database_username: "tdarr"
+tdarr_database_password: "{{ vault_tdarr_database_password }}"
+
+# Redis Configuration (if using)
+tdarr_redis_enabled: false
+tdarr_redis_host: "{{ redis_host | default('redis') }}"
+tdarr_redis_port: "{{ redis_port | default(6379) }}"
+tdarr_redis_password: "{{ vault_tdarr_redis_password }}"
+tdarr_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+tdarr_data_dir: "{{ homelab_data_dir }}/tdarr"
+tdarr_config_dir: "{{ tdarr_data_dir }}/config"
+tdarr_backup_dir: "{{ tdarr_data_dir }}/backups"
+
+# Volume Mappings
+tdarr_volumes:
+  - "{{ tdarr_config_dir }}:/config"
+  - "{{ tdarr_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+tdarr_health_check_enabled: true
+tdarr_health_check_path: "/health"
+tdarr_health_check_interval: 30
+tdarr_health_check_timeout: 10
+tdarr_health_check_retries: 3
+
+# Monitoring Integration
+tdarr_monitoring_enabled: true
+tdarr_prometheus_enabled: true
+tdarr_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+tdarr_backup_enabled: true
+tdarr_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+tdarr_backup_retention_days: 30
+tdarr_backup_encryption_enabled: true
+tdarr_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+tdarr_smtp_enabled: false
+tdarr_smtp_host: "{{ smtp_host | default('') }}"
+tdarr_smtp_port: "{{ smtp_port | default(587) }}"
+tdarr_smtp_username: "{{ vault_smtp_username }}"
+tdarr_smtp_password: "{{ vault_tdarr_smtp_password }}"
+tdarr_smtp_from: "{{ tdarr_admin_email | default('admin@' + domain) }}"
+tdarr_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+tdarr_webhook_enabled: false
+tdarr_webhook_url: "{{ vault_webhook_url | default('') }}"
+tdarr_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+tdarr_discovery_enabled: true
+tdarr_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+tdarr_cpu_limit: "1.0"
+tdarr_memory_limit: "1g"
+tdarr_memory_reservation: "512m"
+
+# Performance Settings
+tdarr_scan_interval: 10
+tdarr_parallel_downloads: 3
+tdarr_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+tdarr_log_level: "info"  # Options: trace, debug, info, warn, error
+tdarr_log_rotation_enabled: true
+tdarr_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+tdarr_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+tdarr_rate_limit_enabled: true
+tdarr_rate_limit_requests: 100
+tdarr_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+tdarr_deploy_enabled: true
+tdarr_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+tdarr_restart_policy: "unless-stopped"
+tdarr_auto_update_enabled: true
+
+# Environment Variables
+tdarr_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  TDARR_API_KEY: "{{ tdarr_api_key }}"
+  TDARR_SECRET_KEY: "{{ tdarr_secret_key }}"
+  TDARR_ENCRYPTION_KEY: "{{ tdarr_encryption_key }}"
+  TDARR_JWT_SECRET: "{{ tdarr_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+tdarr_validation_enabled: true
+tdarr_validation_timeout: 300
+tdarr_validation_retries: 3
+
+# Testing Configuration
+tdarr_test_enabled: false
+tdarr_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+tdarr_compliance_enabled: true
+tdarr_audit_logging_enabled: true
+tdarr_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+tdarr_automation_enabled: true
+tdarr_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+tdarr_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+tdarr_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+tdarr_fallback_enabled: true
+tdarr_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

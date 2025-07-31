@@ -1,0 +1,14 @@
+---
+# Romm Deployment Validation
+
+- name: Check Romm service health
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ romm_external_port }}"
+    status_code: [200, 302, 401, 403]
+  register: health_check
+  tags: [romm, validation]
+
+- name: Display Romm health status
+  debug:
+    msg: "Romm is { 'healthy' if health_check.status in [200, 302, 401, 403] else 'unhealthy' }"
+  tags: [romm, validation]

@@ -37,7 +37,7 @@
 
 - name: Wait for Paperless-ngx to start
   ansible.builtin.wait_for:
-    host: "localhost"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ paperless_ngx_web_port }}"
     timeout: 120
     delay: 10
@@ -61,7 +61,7 @@
 
 - name: Wait for Paperless-ngx web interface
   ansible.builtin.uri:
-    url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
     method: GET
     status_code: [200, 302, 401, 403]
     timeout: 30
@@ -75,7 +75,7 @@
   block:
     - name: Check if admin user exists
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/users/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/users/"
         method: GET
         headers:
           Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
@@ -86,7 +86,7 @@
 
     - name: Create admin user via API
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/users/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/users/"
         method: POST
         headers:
           Content-Type: "application/json"
@@ -94,7 +94,7 @@
         body:
           username: "admin"
           email: "{{ paperless_ngx_admin_email }}"
-          password: "{{ paperless_ngx_admin_password }}"
+          password: "{{ vault_paperless_ngx_password }}"
           is_superuser: true
           is_staff: true
         status_code: [201, 400]
@@ -107,14 +107,7 @@
 
   when: 
     - paperless_ngx_auth_method != "authentik"
-    - paperless_ngx_admin_password | default('') != ''
-  tags: [paperless-ngx, deploy]
-
-- name: Configure Paperless-ngx initial settings
-  block:
-    - name: Set Paperless-ngx timezone
-      ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+    - paperless_ngx_admin_password: "{{ vault_paperless_ngx_password }}"bcrypt") }}"http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
         method: PATCH
         headers:
           Content-Type: "application/json"
@@ -130,7 +123,7 @@
 
     - name: Set Paperless-ngx OCR language
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
         method: PATCH
         headers:
           Content-Type: "application/json"
@@ -146,7 +139,7 @@
 
     - name: Set Paperless-ngx consumer polling
       ansible.builtin.uri:
-        url: "http://localhost:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
         method: PATCH
         headers:
           Content-Type: "application/json"
@@ -209,7 +202,7 @@
 
 - name: Wait for Paperless-ngx to be ready after restart
   ansible.builtin.wait_for:
-    host: "localhost"
+    host: "{{ ansible_default_ipv4.address }}"
     port: "{{ paperless_ngx_web_port }}"
     timeout: 60
     delay: 5
@@ -218,7 +211,7 @@
 
 - name: Verify Paperless-ngx deployment
   ansible.builtin.uri:
-    url: "http://localhost:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
     method: GET
     status_code: [200, 302, 401, 403]
     timeout: 10

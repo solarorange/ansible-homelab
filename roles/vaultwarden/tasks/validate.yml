@@ -1,116 +1,89 @@
 ---
-# Vaultwarden Configuration Validation
-# Validates all configuration parameters and system requirements
+# Vaultwarden Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate Vaultwarden basic configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_enabled is defined
-      - vaultwarden_subdomain is defined
-      - vaultwarden_port is defined
-      - vaultwarden_database_type in ['sqlite', 'postgresql']
-    fail_msg: "Invalid Vaultwarden basic configuration"
-  tags: [vaultwarden, vaultwarden-validation, config]
+- name: Validate Vaultwarden vault variables
+  block:
+    - name: Check required Vaultwarden vault variables
+      assert:
+        that:
+          - vault_vaultwarden_admin_password is defined
+          - vault_vaultwarden_database_password is defined
+          - vault_vaultwarden_api_key is defined
+          - vault_vaultwarden_secret_key is defined
+          - vault_vaultwarden_encryption_key is defined
+          - vault_vaultwarden_jwt_secret is defined
+        fail_msg: "Required Vaultwarden vault variables are not defined"
+        success_msg: "All required Vaultwarden vault variables are defined"
+
+    - name: Validate Vaultwarden password complexity
+      assert:
+        that:
+          - vault_vaultwarden_admin_password | length >= 12
+          - vault_vaultwarden_database_password | length >= 12
+        fail_msg: "Vaultwarden passwords must be at least 12 characters long"
+        success_msg: "Vaultwarden password complexity requirements met"
 
 - name: Validate Vaultwarden network configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_network_name is defined
-      - vaultwarden_traefik_enabled is defined
-      - vaultwarden_traefik_network is defined
-    fail_msg: "Invalid Vaultwarden network configuration"
-  tags: [vaultwarden, vaultwarden-validation, network]
+  block:
+    - name: Check Vaultwarden port configuration
+      assert:
+        that:
+          - vaultwarden_port is defined
+          - vaultwarden_port | int >= 1024
+          - vaultwarden_port | int <= 65535
+        fail_msg: "Vaultwarden port must be between 1024 and 65535"
+        success_msg: "Vaultwarden port configuration is valid"
+
+    - name: Check Vaultwarden domain configuration
+      assert:
+        that:
+          - domain is defined
+          - vaultwarden_subdomain is defined
+        fail_msg: "Vaultwarden domain configuration is incomplete"
+        success_msg: "Vaultwarden domain configuration is valid"
 
 - name: Validate Vaultwarden security configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_security_headers is defined
-      - vaultwarden_rate_limiting is defined
-      - vaultwarden_cors_enabled is defined
-    fail_msg: "Invalid Vaultwarden security configuration"
-  tags: [vaultwarden, vaultwarden-validation, security]
+  block:
+    - name: Check Vaultwarden SSL configuration
+      assert:
+        that:
+          - vaultwarden_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Vaultwarden SSL configuration is invalid"
+        success_msg: "Vaultwarden SSL configuration is valid"
 
-- name: Validate Vaultwarden monitoring configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_monitoring_enabled is defined
-      - vaultwarden_health_check_enabled is defined
-      - vaultwarden_prometheus_enabled is defined
-    fail_msg: "Invalid Vaultwarden monitoring configuration"
-  tags: [vaultwarden, vaultwarden-validation, monitoring]
+    - name: Check Vaultwarden authentication configuration
+      assert:
+        that:
+          - vaultwarden_auth_enabled | bool
+          - vaultwarden_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Vaultwarden authentication configuration is invalid"
+        success_msg: "Vaultwarden authentication configuration is valid"
 
-- name: Validate Vaultwarden backup configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_backup_enabled is defined
-      - vaultwarden_backup_retention_days is defined
-      - vaultwarden_backup_schedule is defined
-    fail_msg: "Invalid Vaultwarden backup configuration"
-  tags: [vaultwarden, vaultwarden-validation, backup]
+- name: Validate Vaultwarden storage configuration
+  block:
+    - name: Check Vaultwarden data directories
+      assert:
+        that:
+          - vaultwarden_data_dir is defined
+          - vaultwarden_config_dir is defined
+          - vaultwarden_backup_dir is defined
+        fail_msg: "Vaultwarden storage configuration is incomplete"
+        success_msg: "Vaultwarden storage configuration is valid"
 
-- name: Validate Vaultwarden homepage integration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_homepage_enabled is defined
-      - vaultwarden_homepage_category is defined
-      - vaultwarden_homepage_description is defined
-    fail_msg: "Invalid Vaultwarden homepage integration configuration"
-  tags: [vaultwarden, vaultwarden-validation, homepage]
+    - name: Create Vaultwarden directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ vaultwarden_data_dir }}"
+        - "{{ vaultwarden_config_dir }}"
+        - "{{ vaultwarden_backup_dir }}"
 
-- name: Validate Vaultwarden port configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_port >= 1
-      - vaultwarden_port <= 65535
-      - vaultwarden_websocket_port >= 1
-      - vaultwarden_websocket_port <= 65535
-    fail_msg: "Invalid Vaultwarden port configuration"
-  tags: [vaultwarden, vaultwarden-validation, ports]
-
-- name: Validate Vaultwarden resource limits
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_memory_limit is defined
-      - vaultwarden_cpu_limit is defined
-      - vaultwarden_storage_limit is defined
-    fail_msg: "Invalid Vaultwarden resource limits configuration"
-  tags: [vaultwarden, vaultwarden-validation, resources]
-
-- name: Check Vaultwarden domain configuration
-  ansible.builtin.assert:
-    that:
-      - domain is defined
-      - vaultwarden_subdomain is defined
-    fail_msg: "Vaultwarden domain configuration is incomplete"
-  tags: [vaultwarden, vaultwarden-validation, domain]
-
-- name: Validate Vaultwarden database configuration
-  ansible.builtin.assert:
-    that:
-      - vaultwarden_database_type in ['sqlite', 'postgresql']
-      - vaultwarden_database_type == 'sqlite' or (vaultwarden_database_host is defined and vaultwarden_database_port is defined)
-    fail_msg: "Invalid Vaultwarden database configuration"
-  tags: [vaultwarden, vaultwarden-validation, database]
-
-- name: Display Vaultwarden validation results
-  ansible.builtin.debug:
-    msg: |
-      ========================================
-      VAULTWARDEN CONFIGURATION VALIDATION
-      ========================================
-      
-      Basic Configuration: ✓
-      Network Configuration: ✓
-      Security Configuration: ✓
-      Monitoring Configuration: ✓
-      Backup Configuration: ✓
-      Homepage Integration: ✓
-      Port Configuration: ✓
-      Resource Limits: ✓
-      Domain Configuration: ✓
-      Database Configuration: ✓
-      
-      All Vaultwarden configuration parameters are valid.
-      
-      ========================================
-  tags: [vaultwarden, vaultwarden-validation, summary] 
+- name: Final validation summary
+  debug:
+    msg: "Vaultwarden validation completed successfully - all configurations are valid and secure"

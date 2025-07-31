@@ -5,7 +5,7 @@ health_checks:
   # Infrastructure Services
   infrastructure:
     traefik:
-      url: "http://{{ traefik_host | default('localhost') }}:{{ traefik_port | default(8080) }}/api/health"
+      url: "http://{{ traefik_host | default('{{ ansible_default_ipv4.address }}') }}:{{ traefik_port | default(8080) }}/api/health"
       method: "GET"
       expected_status: 200
       timeout: 10
@@ -13,7 +13,7 @@ health_checks:
       retries: 3
     
     authentik:
-      url: "http://{{ authentik_host | default('localhost') }}:{{ authentik_port | default(9000) }}/if/user/"
+      url: "http://{{ authentik_host | default('{{ ansible_default_ipv4.address }}') }}:{{ authentik_port | default(9000) }}/if/user/"
       method: "GET"
       expected_status: [200, 302]
       timeout: 15
@@ -91,7 +91,7 @@ health_checks:
   # Media Services
   media:
     sonarr:
-      url: "http://localhost:8989/health"
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
       method: "GET"
       expected_status: 200
       timeout: 15
@@ -99,7 +99,7 @@ health_checks:
       retries: 3
     
     radarr:
-      url: "http://localhost:7878/health"
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
       method: "GET"
       expected_status: 200
       timeout: 15
@@ -107,7 +107,7 @@ health_checks:
       retries: 3
     
     jellyfin:
-      url: "http://localhost:8096/health"
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
       method: "GET"
       expected_status: 200
       timeout: 15
@@ -115,7 +115,7 @@ health_checks:
       retries: 3
     
     plex:
-      url: "http://localhost:32400/web/index.html"
+      url: "http://{{ ansible_default_ipv4.address }}:/web/index.html"
       method: "GET"
       expected_status: 200
       timeout: 15
@@ -125,7 +125,7 @@ health_checks:
   # Storage Services
   storage:
     nextcloud:
-      url: "http://localhost:8080/status.php"
+      url: "http://{{ ansible_default_ipv4.address }}:/status.php"
       method: "GET"
       expected_status: 200
       timeout: 15
@@ -133,7 +133,7 @@ health_checks:
       retries: 3
     
     samba:
-      url: "localhost:139"
+      url: "{{ ansible_default_ipv4.address }}:"
       method: "TCP"
       expected_status: "connected"
       timeout: 5
@@ -143,7 +143,7 @@ health_checks:
   # Security Services
   security:
     crowdsec:
-      url: "http://localhost:6060/v1/decisions"
+      url: "http://{{ ansible_default_ipv4.address }}:/v1/decisions"
       method: "GET"
       expected_status: 200
       timeout: 10
@@ -151,7 +151,7 @@ health_checks:
       retries: 3
     
     fail2ban:
-      url: "localhost:22"
+      url: "{{ ansible_default_ipv4.address }}:"
       method: "TCP"
       expected_status: "connected"
       timeout: 5

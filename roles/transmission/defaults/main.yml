@@ -1,0 +1,259 @@
+# Transmission Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# TRANSMISSION SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+transmission_service_name: "transmission"
+transmission_container_name: "{{ transmission_service_name }}"
+transmission_image: "linuxserver/transmission:latest"
+transmission_version: "latest"
+
+# Network Configuration
+transmission_port: 9091
+transmission_external_port: "{{ transmission_port }}"
+transmission_protocol: "http"
+transmission_host: "{{ ansible_default_ipv4.address }}"
+transmission_url: "{{ transmission_protocol }}://{{ transmission_host }}:{{ transmission_port }}"
+
+# Domain Configuration
+transmission_subdomain: "transmission"
+transmission_domain: "{{ transmission_subdomain }}.{{ domain }}"
+transmission_external_url: "https://{{ transmission_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+transmission_auth_enabled: true
+transmission_auth_method: "authentik"  # Options: basic, authentik, none
+transmission_admin_username: "admin"
+transmission_admin_password: "{{ vault_transmission_admin_password }}"
+
+# API Configuration
+transmission_api_key: "{{ vault_transmission_api_key }}"
+transmission_api_token: "{{ vault_transmission_api_token }}"
+
+# Encryption & Security
+transmission_secret_key: "{{ vault_transmission_secret_key }}"
+transmission_encryption_key: "{{ vault_transmission_encryption_key }}"
+transmission_jwt_secret: "{{ vault_transmission_jwt_secret }}"
+
+# SSL/TLS Configuration
+transmission_ssl_enabled: true
+transmission_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+transmission_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+transmission_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+transmission_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+transmission_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+transmission_database_port: "{{ databases_postgresql_port | default(5432) }}"
+transmission_database_name: "transmission"
+transmission_database_username: "transmission"
+transmission_database_password: "{{ vault_transmission_database_password }}"
+
+# Redis Configuration (if using)
+transmission_redis_enabled: false
+transmission_redis_host: "{{ redis_host | default('redis') }}"
+transmission_redis_port: "{{ redis_port | default(6379) }}"
+transmission_redis_password: "{{ vault_transmission_redis_password }}"
+transmission_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+transmission_data_dir: "{{ homelab_data_dir }}/transmission"
+transmission_config_dir: "{{ transmission_data_dir }}/config"
+transmission_backup_dir: "{{ transmission_data_dir }}/backups"
+
+# Volume Mappings
+transmission_volumes:
+  - "{{ transmission_config_dir }}:/config"
+  - "{{ transmission_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+transmission_health_check_enabled: true
+transmission_health_check_path: "/health"
+transmission_health_check_interval: 30
+transmission_health_check_timeout: 10
+transmission_health_check_retries: 3
+
+# Monitoring Integration
+transmission_monitoring_enabled: true
+transmission_prometheus_enabled: true
+transmission_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+transmission_backup_enabled: true
+transmission_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+transmission_backup_retention_days: 30
+transmission_backup_encryption_enabled: true
+transmission_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+transmission_smtp_enabled: false
+transmission_smtp_host: "{{ smtp_host | default('') }}"
+transmission_smtp_port: "{{ smtp_port | default(587) }}"
+transmission_smtp_username: "{{ vault_smtp_username }}"
+transmission_smtp_password: "{{ vault_transmission_smtp_password }}"
+transmission_smtp_from: "{{ transmission_admin_email | default('admin@' + domain) }}"
+transmission_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+transmission_webhook_enabled: false
+transmission_webhook_url: "{{ vault_webhook_url | default('') }}"
+transmission_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+transmission_discovery_enabled: true
+transmission_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+transmission_cpu_limit: "1.0"
+transmission_memory_limit: "1g"
+transmission_memory_reservation: "512m"
+
+# Performance Settings
+transmission_scan_interval: 10
+transmission_parallel_downloads: 3
+transmission_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+transmission_log_level: "info"  # Options: trace, debug, info, warn, error
+transmission_log_rotation_enabled: true
+transmission_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+transmission_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+transmission_rate_limit_enabled: true
+transmission_rate_limit_requests: 100
+transmission_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+transmission_deploy_enabled: true
+transmission_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+transmission_restart_policy: "unless-stopped"
+transmission_auto_update_enabled: true
+
+# Environment Variables
+transmission_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  TRANSMISSION_API_KEY: "{{ transmission_api_key }}"
+  TRANSMISSION_SECRET_KEY: "{{ transmission_secret_key }}"
+  TRANSMISSION_ENCRYPTION_KEY: "{{ transmission_encryption_key }}"
+  TRANSMISSION_JWT_SECRET: "{{ transmission_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+transmission_validation_enabled: true
+transmission_validation_timeout: 300
+transmission_validation_retries: 3
+
+# Testing Configuration
+transmission_test_enabled: false
+transmission_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+transmission_compliance_enabled: true
+transmission_audit_logging_enabled: true
+transmission_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+transmission_automation_enabled: true
+transmission_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+transmission_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+transmission_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+transmission_fallback_enabled: true
+transmission_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

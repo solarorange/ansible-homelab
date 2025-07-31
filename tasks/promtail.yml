@@ -32,7 +32,7 @@
         - job_name: system
           static_configs:
             - targets:
-                - localhost
+                - {{ ansible_default_ipv4.address }}
               labels:
                 job: varlogs
                 __path__: /var/log/*log
@@ -41,7 +41,7 @@
         - job_name: docker
           static_configs:
             - targets:
-                - localhost
+                - {{ ansible_default_ipv4.address }}
               labels:
                 job: docker
                 __path__: /var/lib/docker/containers/*/*-json.log
@@ -57,7 +57,7 @@
         - job_name: monitoring
           static_configs:
             - targets:
-                - localhost
+                - {{ ansible_default_ipv4.address }}
               labels:
                 job: monitoring
                 __path__: /var/log/monitoring/*.log
@@ -66,7 +66,7 @@
         - job_name: applications
           static_configs:
             - targets:
-                - localhost
+                - {{ ansible_default_ipv4.address }}
               labels:
                 job: applications
                 __path__: /var/log/applications/*.log
@@ -97,7 +97,7 @@
       
       case "$1" in
         status)
-          curl -s http://localhost:9080/ready
+          curl -s http://{{ ansible_default_ipv4.address }}:/ready
           ;;
         logs)
           docker logs promtail --tail 100 -f
@@ -123,13 +123,13 @@
       #!/bin/bash
       
       # Check if Promtail is responding
-      if ! curl -s http://localhost:9080/ready > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/ready > /dev/null; then
         echo "Promtail is not responding"
         exit 1
       fi
       
       # Check if we can access metrics
-      if ! curl -s http://localhost:9080/metrics > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/metrics > /dev/null; then
         echo "Promtail metrics endpoint is not responding"
         exit 1
       fi
@@ -162,4 +162,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/promtail/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ username }}" 
+    user: "{{ vault_promtail_user }}" 

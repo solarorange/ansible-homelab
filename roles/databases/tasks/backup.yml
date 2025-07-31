@@ -48,7 +48,7 @@
         hour: "{{ databases_backup_schedule.split(' ')[1] }}"
         minute: "{{ databases_backup_schedule.split(' ')[0] }}"
         job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh daily >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
     - name: Add database weekly backup to crontab
@@ -58,7 +58,7 @@
         hour: "3"
         minute: "0"
         job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh weekly >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
     - name: Add database monthly backup to crontab
@@ -68,7 +68,7 @@
         hour: "4"
         minute: "0"
         job: "{{ docker_dir }}/databases/scripts/backup_orchestrator.sh monthly >> {{ logs_dir }}/databases/backup/backup.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
     - name: Add database backup verification to crontab
@@ -77,7 +77,7 @@
         hour: "6"
         minute: "0"
         job: "{{ docker_dir }}/databases/scripts/backup-verify.sh >> {{ logs_dir }}/databases/backup/backup-verify.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
   tags: [databases, backup, cron]
@@ -98,7 +98,7 @@
         hour: "5"
         minute: "0"
         job: "{{ docker_dir }}/databases/scripts/backup-retention.sh >> {{ logs_dir }}/databases/backup/backup-retention.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
   tags: [databases, backup, retention]
@@ -128,7 +128,7 @@
         name: "PostgreSQL PITR backup"
         minute: "*/{{ databases_pitr_interval[:-1] | int * 60 }}"
         job: "{{ docker_dir }}/postgresql/scripts/pitr.sh >> {{ logs_dir }}/postgresql/pitr.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
       when: postgresql_enabled | default(true)
 
@@ -137,7 +137,7 @@
         name: "MariaDB PITR backup"
         minute: "*/{{ databases_pitr_interval[:-1] | int * 60 }}"
         job: "{{ docker_dir }}/mariadb/scripts/pitr.sh >> {{ logs_dir }}/mariadb/pitr.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
       when: mariadb_enabled | default(true)
 
@@ -159,7 +159,7 @@
         name: "Database backup monitoring"
         minute: "*/30"
         job: "{{ docker_dir }}/databases/scripts/backup-monitor.sh >> {{ logs_dir }}/databases/backup/backup-monitor.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
     - name: Create backup reporting script
@@ -176,7 +176,7 @@
         hour: "7"
         minute: "0"
         job: "{{ docker_dir }}/databases/scripts/backup-report.sh"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
   tags: [databases, backup, monitoring]

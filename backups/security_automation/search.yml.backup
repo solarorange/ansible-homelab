@@ -1,0 +1,783 @@
+---
+# Search Databases Deployment
+# Elasticsearch and Kibana configuration and deployment
+
+- name: Deploy Elasticsearch
+  block:
+    - name: Create Elasticsearch directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ docker_dir }}/elasticsearch/data"
+        - "{{ docker_dir }}/elasticsearch/config"
+        - "{{ docker_dir }}/elasticsearch/scripts"
+        - "{{ docker_dir }}/elasticsearch/backup"
+        - "{{ logs_dir }}/elasticsearch"
+
+    - name: Create Elasticsearch configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/config/elasticsearch.yml"
+        content: |
+          # Cluster
+          cluster.name: {{ elasticsearch_cluster_name }}
+          node.name: ${HOSTNAME}
+          node.master: true
+          node.data: true
+          node.ingest: true
+          
+          # Network
+          network.host: 0.0.0.0
+          http.port: {{ elasticsearch_port }}
+          transport.port: {{ elasticsearch_transport_port }}
+          
+          # Discovery
+          discovery.type: {{ elasticsearch_discovery_type }}
+          
+          # Paths
+          path.data: /usr/share/elasticsearch/data
+          path.logs: /usr/share/elasticsearch/logs
+          
+          # Memory
+          bootstrap.memory_lock: {{ elasticsearch_memory_lock | lower }}
+          
+          # JVM
+          xpack.security.enabled: {{ elasticsearch_auth_enabled | lower }}
+          xpack.security.transport.ssl.enabled: true
+          xpack.security.transport.ssl.verification_mode: certificate
+          xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
+          xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+          
+          # Cross-cluster search
+          search.remote.connect: false
+          
+          # Snapshot and Restore
+          path.repo: ["/usr/share/elasticsearch/backup"]
+          
+          # Monitoring
+          xpack.monitoring.enabled: true
+          xpack.monitoring.collection.enabled: true
+          
+          # Machine Learning
+          xpack.ml.enabled: true
+          
+          # Watcher
+          xpack.watcher.enabled: true
+          
+          # Security
+          xpack.security.audit.enabled: true
+          xpack.security.audit.outputs: [logfile]
+          xpack.security.audit.logfile.events.include: authentication_granted,authentication_failed,access_granted,access_denied,anonymous_access_denied,connection_granted,connection_denied,tampered_request,run_as_granted,run_as_denied
+          
+          # Logging
+          logger.level: INFO
+          logger.name: org.elasticsearch
+          logger.name: org.elasticsearch.transport
+          logger.name: org.elasticsearch.http
+          logger.name: org.elasticsearch.discovery
+          logger.name: org.elasticsearch.cluster.service
+          logger.name: org.elasticsearch.indices
+          logger.name: org.elasticsearch.search
+          logger.name: org.elasticsearch.mapping
+          logger.name: org.elasticsearch.action
+          logger.name: org.elasticsearch.security
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create Elasticsearch JVM options
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/config/jvm.options"
+        content: |
+          # JVM Configuration
+          
+          # Memory
+          -Xms{{ elasticsearch_xms }}
+          -Xmx{{ elasticsearch_xmx }}
+          
+          # GC Settings
+          -XX:+UseG1GC
+          -XX:G1ReservePercent=25
+          -XX:InitiatingHeapOccupancyPercent=75
+          
+          # Logging
+          -XX:+HeapDumpOnOutOfMemoryError
+          -XX:HeapDumpPath=data
+          -XX:ErrorFile=logs/hs_err_pid%p.log
+          
+          # System Properties
+          -Djava.awt.headless=true
+          -Dfile.encoding=UTF-8
+          -Djna.nosys=true
+          
+          # Security
+          -Djava.security.manager=allow
+          -Djava.security.policy=file:config/security.policy
+          
+          # Performance
+          -XX:+AlwaysPreTouch
+          -XX:+DisableExplicitGC
+          -XX:+UseStringDeduplication
+          -XX:+UseCompressedOops
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create Elasticsearch backup script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/backup.sh"
+        content: |
+          #!/bin/bash
+          
+          # Elasticsearch Backup Script
+          
+          BACKUP_DIR="{{ docker_dir }}/elasticsearch/backup"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          SNAPSHOT_NAME="snapshot_$TIMESTAMP"
+          
+          # Create backup directory if it doesn't exist
+          mkdir -p "$BACKUP_DIR"
+          
+          # Register snapshot repository
+          curl -X PUT "{{ ansible_default_ipv4.address }}:{{ elasticsearch_port }}/_snapshot/backup" -H 'Content-Type: application/json' -d'
+          {
+            "type": "fs",
+            "settings": {
+              "location": "/usr/share/elasticsearch/backup"
+            }
+          }'
+          
+          # Create snapshot
+          curl -X PUT "{{ ansible_default_ipv4.address }}:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME?wait_for_completion=true"
+          
+          # Remove snapshots older than 7 days
+          find "$BACKUP_DIR" -name "snapshot_*" -mtime +7 -delete
+          
+          echo "Backup created: $SNAPSHOT_NAME"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Elasticsearch restore script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/restore.sh"
+        content: |
+          #!/bin/bash
+          
+          # Elasticsearch Restore Script
+          
+          if [ -z "$1" ]; then
+            echo "Please specify snapshot name"
+            exit 1
+          fi
+          
+          SNAPSHOT_NAME="$1"
+          
+          # Check if snapshot exists
+          if ! curl -s -f "localhost:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME" > /dev/null; then
+            echo "Snapshot not found: $SNAPSHOT_NAME"
+            exit 1
+          fi
+          
+          # Restore snapshot
+          curl -X POST "localhost:{{ elasticsearch_port }}/_snapshot/backup/$SNAPSHOT_NAME/_restore?wait_for_completion=true"
+          
+          echo "Snapshot restored: $SNAPSHOT_NAME"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Elasticsearch management script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/manage.sh"
+        content: |
+          #!/bin/bash
+          
+          # Elasticsearch Management Script
+          
+          function show_help {
+            echo "Elasticsearch Management Script"
+            echo "Usage: $0 [command]"
+            echo ""
+            echo "Commands:"
+            echo "  status    - Show Elasticsearch status"
+            echo "  logs      - Show Elasticsearch logs"
+            echo "  restart   - Restart Elasticsearch"
+            echo "  backup    - Create backup"
+            echo "  restore   - Restore from backup"
+            echo "  health    - Show cluster health"
+            echo "  indices   - List indices"
+            echo "  help      - Show this help"
+          }
+          
+          case "$1" in
+            status)
+              docker ps -f name=elasticsearch
+              curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq .
+              ;;
+            logs)
+              docker logs elasticsearch --tail 100 -f
+              ;;
+            restart)
+              docker restart elasticsearch
+              ;;
+            backup)
+              {{ docker_dir }}/elasticsearch/scripts/backup.sh
+              ;;
+            restore)
+              {{ docker_dir }}/elasticsearch/scripts/restore.sh "$2"
+              ;;
+            health)
+              curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq .
+              ;;
+            indices)
+              curl -s "localhost:{{ elasticsearch_port }}/_cat/indices?v" | jq .
+              ;;
+            help|*)
+              show_help
+              ;;
+          esac
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Elasticsearch health check script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/healthcheck.sh"
+        content: |
+          #!/bin/bash
+          
+          # Check if Elasticsearch is running
+          if ! docker ps -f name=elasticsearch -f status=running | grep -q elasticsearch; then
+            echo "Elasticsearch is not running"
+            exit 1
+          fi
+          
+          # Check if Elasticsearch is responding
+          if ! curl -s -f "localhost:{{ elasticsearch_port }}/_cluster/health" > /dev/null 2>&1; then
+            echo "Elasticsearch is not responding"
+            exit 1
+          fi
+          
+          # Check Elasticsearch status
+          STATUS=$(curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq -r .status)
+          if [ "$STATUS" != "green" ] && [ "$STATUS" != "yellow" ]; then
+            echo "Elasticsearch cluster status is $STATUS"
+            exit 1
+          fi
+          
+          exit 0
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Elasticsearch log rotation configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/config/logrotate.conf"
+        content: |
+          {{ logs_dir }}/elasticsearch/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ username }} {{ username }}
+          }
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Add Elasticsearch log rotation to crontab
+      ansible.builtin.cron:
+        name: "Rotate Elasticsearch logs"
+        job: "logrotate {{ docker_dir }}/elasticsearch/config/logrotate.conf"
+        hour: "0"
+        minute: "0"
+        user: "{{ username }}"
+
+    - name: Add Elasticsearch backup to crontab
+      ansible.builtin.cron:
+        name: "Elasticsearch daily backup"
+        job: "{{ docker_dir }}/elasticsearch/scripts/backup.sh"
+        hour: "2"
+        minute: "45"
+        user: "{{ username }}"
+
+    - name: Add Elasticsearch maintenance to crontab
+      ansible.builtin.cron:
+        name: "Elasticsearch weekly maintenance"
+        job: "{{ docker_dir }}/elasticsearch/scripts/manage.sh health"
+        weekday: "0"
+        hour: "3"
+        minute: "45"
+        user: "{{ username }}"
+
+  when: elasticsearch_enabled | default(true)
+  tags: [databases, elasticsearch, search]
+
+- name: Deploy Kibana
+  block:
+    - name: Create Kibana directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        - "{{ docker_dir }}/kibana/config"
+        - "{{ docker_dir }}/kibana/data"
+        - "{{ docker_dir }}/kibana/scripts"
+        - "{{ logs_dir }}/kibana"
+
+    - name: Create Kibana configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/config/kibana.yml"
+        content: |
+          # Server
+          server.name: kibana
+          server.host: "0.0.0.0"
+          server.port: {{ kibana_port }}
+          server.basePath: ""
+          server.maxPayloadBytes: 1048576
+          server.ssl.enabled: {{ databases_ssl_enabled | lower }}
+          {% if databases_ssl_enabled %}
+          server.ssl.certificate: /usr/share/kibana/config/certs/kibana.crt
+          server.ssl.key: /usr/share/kibana/config/certs/kibana.key
+          {% endif %}
+          
+          # Elasticsearch
+          elasticsearch.hosts: ["http://elasticsearch:{{ elasticsearch_port }}"]
+          elasticsearch.ssl.enabled: {{ databases_ssl_enabled | lower }}
+          {% if databases_ssl_enabled %}
+          elasticsearch.ssl.certificate: /usr/share/kibana/config/certs/kibana.crt
+          elasticsearch.ssl.key: /usr/share/kibana/config/certs/kibana.key
+          elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/ca.crt"]
+          elasticsearch.ssl.verificationMode: certificate
+          {% endif %}
+          
+          # Security
+          xpack.security.enabled: {{ kibana_auth_enabled | lower }}
+          xpack.security.encryptionKey: "{{ kibana_encryption_key }}"
+          xpack.security.session.idleTimeout: "1h"
+          xpack.security.session.lifespan: "24h"
+          
+          # Monitoring
+          xpack.monitoring.enabled: true
+          xpack.monitoring.ui.container.elasticsearch.enabled: true
+          
+          # Reporting
+          xpack.reporting.enabled: true
+          xpack.reporting.encryptionKey: "{{ kibana_encryption_key }}"
+          
+          # Canvas
+          xpack.canvas.enabled: true
+          
+          # Maps
+          xpack.maps.enabled: true
+          
+          # Machine Learning
+          xpack.ml.enabled: true
+          
+          # APM
+          xpack.apm.enabled: true
+          
+          # Logging
+          logging.root.level: info
+          logging.appenders:
+            file:
+              type: file
+              fileName: /usr/share/kibana/logs/kibana.log
+              layout:
+                type: pattern
+          logging.loggers:
+            - name: elasticsearch
+              level: error
+            - name: http
+              level: error
+            - name: security
+              level: info
+            - name: audit
+              level: info
+          
+          # Telemetry
+          telemetry.enabled: false
+          
+          # Optimization
+          optimize.bundleFilter: "!tests"
+          optimize.useBundleCache: true
+          optimize.watchPort: 5602
+          
+          # Paths
+          path.data: /usr/share/kibana/data
+          path.logs: /usr/share/kibana/logs
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create Kibana management script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/scripts/manage.sh"
+        content: |
+          #!/bin/bash
+          
+          # Kibana Management Script
+          
+          function show_help {
+            echo "Kibana Management Script"
+            echo "Usage: $0 [command]"
+            echo ""
+            echo "Commands:"
+            echo "  status    - Show Kibana status"
+            echo "  logs      - Show Kibana logs"
+            echo "  restart   - Restart Kibana"
+            echo "  health    - Show Kibana health"
+            echo "  help      - Show this help"
+          }
+          
+          case "$1" in
+            status)
+              docker ps -f name=kibana
+              curl -s -k https://{{ ansible_default_ipv4.address }}:{{ kibana_port }}/api/status | jq .
+              ;;
+            logs)
+              docker logs kibana --tail 100 -f
+              ;;
+            restart)
+              docker restart kibana
+              ;;
+            health)
+              curl -s -k https://{{ ansible_default_ipv4.address }}:{{ kibana_port }}/api/status | jq .
+              ;;
+            help|*)
+              show_help
+              ;;
+          esac
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Kibana health check script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/scripts/healthcheck.sh"
+        content: |
+          #!/bin/bash
+          
+          # Check if Kibana is running
+          if ! docker ps -f name=kibana -f status=running | grep -q kibana; then
+            echo "Kibana is not running"
+            exit 1
+          fi
+          
+          # Check if Kibana is responding
+          if ! curl -s -k -f https://{{ ansible_default_ipv4.address }}:{{ kibana_port }}/api/status > /dev/null 2>&1; then
+            echo "Kibana is not responding"
+            exit 1
+          fi
+          
+          # Check Kibana status
+          STATUS=$(curl -s -k https://{{ ansible_default_ipv4.address }}:{{ kibana_port }}/api/status | jq -r .status.overall.level)
+          if [ "$STATUS" != "available" ]; then
+            echo "Kibana status is $STATUS"
+            exit 1
+          fi
+          
+          exit 0
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Kibana log rotation configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/config/logrotate.conf"
+        content: |
+          {{ logs_dir }}/kibana/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            missingok
+            notifempty
+            create 0640 {{ username }} {{ username }}
+          }
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Add Kibana log rotation to crontab
+      ansible.builtin.cron:
+        name: "Rotate Kibana logs"
+        job: "logrotate {{ docker_dir }}/kibana/config/logrotate.conf"
+        hour: "0"
+        minute: "0"
+        user: "{{ username }}"
+
+  when: kibana_enabled | default(true)
+  tags: [databases, kibana, search]
+
+- name: Configure search databases security
+  block:
+    - name: Create Elasticsearch security configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/config/security.yml"
+        content: |
+          # Elasticsearch Security Configuration
+          
+          # Authentication
+          xpack.security.enabled: {{ elasticsearch_auth_enabled | lower }}
+          
+          # SSL/TLS Configuration
+          xpack.security.transport.ssl.enabled: true
+          xpack.security.transport.ssl.verification_mode: certificate
+          xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
+          xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+          
+          # HTTP SSL
+          xpack.security.http.ssl.enabled: {{ databases_ssl_enabled | lower }}
+          {% if databases_ssl_enabled %}
+          xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/elasticsearch.crt
+          xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/elasticsearch.key
+          xpack.security.http.ssl.certificate_authorities: ["/usr/share/elasticsearch/config/certs/ca.crt"]
+          {% endif %}
+          
+          # Audit Logging
+          xpack.security.audit.enabled: true
+          xpack.security.audit.outputs: [logfile]
+          xpack.security.audit.logfile.events.include: authentication_granted,authentication_failed,access_granted,access_denied,anonymous_access_denied,connection_granted,connection_denied,tampered_request,run_as_granted,run_as_denied
+          
+          # Access Control
+          xpack.security.authc.realms:
+            native:
+              native1:
+                order: 0
+            file:
+              file1:
+                order: 1
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create Kibana security configuration
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/config/security.yml"
+        content: |
+          # Kibana Security Configuration
+          
+          # Authentication
+          xpack.security.enabled: {{ kibana_auth_enabled | lower }}
+          xpack.security.encryptionKey: "{{ kibana_encryption_key }}"
+          
+          # Session Management
+          xpack.security.session.idleTimeout: "1h"
+          xpack.security.session.lifespan: "24h"
+          
+          # SSL/TLS Configuration
+          server.ssl.enabled: {{ databases_ssl_enabled | lower }}
+          {% if databases_ssl_enabled %}
+          server.ssl.certificate: /usr/share/kibana/config/certs/kibana.crt
+          server.ssl.key: /usr/share/kibana/config/certs/kibana.key
+          {% endif %}
+          
+          # Elasticsearch Security
+          elasticsearch.ssl.enabled: {{ databases_ssl_enabled | lower }}
+          {% if databases_ssl_enabled %}
+          elasticsearch.ssl.certificate: /usr/share/kibana/config/certs/kibana.crt
+          elasticsearch.ssl.key: /usr/share/kibana/config/certs/kibana.key
+          elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/config/certs/ca.crt"]
+          elasticsearch.ssl.verificationMode: certificate
+          {% endif %}
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+
+    - name: Create search databases access control script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/access-control.sh"
+        content: |
+          #!/bin/bash
+          
+          # Elasticsearch Access Control Script
+          
+          # Check cluster health
+          HEALTH=$(curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq -r .status)
+          
+          # Check number of nodes
+          NODES=$(curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq -r .number_of_nodes)
+          
+          # Check indices count
+          INDICES=$(curl -s "localhost:{{ elasticsearch_port }}/_cat/indices?v" | wc -l)
+          
+          # Check shard status
+          UNASSIGNED_SHARDS=$(curl -s "localhost:{{ elasticsearch_port }}/_cluster/health" | jq -r .unassigned_shards)
+          
+          echo "Elasticsearch Access Control Report"
+          echo "==================================="
+          echo "Cluster Health: $HEALTH"
+          echo "Number of Nodes: $NODES"
+          echo "Number of Indices: $INDICES"
+          echo "Unassigned Shards: $UNASSIGNED_SHARDS"
+          
+          # Alert if cluster is red
+          if [ "$HEALTH" = "red" ]; then
+            echo "WARNING: Cluster health is RED"
+          fi
+          
+          # Alert if unassigned shards
+          if [ "$UNASSIGNED_SHARDS" -gt 0 ]; then
+            echo "WARNING: Unassigned shards detected"
+          fi
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Add search databases access control monitoring to crontab
+      ansible.builtin.cron:
+        name: "Elasticsearch access control monitoring"
+        job: "{{ docker_dir }}/elasticsearch/scripts/access-control.sh >> {{ logs_dir }}/elasticsearch/access-control.log 2>&1"
+        minute: "*/5"
+        user: "{{ username }}"
+
+  when: (elasticsearch_enabled | default(true) or kibana_enabled | default(true)) and databases_security_enabled | default(true)
+  tags: [databases, elasticsearch, kibana, search, security]
+
+- name: Configure search databases monitoring
+  block:
+    - name: Create Elasticsearch monitoring script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/elasticsearch/scripts/monitor.sh"
+        content: |
+          #!/bin/bash
+          
+          # Elasticsearch Monitoring Script
+          
+          # Get cluster health
+          HEALTH=$(curl -s "localhost:{{ elasticsearch_port }}/_cluster/health")
+          
+          # Extract metrics
+          STATUS=$(echo "$HEALTH" | jq -r .status)
+          NODES=$(echo "$HEALTH" | jq -r .number_of_nodes)
+          INDICES=$(echo "$HEALTH" | jq -r .number_of_indices)
+          SHARDS=$(echo "$HEALTH" | jq -r .active_shards)
+          UNASSIGNED_SHARDS=$(echo "$HEALTH" | jq -r .unassigned_shards)
+          
+          # Get node stats
+          NODE_STATS=$(curl -s "localhost:{{ elasticsearch_port }}/_nodes/stats")
+          CPU_PERCENT=$(echo "$NODE_STATS" | jq -r '.nodes[].os.cpu.percent')
+          MEMORY_USED=$(echo "$NODE_STATS" | jq -r '.nodes[].os.mem.used_percent')
+          
+          # Log metrics
+          echo "$(date): Elasticsearch Metrics - Status: $STATUS, Nodes: $NODES, Indices: $INDICES, Shards: $SHARDS, CPU: ${CPU_PERCENT}%, Memory: ${MEMORY_USED}%"
+          
+          # Send to monitoring system if available
+          if command -v curl > /dev/null 2>&1; then
+            curl -X POST "http://{{ ansible_default_ipv4.address }}:/metrics/job/elasticsearch/instance/{{ ansible_hostname }}" \
+              -d "elasticsearch_cluster_status{status=\"$STATUS\"} 1" \
+              -d "elasticsearch_nodes_total $NODES" \
+              -d "elasticsearch_indices_total $INDICES" \
+              -d "elasticsearch_active_shards $SHARDS" \
+              -d "elasticsearch_unassigned_shards $UNASSIGNED_SHARDS" \
+              -d "elasticsearch_cpu_percent $CPU_PERCENT" \
+              -d "elasticsearch_memory_percent $MEMORY_USED"
+          fi
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Create Kibana monitoring script
+      ansible.builtin.copy:
+        dest: "{{ docker_dir }}/kibana/scripts/monitor.sh"
+        content: |
+          #!/bin/bash
+          
+          # Kibana Monitoring Script
+          
+          # Get Kibana status
+          STATUS=$(curl -s -k "https://{{ ansible_default_ipv4.address }}:{{ kibana_port }}/api/status")
+          
+          # Extract metrics
+          OVERALL_STATUS=$(echo "$STATUS" | jq -r .status.overall.level)
+          UPTIME=$(echo "$STATUS" | jq -r .status.overall.uptime)
+          
+          # Log metrics
+          echo "$(date): Kibana Metrics - Status: $OVERALL_STATUS, Uptime: $UPTIME"
+          
+          # Send to monitoring system if available
+          if command -v curl > /dev/null 2>&1; then
+            curl -X POST "http://{{ ansible_default_ipv4.address }}:/metrics/job/kibana/instance/{{ ansible_hostname }}" \
+              -d "kibana_status{status=\"$OVERALL_STATUS\"} 1" \
+              -d "kibana_uptime $UPTIME"
+          fi
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0750"
+
+    - name: Add Elasticsearch monitoring to crontab
+      ansible.builtin.cron:
+        name: "Elasticsearch monitoring"
+        job: "{{ docker_dir }}/elasticsearch/scripts/monitor.sh >> {{ logs_dir }}/elasticsearch/monitoring.log 2>&1"
+        minute: "*/1"
+        user: "{{ username }}"
+
+    - name: Add Kibana monitoring to crontab
+      ansible.builtin.cron:
+        name: "Kibana monitoring"
+        job: "{{ docker_dir }}/kibana/scripts/monitor.sh >> {{ logs_dir }}/kibana/monitoring.log 2>&1"
+        minute: "*/1"
+        user: "{{ username }}"
+
+  when: (elasticsearch_enabled | default(true) or kibana_enabled | default(true)) and databases_monitoring_enabled | default(true)
+  tags: [databases, elasticsearch, kibana, search, monitoring]
+
+- name: Validate search databases deployment
+  block:
+    - name: Test Elasticsearch connectivity
+      ansible.builtin.command: "{{ docker_dir }}/elasticsearch/scripts/healthcheck.sh"
+      register: elasticsearch_health
+      failed_when: false
+      when: elasticsearch_enabled | default(true)
+
+    - name: Test Kibana connectivity
+      ansible.builtin.command: "{{ docker_dir }}/kibana/scripts/healthcheck.sh"
+      register: kibana_health
+      failed_when: false
+      when: kibana_enabled | default(true)
+
+    - name: Display search databases deployment status
+      ansible.builtin.debug:
+        msg: |
+          Search Databases deployment completed!
+          
+          Elasticsearch Status:
+          - Enabled: {{ elasticsearch_enabled | default(true) }}
+          - Health Check: {{ elasticsearch_health.rc == 0 if elasticsearch_health is defined else 'N/A' }}
+          - Port: {{ elasticsearch_port }}
+          - Transport Port: {{ elasticsearch_transport_port }}
+          - Data Directory: {{ docker_dir }}/elasticsearch/data
+          - Backup Directory: {{ docker_dir }}/elasticsearch/backup
+          - Cluster Name: {{ elasticsearch_cluster_name }}
+          - Discovery Type: {{ elasticsearch_discovery_type }}
+          
+          Kibana Status:
+          - Enabled: {{ kibana_enabled | default(true) }}
+          - Health Check: {{ kibana_health.rc == 0 if kibana_health is defined else 'N/A' }}
+          - Port: {{ kibana_port }}
+          - Data Directory: {{ docker_dir }}/kibana/data
+          
+          Management Scripts:
+          - Elasticsearch: {{ docker_dir }}/elasticsearch/scripts/manage.sh
+          - Kibana: {{ docker_dir }}/kibana/scripts/manage.sh
+          
+          Backup Scripts:
+          - Elasticsearch: {{ docker_dir }}/elasticsearch/scripts/backup.sh
+          
+          Security Features:
+          - Authentication: {{ elasticsearch_auth_enabled | default(true) }}
+          - SSL/TLS: {{ databases_ssl_enabled | default(true) }}
+          - Access Control: {{ databases_security_enabled | default(true) }}
+          - Monitoring: {{ databases_monitoring_enabled | default(true) }}
+
+  tags: [databases, search, validation] 

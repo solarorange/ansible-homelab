@@ -1,0 +1,405 @@
+---
+# Docker Compose Configuration for Media Services
+# This file is used by Ansible to manage the media services stack
+
+- name: Create docker-compose.yml for media services
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/docker-compose.yml"
+    content: |
+      version: '3.8'
+      
+      services:
+        # Prowlarr - Indexer Management
+        prowlarr:
+          image: linuxserver/prowlarr:latest
+          container_name: prowlarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/prowlarr/config:/config
+            - {{ docker_dir }}/prowlarr/data:/data
+            - {{ logs_dir }}/prowlarr:/logs
+          ports:
+            - "9696:9696"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+
+        # SABnzbd - Usenet Downloader
+        sabnzbd:
+          image: linuxserver/sabnzbd:latest
+          container_name: sabnzbd
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/sabnzbd/config:/config
+            - {{ docker_dir }}/sabnzbd/data:/data
+            - {{ media_dir }}/downloads:/downloads
+            - {{ logs_dir }}/sabnzbd:/logs
+          ports:
+            - "8080:8080"
+            - "9090:9090"
+          restart: unless-stopped
+          networks:
+            - media_network
+
+        # qBittorrent - Torrent Client
+        qbittorrent:
+          image: linuxserver/qbittorrent:latest
+          container_name: qbittorrent
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - WEBUI_PORT=8080
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/qbittorrent/config:/config
+            - {{ docker_dir }}/qbittorrent/data:/data
+            - {{ media_dir }}/downloads:/downloads
+            - {{ logs_dir }}/qbittorrent:/logs
+          ports:
+            - "8080:8080"
+            - "6881:6881"
+            - "6881:6881/udp"
+          restart: unless-stopped
+          networks:
+            - media_network
+
+        # Tdarr - Media Transcoding
+        tdarr:
+          image: ghcr.io/haveagitgat/tdarr:latest
+          container_name: tdarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - serverIP=0.0.0.0
+            - serverPort=8265
+            - webUIPort=8266
+          volumes:
+            - {{ docker_dir }}/tdarr/config:/app/config
+            - {{ docker_dir }}/tdarr/data:/app/data
+            - {{ docker_dir }}/tdarr/logs:/app/logs
+            - {{ media_dir }}:/media
+          ports:
+            - "8265:8265"
+            - "8266:8266"
+          restart: unless-stopped
+          networks:
+            - media_network
+
+        # Calibre-Web - E-book Management
+        calibre-web:
+          image: linuxserver/calibre-web:latest
+          container_name: calibre-web
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/calibre-web/config:/config
+            - {{ docker_dir }}/calibre-web/data:/data
+            - {{ media_dir }}/books:/books
+            - {{ logs_dir }}/calibre-web:/logs
+          ports:
+            - "8083:8083"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+
+        # Audiobookshelf - Audiobook Management
+        audiobookshelf:
+          image: ghcr.io/advplyr/audiobookshelf:latest
+          container_name: audiobookshelf
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+          volumes:
+            - {{ docker_dir }}/audiobookshelf/config:/config
+            - {{ docker_dir }}/audiobookshelf/data:/data
+            - {{ media_dir }}/audiobooks:/audiobooks
+            - {{ logs_dir }}/audiobookshelf:/logs
+          ports:
+            - "13378:80"
+          restart: unless-stopped
+          networks:
+            - media_network
+
+        # Komga - Comic Book Management
+        komga:
+          image: gotson/komga:latest
+          container_name: komga
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+          volumes:
+            - {{ docker_dir }}/komga/config:/config
+            - {{ docker_dir }}/komga/data:/data
+            - {{ media_dir }}/comics:/comics
+            - {{ logs_dir }}/komga:/logs
+          ports:
+            - "8085:8080"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+
+        # Sonarr - TV Show Management
+        sonarr:
+          image: linuxserver/sonarr:latest
+          container_name: sonarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/sonarr/config:/config
+            - {{ docker_dir }}/sonarr/data:/data
+            - {{ media_dir }}/tv:/tv
+            - {{ media_dir }}/downloads/tv:/downloads
+            - {{ logs_dir }}/sonarr:/logs
+          ports:
+            - "8989:8989"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+            - prowlarr
+            - sabnzbd
+            - qbittorrent
+
+        # Radarr - Movie Management
+        radarr:
+          image: linuxserver/radarr:latest
+          container_name: radarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/radarr/config:/config
+            - {{ docker_dir }}/radarr/data:/data
+            - {{ media_dir }}/movies:/movies
+            - {{ media_dir }}/downloads/movies:/downloads
+            - {{ logs_dir }}/radarr:/logs
+          ports:
+            - "7878:7878"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+            - prowlarr
+            - sabnzbd
+            - qbittorrent
+
+        # Lidarr - Music Management
+        lidarr:
+          image: linuxserver/lidarr:latest
+          container_name: lidarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/lidarr/config:/config
+            - {{ docker_dir }}/lidarr/data:/data
+            - {{ media_dir }}/music:/music
+            - {{ media_dir }}/downloads/music:/downloads
+            - {{ logs_dir }}/lidarr:/logs
+          ports:
+            - "8686:8686"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+            - prowlarr
+            - sabnzbd
+            - qbittorrent
+
+        # Readarr - Book Management
+        readarr:
+          image: linuxserver/readarr:latest
+          container_name: readarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/readarr/config:/config
+            - {{ docker_dir }}/readarr/data:/data
+            - {{ media_dir }}/books:/books
+            - {{ media_dir }}/downloads/books:/downloads
+            - {{ logs_dir }}/readarr:/logs
+          ports:
+            - "8787:8787"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - postgresql
+            - prowlarr
+            - sabnzbd
+            - qbittorrent
+
+        # Bazarr - Subtitle Management
+        bazarr:
+          image: linuxserver/bazarr:latest
+          container_name: bazarr
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - DOCKER_MODS=linuxserver/mods:universal-docker
+          volumes:
+            - {{ docker_dir }}/bazarr/config:/config
+            - {{ docker_dir }}/bazarr/data:/data
+            - {{ media_dir }}/movies:/movies
+            - {{ media_dir }}/tv:/tv
+            - {{ media_dir }}/anime:/anime
+            - {{ logs_dir }}/bazarr:/logs
+          ports:
+            - "6767:6767"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - sonarr
+            - radarr
+
+        # Emby - Media Server
+        emby:
+          image: emby/embyserver:latest
+          container_name: emby
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+          volumes:
+            - {{ docker_dir }}/emby/config:/config
+            - {{ docker_dir }}/emby/data:/data
+            - {{ docker_dir }}/emby/cache:/cache
+            - {{ docker_dir }}/emby/metadata:/metadata
+            - {{ media_dir }}:/media
+            - {{ logs_dir }}/emby:/logs
+          ports:
+            - "8096:8096"
+            - "8920:8920"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - sonarr
+            - radarr
+            - lidarr
+            - readarr
+            - bazarr
+            - tdarr
+
+        # Jellyfin - Media Server
+        jellyfin:
+          image: jellyfin/jellyfin:latest
+          container_name: jellyfin
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+          volumes:
+            - {{ docker_dir }}/jellyfin/config:/config
+            - {{ docker_dir }}/jellyfin/data:/data
+            - {{ docker_dir }}/jellyfin/cache:/cache
+            - {{ docker_dir }}/jellyfin/metadata:/metadata
+            - {{ media_dir }}:/media
+            - {{ logs_dir }}/jellyfin:/logs
+          ports:
+            - "8096:8096"
+            - "8920:8920"
+          restart: unless-stopped
+          networks:
+            - media_network
+          depends_on:
+            - sonarr
+            - radarr
+            - lidarr
+            - readarr
+            - bazarr
+            - tdarr
+
+        # PostgreSQL - Database for *arr applications
+        postgresql:
+          image: postgres:14-alpine
+          container_name: postgresql
+          environment:
+            - POSTGRES_USER={{ postgres_user }}
+            - POSTGRES_PASSWORD={{ postgres_password }}
+            - POSTGRES_DB={{ postgres_db }}
+          volumes:
+            - {{ docker_dir }}/postgresql/data:/var/lib/postgresql/data
+            - {{ docker_dir }}/postgresql/backup:/backup
+            - {{ logs_dir }}/postgresql:/var/log/postgresql
+          ports:
+            - "5432:5432"
+          restart: unless-stopped
+          networks:
+            - media_network
+      
+      networks:
+        media_network:
+          driver: bridge
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create docker-compose override file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/docker-compose.override.yml"
+    content: |
+      version: '3.8'
+      
+      services:
+        # Override ports for Emby and Jellyfin to avoid conflicts
+        emby:
+          ports:
+            - "8096:8096"
+            - "8920:8920"
+      
+        jellyfin:
+          ports:
+            - "8097:8096"
+            - "8921:8920"
+        
+        # Override ports for SABnzbd and qBittorrent to avoid conflicts
+        sabnzbd:
+          ports:
+            - "8080:8080"
+            - "9090:9090"
+        
+        qbittorrent:
+          ports:
+            - "8081:8080"
+            - "6881:6881"
+            - "6881:6881/udp"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640" 

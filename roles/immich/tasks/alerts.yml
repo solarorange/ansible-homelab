@@ -37,7 +37,7 @@
         name: "Immich Alert Monitoring"
         minute: "*/2"
         job: "{{ immich_config_dir }}/alert-monitor.sh >> {{ logs_dir }}/immich/alerts/monitor.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, alerts]
 
     - name: Create Immich alert directories
@@ -75,7 +75,7 @@
         name: "Immich Alert Escalation"
         minute: "*/5"
         job: "{{ immich_config_dir }}/alert-escalation.sh >> {{ logs_dir }}/immich/alerts/escalation.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, alerts]
 
     - name: Generate Immich alert rules
@@ -146,7 +146,7 @@
         hour: "1"
         minute: "0"
         job: "{{ immich_config_dir }}/alert-history.sh >> {{ logs_dir }}/immich/alerts/history.log 2>&1"
-        user: "{{ ansible_user }}"
+        user: "{{ vault_immich_user }}"
       tags: [immich, alerts]
 
   tags: [immich, alerts, always] 

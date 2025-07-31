@@ -40,7 +40,7 @@
         name: "Database alert notification"
         minute: "*/5"
         job: "{{ docker_dir }}/databases/scripts/alert-notify.sh >> {{ logs_dir }}/databases/alerts.log 2>&1"
-        user: "{{ username }}"
+        user: "{{ vault_databases_user }}"
         state: present
 
   when: databases_alerting_enabled | default(true) and databases_notifications_enabled | default(true)
@@ -50,7 +50,7 @@
   block:
     - name: Check Prometheus alert rules
       ansible.builtin.uri:
-        url: http://localhost:9090/api/v1/rules
+        url: http://{{ ansible_default_ipv4.address }}:9090/api/v1/rules
         return_content: yes
       register: prometheus_rules
       until: prometheus_rules.status == 200
@@ -68,7 +68,7 @@
 
     - name: Check Alertmanager configuration
       ansible.builtin.uri:
-        url: http://localhost:9093/api/v1/status
+        url: http://{{ ansible_default_ipv4.address }}:9093/api/v1/status
         return_content: yes
       register: alertmanager_status
       until: alertmanager_status.status == 200

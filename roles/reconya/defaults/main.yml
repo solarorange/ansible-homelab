@@ -1,207 +1,259 @@
----
-# Reconya Configuration
-# Production-ready defaults for Reconya network reconnaissance deployment
+# Reconya Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Service Configuration
-reconya_enabled: true
+# =============================================================================
+# RECONYA SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+reconya_service_name: "reconya"
+reconya_container_name: "{{ reconya_service_name }}"
+reconya_image: "reconya/reconya:latest"
 reconya_version: "latest"
-reconya_network_name: "reconya"
-reconya_network_external: true
 
-# Container Configuration
-reconya_container_restart_policy: "unless-stopped"
-reconya_container_network_mode: "host"  # Required for full network access
-
-# Port Configuration
-reconya_port: 3008
+# Network Configuration
+reconya_port: 8080
+reconya_external_port: "{{ reconya_port }}"
+reconya_protocol: "http"
+reconya_host: "{{ ansible_default_ipv4.address }}"
+reconya_url: "{{ reconya_protocol }}://{{ reconya_host }}:{{ reconya_port }}"
 
 # Domain Configuration
 reconya_subdomain: "reconya"
+reconya_domain: "{{ reconya_subdomain }}.{{ domain }}"
+reconya_external_url: "https://{{ reconya_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 reconya_auth_enabled: true
-reconya_auth_method: "basic"  # Options: basic, authentik, none
+reconya_auth_method: "authentik"  # Options: basic, authentik, none
 reconya_admin_username: "admin"
-reconya_admin_password: "{{ vault_reconya_admin_password | default('') }}"
+reconya_admin_password: "{{ vault_reconya_admin_password }}"
 
-# Database Configuration
-reconya_database_type: "sqlite"
-reconya_database_path: "/app/data/reconya.db"
+# API Configuration
+reconya_api_key: "{{ vault_reconya_api_key }}"
+reconya_api_token: "{{ vault_reconya_api_token }}"
+
+# Encryption & Security
+reconya_secret_key: "{{ vault_reconya_secret_key }}"
+reconya_encryption_key: "{{ vault_reconya_encryption_key }}"
+reconya_jwt_secret: "{{ vault_reconya_jwt_secret }}"
+
+# SSL/TLS Configuration
+reconya_ssl_enabled: true
+reconya_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+reconya_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+reconya_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+reconya_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+reconya_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+reconya_database_port: "{{ databases_postgresql_port | default(5432) }}"
 reconya_database_name: "reconya"
+reconya_database_username: "reconya"
+reconya_database_password: "{{ vault_reconya_database_password }}"
 
-# Network Configuration
-reconya_network_range: "192.168.1.0/24"
-reconya_scan_interval: 300  # 5 minutes
-reconya_scan_timeout: 60
-reconya_max_devices: 1000
-reconya_auto_discovery: true
-reconya_network_ranges: ["192.168.1.0/24"]
+# Redis Configuration (if using)
+reconya_redis_enabled: false
+reconya_redis_host: "{{ redis_host | default('redis') }}"
+reconya_redis_port: "{{ redis_port | default(6379) }}"
+reconya_redis_password: "{{ vault_reconya_redis_password }}"
+reconya_redis_database: 0
 
-# Service Components
-reconya_components:
-  backend:
-    enabled: true
-    image: "ghcr.io/dyneteq/reconya:latest"
-    container_name: "reconya-backend"
-    port: 3008
-    volumes:
-      - "{{ docker_dir }}/reconya/data:/app/data"
-      - "{{ logs_dir }}/reconya:/app/logs"
-      - "/proc/net:/proc/net:ro"
-      - "/sys/class/net:/sys/class/net:ro"
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    environment:
-      - DATABASE_TYPE={{ reconya_database_type }}
-      - SQLITE_PATH={{ reconya_database_path }}
-      - DATABASE_NAME={{ reconya_database_name }}
-      - NETWORK_RANGE={{ reconya_network_range }}
-      - JWT_SECRET_KEY={{ vault_reconya_jwt_secret | default('') }}
-      - LOGIN_USERNAME={{ reconya_admin_username }}
-      - LOGIN_PASSWORD={{ reconya_admin_password }}
-      - SCAN_INTERVAL={{ reconya_scan_interval }}
-      - SCAN_TIMEOUT={{ reconya_scan_timeout }}
-      - MAX_DEVICES={{ reconya_max_devices }}
-      - AUTO_DISCOVERY={{ reconya_auto_discovery | lower }}
-      - NETWORK_RANGES={{ reconya_network_ranges | join(',') }}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
-      interval: "30s"
-      timeout: "10s"
-      retries: 3
-    capabilities:
-      - NET_ADMIN
-      - NET_RAW
-    resources:
-      limits:
-        cpus: '1'
-        memory: 1G
-      reservations:
-        cpus: '0.25'
-        memory: 256M
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+reconya_data_dir: "{{ homelab_data_dir }}/reconya"
+reconya_config_dir: "{{ reconya_data_dir }}/config"
+reconya_backup_dir: "{{ reconya_data_dir }}/backups"
+
+# Volume Mappings
+reconya_volumes:
+  - "{{ reconya_config_dir }}:/config"
+  - "{{ reconya_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+reconya_health_check_enabled: true
+reconya_health_check_path: "/health"
+reconya_health_check_interval: 30
+reconya_health_check_timeout: 10
+reconya_health_check_retries: 3
 
 # Monitoring Integration
 reconya_monitoring_enabled: true
-reconya_metrics_enabled: true
-reconya_health_check_enabled: true
-reconya_health_check_interval: 30
+reconya_prometheus_enabled: true
+reconya_grafana_enabled: true
 
-# Security Configuration
-reconya_security_headers: true
-reconya_rate_limiting: true
-reconya_rate_limit_requests: 100
-reconya_rate_limit_window: 60
-reconya_cors_enabled: false
-reconya_cors_origins: []
-reconya_allow_anonymous_access: false
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 reconya_backup_enabled: true
 reconya_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-reconya_backup_retention: 7  # Keep backups for 7 days
-reconya_backup_compression: true
-reconya_backup_include_database: true
-reconya_backup_include_config: true
-reconya_backup_dir: "{{ backup_dir }}/reconya"
-reconya_backup_retention_days: 7
-reconya_backup_log_file: "{{ logs_dir }}/reconya/backup/backup.log"
-reconya_backup_max_log_size: "10M"
-reconya_backup_notifications_enabled: true
+reconya_backup_retention_days: 30
+reconya_backup_encryption_enabled: true
+reconya_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-reconya_log_level: "info"  # Options: debug, info, warn, error
-reconya_log_format: "json"
-reconya_log_retention: 30  # Days
-reconya_log_rotation: true
-reconya_health_check_log_file: "{{ logs_dir }}/reconya/health/health.log"
-reconya_health_check_max_log_size: "10M"
-reconya_health_check_retention_days: 7
-reconya_health_check_timeout: 30
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+reconya_smtp_enabled: false
+reconya_smtp_host: "{{ smtp_host | default('') }}"
+reconya_smtp_port: "{{ smtp_port | default(587) }}"
+reconya_smtp_username: "{{ vault_smtp_username }}"
+reconya_smtp_password: "{{ vault_reconya_smtp_password }}"
+reconya_smtp_from: "{{ reconya_admin_email | default('admin@' + domain) }}"
+reconya_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+reconya_webhook_enabled: false
+reconya_webhook_url: "{{ vault_webhook_url | default('') }}"
+reconya_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+reconya_discovery_enabled: true
+reconya_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-reconya_memory_limit: "2g"
-reconya_cpu_limit: "2.0"
-reconya_storage_limit: "10g"
+reconya_cpu_limit: "1.0"
+reconya_memory_limit: "1g"
+reconya_memory_reservation: "512m"
 
-# Traefik Configuration
-reconya_traefik_enabled: true
-reconya_traefik_network: "{{ traefik_network | default('homelab') }}"
-reconya_traefik_middleware: "secure-headers,compress"
-reconya_traefik_auth_middleware: "authentik@docker"
-reconya_traefik_ssl_enabled: true
-reconya_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Performance Settings
+reconya_scan_interval: 10
+reconya_parallel_downloads: 3
+reconya_auto_download_enabled: true
 
-# Homepage Integration
-reconya_homepage_enabled: true
-reconya_homepage_category: "Network"
-reconya_homepage_description: "Network Reconnaissance & Asset Discovery"
-reconya_homepage_icon: "reconya.png"
-reconya_homepage_widget_enabled: true
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
 
-# Telegraf Integration
-reconya_telegraf_enabled: true
-reconya_telegraf_metrics: true
-reconya_telegraf_logs: true
+# Log Settings
+reconya_log_level: "info"  # Options: trace, debug, info, warn, error
+reconya_log_rotation_enabled: true
+reconya_log_retention_days: 30
 
-# Prometheus Integration
-reconya_prometheus_enabled: true
-reconya_prometheus_metrics: true
-reconya_prometheus_scrape_interval: 30
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Grafana Integration
-reconya_grafana_enabled: true
-reconya_grafana_dashboard: true
-reconya_grafana_datasource: "prometheus"
+# Security Headers
+reconya_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Loki Integration
-reconya_loki_enabled: true
-reconya_loki_logs: true
+# Rate Limiting
+reconya_rate_limit_enabled: true
+reconya_rate_limit_requests: 100
+reconya_rate_limit_window: 60
 
-# Alerting Configuration
-reconya_alerting_enabled: true
-reconya_alerting_provider: "alertmanager"
-reconya_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
 
-# CrowdSec Integration
-reconya_crowdsec_enabled: true
-reconya_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
+# Deployment Settings
+reconya_deploy_enabled: true
+reconya_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+reconya_restart_policy: "unless-stopped"
+reconya_auto_update_enabled: true
 
-# Fail2ban Integration
-reconya_fail2ban_enabled: true
-reconya_fail2ban_jail: "reconya"
-reconya_fail2ban_max_retry: 5
-reconya_fail2ban_bantime: 3600
+# Environment Variables
+reconya_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  RECONYA_API_KEY: "{{ reconya_api_key }}"
+  RECONYA_SECRET_KEY: "{{ reconya_secret_key }}"
+  RECONYA_ENCRYPTION_KEY: "{{ reconya_encryption_key }}"
+  RECONYA_JWT_SECRET: "{{ reconya_jwt_secret }}"
 
-# Service Dependencies
-reconya_dependencies:
-  - "docker"
-  - "traefik"
-  - "monitoring_infrastructure"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Health Check Configuration
-reconya_health_check_url: "/api/health"
-reconya_health_check_timeout: 10
-reconya_health_check_retries: 3
+# Validation Settings
+reconya_validation_enabled: true
+reconya_validation_timeout: 300
+reconya_validation_retries: 3
 
-# Service configuration directories
-reconya_config_dir: "{{ docker_dir }}/reconya"
-reconya_data_dir: "{{ docker_dir }}/reconya/data"
-reconya_logs_dir: "{{ logs_dir }}/reconya"
+# Testing Configuration
+reconya_test_enabled: false
+reconya_test_items: 3
 
-# Service container names
-reconya_backend_container_name: "reconya-backend"
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
 
-# Service ports
-reconya_backend_port: 3008
+# Compliance Settings
+reconya_compliance_enabled: true
+reconya_audit_logging_enabled: true
+reconya_access_logging_enabled: true
 
-# Network scanning capabilities
-reconya_network_capabilities:
-  - NET_ADMIN
-  - NET_RAW
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
 
-# Network access requirements
-reconya_network_access:
-  - "/proc/net:/proc/net:ro"
-  - "/sys/class/net:/sys/class/net:ro"
-  - "/var/run/docker.sock:/var/run/docker.sock:ro" 
+# Automation Scripts
+reconya_automation_enabled: true
+reconya_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+reconya_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+reconya_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+reconya_fallback_enabled: true
+reconya_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

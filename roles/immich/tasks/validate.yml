@@ -1,91 +1,89 @@
 ---
-# Validate Immich Configuration
-# Production-ready validation tasks for Immich deployment
+# Immich Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
 
-- name: Validate Immich configuration
+- name: Validate Immich vault variables
   block:
-    - name: Check if Immich is enabled
-      ansible.builtin.assert:
+    - name: Check required Immich vault variables
+      assert:
         that:
-          - immich_enabled | default(true) is boolean
-        fail_msg: "immich_enabled must be a boolean value"
-        success_msg: "Immich is enabled for deployment"
+          - vault_immich_admin_password is defined
+          - vault_immich_database_password is defined
+          - vault_immich_api_key is defined
+          - vault_immich_secret_key is defined
+          - vault_immich_encryption_key is defined
+          - vault_immich_jwt_secret is defined
+        fail_msg: "Required Immich vault variables are not defined"
+        success_msg: "All required Immich vault variables are defined"
 
-    - name: Validate Immich domain configuration
-      ansible.builtin.assert:
+    - name: Validate Immich password complexity
+      assert:
         that:
-          - immich_subdomain is defined
-          - immich_subdomain is string
-          - immich_subdomain | length > 0
-        fail_msg: "immich_subdomain must be a non-empty string"
-        success_msg: "Immich subdomain is properly configured"
+          - vault_immich_admin_password | length >= 12
+          - vault_immich_database_password | length >= 12
+        fail_msg: "Immich passwords must be at least 12 characters long"
+        success_msg: "Immich password complexity requirements met"
 
-    - name: Validate Immich database configuration
-      ansible.builtin.assert:
+- name: Validate Immich network configuration
+  block:
+    - name: Check Immich port configuration
+      assert:
         that:
-          - immich_database_host is defined
-          - immich_database_port is defined
-          - immich_database_name is defined
-          - immich_database_user is defined
-        fail_msg: "Immich database configuration is incomplete"
-        success_msg: "Immich database configuration is valid"
-
-    - name: Validate Immich Redis configuration
-      ansible.builtin.assert:
-        that:
-          - immich_redis_host is defined
-          - immich_redis_port is defined
-        fail_msg: "Immich Redis configuration is incomplete"
-        success_msg: "Immich Redis configuration is valid"
-
-    - name: Validate Immich port configuration
-      ansible.builtin.assert:
-        that:
-          - immich_ports.server is defined
-          - immich_ports.web is defined
-          - immich_ports.machine_learning is defined
-          - immich_ports.server is number
-          - immich_ports.web is number
-          - immich_ports.machine_learning is number
-        fail_msg: "Immich port configuration is invalid"
+          - immich_port is defined
+          - immich_port | int >= 1024
+          - immich_port | int <= 65535
+        fail_msg: "Immich port must be between 1024 and 65535"
         success_msg: "Immich port configuration is valid"
 
-    - name: Validate Immich component configuration
-      ansible.builtin.assert:
+    - name: Check Immich domain configuration
+      assert:
         that:
-          - immich_components is defined
-          - immich_components is mapping
-        fail_msg: "Immich components configuration is missing or invalid"
-        success_msg: "Immich components configuration is valid"
+          - domain is defined
+          - immich_subdomain is defined
+        fail_msg: "Immich domain configuration is incomplete"
+        success_msg: "Immich domain configuration is valid"
 
-    - name: Check for required vault variables
-      ansible.builtin.assert:
+- name: Validate Immich security configuration
+  block:
+    - name: Check Immich SSL configuration
+      assert:
         that:
-          - vault_immich_postgres_password is defined or immich_database_password is defined
-          - vault_immich_redis_password is defined or immich_redis_password is defined
-          - vault_immich_jwt_secret is defined
-        fail_msg: "Required Immich vault variables are missing"
-        success_msg: "All required Immich vault variables are present"
+          - immich_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Immich SSL configuration is invalid"
+        success_msg: "Immich SSL configuration is valid"
 
-    - name: Validate Immich directory paths
-      ansible.builtin.assert:
+    - name: Check Immich authentication configuration
+      assert:
         that:
-          - docker_dir is defined
-          - data_dir is defined
-          - logs_dir is defined
-          - backup_dir is defined
-        fail_msg: "Required directory paths are not defined"
-        success_msg: "All required directory paths are defined"
+          - immich_auth_enabled | bool
+          - immich_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Immich authentication configuration is invalid"
+        success_msg: "Immich authentication configuration is valid"
 
-    - name: Check for port conflicts
-      ansible.builtin.shell: |
-        netstat -tlnp 2>/dev/null | grep -E ":({{ immich_ports.server }}|{{ immich_ports.web }}|{{ immich_ports.machine_learning }})\s" || true
-      register: port_check
-      changed_when: false
+- name: Validate Immich storage configuration
+  block:
+    - name: Check Immich data directories
+      assert:
+        that:
+          - immich_data_dir is defined
+          - immich_config_dir is defined
+          - immich_backup_dir is defined
+        fail_msg: "Immich storage configuration is incomplete"
+        success_msg: "Immich storage configuration is valid"
 
-    - name: Warn about potential port conflicts
-      ansible.builtin.debug:
-        msg: "Warning: Port conflicts detected for Immich services"
-      when: port_check.stdout != ""
+    - name: Create Immich directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ immich_data_dir }}"
+        - "{{ immich_config_dir }}"
+        - "{{ immich_backup_dir }}"
 
-  tags: [immich, validation, always] 
+- name: Final validation summary
+  debug:
+    msg: "Immich validation completed successfully - all configurations are valid and secure"

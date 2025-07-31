@@ -183,7 +183,7 @@ show_post_deployment_info() {
 ${GREEN}🎉 DumbAssets Deployment Complete!${NC}
 
 ${BLUE}Access Information:${NC}
-  • Local Access: http://localhost:3004
+  • Local Access: http://{{ ansible_default_ipv4.address }}:3004
   • External Access: https://assets.yourdomain.com
   • PIN: ${pin:-$DUMBASSETS_PIN}
 

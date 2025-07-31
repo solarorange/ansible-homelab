@@ -1,252 +1,259 @@
----
-# Paperless-ngx Document Management Service Configuration
-# Production-ready defaults for homelab deployment
+# Paperless_Ngx Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
 
-# Service Configuration
-paperless_ngx_enabled: true
-paperless_ngx_version: "latest"
+# =============================================================================
+# PAPERLESS_NGX SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+paperless_ngx_service_name: "paperless_ngx"
+paperless_ngx_container_name: "{{ paperless_ngx_service_name }}"
 paperless_ngx_image: "ghcr.io/paperless-ngx/paperless-ngx:latest"
+paperless_ngx_version: "latest"
 
-# Container Configuration
-paperless_ngx_container_name: "paperless-ngx"
-paperless_ngx_restart_policy: "unless-stopped"
-paperless_ngx_network_mode: "bridge"
-
-# Port Configuration
-paperless_ngx_web_port: 8000
-paperless_ngx_api_port: 8000
+# Network Configuration
+paperless_ngx_port: 8010
+paperless_ngx_external_port: "{{ paperless_ngx_port }}"
+paperless_ngx_protocol: "http"
+paperless_ngx_host: "{{ ansible_default_ipv4.address }}"
+paperless_ngx_url: "{{ paperless_ngx_protocol }}://{{ paperless_ngx_host }}:{{ paperless_ngx_port }}"
 
 # Domain Configuration
-paperless_ngx_subdomain: "docs"
+paperless_ngx_subdomain: "paperless_ngx"
 paperless_ngx_domain: "{{ paperless_ngx_subdomain }}.{{ domain }}"
+paperless_ngx_external_url: "https://{{ paperless_ngx_domain }}"
 
-# Authentication Configuration
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
 paperless_ngx_auth_enabled: true
-paperless_ngx_auth_method: "authentik"  # Options: authentik, basic, none
-paperless_ngx_admin_email: "{{ admin_email | default('admin@' + domain) }}"
-paperless_ngx_admin_password: "{{ vault_paperless_admin_password | default('') }}"
-paperless_ngx_secret_key: "{{ vault_paperless_secret_key | default('') }}"
+paperless_ngx_auth_method: "authentik"  # Options: basic, authentik, none
+paperless_ngx_admin_username: "admin"
+paperless_ngx_admin_password: "{{ vault_paperless_ngx_admin_password }}"
 
-# Database Configuration
-paperless_ngx_database_type: "postgresql"  # Options: postgresql, sqlite
-paperless_ngx_database_host: "{{ postgresql_host | default('postgresql') }}"
-paperless_ngx_database_port: "{{ postgresql_port | default(5432) }}"
-paperless_ngx_database_name: "paperless"
-paperless_ngx_database_user: "paperless"
-paperless_ngx_database_password: "{{ vault_paperless_database_password | default('') }}"
+# API Configuration
+paperless_ngx_api_key: "{{ vault_paperless_ngx_api_key }}"
+paperless_ngx_api_token: "{{ vault_paperless_ngx_api_token }}"
 
-# Redis Configuration
+# Encryption & Security
+paperless_ngx_secret_key: "{{ vault_paperless_ngx_secret_key }}"
+paperless_ngx_encryption_key: "{{ vault_paperless_ngx_encryption_key }}"
+paperless_ngx_jwt_secret: "{{ vault_paperless_ngx_jwt_secret }}"
+
+# SSL/TLS Configuration
+paperless_ngx_ssl_enabled: true
+paperless_ngx_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+paperless_ngx_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+paperless_ngx_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+paperless_ngx_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+paperless_ngx_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+paperless_ngx_database_port: "{{ databases_postgresql_port | default(5432) }}"
+paperless_ngx_database_name: "paperless_ngx"
+paperless_ngx_database_username: "paperless_ngx"
+paperless_ngx_database_password: "{{ vault_paperless_ngx_database_password }}"
+
+# Redis Configuration (if using)
+paperless_ngx_redis_enabled: false
 paperless_ngx_redis_host: "{{ redis_host | default('redis') }}"
 paperless_ngx_redis_port: "{{ redis_port | default(6379) }}"
-paperless_ngx_redis_password: "{{ vault_redis_password | default('') }}"
-paperless_ngx_redis_db: 0
+paperless_ngx_redis_password: "{{ vault_paperless_ngx_redis_password }}"
+paperless_ngx_redis_database: 0
 
-# OCR Configuration
-paperless_ngx_ocr_enabled: true
-paperless_ngx_ocr_language: "eng"
-paperless_ngx_ocr_clean: true
-paperless_ngx_ocr_deskew: true
-paperless_ngx_ocr_rotate_pages: true
-paperless_ngx_ocr_rotate_pages_threshold: 12.0
-paperless_ngx_ocr_max_image_pixels: 16777216
-paperless_ngx_ocr_output_type: "pdf"
-paperless_ngx_ocr_pages: 1
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
 
-# Document Processing Configuration
-paperless_ngx_consumer_polling: 10
-paperless_ngx_consumer_delete_duplicates: true
-paperless_ngx_consumer_subdirs: true
-paperless_ngx_consumer_recursive: true
-paperless_ngx_consumer_override_filename: true
+# Data Directories
+paperless_ngx_data_dir: "{{ homelab_data_dir }}/paperless_ngx"
+paperless_ngx_config_dir: "{{ paperless_ngx_data_dir }}/config"
+paperless_ngx_backup_dir: "{{ paperless_ngx_data_dir }}/backups"
+
+# Volume Mappings
+paperless_ngx_volumes:
+  - "{{ paperless_ngx_config_dir }}:/config"
+  - "{{ paperless_ngx_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+paperless_ngx_health_check_enabled: true
+paperless_ngx_health_check_path: "/health"
+paperless_ngx_health_check_interval: 30
+paperless_ngx_health_check_timeout: 10
+paperless_ngx_health_check_retries: 3
 
 # Monitoring Integration
 paperless_ngx_monitoring_enabled: true
-paperless_ngx_metrics_enabled: true
-paperless_ngx_health_check_enabled: true
-paperless_ngx_health_check_interval: 30
+paperless_ngx_prometheus_enabled: true
+paperless_ngx_grafana_enabled: true
 
-# Security Configuration
-paperless_ngx_security_headers: true
-paperless_ngx_rate_limiting: true
-paperless_ngx_rate_limit_requests: 100
-paperless_ngx_rate_limit_window: 60
-paperless_ngx_cors_enabled: false
-paperless_ngx_cors_origins: []
-paperless_ngx_allow_anonymous_access: false
-paperless_ngx_allow_registration: false
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
 
 # Backup Configuration
 paperless_ngx_backup_enabled: true
 paperless_ngx_backup_schedule: "0 2 * * *"  # Daily at 2 AM
-paperless_ngx_backup_retention: 7  # Keep backups for 7 days
-paperless_ngx_backup_compression: true
-paperless_ngx_backup_include_media: true
-paperless_ngx_backup_include_database: true
-paperless_ngx_backup_dir: "{{ backup_dir }}/paperless-ngx"
-paperless_ngx_backup_retention_days: 7
-paperless_ngx_backup_log_file: "{{ logs_dir }}/paperless-ngx/backup/backup.log"
-paperless_ngx_backup_max_log_size: "10M"
-paperless_ngx_backup_notifications_enabled: true
+paperless_ngx_backup_retention_days: 30
+paperless_ngx_backup_encryption_enabled: true
+paperless_ngx_backup_encryption_key: "{{ vault_backup_encryption_key }}"
 
-# Logging Configuration
-paperless_ngx_log_level: "info"  # Options: debug, info, warn, error
-paperless_ngx_log_format: "json"
-paperless_ngx_log_retention: 30  # Days
-paperless_ngx_log_rotation: true
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+paperless_ngx_smtp_enabled: false
+paperless_ngx_smtp_host: "{{ smtp_host | default('') }}"
+paperless_ngx_smtp_port: "{{ smtp_port | default(587) }}"
+paperless_ngx_smtp_username: "{{ vault_smtp_username }}"
+paperless_ngx_smtp_password: "{{ vault_paperless_ngx_smtp_password }}"
+paperless_ngx_smtp_from: "{{ paperless_ngx_admin_email | default('admin@' + domain) }}"
+paperless_ngx_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+paperless_ngx_webhook_enabled: false
+paperless_ngx_webhook_url: "{{ vault_webhook_url | default('') }}"
+paperless_ngx_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+paperless_ngx_discovery_enabled: true
+paperless_ngx_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
 
 # Resource Limits
-paperless_ngx_memory_limit: "2g"
 paperless_ngx_cpu_limit: "1.0"
-paperless_ngx_storage_limit: "50g"
+paperless_ngx_memory_limit: "1g"
+paperless_ngx_memory_reservation: "512m"
 
-# Traefik Configuration
-paperless_ngx_traefik_enabled: true
-paperless_ngx_traefik_network: "{{ traefik_network | default('homelab') }}"
-paperless_ngx_traefik_middleware: "secure-headers,compress"
-paperless_ngx_traefik_auth_middleware: "authentik-forward-auth"
-paperless_ngx_traefik_ssl_enabled: true
-paperless_ngx_traefik_ssl_resolver: "{{ traefik_ssl_resolver | default('cloudflare') }}"
+# Performance Settings
+paperless_ngx_scan_interval: 10
+paperless_ngx_parallel_downloads: 3
+paperless_ngx_auto_download_enabled: true
 
-# Homepage Integration
-paperless_ngx_homepage_enabled: true
-paperless_ngx_homepage_category: "Storage"
-paperless_ngx_homepage_description: "Document Management & OCR"
-paperless_ngx_homepage_icon: "paperless.png"
-paperless_ngx_homepage_widget_enabled: true
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
 
-# Telegraf Integration
-paperless_ngx_telegraf_enabled: true
-paperless_ngx_telegraf_metrics: true
-paperless_ngx_telegraf_logs: true
+# Log Settings
+paperless_ngx_log_level: "info"  # Options: trace, debug, info, warn, error
+paperless_ngx_log_rotation_enabled: true
+paperless_ngx_log_retention_days: 30
 
-# Prometheus Integration
-paperless_ngx_prometheus_enabled: true
-paperless_ngx_prometheus_metrics: true
-paperless_ngx_prometheus_scrape_interval: 30
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
 
-# Grafana Integration
-paperless_ngx_grafana_enabled: true
-paperless_ngx_grafana_dashboard: true
-paperless_ngx_grafana_datasource: "prometheus"
+# Security Headers
+paperless_ngx_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
-# Loki Integration
-paperless_ngx_loki_enabled: true
-paperless_ngx_loki_logs: true
+# Rate Limiting
+paperless_ngx_rate_limit_enabled: true
+paperless_ngx_rate_limit_requests: 100
+paperless_ngx_rate_limit_window: 60
 
-# Alerting Configuration
-paperless_ngx_alerting_enabled: true
-paperless_ngx_alerting_provider: "alertmanager"
-paperless_ngx_alerting_webhook: "http://alertmanager:9093/api/v1/alerts"
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
 
-# CrowdSec Integration
-paperless_ngx_crowdsec_enabled: true
-paperless_ngx_crowdsec_collections:
-  - "crowdsecurity/nginx"
-  - "crowdsecurity/http-cve"
+# Deployment Settings
+paperless_ngx_deploy_enabled: true
+paperless_ngx_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+paperless_ngx_restart_policy: "unless-stopped"
+paperless_ngx_auto_update_enabled: true
 
-# Fail2ban Integration
-paperless_ngx_fail2ban_enabled: true
-paperless_ngx_fail2ban_jail: "paperless-ngx"
-paperless_ngx_fail2ban_max_retry: 5
-paperless_ngx_fail2ban_bantime: 3600
+# Environment Variables
+paperless_ngx_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  PAPERLESS_NGX_API_KEY: "{{ paperless_ngx_api_key }}"
+  PAPERLESS_NGX_SECRET_KEY: "{{ paperless_ngx_secret_key }}"
+  PAPERLESS_NGX_ENCRYPTION_KEY: "{{ paperless_ngx_encryption_key }}"
+  PAPERLESS_NGX_JWT_SECRET: "{{ paperless_ngx_jwt_secret }}"
 
-# Vault Integration
-paperless_ngx_vault_enabled: true
-paperless_ngx_vault_path: "secret/paperless-ngx"
-paperless_ngx_vault_secrets:
-  - "database_password"
-  - "admin_password"
-  - "secret_key"
-  - "redis_password"
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
 
-# Service Dependencies
-paperless_ngx_dependencies:
-  - "docker"
-  - "traefik"
-  - "postgresql"
-  - "redis"
-  - "monitoring_infrastructure"
+# Validation Settings
+paperless_ngx_validation_enabled: true
+paperless_ngx_validation_timeout: 300
+paperless_ngx_validation_retries: 3
 
-# Health Check Configuration
-paperless_ngx_health_check_url: "/api/health/"
-paperless_ngx_health_check_timeout: 10
-paperless_ngx_health_check_retries: 3
-paperless_ngx_health_check_log_file: "{{ logs_dir }}/paperless-ngx/health/health.log"
-paperless_ngx_health_check_max_log_size: "10M"
-paperless_ngx_health_check_retention_days: 7
+# Testing Configuration
+paperless_ngx_test_enabled: false
+paperless_ngx_test_items: 3
 
-# API Configuration
-paperless_ngx_api_enabled: true
-paperless_ngx_api_version: "v1"
-paperless_ngx_api_rate_limit: 1000
-paperless_ngx_api_rate_limit_window: 3600
-paperless_ngx_admin_token: "{{ vault_paperless_admin_token | default('') }}"
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
 
-# Webhook Configuration
-paperless_ngx_webhooks_enabled: true
-paperless_ngx_webhook_events:
-  - "document_created"
-  - "document_updated"
-  - "document_deleted"
-  - "correspondent_created"
-  - "correspondent_updated"
-  - "correspondent_deleted"
+# Compliance Settings
+paperless_ngx_compliance_enabled: true
+paperless_ngx_audit_logging_enabled: true
+paperless_ngx_access_logging_enabled: true
 
-# Notification Configuration
-paperless_ngx_notifications_enabled: true
-paperless_ngx_notification_channels:
-  - "email"
-  - "webhook"
-  - "slack"
-  - "discord"
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
 
-# Email Configuration
-paperless_ngx_email_enabled: false
-paperless_ngx_smtp_host: "{{ smtp_host | default('localhost') }}"
-paperless_ngx_smtp_port: "{{ smtp_port | default(587) }}"
-paperless_ngx_smtp_username: "{{ vault_smtp_username | default('') }}"
-paperless_ngx_smtp_password: "{{ vault_smtp_password | default('') }}"
-paperless_ngx_smtp_encryption: "{{ smtp_encryption | default('tls') }}"
+# Automation Scripts
+paperless_ngx_automation_enabled: true
+paperless_ngx_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
 
-# Slack Configuration
-paperless_ngx_slack_enabled: false
-paperless_ngx_slack_webhook: "{{ vault_slack_webhook | default('') }}"
-paperless_ngx_slack_channel: "{{ slack_channel | default('#alerts') }}"
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
 
-# Discord Configuration
-paperless_ngx_discord_enabled: false
-paperless_ngx_discord_webhook: "{{ vault_discord_webhook | default('') }}"
-paperless_ngx_discord_channel: "{{ discord_channel | default('alerts') }}"
+# Default Values
+paperless_ngx_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+paperless_ngx_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
 
-# Custom Configuration
-paperless_ngx_custom_config: {}
-paperless_ngx_environment_variables: {}
-paperless_ngx_volume_mounts: []
-paperless_ngx_extra_labels: {}
-
-# Maintenance Configuration
-paperless_ngx_maintenance_enabled: true
-paperless_ngx_maintenance_schedule: "0 3 * * 0"  # Weekly at 3 AM on Sunday
-paperless_ngx_maintenance_window: 3600  # 1 hour
-paperless_ngx_maintenance_tasks:
-  - "cleanup_old_documents"
-  - "optimize_database"
-  - "cleanup_temp_files"
-  - "update_search_index"
-
-# Performance Configuration
-paperless_ngx_performance_mode: "production"
-paperless_ngx_cache_enabled: true
-paperless_ngx_cache_size: "512m"
-paperless_ngx_cache_ttl: 3600
-
-# Development Configuration
-paperless_ngx_debug_enabled: false
-paperless_ngx_debug_port: 5678
-paperless_ngx_debug_host: "0.0.0.0"
-
-# Update Configuration
-paperless_ngx_update_enabled: true
-paperless_ngx_update_schedule: "0 4 * * 0"  # Weekly at 4 AM on Sunday
-paperless_ngx_update_backup_before: true
-paperless_ngx_update_rollback_on_failure: true 
+# Fallback Configuration
+paperless_ngx_fallback_enabled: true
+paperless_ngx_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

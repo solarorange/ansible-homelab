@@ -54,10 +54,9 @@ class UserManager:
     def __init__(self, config_path: str = None):
         self.config_path = config_path or "automation_config.yml"
         self.config = self.load_config()
-        self.authentik_url = "http://localhost:{{ authentik_port }}"
+        self.authentik_url = "http://{{ ansible_default_ipv4.address }}:{{ authentik_port }}"
         self.admin_user = "{{ authentik_admin_user | default('admin') }}"
-        self.admin_password = "{{ authentik_admin_password | default('changeme') }}"
-        self.api_token = "{{ authentik_api_token | default('') }}"
+        self.admin_password: "{{ vault_security_admin_password | password_hash("bcrypt") }}"{{ authentik_api_token | default('') }}"
         self.session = self.create_session()
         
     def load_config(self) -> Dict[str, Any]:
