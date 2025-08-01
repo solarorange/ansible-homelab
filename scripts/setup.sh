@@ -92,7 +92,7 @@ done
 read -p "Enter Proxmox user (default: root@pam): " proxmox_user
 proxmox_user=${proxmox_user:-root@pam}
 
-read -sp "Enter Proxmox password: "{{ vault_service_password }}"zorg.media"
+read -sp "Enter Proxmox password: "{{ vault_service_password }}"your-domain.com"
 network_subnet=${network_subnet:-{{ ansible_default_ipv4.address }}/24}
 gateway_ip=${gateway_ip:-{{ ansible_default_ipv4.address }}}
 

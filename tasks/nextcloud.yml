@@ -32,7 +32,7 @@
           - MYSQL_USER=nextcloud
           - MYSQL_PASSWORD={{ nextcloud_db_password }}
           - REDIS_HOST=nextcloud-redis
-          - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.zorg.media
+          - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.{{ domain }}
           - NEXTCLOUD_ADMIN_USER={{ nextcloud_admin_user }}
           - NEXTCLOUD_ADMIN_PASSWORD={{ nextcloud_admin_password }}
         depends_on:
@@ -43,7 +43,7 @@
           - traefik_network
         labels:
           - "traefik.enable=true"
-          - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.zorg.media`)"
+          - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.{{ domain }}`)"
           - "traefik.http.routers.nextcloud.entrypoints=websecure"
           - "traefik.http.routers.nextcloud.tls=true"
           - "traefik.http.services.nextcloud.loadbalancer.server.port=80"

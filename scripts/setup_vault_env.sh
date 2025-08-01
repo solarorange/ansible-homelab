@@ -106,8 +106,8 @@ if ! validate_email "$admin_email"; then
 fi
 
 # Get domain
-read -p "Enter your domain (default: zorg.media): " domain
-domain=${domain:-zorg.media}
+read -p "Enter your domain (default: your-domain.com): " domain
+domain=${domain:-your-domain.com}
 
 # Get SMTP configuration (optional)
 print_status "SMTP Configuration (optional - press Enter to skip)"

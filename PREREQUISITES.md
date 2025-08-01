@@ -75,7 +75,7 @@ proxmox_token_secret: YOUR_TOKEN_SECRET
 Edit `group_vars/all/vars.yml`:
 ```yaml
 network:
-  domain: zorg.media
+  domain: your-domain.com
   subnet: 192.168.40.0/24
   gateway: 192.168.40.1
   dns_servers:
@@ -88,9 +88,9 @@ Edit `group_vars/all/vars.yml`:
 ```yaml
 services:
   traefik:
-    email: admin@zorg.media
+    email: admin@your-domain.com
   authentik:
-    admin_email: admin@zorg.media
+    admin_email: admin@your-domain.com
   grafana:
     admin_password: changeme  # Change this to a secure password
 ```
