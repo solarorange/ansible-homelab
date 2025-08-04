@@ -76,6 +76,37 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
    - 🔐 **Authentication**: `https://auth.yourdomain.com`
    - 📊 **Monitoring**: `https://grafana.yourdomain.com`
 
+4. **📖 Read the Post-Setup Guide**:
+   - 📋 **[POST_SETUP_GUIDE.md](POST_SETUP_GUIDE.md)** - Complete guide to accessing and using all 60+ services
+   - 🚀 **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Essential URLs and commands for quick access
+   - 📚 **[DOCUMENTATION.md](DOCUMENTATION.md)** - Complete documentation index
+   - 🎯 **✨ NEW: Automatic Domain Personalization** - All documentation automatically updated with your domain!
+
+## 🎯 **✨ NEW: Automatic Domain Personalization**
+
+**🚀 The Ultimate Turnkey Experience - Your Documentation is Automatically Personalized!**
+
+When you run the seamless setup script, it automatically:
+- ✅ **Updates all documentation** with your actual domain
+- ✅ **Creates personalized guides** with your service URLs ready to use
+- ✅ **Generates custom quick references** with your domain
+- ✅ **Updates interactive scripts** with your domain
+- ✅ **Zero manual editing required** - everything works immediately
+
+**Example**: If you enter `myhomelab.com`, all documentation automatically shows:
+- `https://dash.myhomelab.com` instead of `https://dash.your-domain.com`
+- `https://grafana.myhomelab.com` instead of `https://grafana.your-domain.com`
+- All 60+ service URLs personalized and ready to use!
+
+**Files automatically personalized**:
+- `POST_SETUP_GUIDE_PERSONALIZED.md` - Complete guide with your domain
+- `QUICK_REFERENCE_PERSONALIZED.md` - Quick reference with your domain
+- `scripts/post_setup_info.sh` - Interactive script with your domain
+
+**✨ Bonus**: The setup wizard asks if you want to run the post-setup info script immediately, showing all your service URLs right after setup!
+
+---
+
 ## 🎯 **🚀 Service Integration Wizard - Add Any Service in Minutes!**
 
 **The most powerful feature of this homelab platform - add ANY service to your homelab with full automation!**

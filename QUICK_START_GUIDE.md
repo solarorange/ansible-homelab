@@ -261,6 +261,20 @@ ansible-playbook tasks/validate_services.yml --ask-vault-pass
 ansible-playbook tests/integration/test_services.yml --ask-vault-pass
 ```
 
+## 🎯 **Step 8: Post-Setup Guide**
+
+### 8.1 Access Your Services
+After successful deployment, read the comprehensive post-setup guide:
+
+**📖 [POST_SETUP_GUIDE.md](POST_SETUP_GUIDE.md)** - Complete guide to accessing and using all 60+ services
+
+This guide includes:
+- ✅ **Complete service access list** with URLs and credentials
+- ✅ **Step-by-step configuration** for each service
+- ✅ **Monitoring and security** verification
+- ✅ **Troubleshooting** and common issues
+- ✅ **Pro tips** for daily operations
+
 ### 7.2 Check System Health
 ```bash
 # View system status
