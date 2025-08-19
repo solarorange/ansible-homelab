@@ -1,0 +1,45 @@
+---
+# Alertmanager Deployment Tasks
+
+- name: Render Alertmanager docker-compose
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/monitoring/alertmanager-docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/alertmanager/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Deploy Alertmanager with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "alertmanager"
+    project_src: "{{ docker_dir }}/monitoring/alertmanager"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports: "{{ [alertmanager_port | default(9093)] if (alertmanager_direct_expose_enabled | default(false)) else [] }}"
+  tags: [alertmanager, deploy, rollback]
+
+- name: Wait for Alertmanager local port (only if directly exposed)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port | default(9093) }}/-/ready"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: alertmanager_health_local
+  retries: 5
+  delay: 10
+  until: alertmanager_health_local.status == 200
+  when: alertmanager_direct_expose_enabled | default(false)
+  tags: [alertmanager, deploy, health]
+
+- name: Wait for Alertmanager via Traefik route (default)
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://alertmanager.{{ domain }}/-/ready"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (alertmanager_direct_expose_enabled | default(false))
+  tags: [alertmanager, deploy, health]
+

@@ -354,6 +354,52 @@ sudo certbot renew
 
 ---
 
+## 🏠 **✨ External Server Integration**
+
+### **Unify Your Entire Homelab Ecosystem**
+
+**🚀 Seamlessly integrate external servers (Synology, Unraid, Proxmox, etc.) into your HomelabOS ecosystem!**
+
+#### **Quick Integration**
+```bash
+# Interactive setup (recommended)
+./scripts/integrate_server.sh
+
+# Command line setup
+./scripts/integrate_server.sh --name synology --ip 192.168.1.100 --port 5000
+
+# Configuration file setup
+./scripts/integrate_server.sh --config config/external_servers.yml
+```
+
+#### **What Gets Integrated**
+- ✅ **SSL Certificates** - Automatic Let's Encrypt certificates
+- ✅ **DNS Management** - Automatic subdomain creation
+- ✅ **Grafana Monitoring** - Custom dashboards for each server
+- ✅ **Traefik Proxy** - Reverse proxy with authentication
+- ✅ **Health Monitoring** - Automated health checks and alerting
+- ✅ **Backup Integration** - Automated backup configuration
+- ✅ **Homepage Integration** - Unified dashboard access
+
+#### **Supported External Servers**
+- **Storage**: Synology, TrueNAS, Unraid
+- **Virtualization**: Proxmox, VMware ESXi
+- **Home Automation**: Home Assistant, OpenHAB
+- **Network**: Routers, Pi-hole, Firewalls
+- **Security**: NVR systems, IP cameras
+- **Development**: Git servers, CI/CD systems
+- **Gaming**: Game servers, Steam servers
+
+#### **Unified Access**
+After integration, access all your servers at:
+- **Homepage Dashboard**: `https://dash.your-domain.com`
+- **Grafana Monitoring**: `https://grafana.your-domain.com`
+- **Individual Servers**: `https://server-name.your-domain.com`
+
+**📖 Complete Guide**: [External Server Integration Guide](docs/EXTERNAL_SERVER_INTEGRATION.md)
+
+---
+
 ## 🎯 **Success Metrics**
 
 ### **✅ 100% Automation**

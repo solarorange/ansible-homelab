@@ -79,7 +79,8 @@ check_prerequisites() {
 # Function to backup existing configuration
 backup_config() {
     if [[ -d "$CONFIG_DIR" ]]; then
-        local backup_file="$BACKUP_DIR/homepage-config-$(date +%Y%m%d-%H%M%S).tar.gz"
+        local backup_file
+        backup_file="$BACKUP_DIR/homepage-config-$(date +%Y%m%d-%H%M%S).tar.gz"
         log_info "Creating backup of existing configuration..."
         tar -czf "$backup_file" -C "$SCRIPT_DIR" config/
         log_info "Backup created: $backup_file"
@@ -181,7 +182,7 @@ check_health() {
     sleep 5
     
     # Check if Homepage is responding
-    if curl -f -s http://{{ ansible_default_ipv4.address }}:3000/health &> /dev/null; then
+if curl -f -s "http://{{ ansible_default_ipv4.address }}:3000/health" &> /dev/null; then
         log_info "Homepage health check passed!"
     else
         log_warning "Homepage health check failed. Service may still be starting..."
@@ -222,7 +223,8 @@ show_info() {
 # Function to backup configuration
 backup() {
     log "Creating configuration backup..."
-    local backup_file="$BACKUP_DIR/homepage-config-$(date +%Y%m%d-%H%M%S).tar.gz"
+    local backup_file
+    backup_file="$BACKUP_DIR/homepage-config-$(date +%Y%m%d-%H%M%S).tar.gz"
     tar -czf "$backup_file" -C "$SCRIPT_DIR" config/ .env
     log "Backup created: $backup_file"
 }
@@ -233,7 +235,8 @@ restore() {
         error "Please specify backup file to restore"
     fi
     
-    local backup_file="$1"
+    local backup_file
+    backup_file="$1"
     if [[ ! -f "$backup_file" ]]; then
         error "Backup file not found: $backup_file"
     fi

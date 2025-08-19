@@ -140,7 +140,7 @@
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: "{{ security_authentik.automation_api_timeout | default(30) }}"
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: authentik_traefik_validation
   when: security_authentik.automation_enabled | default(true)
   tags: [authentik, automation, validate]
@@ -178,13 +178,13 @@
       ========================================
       AUTHENTIK VALIDATION SUMMARY
       ========================================
-      
+
       Service Health:
       - API Health: {{ authentik_health_validation.status | default('Unknown') }}
       - Container Status: {{ authentik_container_info.container.State.Status | default('Unknown') }}
       - Container Health: {{ authentik_container_info.container.State.Health.Status | default('Unknown') }}
       - Database Connection: {{ authentik_db_validation.status | default('Unknown') }}
-      
+
       Configuration Files:
       - Docker Compose: {{ authentik_config_validation.results[0].stat.exists | default(false) }}
       - Automation Config: {{ authentik_config_validation.results[1].stat.exists | default(false) }}
@@ -194,19 +194,19 @@
       - Monitoring Config: {{ authentik_config_validation.results[5].stat.exists | default(false) }}
       - Traefik Config: {{ authentik_config_validation.results[6].stat.exists | default(false) }}
       - Backup Config: {{ authentik_config_validation.results[7].stat.exists | default(false) }}
-      
+
       Script Tests:
       - Automation Test: {{ authentik_automation_test.rc == 0 if authentik_automation_test.rc is defined else 'Not Run' }}
       - App Provisioning Test: {{ authentik_app_provisioning_test.rc == 0 if authentik_app_provisioning_test.rc is defined else 'Not Run' }}
       - User Management Test: {{ authentik_user_management_test.rc == 0 if authentik_user_management_test.rc is defined else 'Not Run' }}
-      
+
       API Endpoints:
       - Users API: {{ authentik_api_validation.results[0].status | default('Unknown') }}
       - Groups API: {{ authentik_api_validation.results[1].status | default('Unknown') }}
       - Applications API: {{ authentik_api_validation.results[2].status | default('Unknown') }}
       - Policies API: {{ authentik_api_validation.results[3].status | default('Unknown') }}
       - Tokens API: {{ authentik_api_validation.results[4].status | default('Unknown') }}
-      
+
       Integration Status:
       - Users: {{ authentik_users_validation.status | default('Unknown') }}
       - Groups: {{ authentik_groups_validation.status | default('Unknown') }}
@@ -215,13 +215,13 @@
       - Monitoring: {{ authentik_monitoring_validation.status | default('Unknown') }}
       - Health Endpoint: {{ authentik_health_endpoint_validation.status | default('Unknown') }}
       - Traefik: {{ authentik_traefik_validation.status | default('Unknown') }}
-      
+
       Data Counts:
       - Users: {{ authentik_users_validation.json.results | length if authentik_users_validation.json.results else 0 }}
       - Groups: {{ authentik_groups_validation.json.results | length if authentik_groups_validation.json.results else 0 }}
       - Applications: {{ authentik_applications_validation.json.results | length if authentik_applications_validation.json.results else 0 }}
       - Policies: {{ authentik_policies_validation.json.results | length if authentik_policies_validation.json.results else 0 }}
-      
+
       Validation Results:
       - All Config Files Present: {{ authentik_config_validation.results | map(attribute='stat.exists') | list | all }}
       - Service Healthy: {{ authentik_health_validation.status in [200, 302, 401] if authentik_health_validation.status is defined else false }}
@@ -230,14 +230,14 @@
       - Groups Configured: {{ authentik_groups_validation.json.results | length > 0 if authentik_groups_validation.json.results else false }}
       - Applications Configured: {{ authentik_applications_validation.json.results | length > 0 if authentik_applications_validation.json.results else false }}
       - Policies Configured: {{ authentik_policies_validation.json.results | length > 0 if authentik_policies_validation.json.results else false }}
-      
+
       ========================================
   when: security_authentik.automation_enabled | default(true)
   tags: [authentik, automation, validate, summary]
 
 - name: Set Authentik validation result
   ansible.builtin.set_fact:
-    authentik_validation_success: "{{ 
+    authentik_validation_success: "{{
       authentik_health_validation.status in [200, 302, 401] and
       authentik_config_validation.results | map(attribute='stat.exists') | list | all and
       authentik_container_info.container.State.Status == 'running' and
@@ -250,7 +250,7 @@
 - name: Fail if Authentik validation fails
   ansible.builtin.fail:
     msg: "Authentik validation failed. Check the validation summary above for details."
-  when: 
+  when:
     - security_authentik.automation_enabled | default(true)
     - not authentik_validation_success
-  tags: [authentik, automation, validate] 
+  tags: [authentik, automation, validate]

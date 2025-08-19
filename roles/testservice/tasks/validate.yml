@@ -1,0 +1,23 @@
+---
+# Test Service Validation Tasks
+
+- name: Validate Test Service configuration
+  uri:
+    url: "https://{{ testservice_domain }}/api/health"
+    method: GET
+  register: health_check
+  tags: [testservice, validate]
+
+- name: Check Test Service service status
+  uri:
+    url: "https://{{ testservice_domain }}/api/status"
+    method: GET
+  register: status_check
+  tags: [testservice, validate]
+
+- name: Validate Test Service authentication
+  uri:
+    url: "https://{{ testservice_domain }}/api/auth/status"
+    method: GET
+  register: auth_check
+  tags: [testservice, validate]

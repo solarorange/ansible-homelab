@@ -1,3 +1,4 @@
+---
 # Pezzo Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,21 @@ pezzo_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+pezzo_manage_secret_files: true
+
+pezzo_secret_files:
+  - { name: "PEZZO_ADMIN_PASSWORD", value: "{{ pezzo_admin_password }}" }
+  - { name: "PEZZO_SECRET_KEY", value: "{{ pezzo_secret_key }}" }
+  - { name: "PEZZO_DATABASE_PASSWORD", value: "{{ pezzo_database_password }}" }
+  - { name: "PEZZO_REDIS_PASSWORD", value: "{{ pezzo_redis_password }}" }
+  - { name: "PEZZO_SMTP_PASSWORD", value: "{{ pezzo_smtp_password }}" }
+
+pezzo_required_secrets:
+  - PEZZO_ADMIN_PASSWORD
+  - PEZZO_SECRET_KEY
+  - PEZZO_DATABASE_PASSWORD

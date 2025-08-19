@@ -1,3 +1,4 @@
+---
 # Reconya Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,21 @@ reconya_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+reconya_manage_secret_files: true
+
+reconya_secret_files:
+  - { name: "RECONYA_ADMIN_PASSWORD", value: "{{ reconya_admin_password }}" }
+  - { name: "RECONYA_API_KEY", value: "{{ reconya_api_key }}" }
+  - { name: "DB_PASSWORD", value: "{{ reconya_database_password }}" }
+
+reconya_required_secrets:
+  - RECONYA_ADMIN_PASSWORD
+  - DB_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+reconya_direct_expose_enabled: false

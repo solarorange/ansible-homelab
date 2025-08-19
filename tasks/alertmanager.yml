@@ -26,9 +26,9 @@
         smtp_smarthost: '{{ smtp_host | default("smtp.gmail.com") }}:{{ smtp_port | default(587) }}'
         smtp_from: '{{ monitoring_email | default("monitoring@" + domain) }}'
         smtp_auth_username: '{{ smtp_username | default("") }}'
-        smtp_auth_password: "{{ vault_alertmanager_password }}"") }}'
+        smtp_auth_password: "{{ vault_alertmanager_password }}"
         smtp_require_tls: true
-      
+
       route:
         group_by: ['alertname', 'job', 'severity', 'service']
         group_wait: 30s
@@ -44,7 +44,7 @@
             group_wait: 10s
             group_interval: 1m
             repeat_interval: 1h
-          
+
           # SSL certificate alerts - immediate notification
           - match:
               service: ssl
@@ -53,7 +53,7 @@
             group_wait: 10s
             group_interval: 1m
             repeat_interval: 30m
-          
+
           # System alerts - moderate urgency
           - match:
               service: system
@@ -62,7 +62,7 @@
             group_wait: 1m
             group_interval: 5m
             repeat_interval: 2h
-          
+
           # Service availability alerts
           - match:
               service: availability
@@ -71,7 +71,7 @@
             group_wait: 30s
             group_interval: 2m
             repeat_interval: 1h
-          
+
           # Docker alerts
           - match:
               service: docker
@@ -80,7 +80,7 @@
             group_wait: 1m
             group_interval: 5m
             repeat_interval: 2h
-          
+
           # Network alerts
           - match:
               service: network
@@ -89,7 +89,7 @@
             group_wait: 1m
             group_interval: 5m
             repeat_interval: 2h
-          
+
           # Monitoring alerts - high priority
           - match:
               service: monitoring
@@ -98,7 +98,7 @@
             group_wait: 10s
             group_interval: 1m
             repeat_interval: 30m
-          
+
           # Backup alerts - critical for data safety
           - match:
               service: backup
@@ -107,7 +107,7 @@
             group_wait: 10s
             group_interval: 1m
             repeat_interval: 1h
-      
+
       receivers:
         - name: 'default'
           email_configs:
@@ -117,7 +117,7 @@
                 subject: '{{ "{{" }} .GroupLabels.alertname {{ "}}" }} - {{ "{{" }} .GroupLabels.severity {{ "}}" }}'
               html: |
                 {{ "{{" }} template "email.html" . {{ "}}" }}
-        
+
         - name: 'critical'
           email_configs:
             - to: '{{ admin_email }}'
@@ -141,7 +141,7 @@
                 🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
                 {{ "{{" }} end {{ "}}" }}
           {% endif %}
-        
+
         - name: 'ssl'
           email_configs:
             - to: '{{ admin_email }}'
@@ -165,7 +165,7 @@
                 🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
                 {{ "{{" }} end {{ "}}" }}
           {% endif %}
-        
+
         - name: 'system'
           email_configs:
             - to: '{{ admin_email }}'
@@ -174,7 +174,7 @@
                 subject: '💻 SYSTEM: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
               html: |
                 {{ "{{" }} template "email_system.html" . {{ "}}" }}
-        
+
         - name: 'availability'
           email_configs:
             - to: '{{ admin_email }}'
@@ -183,7 +183,7 @@
                 subject: '🌐 AVAILABILITY: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
               html: |
                 {{ "{{" }} template "email_availability.html" . {{ "}}" }}
-        
+
         - name: 'docker'
           email_configs:
             - to: '{{ admin_email }}'
@@ -192,7 +192,7 @@
                 subject: '🐳 DOCKER: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
               html: |
                 {{ "{{" }} template "email_docker.html" . {{ "}}" }}
-        
+
         - name: 'network'
           email_configs:
             - to: '{{ admin_email }}'
@@ -201,7 +201,7 @@
                 subject: '🌐 NETWORK: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
               html: |
                 {{ "{{" }} template "email_network.html" . {{ "}}" }}
-        
+
         - name: 'monitoring'
           email_configs:
             - to: '{{ admin_email }}'
@@ -225,7 +225,7 @@
                 🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
                 {{ "{{" }} end {{ "}}" }}
           {% endif %}
-        
+
         - name: 'backup'
           email_configs:
             - to: '{{ admin_email }}'
@@ -260,14 +260,14 @@
           target_match:
             service: 'system'
           equal: ['instance']
-        
+
         # Inhibit service alerts when the monitoring system is down
         - source_match:
             service: 'monitoring'
           target_match:
             service: 'availability'
           equal: ['instance']
-        
+
         # Inhibit SSL alerts when the service is down
         - source_match:
             service: 'availability'
@@ -307,7 +307,7 @@
         <h2>{{ "{{" }} .GroupLabels.alertname {{ "}}" }}</h2>
         <p class="severity-{{ "{{" }} .GroupLabels.severity {{ "}}" }}">Severity: {{ "{{" }} .GroupLabels.severity | toUpper {{ "}}" }}</p>
         <p class="timestamp">Time: {{ "{{" }} .StartsAt | since {{ "}}" }}</p>
-        
+
         {{ "{{" }} range .Alerts {{ "}}" }}
         <div class="alert {{ "{{" }} if eq .Labels.severity "critical" {{ "}}" }}critical{{ "{{" }} else if eq .Labels.severity "warning" {{ "}}" }}warning{{ "{{" }} else {{ "}}" }}info{{ "{{" }} end {{ "}}" }}">
           <h3>{{ "{{" }} .Annotations.summary {{ "}}" }}</h3>
@@ -354,7 +354,7 @@
         <h2>🔒 SSL Certificate Alert</h2>
         <p class="severity-{{ "{{" }} .GroupLabels.severity {{ "}}" }}">Severity: {{ "{{" }} .GroupLabels.severity | toUpper {{ "}}" }}</p>
         <p class="timestamp">Time: {{ "{{" }} .StartsAt | since {{ "}}" }}</p>
-        
+
         {{ "{{" }} range .Alerts {{ "}}" }}
         <div class="alert ssl">
           <h3>{{ "{{" }} .Annotations.summary {{ "}}" }}</h3>
@@ -385,9 +385,9 @@
     dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Enhanced AlertManager Management Script
-      
+
       function show_help {
         echo "Enhanced AlertManager Management Script"
         echo "Usage: $0 [command]"
@@ -402,7 +402,7 @@
         echo "  test      - Test notification channels"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
           curl -s http://{{ ansible_default_ipv4.address }}:9093/-/healthy
@@ -418,14 +418,14 @@
           curl -X POST http://{{ ansible_default_ipv4.address }}:9093/-/reload
           ;;
         alerts)
-          curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/alerts | jq '.'
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/alerts | jq '.'
           ;;
         silences)
-          curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/silences | jq '.'
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/silences | jq '.'
           ;;
         test)
           echo "Testing notification channels..."
-          curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v2/alerts \
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v2/alerts \
             -H "Content-Type: application/json" \
             -d '[{"labels":{"alertname":"TestAlert","severity":"warning"},"annotations":{"summary":"Test Alert","description":"This is a test alert"},"startsAt":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"}]'
           ;;
@@ -442,27 +442,27 @@
     dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Enhanced AlertManager Health Check Script
-      
+
       # Check if AlertManager is responding
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/-/healthy > /dev/null; then
         echo "AlertManager is not responding"
         exit 1
       fi
-      
+
       # Check if we can access the API
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/status > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/status > /dev/null; then
         echo "AlertManager API is not responding"
         exit 1
       fi
-      
+
       # Check if configuration is valid
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v2/status | jq -e '.config' > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/status | jq -e '.config' > /dev/null; then
         echo "AlertManager configuration is invalid"
         exit 1
       fi
-      
+
       echo "AlertManager is healthy"
       exit 0
     owner: "{{ username }}"
@@ -492,4 +492,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ vault_alertmanager_user }}" 
+    user: "{{ vault_alertmanager_user }}"

@@ -37,6 +37,7 @@ scrape_configs:
           host: {{ inventory_hostname }}
           environment: {{ environment | default('production') }}
           service: system
+          role: system
         __path__: 
           - /var/log/syslog
           - /var/log/auth.log
@@ -62,6 +63,7 @@ scrape_configs:
           host: {{ inventory_hostname }}
           environment: {{ environment | default('production') }}
           service: docker
+          role: system
         __path__: /var/lib/docker/containers/*/*-json.log
     pipeline_stages:
       - json:
@@ -85,6 +87,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: systemd
+          role: system
 
   # =============================================================================
   # WEB SERVICES
@@ -100,6 +103,7 @@ scrape_configs:
           host: {{ inventory_hostname }}
           environment: {{ environment | default('production') }}
           service: web
+          role: web
         __path__:
           - /var/log/nginx/*.log
           - /var/log/apache2/*.log
@@ -135,6 +139,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: database
+          role: databases
       __path__:
         - {{ docker_dir }}/postgres/logs/*.log
         - {{ docker_dir }}/mysql/logs/*.log
@@ -157,6 +162,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: monitoring
+          role: monitoring
       __path__:
         - {{ docker_dir }}/monitoring/prometheus/logs/*.log
         - {{ docker_dir }}/monitoring/grafana/logs/*.log
@@ -180,6 +186,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: media
+          role: media
       __path__:
         - {{ docker_dir }}/sonarr/logs/*.log
         - {{ docker_dir }}/radarr/logs/*.log
@@ -210,6 +217,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: security
+          role: security
       __path__:
         - /var/log/fail2ban.log
         - /var/log/crowdsec.log
@@ -232,6 +240,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: network
+          role: network
       __path__:
         - /var/log/dnsmasq.log
         - /var/log/dhcpd.log
@@ -252,6 +261,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: storage
+          role: storage
       __path__:
         - /var/log/samba/*.log
         - /var/log/nfs/*.log
@@ -274,6 +284,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: paperless_ngx
+          role: documentation
       __path__:
         - {{ docker_dir }}/paperless-ngx/logs/*.log
         - {{ logs_dir }}/paperless-ngx/application/*.log
@@ -295,6 +306,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: fing
+          role: monitoring
       __path__:
         - {{ docker_dir }}/fing/logs/*.log
         - {{ logs_dir }}/fing/application/*.log
@@ -316,6 +328,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: certificate_management
+          role: security
       __path__:
         - {{ docker_dir }}/certbot/logs/*.log
         - {{ logs_dir }}/certificate_management/*.log
@@ -336,6 +349,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: automation
+          role: automation
       __path__:
         - {{ docker_dir }}/portainer/logs/*.log
         - {{ docker_dir }}/watchtower/logs/*.log
@@ -359,6 +373,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: utilities
+          role: utilities
       __path__:
         - {{ docker_dir }}/homepage/logs/*.log
         - {{ docker_dir }}/tdarr/logs/*.log
@@ -379,6 +394,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: application
+          role: applications
       __path__: {{ logs_dir }}/applications/*.log
 
 # =============================================================================
@@ -395,6 +411,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: custom
+          role: custom
       __path__: {{ logs_dir }}/custom/*.log
 
 # =============================================================================
@@ -411,6 +428,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: ansible
+          role: automation
       __path__:
         - /var/log/ansible/*.log
         - {{ logs_dir }}/ansible/*.log
@@ -430,6 +448,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: backup
+          role: backup
       __path__:
         - {{ logs_dir }}/backup/*.log
         - {{ backup_dir }}/logs/*.log
@@ -449,6 +468,7 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: performance
+          role: performance
       __path__:
         - {{ logs_dir }}/performance/*.log
         - /var/log/performance/*.log
@@ -468,6 +488,51 @@ scrape_configs:
         host: {{ inventory_hostname }}
         environment: {{ environment | default('production') }}
         service: errors
+          role: errors
       __path__:
         - {{ logs_dir }}/errors/*.log
         - /var/log/errors/*.log 
+
+  # =============================================================================
+  # GENERIC LOGS_DIR SCRAPING (CATCH-ALL)
+  # =============================================================================
+
+  # Catch-all for one-level services: {{ logs_dir }}/<service>/*.log
+  - job_name: logs_dir_flat
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: logs_dir
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/*/*.log
+    relabel_configs:
+      - source_labels: ['__path__']
+        regex: '{{ logs_dir }}/([^/]+)/.*'
+        target_label: service
+        replacement: '$1'
+      - target_label: role
+        replacement: applications
+
+  # Catch-all for grouped services: {{ logs_dir }}/<role>/<service>/*.log
+  - job_name: logs_dir_grouped
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: logs_dir
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/*/*/*.log
+    relabel_configs:
+      - source_labels: ['__path__']
+        regex: '{{ logs_dir }}/([^/]+)/([^/]+)/.*'
+        target_label: role
+        replacement: '$1'
+      - source_labels: ['__path__']
+        regex: '{{ logs_dir }}/([^/]+)/([^/]+)/.*'
+        target_label: service
+        replacement: '$2'

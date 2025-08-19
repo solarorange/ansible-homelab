@@ -75,13 +75,15 @@
     vault_homepage_api_keys: "{{ homepage_api_keys }}"
   no_log: true
 
-- name: Deploy Homepage container
-  community.docker.docker_compose:
+- name: Deploy Homepage container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "homepage"
     project_src: "{{ docker_compose_dir }}/homepage"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 3000
   register: homepage_deploy
 
 - name: Wait for Homepage to be ready
@@ -93,4 +95,4 @@
   until: homepage_ready.status == 200
   retries: 30
   delay: 10
-  when: homepage_deploy.changed 
+  when: homepage_deploy.changed

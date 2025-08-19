@@ -21,7 +21,7 @@ services:
     volumes:
       - "{{ config_dir }}/overseerr:/config"
       - "{{ data_dir }}/overseerr:/data"
-      - "{{ logs_dir }}/overseerr:/var/log/overseerr"
+      - "{{ logs_dir }}/overseerr:/logs"
     ports:
       - "5055:5055"
     networks:
@@ -48,8 +48,13 @@ services:
       - "prometheus.enable=true"
       - "prometheus.job=overseerr"
       - "prometheus.port=5055"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:5055/api/v1/status"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5055/api/v1/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -64,11 +69,4 @@ services:
       nofile:
         soft: 26677
         hard: 46677
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5' 
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.

@@ -69,15 +69,17 @@ class ValidationError(Exception):
 class APIKeyManager:
     """Manages API keys for homelab services with enhanced security"""
     
-    def __init__(self, config_dir: str = "config", keys_file: str = "api_keys.enc"):
-        self.config_dir = Path(config_dir)
+    def __init__(self, config_dir: str = None, keys_file: str = "api_keys.enc"):
+        # Prefer externalized config directory to avoid modifying repo-tracked files
+        resolved_config_dir = config_dir or os.environ.get('HOMEPAGE_CONFIG_DIR') or '/app/config'
+        self.config_dir = Path(resolved_config_dir)
         self.keys_file = self.config_dir / keys_file
         self.master_key_file = self.config_dir / "master.key"
         self.services_config = self.config_dir / "services.yml"
         self.widgets_config = self.config_dir / "widgets.yml"
         self.backup_dir = self.config_dir / "backups"
         
-        # Ensure directories exist
+        # Ensure directories exist (only for externalized paths)
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(exist_ok=True)
         
@@ -899,7 +901,7 @@ Examples:
     parser.add_argument('api_key', nargs='?', help='API key')
     parser.add_argument('--all', action='store_true', help='Apply to all services')
     parser.add_argument('--backup-file', help='Backup file path')
-    parser.add_argument('--config-dir', default='config', help='Configuration directory')
+    parser.add_argument('--config-dir', default=None, help='Configuration directory (defaults to HOMEPAGE_CONFIG_DIR or /app/config)')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='Logging level')
     parser.add_argument('--log-file', default='api_key_manager.log', help='Log file name')

@@ -3,7 +3,9 @@
 # Enhanced setup script for Ansible Watchtower
 # This script automates initial configuration and setup
 
-set -e
+set -Eeuo pipefail
+trap 'echo "Error on line $LINENO: $BASH_COMMAND" >&2' ERR
+IFS=$'\n\t'
 
 # Colors for output
 RED='\033[0;31m'

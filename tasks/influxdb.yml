@@ -35,7 +35,7 @@
     dest: "{{ docker_dir }}/monitoring/influxdb/scripts/init.sh"
     content: |
       #!/bin/bash
-      
+
       # Wait for InfluxDB to be ready with proper timeout
       timeout=60
       counter=0
@@ -48,7 +48,7 @@
           exit 1
         fi
       done
-      
+
       # Create initial setup if not already done
       if ! influx setup --force \
         --username "${INFLUXDB_ADMIN_USER}" \
@@ -58,12 +58,12 @@
         --token "${INFLUXDB_TOKEN}"; then
         echo "InfluxDB setup completed"
       fi
-      
+
       # Create additional buckets if needed
       influx bucket create --name "system_metrics" --retention 30d
       influx bucket create --name "application_metrics" --retention 90d
       influx bucket create --name "security_events" --retention 365d
-      
+
       # Create read/write tokens for services
       influx auth create \
         --org "${INFLUXDB_ORG}" \
@@ -80,9 +80,9 @@
     dest: "{{ docker_dir }}/monitoring/influxdb/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # InfluxDB Management Script
-      
+
       function show_help {
         echo "InfluxDB Management Script"
         echo "Usage: $0 [command]"
@@ -95,7 +95,7 @@
         echo "  restart   - Restart InfluxDB"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
           docker exec influxdb influx ping
@@ -133,19 +133,19 @@
     dest: "{{ docker_dir }}/monitoring/influxdb/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if InfluxDB is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8086/health > /dev/null; then
         echo "InfluxDB is not responding"
         exit 1
       fi
-      
+
       # Check if we can query the database
       if ! docker exec influxdb influx ping > /dev/null; then
         echo "InfluxDB is not accepting queries"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -211,7 +211,7 @@
       - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
       - "traefik.http.routers.influxdb.middlewares=authentik@docker"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8086/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -227,4 +227,4 @@
     ulimits:
       nofile:
         soft: 65536
-        hard: 65536 
+        hard: 65536

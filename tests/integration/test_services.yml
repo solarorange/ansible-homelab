@@ -41,14 +41,14 @@
 
     - name: Test Redis connectivity from applications
       ansible.builtin.shell: |
-        curl -f http://{{ ansible_default_ipv4.address }}:6767/api/v1/health
+        wget -qO- http://127.0.0.1:6767/api/v1/health || exit 1
       register: bazarr_redis_test
       changed_when: false
       tags: [integration, dependencies]
 
     - name: Test monitoring integration
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -79,7 +79,7 @@
 
     - name: Test service discovery
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
         method: GET
         status_code: 200
         timeout: 10
@@ -106,7 +106,7 @@
   block:
     - name: Test Authentik authentication
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
         method: GET
         status_code: [200, 302]
         timeout: 10
@@ -177,7 +177,7 @@
   block:
     - name: Test AlertManager configuration
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
         method: GET
         status_code: 200
         timeout: 10
@@ -186,7 +186,7 @@
 
     - name: Test Prometheus rule evaluation
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/rules"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/rules"
         method: GET
         status_code: 200
         timeout: 10
@@ -203,7 +203,7 @@
 
     - name: Test notification delivery
       ansible.builtin.shell: |
-        curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v1/alerts \
+        curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v1/alerts \
           -H "Content-Type: application/json" \
           -d '[{"labels":{"alertname":"test_alert"},"annotations":{"description":"Test alert"}}]'
       register: test_alert
@@ -217,7 +217,7 @@
   block:
     - name: Test Traefik load balancing
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
         method: GET
         status_code: 200
         timeout: 10
@@ -252,8 +252,10 @@
       register: ssl_test
       tags: [integration, security]
 
-    - name: Test firewall rules
-      ansible.builtin.shell: "ufw status numbered"
+    - name: Check UFW is enabled (no changes)
+      community.general.ufw:
+        state: enabled
+      check_mode: true
       register: firewall_rules
       changed_when: false
       tags: [integration, security]
@@ -268,10 +270,11 @@
       ansible.builtin.assert:
         that:
           - ssl_test.status in [200, 404]
-          - "'Status: active' in firewall_rules.stdout"
+          - not firewall_rules.changed
           - fail2ban_status.rc == 0
         fail_msg: "Security configuration test failed"
       tags: [integration, security]
+  when: not (firewall.centralized | default(false))
 
   tags: [integration, security]
 
@@ -296,10 +299,10 @@
           ========================================
           INTEGRATION TEST SUMMARY
           ========================================
-          
+
           Timestamp: {{ integration_results.timestamp }}
           Host: {{ integration_results.host }}
-          
+
           Test Results:
           - Dependencies: {{ integration_results.dependencies }}
           - Communication: {{ integration_results.communication }}
@@ -308,7 +311,7 @@
           - Monitoring: {{ integration_results.monitoring }}
           - Load Balancing: {{ integration_results.loadbalancing }}
           - Security: {{ integration_results.security }}
-          
+
           ========================================
       tags: [integration, summary]
 
@@ -318,4 +321,4 @@
         dest: "{{ test_dir }}/results/integration_report_{{ ansible_date_time.epoch }}.yml"
       tags: [integration, report]
 
-  tags: [integration, summary] 
+  tags: [integration, summary]

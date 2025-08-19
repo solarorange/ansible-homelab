@@ -19,15 +19,25 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in vaultwarden_components.app.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in vaultwarden_components.app.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if vaultwarden_manage_secret_files | default(true) %}
+      - "{{ vaultwarden_config_dir }}/secrets:/run/secrets:ro"
+      {% endif %}
+      - "{{ logs_dir }}/vaultwarden:/logs"
+    {% if vaultwarden_direct_expose_enabled | default(false) %}
     ports:
       - "{{ vaultwarden_port }}:{{ vaultwarden_port }}"
       - "{{ vaultwarden_websocket_port }}:{{ vaultwarden_websocket_port }}"
+    {% endif %}
     labels:
       # Traefik labels
       - "traefik.enable={{ 'true' if vaultwarden_traefik_enabled else 'false' }}"
@@ -68,24 +78,20 @@ services:
       {% for dependency in vaultwarden_components.app.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ vaultwarden_components.app.resources.limits.cpus }}'
-          memory: {{ vaultwarden_components.app.resources.limits.memory }}
-        reservations:
-          cpus: '{{ vaultwarden_components.app.resources.reservations.cpus }}'
-          memory: {{ vaultwarden_components.app.resources.reservations.memory }}
+    
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: {{ vaultwarden_read_only | default(false) }}
     tmpfs:
       - /tmp:noexec,nosuid,size=100m
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: {{ vaultwarden_components.app.resources.limits.memory }}
+    cpus: '{{ vaultwarden_components.app.resources.limits.cpus }}'
   {% endif %}
 
   # Vaultwarden PostgreSQL Database (optional)
@@ -101,12 +107,20 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in vaultwarden_components.postgres.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in vaultwarden_components.postgres.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if vaultwarden_manage_secret_files | default(true) %}
+      - "{{ vaultwarden_config_dir }}/secrets:/run/secrets:ro"
+      {% endif %}
+      - "{{ logs_dir }}/vaultwarden/postgres:/logs"
     labels:
       # Prometheus scraping labels
       - "vaultwarden.prometheus.scrape=true"
@@ -124,22 +138,18 @@ services:
       timeout: "{{ vaultwarden_components.postgres.healthcheck.timeout }}"
       retries: {{ vaultwarden_components.postgres.healthcheck.retries }}
       start_period: "30s"
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ vaultwarden_components.postgres.resources.limits.cpus }}'
-          memory: {{ vaultwarden_components.postgres.resources.limits.memory }}
-        reservations:
-          cpus: '{{ vaultwarden_components.postgres.resources.reservations.cpus }}'
-          memory: {{ vaultwarden_components.postgres.resources.reservations.memory }}
+    
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: {{ vaultwarden_postgres_read_only | default(false) }}
     tmpfs:
       - /tmp:noexec,nosuid,size=100m
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
+    mem_limit: {{ vaultwarden_components.postgres.resources.limits.memory }}
+    cpus: '{{ vaultwarden_components.postgres.resources.limits.cpus }}'
   {% endif %} 

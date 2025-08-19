@@ -21,7 +21,7 @@
     state: present
 
 - name: Enable UFW firewall and allow required ports
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
@@ -32,9 +32,10 @@
     - 22000
     - 80
     - 443
+  when: not (firewall.centralized | default(false))
 
 - name: Enable UFW firewall and allow required UDP ports
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: udp
@@ -42,12 +43,14 @@
     - 137
     - 138
     - 21027
+  when: not (firewall.centralized | default(false))
 
 - name: Enable UFW firewall
-  ansible.builtin.ufw:
+  community.general.ufw:
     state: enabled
     policy: deny
+  when: not (firewall.centralized | default(false))
 
 - name: Ensure encryption is enabled for backup
   ansible.builtin.command: "echo 'Encryption enabled for backup'"
-  when: encryption_enabled 
+  when: encryption_enabled

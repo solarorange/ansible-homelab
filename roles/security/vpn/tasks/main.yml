@@ -21,12 +21,15 @@
     mode: "0644"
   notify: Restart wireguard stack
 
-- name: Start wireguard stack
-  community.docker.docker_compose:
+- name: Start wireguard stack safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "wireguard"
     project_src: "{{ docker_dir }}/wireguard"
-    build: false
+    compose_files:
+      - docker-compose.yml
   register: wireguard_result
 
 - name: Display wireguard deployment result
   ansible.builtin.debug:
-    var: wireguard_result 
+    var: wireguard_result

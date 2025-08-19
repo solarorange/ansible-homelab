@@ -22,6 +22,43 @@
         mode: '0600'
       tags: [immich, deploy]
 
+    - name: Prepare Immich secret files
+      ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+      vars:
+        service_name: "immich"
+        secret_dir_root: "{{ docker_dir }}/immich"
+        secret_files: "{{ immich_secret_files | default([]) }}"
+        secret_env_maps:
+          - "{{ immich_components.server.environment | default({}) }}"
+          - "{{ immich_components.web.environment | default({}) }}"
+          - "{{ immich_components.postgres.environment | default({}) }}"
+          - "{{ immich_components.redis.environment | default({}) }}"
+          - "{{ immich_components.machine_learning.environment | default({}) }}"
+      when: immich_manage_secret_files | default(true) | bool
+      tags: [immich, deploy, setup]
+
+    - name: Validate Immich environment maps use *_FILE for secrets
+      ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+      vars:
+        env_map_input: "{{ immich_components.server.environment | default({}) }}"
+      when: immich_manage_secret_files | default(true) | bool
+      tags: [immich, deploy, validate]
+
+    - name: Validate required Immich secret files exist
+      ansible.builtin.stat:
+        path: "{{ docker_dir }}/immich/secrets/{{ item }}"
+      register: immich_secret_stats
+      loop: "{{ immich_required_secrets | default([]) }}"
+      when: immich_manage_secret_files | default(true) | bool and (immich_required_secrets | default([]) | length > 0)
+
+    - name: Fail if required Immich secret files are missing
+      ansible.builtin.assert:
+        that: "{{ immich_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+        fail_msg: >-
+          One or more required secret files are missing under {{ docker_dir }}/immich/secrets.
+          Missing: {{ (immich_required_secrets | default([])) | reject('in', (immich_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+      when: immich_manage_secret_files | default(true) | bool and (immich_required_secrets | default([]) | length > 0)
+
     - name: Generate Immich Traefik configuration
       ansible.builtin.template:
         src: traefik.yml.j2
@@ -46,19 +83,21 @@
       tags: [immich, deploy]
 
     - name: Stop existing Immich containers
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ immich_config_dir }}"
         state: absent
       tags: [immich, deploy]
 
-    - name: Deploy Immich services
-      community.docker.docker_compose:
+    - name: Deploy Immich services safely with rollback
+      ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "immich"
         project_src: "{{ immich_config_dir }}"
-        state: present
-        pull: yes
-        build: no
-        remove_orphans: yes
-      tags: [immich, deploy]
+        compose_files:
+          - docker-compose.yml
+        wait_for_ports:
+          - "{{ immich_ports.server }}"
+      tags: [immich, deploy, rollback]
 
     - name: Wait for Immich services to be ready
       ansible.builtin.wait_for:
@@ -78,6 +117,18 @@
       retries: 5
       delay: 10
       until: health_check.status == 200
+      when: immich_direct_expose_enabled | default(false)
+      tags: [immich, deploy]
+
+    - name: Verify Immich via Traefik route
+      ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+      vars:
+        route_health_check_url: "https://{{ immich_subdomain }}.{{ domain }}/api/health"
+        route_health_check_status_codes: [200, 302, 401]
+        route_health_check_timeout: 30
+        route_health_check_retries: 10
+        route_health_check_delay: 10
+      when: not (immich_direct_expose_enabled | default(false))
       tags: [immich, deploy]
 
     - name: Create Immich admin user
@@ -101,18 +152,18 @@
       ansible.builtin.debug:
         msg: |
           Immich deployment completed successfully!
-          
+
           Access URLs:
           - Web Interface: https://{{ immich_subdomain }}.{{ domain }}
           - API: https://{{ immich_subdomain }}.{{ domain }}/api
-          
+
           Admin credentials:
           - Email: {{ immich_admin_email }}
           - Password: (check vault or use default)
-          
+
           Service status:
           - Server: {{ health_check.status }}
           - Admin user: {{ 'Created' if admin_creation.status in [200, 201] else 'Already exists' }}
       tags: [immich, deploy]
 
-  tags: [immich, deploy, always] 
+  tags: [immich, deploy, always]

@@ -28,7 +28,7 @@
 
 - name: Validate Traefik routes
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
     method: GET
     status_code: [200]
     timeout: 30
@@ -43,4 +43,4 @@
       - Configuration: {{ 'Valid' if traefik_config.rc == 0 else 'Invalid' }}
       - Metrics Available: {{ 'Yes' if traefik_metrics is success else 'No' }}
       - Active Routes: {{ traefik_routes.json | length if traefik_routes is success else 0 }}
-  when: traefik_health is defined 
+  when: traefik_health is defined

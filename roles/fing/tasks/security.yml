@@ -153,7 +153,7 @@
   when: fing_crowdsec_enabled | default(true) or fing_fail2ban_enabled | default(true)
 
 - name: Configure UFW rules for Fing
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
@@ -161,35 +161,37 @@
     - "{{ fing_web_port }}"
     - "{{ fing_api_port }}"
     - "{{ fing_metrics_port }}"
-  when: fing_metrics_enabled | default(true)
+  when: fing_metrics_enabled | default(true) and not (firewall.centralized | default(false))
 
 - name: Configure UFW rate limiting for Fing
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: limit
     port: "{{ fing_web_port }}"
     proto: tcp
     from_ip: any
-  when: fing_rate_limiting | default(true)
+  when: fing_rate_limiting | default(true) and not (firewall.centralized | default(false))
 
 - name: Configure UFW rate limiting for Fing API
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: limit
     port: "{{ fing_api_port }}"
     proto: tcp
     from_ip: any
-  when: 
+  when:
     - fing_rate_limiting | default(true)
     - fing_api_enabled | default(true)
+    - not (firewall.centralized | default(false))
 
 - name: Configure UFW rate limiting for Fing metrics
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: limit
     port: "{{ fing_metrics_port }}"
     proto: tcp
     from_ip: any
-  when: 
+  when:
     - fing_rate_limiting | default(true)
     - fing_metrics_enabled | default(true)
+    - not (firewall.centralized | default(false))
 
 - name: Restart security services to apply configuration
   ansible.builtin.systemd:
@@ -210,7 +212,7 @@
   loop:
     - 6060  # CrowdSec API
     - 6061  # CrowdSec LAPI
-  when: 
+  when:
     - fing_crowdsec_enabled | default(true)
     - security_restart_result.changed
 
@@ -271,7 +273,7 @@
   ansible.builtin.debug:
     msg: |
       Fing Security Integration Complete:
-      
+
       CrowdSec Integration:
       - CrowdSec Enabled: {{ fing_crowdsec_enabled | default(true) }}
       - Acquis Config: {{ docker_dir }}/crowdsec/config/acquis.d/fing.yml
@@ -279,7 +281,7 @@
       - Collections Config: {{ docker_dir }}/crowdsec/config/collections/fing.yml
       - Collections: {{ fing_crowdsec_collections | join(', ') }}
       - Config Status: {{ crowdsec_config_check.rc | default('N/A') }}
-      
+
       Fail2ban Integration:
       - Fail2ban Enabled: {{ fing_fail2ban_enabled | default(true) }}
       - Jail Config: /etc/fail2ban/jail.d/fing.conf
@@ -288,13 +290,13 @@
       - Max Retry: {{ fing_fail2ban_max_retry }}
       - Ban Time: {{ fing_fail2ban_bantime }}s
       - Status: {{ fail2ban_status_check.rc | default('N/A') }}
-      
+
       UFW Configuration:
       - Web Port: {{ fing_web_port }} (allowed)
       - API Port: {{ fing_api_port }} (allowed)
       - Metrics Port: {{ fing_metrics_port }} (allowed)
       - Rate Limiting: {{ fing_rate_limiting | default(true) | ternary('Enabled', 'Disabled') }}
-      
+
       Security Scripts:
       - Security Monitor: {{ docker_dir }}/fing/security-monitor.sh
       - Threat Detection: {{ docker_dir }}/fing/threat-detection.sh
@@ -302,7 +304,7 @@
       - Access Control: {{ docker_dir }}/fing/access-control.sh
       - Audit Log: {{ docker_dir }}/fing/audit-log.sh
       - Security Report: {{ docker_dir }}/fing/security-report.sh
-      
+
       Cron Jobs:
       - Security Monitoring: Every 5 minutes
       - Threat Detection: Every 10 minutes
@@ -310,12 +312,12 @@
       - Access Control: Every 15 minutes
       - Audit Log: Every 30 minutes
       - Security Report: Daily at 6 AM
-      
+
       Security Tests:
       - Security Endpoint: {{ fing_security_check.status | default('N/A') }}
       - Authentication: {{ fing_auth_check.status | default('N/A') }}
       - Rate Limiting: {{ fing_rate_limit_check.status | default('N/A') }}
-      
+
       Security Features:
       - Authentication: {{ fing_auth_enabled | default(true) | ternary('Enabled', 'Disabled') }}
       - Auth Method: {{ fing_auth_method }}
@@ -324,13 +326,13 @@
       - CORS: {{ fing_cors_enabled | default(false) | ternary('Enabled', 'Disabled') }}
       - Rate Limit Requests: {{ fing_rate_limit_requests }}
       - Rate Limit Window: {{ fing_rate_limit_window }}s
-      
+
       Access Control:
       - Admin Email: {{ fing_admin_email }}
       - API Key: Configured
       - API Rate Limit: {{ fing_api_rate_limit }}
       - API Rate Limit Window: {{ fing_api_rate_limit_window }}s
-      
+
       Next Steps:
       1. Monitor CrowdSec alerts for Fing
       2. Check Fail2ban logs for blocked attempts
@@ -339,4 +341,4 @@
       5. Set up security monitoring dashboards
       6. Test authentication and rate limiting
       7. Monitor access logs for suspicious activity
-      8. Configure security notifications 
+      8. Configure security notifications

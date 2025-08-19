@@ -18,14 +18,25 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in immich_components.server.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in immich_components.server.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if immich_manage_secret_files | default(true) %}
+      {% for secret in immich_secret_files %}
+      - "{{ docker_dir }}/immich/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
+    {% if immich_direct_expose_server | default(false) %}
     ports:
       - "{{ immich_ports.server }}:{{ immich_ports.server }}"
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if immich_traefik_enabled else 'false' }}"
       - "traefik.http.routers.immich-server.rule=Host(`{{ immich_subdomain }}.{{ domain }}`)"
@@ -48,14 +59,16 @@ services:
       {% for dependency in immich_components.server.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ immich_components.server.resources.limits.cpus }}'
-          memory: {{ immich_components.server.resources.limits.memory }}
-        reservations:
-          cpus: '{{ immich_components.server.resources.reservations.cpus }}'
-          memory: {{ immich_components.server.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ immich_components.server.resources.limits.memory }}
+    cpus: '{{ immich_components.server.resources.limits.cpus }}'
   {% endif %}
 
   # Immich Web
@@ -71,14 +84,25 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in immich_components.web.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in immich_components.web.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if immich_manage_secret_files | default(true) %}
+      {% for secret in immich_secret_files %}
+      - "{{ docker_dir }}/immich/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
+    {% if immich_direct_expose_web | default(false) %}
     ports:
       - "{{ immich_ports.web }}:{{ immich_ports.web }}"
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if immich_traefik_enabled else 'false' }}"
       - "traefik.http.routers.immich-web.rule=Host(`{{ immich_subdomain }}.{{ domain }}`) && PathPrefix(`/`)"
@@ -101,14 +125,16 @@ services:
       {% for dependency in immich_components.web.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ immich_components.web.resources.limits.cpus }}'
-          memory: {{ immich_components.web.resources.limits.memory }}
-        reservations:
-          cpus: '{{ immich_components.web.resources.reservations.cpus }}'
-          memory: {{ immich_components.web.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ immich_components.web.resources.limits.memory }}
+    cpus: '{{ immich_components.web.resources.limits.cpus }}'
   {% endif %}
 
   # Immich PostgreSQL Database
@@ -124,12 +150,21 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in immich_components.postgres.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in immich_components.postgres.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if immich_manage_secret_files | default(true) %}
+      {% for secret in immich_secret_files %}
+      - "{{ docker_dir }}/immich/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
     labels:
       # Prometheus scraping labels
       - "immich.prometheus.scrape=true"
@@ -141,14 +176,16 @@ services:
       interval: "{{ immich_components.postgres.healthcheck.interval }}"
       timeout: "{{ immich_components.postgres.healthcheck.timeout }}"
       retries: {{ immich_components.postgres.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ immich_components.postgres.resources.limits.cpus }}'
-          memory: {{ immich_components.postgres.resources.limits.memory }}
-        reservations:
-          cpus: '{{ immich_components.postgres.resources.reservations.cpus }}'
-          memory: {{ immich_components.postgres.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ immich_components.postgres.resources.limits.memory }}
+    cpus: '{{ immich_components.postgres.resources.limits.cpus }}'
   {% endif %}
 
   # Immich Redis Cache
@@ -164,6 +201,11 @@ services:
       {% for volume in immich_components.redis.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if immich_manage_secret_files | default(true) %}
+      {% for secret in immich_secret_files %}
+      - "{{ docker_dir }}/immich/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
     labels:
       # Prometheus scraping labels
       - "immich.prometheus.scrape=true"
@@ -175,14 +217,16 @@ services:
       interval: "{{ immich_components.redis.healthcheck.interval }}"
       timeout: "{{ immich_components.redis.healthcheck.timeout }}"
       retries: {{ immich_components.redis.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ immich_components.redis.resources.limits.cpus }}'
-          memory: {{ immich_components.redis.resources.limits.memory }}
-        reservations:
-          cpus: '{{ immich_components.redis.resources.reservations.cpus }}'
-          memory: {{ immich_components.redis.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ immich_components.redis.resources.limits.memory }}
+    cpus: '{{ immich_components.redis.resources.limits.cpus }}'
   {% endif %}
 
   # Immich Machine Learning
@@ -198,14 +242,25 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in immich_components.machine_learning.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in immich_components.machine_learning.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if immich_manage_secret_files | default(true) %}
+      {% for secret in immich_secret_files %}
+      - "{{ immich_config_dir }}/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
+    {% if immich_direct_expose_ml | default(false) %}
     ports:
       - "{{ immich_ports.machine_learning }}:{{ immich_ports.machine_learning }}"
+    {% endif %}
     labels:
       # Prometheus scraping labels
       - "immich.prometheus.scrape=true"
@@ -222,12 +277,14 @@ services:
       {% for dependency in immich_components.machine_learning.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ immich_components.machine_learning.resources.limits.cpus }}'
-          memory: {{ immich_components.machine_learning.resources.limits.memory }}
-        reservations:
-          cpus: '{{ immich_components.machine_learning.resources.reservations.cpus }}'
-          memory: {{ immich_components.machine_learning.resources.reservations.memory }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ immich_components.machine_learning.resources.limits.memory }}
+    cpus: '{{ immich_components.machine_learning.resources.limits.cpus }}'
   {% endif %} 

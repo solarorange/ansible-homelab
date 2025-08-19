@@ -47,25 +47,44 @@
     group: "{{ username }}"
     mode: "0750"
 
+- name: Ensure Redis secrets directory exists
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/redis/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+
+- name: Write Redis password secret file from provided value (disabled by default)
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/secrets/redis_password"
+    content: "{{ redis_password | default('') }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: databases_redis_write_secret_file | default(false) | bool and (redis_password | default('') != '')
+  notify: restart redis
+
 - name: Start Redis container
   community.docker.docker_container:
     name: "{{ redis_container_name }}"
     image: "{{ redis_image }}"
     restart_policy: "{{ redis_restart_policy }}"
-    network_mode: "{{ redis_network_mode }}"
-    published_ports:
-      - "{{ redis_web_port }}:6379"
+    networks:
+      - name: homelab
     env:
-      REDIS_password: "{{ vault_databases_database_password }}"
-    command: "redis-server /usr/local/etc/redis/redis.conf --requirepass {{ redis_password }}"
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+    command: >
+      sh -c 'exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$(cat /run/secrets/redis_password)"'
     volumes:
+      - "{{ docker_dir }}/redis/secrets/redis_password:/run/secrets/redis_password:ro"
       - "{{ docker_dir }}/redis/data:/data"
       - "{{ docker_dir }}/redis/config:/usr/local/etc/redis"
       - "{{ docker_dir }}/redis/scripts:/docker-entrypoint-initdb.d"
       - "{{ docker_dir }}/redis/backup:/backup"
       - "{{ logs_dir }}/redis:/var/log/redis"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "{{ redis_password }}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -74,7 +93,7 @@
   register: redis_container
 
 - name: Validate Redis is running
-  ansible.builtin.command: docker exec {{ redis_container_name }} redis-cli -a {{ redis_password }} ping
+  ansible.builtin.command: docker exec {{ redis_container_name }} bash -lc 'redis-cli -a "$(cat /run/secrets/redis_password)" ping'
   register: redis_ping_result
   changed_when: false
   failed_when: redis_ping_result.stdout.strip() != 'PONG'
@@ -95,4 +114,4 @@
     mode: "0644"
   when: redis_homepage_enabled | default(true)
 
-# Security and SSL tasks can be added here as needed 
+# Security and SSL tasks can be added here as needed

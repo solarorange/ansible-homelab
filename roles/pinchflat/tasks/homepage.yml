@@ -1,0 +1,17 @@
+---
+# Pinchflat Homepage Integration Tasks
+
+- name: Add Pinchflat to homepage services
+  template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/pinchflat.yml"
+    mode: '0644'
+  when: pinchflat_homepage_enabled | default(true)
+  tags: [pinchflat, homepage]
+
+- name: Reload homepage configuration
+  uri:
+    url: "http://{ ansible_default_ipv4.address }:{{ homepage_port | default(3000) }}/api/reload"
+    method: POST
+  when: pinchflat_homepage_enabled | default(true)
+  tags: [pinchflat, homepage]

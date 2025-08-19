@@ -1,3 +1,4 @@
+---
 # Linkwarden Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,21 @@ linkwarden_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+linkwarden_manage_secret_files: true
+
+linkwarden_secret_files:
+  - { name: "LINKWARDEN_ADMIN_PASSWORD", value: "{{ linkwarden_admin_password }}" }
+  - { name: "DB_PASSWORD", value: "{{ linkwarden_database_password }}" }
+  - { name: "SMTP_PASSWORD", value: "{{ linkwarden_smtp_password }}" }
+
+linkwarden_required_secrets:
+  - LINKWARDEN_ADMIN_PASSWORD
+  - DB_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+linkwarden_direct_expose_enabled: false

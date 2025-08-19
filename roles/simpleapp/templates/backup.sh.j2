@@ -1,0 +1,20 @@
+#!/bin/bash
+# Simple App Backup Script
+
+BACKUP_DIR="{{ backup_dir }}/simpleapp"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup data directory
+if [ -d "{{ docker_data_root }}/simpleapp" ]; then
+    tar -czf "$BACKUP_DIR/data_$DATE.tar.gz" -C "{{ docker_data_root }}" simpleapp
+fi
+
+# Backup config directory
+if [ -d "{{ docker_config_root }}/simpleapp" ]; then
+    tar -czf "$BACKUP_DIR/config_$DATE.tar.gz" -C "{{ docker_config_root }}" simpleapp
+fi
+
+# Cleanup old backups
+find "$BACKUP_DIR" -name "*.tar.gz" -mtime +{{ simpleapp_backup_retention_days | default(30) }} -delete

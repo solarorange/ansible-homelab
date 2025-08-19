@@ -17,14 +17,24 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in reconya_components.backend.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in reconya_components.backend.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if reconya_manage_secret_files | default(true) %}
+      - "{{ reconya_config_dir }}/secrets:/run/secrets:ro"
+      {% endif %}
+      - "{{ logs_dir }}/reconya/backend:/logs"
+    {% if reconya_direct_expose_enabled | default(false) %}
     ports:
       - "{{ reconya_port }}:{{ reconya_port }}"
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if reconya_traefik_enabled else 'false' }}"
       - "traefik.http.routers.reconya.rule=Host(`{{ reconya_subdomain }}.{{ domain }}`)"
@@ -53,17 +63,11 @@ services:
       {% for capability in reconya_components.backend.capabilities %}
       - {{ capability }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ reconya_components.backend.resources.limits.cpus }}'
-          memory: {{ reconya_components.backend.resources.limits.memory }}
-        reservations:
-          cpus: '{{ reconya_components.backend.resources.reservations.cpus }}'
-          memory: {{ reconya_components.backend.resources.reservations.memory }}
+    mem_limit: {{ reconya_components.backend.resources.limits.memory }}
+    cpus: '{{ reconya_components.backend.resources.limits.cpus }}'
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: {{ reconya_read_only | default(false) }}
     tmpfs:
       - /tmp
       - /var/tmp

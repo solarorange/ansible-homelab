@@ -1,0 +1,17 @@
+---
+# Simple App Homepage Integration Tasks
+
+- name: Add Simple App to homepage services
+  template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/simpleapp.yml"
+    mode: '0644'
+  when: simpleapp_homepage_enabled | default(true)
+  tags: [simpleapp, homepage]
+
+- name: Reload homepage configuration
+  uri:
+    url: "http://{ ansible_default_ipv4.address }:{{ homepage_port | default(3000) }}/api/reload"
+    method: POST
+  when: simpleapp_homepage_enabled | default(true)
+  tags: [simpleapp, homepage]

@@ -22,6 +22,8 @@ services:
       {% for volume in service.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      - "{{ logs_dir }}/{{ name }}:/logs"
+    {% if media_direct_expose_enabled | default(false) %}
     ports:
       - "{{ service.port }}:{{ service.port }}"
       {% if service.ports is defined %}
@@ -29,6 +31,7 @@ services:
       - "{{ port }}"
       {% endfor %}
       {% endif %}
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
       - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
@@ -42,6 +45,14 @@ services:
       interval: "{{ service.healthcheck.interval }}"
       timeout: "{{ service.healthcheck.timeout }}"
       retries: {{ service.healthcheck.retries }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: {{ service.read_only | default(true) }}
+    tmpfs:
+      - /tmp
+    user: "{{ service.puid | default(PUID) }}:{{ service.pgid | default(PGID) }}"
   {% endif %}
   {% endfor %}
 
@@ -62,8 +73,11 @@ services:
       {% for volume in service.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      - "{{ logs_dir }}/{{ name }}:/logs"
+    {% if media_direct_expose_enabled | default(false) %}
     ports:
       - "{{ service.port }}:{{ service.port }}"
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
       - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
@@ -81,6 +95,14 @@ services:
       interval: "{{ service.healthcheck.interval }}"
       timeout: "{{ service.healthcheck.timeout }}"
       retries: {{ service.healthcheck.retries }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: {{ service.read_only | default(true) }}
+    tmpfs:
+      - /tmp
+    user: "{{ service.puid | default(PUID) }}:{{ service.pgid | default(PGID) }}"
   {% endif %}
   {% endfor %}
 
@@ -106,6 +128,8 @@ services:
       {% for volume in service.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      - "{{ logs_dir }}/{{ name }}:/logs"
+    {% if media_direct_expose_enabled | default(false) %}
     ports:
       - "{{ service.port }}:{{ service.port }}"
       {% if service.ports is defined %}
@@ -113,6 +137,7 @@ services:
       - "{{ port }}"
       {% endfor %}
       {% endif %}
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if media_traefik_enabled else 'false' }}"
       - "traefik.http.routers.{{ name }}.rule=Host(`{{ service.subdomain }}.{{ domain }}`)"
@@ -126,6 +151,14 @@ services:
       interval: "{{ service.healthcheck.interval }}"
       timeout: "{{ service.healthcheck.timeout }}"
       retries: {{ service.healthcheck.retries }}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: {{ service.read_only | default(true) }}
+    tmpfs:
+      - /tmp
+    user: "{{ service.puid | default(PUID) }}:{{ service.pgid | default(PGID) }}"
   {% endif %}
   {% endfor %}
 
@@ -138,7 +171,7 @@ services:
     networks:
       - "{{ media_network_name }}"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
       - WATCHTOWER_SCHEDULE={{ media_watchtower_schedule }}
       - WATCHTOWER_CLEANUP={{ media_watchtower_cleanup }}
@@ -148,7 +181,7 @@ services:
       - WATCHTOWER_REMOVE_VOLUMES={{ media_watchtower_remove_volumes }}
       - WATCHTOWER_NO_PULL={{ media_watchtower_no_pull }}
       - WATCHTOWER_NO_STARTUP_MESSAGE={{ media_watchtower_no_startup_message }}
-      - WATCHTOWER_HTTP_API_TOKEN={{ media_watchtower_http_api_token }}
+      - WATCHTOWER_HTTP_API_TOKEN_FILE=/run/secrets/WATCHTOWER_HTTP_API_TOKEN
     labels:
       # This service should not be updated by watchtower
       - "com.centurylinklabs.watchtower.enable=false"

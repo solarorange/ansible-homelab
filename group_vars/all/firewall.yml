@@ -1,0 +1,189 @@
+---
+# Central firewall configuration applied by the security/firewall role
+
+firewall:
+  enabled: true
+  backend: ufw
+  logging: on
+  centralized: true
+
+  # Default policies
+  default_policies:
+    incoming: deny
+    outgoing: allow
+    routed: allow
+
+  # SSH access (set from to restrict, e.g. 192.168.1.0/24)
+  ssh:
+    enabled: true
+    from: any
+    port: "22"
+    proto: tcp
+    comment: "SSH access"
+
+  # Feature-defined ports. Add new features here.
+  features:
+    # Observability agents and exporters (local-only)
+    telegraf:
+      ports: []
+    promtail:
+      ports: []
+    blackbox_exporter:
+      ports:
+        - { port: "9115", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Blackbox Exporter (local)" }
+    # Media stack (behind Traefik by default; if direct access needed, uncomment and restrict to LAN)
+    jellyfin:
+      ports: []
+    plex:
+      ports: []
+    emby:
+      ports: []
+    sonarr:
+      ports: []
+    radarr:
+      ports: []
+    prowlarr:
+      ports: []
+    bazarr:
+      ports: []
+    overseerr:
+      ports: []
+    tautulli:
+      ports: []
+    komga:
+      ports: []
+    ersatztv:
+      ports: []
+    qbittorrent:
+      ports: []
+    transmission:
+      ports: []
+    sabnzbd:
+      ports: []
+    traefik:
+      ports:
+        - { port: "80", proto: "tcp", comment: "Traefik HTTP" }
+        - { port: "443", proto: "tcp", comment: "Traefik HTTPS" }
+    wireguard:
+      ports:
+        - { port: "51820", proto: "udp", comment: "WireGuard VPN" }
+    traefik_api:
+      ports:
+        - { port: "8080", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Traefik API (local)" }
+
+    # Monitoring (restrict to local network)
+    prometheus:
+      ports:
+        - { port: "9090", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Prometheus (local)" }
+    grafana:
+      ports:
+        - { port: "3000", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Grafana (local)" }
+    alertmanager:
+      ports:
+        - { port: "9093", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Alertmanager (local)" }
+    loki:
+      ports:
+        - { port: "3100", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Loki (local)" }
+    uptime_kuma:
+      ports:
+        - { port: "3001", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Uptime Kuma (local)" }
+
+    # Management (restrict to local network)
+    portainer:
+      ports:
+        - { port: "9000", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Portainer (local)" }
+    nginx_proxy_manager:
+      ports:
+        - { port: "81", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "NPM UI (local)" }
+
+    # DNS (Pi-hole) - restrict to local network
+    pihole_dns:
+      ports:
+        - { port: "53", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "DNS TCP (local)" }
+        - { port: "53", proto: "udp", src: "{{ ansible_default_ipv4.network }}/24", comment: "DNS UDP (local)" }
+
+    # Databases (restrict to local network)
+    postgresql:
+      ports:
+        - { port: "5432", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "PostgreSQL (local)" }
+    mariadb:
+      ports:
+        - { port: "3306", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "MariaDB/MySQL (local)" }
+    redis:
+      ports:
+        - { port: "6379", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Redis (local)" }
+    elasticsearch:
+      ports:
+        - { port: "9200", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Elasticsearch HTTP (local)" }
+        - { port: "9300", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Elasticsearch transport (local)" }
+    kibana:
+      ports:
+        - { port: "5601", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Kibana (local)" }
+
+    # File services (restrict to local network)
+    samba:
+      ports:
+        - { port: "445", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "SMB (local)" }
+        - { port: "139", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "NetBIOS-SSN (local)" }
+        - { port: "137", proto: "udp", src: "{{ ansible_default_ipv4.network }}/24", comment: "NetBIOS Name (local)" }
+        - { port: "138", proto: "udp", src: "{{ ansible_default_ipv4.network }}/24", comment: "NetBIOS Datagram (local)" }
+    syncthing:
+      ports:
+        - { port: "8384", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Syncthing UI (local)" }
+        - { port: "22000", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Syncthing Sync TCP (local)" }
+        - { port: "22000", proto: "udp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Syncthing Sync UDP (local)" }
+        - { port: "21027", proto: "udp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Syncthing Discovery (local)" }
+
+    # Automation/dev (restrict to local network)
+    n8n:
+      ports:
+        - { port: "5678", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "n8n (local)" }
+    home_assistant:
+      ports:
+        - { port: "8123", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Home Assistant (local)" }
+    node_red:
+      ports:
+        - { port: "1880", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Node-RED (local)" }
+    zigbee2mqtt:
+      ports:
+        - { port: "8080", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "Zigbee2MQTT (local)" }
+    mosquitto:
+      ports:
+        - { port: "1883", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "MQTT (local)" }
+        - { port: "8883", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "MQTT TLS (local)" }
+    crowdsec:
+      ports:
+        - { port: "6060", proto: "tcp", src: "{{ ansible_default_ipv4.network }}/24", comment: "CrowdSec metrics (local)" }
+
+  # Enable desired features from the mapping above.
+  enabled_features:
+    - blackbox_exporter
+    - traefik
+    - wireguard
+    - prometheus
+    - grafana
+    - alertmanager
+    - loki
+    - uptime_kuma
+    - portainer
+    - pihole_dns
+    - postgresql
+    - mariadb
+    - redis
+    - elasticsearch
+    - kibana
+    - samba
+    - syncthing
+    - n8n
+    - traefik_api
+    - nginx_proxy_manager
+    - home_assistant
+    - node_red
+    - zigbee2mqtt
+    - mosquitto
+    - crowdsec
+
+  # Optional additional explicit rules (same schema as feature ports)
+  additional_rules: []
+
+

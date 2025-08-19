@@ -7,7 +7,7 @@
     url: "https://{{ security_authentik.subdomain }}.{{ domain }}/api/v3/root/health/"
     method: GET
     status_code: 200
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: result
   until: result.status == 200
   retries: 10
@@ -30,7 +30,7 @@
     url: "https://{{ security_pihole.subdomain }}.{{ domain }}/admin/api.php?status"
     method: GET
     status_code: 200
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: result
   until: result.status == 200 and "enabled" in result.json.status
   retries: 5
@@ -63,4 +63,4 @@
   ansible.builtin.assert:
     that:
       - crowdsec_container.container.State.Running
-  when: security_crowdsec.enabled | default(true) 
+  when: security_crowdsec.enabled | default(true)

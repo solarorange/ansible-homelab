@@ -42,7 +42,7 @@
             - "traefik.http.routers.sabnzbd.middlewares=authentik@docker"
             - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
           healthcheck:
-            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/api?mode=version"]
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api?mode=version || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -58,19 +58,19 @@
     dest: "{{ docker_dir }}/sabnzbd/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if SABnzbd is running
       if ! docker ps | grep -q sabnzbd; then
           echo "SABnzbd is not running"
           exit 1
       fi
-      
+
       # Check if SABnzbd is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api?mode=version | grep -q "version"; then
           echo "SABnzbd is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -111,9 +111,9 @@
     dest: "{{ docker_dir }}/sabnzbd/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # SABnzbd Management Script
-      
+
       function show_help {
           echo "SABnzbd Management Script"
           echo "Usage: $0 [command]"
@@ -126,14 +126,14 @@
           echo "  restore   - Restore SABnzbd data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up SABnzbd data..."
           tar -czf "{{ docker_dir }}/sabnzbd/backup/sabnzbd_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/sabnzbd" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -143,7 +143,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/sabnzbd"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep sabnzbd
@@ -212,4 +212,4 @@
     - "{{ docker_dir }}/sabnzbd/config"
     - "{{ docker_dir }}/sabnzbd/data"
     - "{{ docker_dir }}/sabnzbd/scripts"
-    - "{{ logs_dir }}/sabnzbd" 
+    - "{{ logs_dir }}/sabnzbd"

@@ -53,27 +53,34 @@ groups:
       # ERROR LOG ALERTS
       # =============================================================================
       
-      # High error rate across all services
-      - alert: HighErrorRate
-        expr: sum(rate(loki_log_entries_total{level="error"}[5m])) > 100
-        for: 5m
-        labels:
-          severity: critical
-          service: errors
-        annotations:
-          summary: "High error rate detected across services"
-          description: "Error log rate is above 100 entries per second for 5 minutes."
-
-      # Service-specific error rates
-      - alert: ServiceErrorRate
-        expr: rate(loki_log_entries_total{level="error"}[5m]) > 50
+      # Error-rate spikes across all services (relative to baseline)
+      - alert: LokiErrorRateSpike
+        expr: (
+          sum by(job) (rate(loki_log_entries_total{level="error"}[5m]))
+        ) > 3 * (
+          sum by(job) (rate(loki_log_entries_total{level="error"}[1h])) + 1
+        )
         for: 5m
         labels:
           severity: warning
-          service: "{{ $labels.service }}"
+          service: errors
         annotations:
-          summary: "High error rate for {{ $labels.service }}"
-          description: "{{ $labels.service }} is generating more than 50 error logs per second."
+          summary: "Error-rate spike for {{ $labels.job }}"
+          description: "Short-term error rate is >3x the 1h baseline"
+
+      # Service-specific error rates
+      - alert: LokiServiceErrorRateSpike
+        expr: (
+          sum by(service) (rate(loki_log_entries_total{level="error", service!=""}[5m]))
+        ) > 3 * (
+          sum by(service) (rate(loki_log_entries_total{level="error", service!=""}[1h])) + 1
+        )
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error-rate spike for service {{ $labels.service }}"
+          description: "Short-term error rate is >3x the 1h baseline"
 
       # =============================================================================
       # SECURITY LOG ALERTS

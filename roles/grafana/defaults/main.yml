@@ -1,3 +1,4 @@
+---
 # Grafana Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -198,10 +199,7 @@ grafana_environment:
   PUID: "{{ ansible_user_id | default(1000) }}"
   PGID: "{{ ansible_group_id | default(1000) }}"
   TZ: "{{ timezone | default('UTC') }}"
-  GRAFANA_API_KEY: "{{ grafana_api_key }}"
-  GRAFANA_SECRET_KEY: "{{ grafana_secret_key }}"
-  GRAFANA_ENCRYPTION_KEY: "{{ grafana_encryption_key }}"
-  GRAFANA_JWT_SECRET: "{{ grafana_jwt_secret }}"
+  # Secrets provided via /run/secrets when grafana_manage_secret_files=true
 
 # =============================================================================
 # VALIDATION & TESTING
@@ -257,3 +255,21 @@ grafana_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+grafana_manage_secret_files: true
+
+grafana_secret_files:
+  - { name: "GF_SECURITY_ADMIN_PASSWORD", value: "{{ grafana_admin_password }}" }
+  - { name: "GF_DATABASE_PASSWORD", value: "{{ grafana_database_password }}" }
+  - { name: "GF_SMTP_PASSWORD", value: "{{ grafana_smtp_password }}" }
+
+grafana_required_secrets:
+  - GF_SECURITY_ADMIN_PASSWORD
+  - GF_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+grafana_direct_expose_enabled: false

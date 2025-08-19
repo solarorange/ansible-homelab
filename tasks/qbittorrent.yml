@@ -51,7 +51,7 @@
             - "traefik.http.routers.qbittorrent.middlewares=authentik@docker"
             - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
           healthcheck:
-            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/api/v2/app/version"]
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v2/app/version || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -69,19 +69,19 @@
     dest: "{{ docker_dir }}/qbittorrent/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if qBittorrent is running
       if ! docker ps | grep -q qbittorrent; then
           echo "qBittorrent is not running"
           exit 1
       fi
-      
+
       # Check if qBittorrent is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api/v2/app/version | grep -q "version"; then
           echo "qBittorrent is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -125,9 +125,9 @@
     dest: "{{ docker_dir }}/qbittorrent/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # qBittorrent Management Script
-      
+
       function show_help {
           echo "qBittorrent Management Script"
           echo "Usage: $0 [command]"
@@ -140,14 +140,14 @@
           echo "  restore   - Restore qBittorrent data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up qBittorrent data..."
           tar -czf "{{ docker_dir }}/qbittorrent/backup/qbittorrent_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/qbittorrent" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -157,7 +157,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/qbittorrent"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep qbittorrent
@@ -205,4 +205,4 @@
     job: "{{ docker_dir }}/qbittorrent/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ vault_qbittorrent_user }}" 
+    user: "{{ vault_qbittorrent_user }}"

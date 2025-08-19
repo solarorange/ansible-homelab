@@ -79,7 +79,7 @@
 
     - name: Send error notifications
       ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh '{{ failed_services | join(', ') }}'"
-      when: 
+      when:
         - failed_services | length > 0
         - notifications.enabled | default(false)
       tags: [error_handling, notifications]
@@ -106,27 +106,27 @@
     - name: Detect high CPU usage
       ansible.builtin.set_fact:
         resource_issues: "{{ resource_issues + ['High CPU usage detected'] }}"
-      when: 
+      when:
         - system_resources.stdout_lines[0] | regex_search('CPU Usage: ([0-9]+)') | int > 90
       tags: [error_handling, analysis]
 
     - name: Detect high memory usage
       ansible.builtin.set_fact:
         resource_issues: "{{ resource_issues + ['High memory usage detected'] }}"
-      when: 
+      when:
         - system_resources.stdout_lines[1] | regex_search('Memory Usage: ([0-9.]+)') | float > 90
       tags: [error_handling, analysis]
 
     - name: Detect high disk usage
       ansible.builtin.set_fact:
         resource_issues: "{{ resource_issues + ['High disk usage detected'] }}"
-      when: 
+      when:
         - system_resources.stdout_lines[2] | regex_search('Disk Usage: ([0-9]+)') | int > 90
       tags: [error_handling, analysis]
 
     - name: Send resource warning notifications
       ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh '{{ resource_issues | join(', ') }}'"
-      when: 
+      when:
         - resource_issues | length > 0
         - notifications.enabled | default(false)
       tags: [error_handling, notifications]
@@ -163,7 +163,7 @@
 
     - name: Send Docker error notifications
       ansible.builtin.shell: "{{ docker_dir }}/error_handling/error_notification.sh 'Docker errors: {{ docker_errors.stdout_lines | join(', ') }}'"
-      when: 
+      when:
         - docker_errors.stdout_lines | length > 0
         - notifications.enabled | default(false)
       tags: [error_handling, notifications]
@@ -184,17 +184,17 @@
       ========================================
       ERROR HANDLING CONFIGURED
       ========================================
-      
+
       Error Handling Directory: {{ docker_dir }}/error_handling/
       Service Recovery Script: {{ docker_dir }}/error_handling/service_recovery.sh
       Error Notification Script: {{ docker_dir }}/error_handling/error_notification.sh
       Health Check Script: {{ docker_dir }}/error_handling/service_health_check.sh
-      
+
       Failed Services: {{ failed_services | default([]) | join(', ') if failed_services | default([]) | length > 0 else 'None' }}
       Resource Issues: {{ resource_issues | default([]) | join(', ') if resource_issues | default([]) | length > 0 else 'None' }}
-      
+
       Monitoring Schedule: Every 5 minutes
       Notifications: {{ 'ENABLED' if notifications.enabled | default(false) else 'DISABLED' }}
-      
+
       ========================================
-  tags: [error_handling, summary] 
+  tags: [error_handling, summary]

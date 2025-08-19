@@ -1,3 +1,4 @@
+---
 # Nginx_Proxy_Manager Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,36 @@ nginx_proxy_manager_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+nginx_proxy_manager_manage_secret_files: true
+
+nginx_proxy_manager_secret_files:
+  # MySQL root password used in DB healthcheck
+  - name: "MYSQL_ROOT_PASSWORD"
+    value: "{{ vault_npm_db_root_password }}"
+  # App DB password
+  - name: "MYSQL_PASSWORD"
+    value: "{{ nginx_proxy_manager_database_password | default(nginx_proxy_manager_db_env.MYSQL_PASSWORD | default('')) }}"
+  # Automation token
+  - name: "NPM_API_TOKEN"
+    value: "{{ npm_api_token | default(vault_nginx_proxy_manager_api_token | default('')) }}"
+  # Core app secrets
+  - { name: "NPM_ADMIN_PASSWORD", value: "{{ nginx_proxy_manager_admin_password | default('') }}" }
+  - { name: "NPM_API_KEY", value: "{{ nginx_proxy_manager_api_key | default('') }}" }
+  - { name: "NPM_SECRET_KEY", value: "{{ nginx_proxy_manager_secret_key | default('') }}" }
+  - { name: "NPM_ENCRYPTION_KEY", value: "{{ nginx_proxy_manager_encryption_key | default('') }}" }
+  - { name: "NPM_JWT_SECRET", value: "{{ nginx_proxy_manager_jwt_secret | default('') }}" }
+  - { name: "NPM_SMTP_PASSWORD", value: "{{ nginx_proxy_manager_smtp_password | default('') }}" }
+
+nginx_proxy_manager_required_secrets:
+  - NPM_ADMIN_PASSWORD
+  - NPM_SECRET_KEY
+  - NPM_ENCRYPTION_KEY
+  - NPM_JWT_SECRET
+
+# Prefer Traefik ingress; gate direct host port exposure
+nginx_proxy_manager_direct_expose_enabled: false

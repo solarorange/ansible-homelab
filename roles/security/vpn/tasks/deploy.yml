@@ -1,12 +1,4 @@
 ---
-# WireGuard Deployment and Management
-
-# All logic from tasks/wireguard.yml is migrated here.
-# Includes: directory creation, config, client management, management, healthcheck, logrotate, cron, validation.
-
-# ... (full migrated content from tasks/wireguard.yml) ... 
-
----
 # Wireguard Configuration
 
 - name: Create Wireguard directories
@@ -22,14 +14,15 @@
     - "{{ docker_dir }}/wireguard/clients"
     - "{{ logs_dir }}/wireguard"
 
-- name: Create Wireguard server configuration
+- name: Create Wireguard server configuration (no embedded private key)
   ansible.builtin.copy:
     dest: "{{ docker_dir }}/wireguard/config/wg0.conf"
     content: |
       [Interface]
       Address = {{ ansible_default_ipv4.address }}/24
       ListenPort = 51820
-      PrivateKey = {{ wireguard_server_private_key }}
+      # PrivateKey is read from /run/secrets/WG_PRIVATE_KEY via env-file/secret
+      # PrivateKey = (supplied at runtime)
       PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
       PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
       DNS = 1.1.1.1, 8.8.8.8
@@ -39,12 +32,12 @@
     group: "{{ username }}"
     mode: "0640"
 
-- name: Create Wireguard client configuration template
+- name: Create Wireguard client configuration template (no embedded private key)
   ansible.builtin.copy:
     dest: "{{ docker_dir }}/wireguard/config/client.conf.template"
     content: |
       [Interface]
-      PrivateKey = {{ client_private_key }}
+      # PrivateKey supplied during generation; not embedded in template
       Address = 10.0.0.{{ client_ip }}/24
       DNS = 1.1.1.1, 8.8.8.8
       MTU = 1420
@@ -185,4 +178,4 @@
     job: "logrotate {{ docker_dir }}/wireguard/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ vault_security_user }}" 
+    user: "{{ vault_security_user }}"

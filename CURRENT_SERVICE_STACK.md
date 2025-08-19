@@ -15,6 +15,19 @@ This document reflects the current comprehensive service stack available in the 
 - ✅ Staged deployment execution
 - ✅ Post-deployment validation
 
+## 🏠 **✨ NEW: External Server Integration**
+
+**`scripts/integrate_server.sh`** - Seamlessly integrate external servers into your HomelabOS ecosystem:
+- ✅ **SSL Certificate Management** - Automatic Let's Encrypt certificates
+- ✅ **DNS Configuration** - Automatic subdomain creation via Cloudflare API
+- ✅ **Grafana Monitoring** - Custom dashboards for each external server
+- ✅ **Traefik Proxy** - Reverse proxy with authentication and security
+- ✅ **Health Monitoring** - Automated health checks and alerting
+- ✅ **Backup Integration** - Automated backup configuration
+- ✅ **Homepage Integration** - Unified dashboard access for all servers
+
+**Supported External Servers**: Synology, TrueNAS, Unraid, Proxmox, Home Assistant, Pi-hole, Routers, NVR systems, and more!
+
 ## 📋 **Service Categories**
 
 ### 🔐 **Security & Authentication (6 Services)**

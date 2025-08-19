@@ -1,3 +1,4 @@
+---
 # N8N Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,26 @@ n8n_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+n8n_manage_secret_files: true
+
+n8n_secret_files:
+  - { name: "N8N_SMTP_PASSWORD", value: "{{ n8n_smtp_password }}" }
+  - { name: "DB_PASSWORD", value: "{{ n8n_database_password }}" }
+  - { name: "N8N_API_KEY", value: "{{ n8n_api_key | default('') }}" }
+  - { name: "N8N_SECRET_KEY", value: "{{ n8n_secret_key | default('') }}" }
+  - { name: "N8N_ENCRYPTION_KEY", value: "{{ n8n_encryption_key | default('') }}" }
+  - { name: "N8N_JWT_SECRET", value: "{{ n8n_jwt_secret | default('') }}" }
+
+n8n_required_secrets:
+  - N8N_SECRET_KEY
+  - N8N_ENCRYPTION_KEY
+  - N8N_JWT_SECRET
+  - DB_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+n8n_direct_expose_enabled: false

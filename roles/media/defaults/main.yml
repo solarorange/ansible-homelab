@@ -1,3 +1,4 @@
+---
 # Media Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,29 @@ media_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+media_manage_secret_files: true
+
+media_secret_files:
+  - { name: "WATCHTOWER_HTTP_API_TOKEN", value: "{{ media_watchtower_http_api_token | default('') }}" }
+  - { name: "MEDIA_API_KEY", value: "{{ media_api_key | default('') }}" }
+  - { name: "MEDIA_SECRET_KEY", value: "{{ media_secret_key | default('') }}" }
+  - { name: "MEDIA_ENCRYPTION_KEY", value: "{{ media_encryption_key | default('') }}" }
+  - { name: "MEDIA_JWT_SECRET", value: "{{ media_jwt_secret | default('') }}" }
+  - { name: "MEDIA_DATABASE_PASSWORD", value: "{{ media_database_password | default('') }}" }
+  - { name: "MEDIA_REDIS_PASSWORD", value: "{{ media_redis_password | default('') }}" }
+  - { name: "MEDIA_SMTP_PASSWORD", value: "{{ media_smtp_password | default('') }}" }
+
+media_required_secrets:
+  - MEDIA_API_KEY
+  - MEDIA_SECRET_KEY
+  - MEDIA_ENCRYPTION_KEY
+  - MEDIA_JWT_SECRET
+  - MEDIA_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+media_direct_expose_enabled: false

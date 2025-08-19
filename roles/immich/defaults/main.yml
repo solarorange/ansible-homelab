@@ -1,3 +1,4 @@
+---
 # Immich Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,31 @@ immich_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+immich_manage_secret_files: true
+
+immich_secret_files:
+  # server/web common secrets
+  - { name: "IMMICH_ADMIN_PASSWORD", value: "{{ immich_admin_password }}" }
+  - { name: "IMMICH_SECRET_KEY", value: "{{ immich_secret_key }}" }
+  - { name: "IMMICH_JWT_SECRET", value: "{{ immich_jwt_secret }}" }
+  - { name: "IMMICH_ENCRYPTION_KEY", value: "{{ immich_encryption_key }}" }
+  # database and redis
+  - { name: "POSTGRES_PASSWORD", value: "{{ immich_database_password }}" }
+  - { name: "REDIS_PASSWORD", value: "{{ immich_redis_password }}" }
+  # smtp
+  - { name: "SMTP_PASSWORD", value: "{{ immich_smtp_password }}" }
+
+immich_required_secrets:
+  - POSTGRES_PASSWORD
+  - REDIS_PASSWORD
+  - IMMICH_JWT_SECRET
+
+# Prefer Traefik ingress; gate direct host port exposure
+immich_direct_expose_server: false
+immich_direct_expose_web: false
+immich_direct_expose_ml: false

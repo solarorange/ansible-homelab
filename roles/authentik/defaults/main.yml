@@ -1,3 +1,4 @@
+---
 # Authentik Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,24 @@ authentik_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+authentik_manage_secret_files: true
+
+authentik_secret_files:
+  - { name: "AUTHENTIK_API_KEY", value: "{{ authentik_api_key | default('') }}" }
+  - { name: "AUTHENTIK_SECRET_KEY", value: "{{ authentik_secret_key | default('') }}" }
+  - { name: "AUTHENTIK_ENCRYPTION_KEY", value: "{{ authentik_encryption_key | default('') }}" }
+  - { name: "AUTHENTIK_JWT_SECRET", value: "{{ authentik_jwt_secret | default('') }}" }
+  - { name: "AUTHENTIK_DATABASE_PASSWORD", value: "{{ authentik_database_password | default('') }}" }
+  - { name: "AUTHENTIK_REDIS_PASSWORD", value: "{{ authentik_redis_password | default('') }}" }
+  - { name: "AUTHENTIK_SMTP_PASSWORD", value: "{{ authentik_smtp_password | default('') }}" }
+
+authentik_required_secrets:
+  - AUTHENTIK_SECRET_KEY
+  - AUTHENTIK_ENCRYPTION_KEY
+  - AUTHENTIK_JWT_SECRET
+  - AUTHENTIK_DATABASE_PASSWORD

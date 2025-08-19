@@ -3,27 +3,26 @@
 
 - name: Backup PostgreSQL databases
   ansible.builtin.shell: |
+    {{ 'PGPASSWORD="$(cat ' ~ item.password_file ~ ')"' if item.password_file is defined else 'PGPASSWORD="' ~ item.password ~ '"' }} \
     pg_dump -U {{ item.user }} -h {{ item.host | default('{{ ansible_default_ipv4.address }}') }} -p {{ item.port | default('5432') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
   loop: "{{ postgres_databases | default([]) }}"
-  environment:
-    PGpassword: "{{ vault_databases_database_password }}"
   tags: [backup, databases, postgres]
 
 - name: Backup MySQL/MariaDB databases
   ansible.builtin.shell: |
-    mysqldump -u {{ item.user }} -p{{ item.password }} -h {{ item.host | default('{{ ansible_default_ipv4.address }}') }} -P {{ item.port | default('3306') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
+    mysqldump -u {{ item.user }} -p"{{ '$(cat ' ~ item.password_file ~ ')' if item.password_file is defined else item.password }}" -h {{ item.host | default('{{ ansible_default_ipv4.address }}') }} -P {{ item.port | default('3306') }} {{ item.name }} | gzip > {{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
   loop: "{{ mysql_databases | default([]) }}"
   tags: [backup, databases, mysql]
 
 - name: Backup MongoDB databases
   ansible.builtin.shell: |
-    mongodump --uri="mongodb://{{ item.user }}:{{ item.password }}@{{ item.host | default('{{ ansible_default_ipv4.address }}') }}:{{ item.port | default('27017') }}/{{ item.name }}" --gzip --archive={{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.archive
+    mongodump --uri="mongodb://{{ item.user }}:{{ '$(cat ' ~ item.password_file ~ ')' if item.password_file is defined else item.password }}@{{ item.host | default('{{ ansible_default_ipv4.address }}') }}:{{ item.port | default('27017') }}/{{ item.name }}" --gzip --archive={{ backup_root_dir | default('/var/backups') }}/databases/{{ item.name }}-{{ ansible_date_time.iso8601_basic_short }}.archive
   loop: "{{ mongodb_databases | default([]) }}"
   tags: [backup, databases, mongodb]
 
 - name: Backup Redis databases
   ansible.builtin.shell: |
-    redis-cli -h {{ item.host | default('{{ ansible_default_ipv4.address }}') }} -p {{ item.port | default('6379') }} -a {{ item.password }} SAVE && cp {{ item.rdb_path | default('/var/lib/redis/dump.rdb') }} {{ backup_root_dir | default('/var/backups') }}/databases/redis-{{ ansible_date_time.iso8601_basic_short }}.rdb
+    redis-cli -h {{ item.host | default('{{ ansible_default_ipv4.address }}') }} -p {{ item.port | default('6379') }} -a "{{ '$(cat ' ~ item.password_file ~ ')' if item.password_file is defined else item.password }}" SAVE && cp {{ item.rdb_path | default('/var/lib/redis/dump.rdb') }} {{ backup_root_dir | default('/var/backups') }}/databases/redis-{{ ansible_date_time.iso8601_basic_short }}.rdb
   loop: "{{ redis_instances | default([]) }}"
   tags: [backup, databases, redis]
 
@@ -38,7 +37,7 @@
         redis-check-rdb "{{ item }}" && echo "{{ item }} is valid" || exit 1
       fi
     fi
-  loop: "{{ backup_root_dir | default('/var/backups') }}/databases/*"
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/databases/*') }}"
   register: backup_verification
   changed_when: false
-  tags: [backup, databases, verification] 
+  tags: [backup, databases, verification]

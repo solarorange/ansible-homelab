@@ -59,7 +59,7 @@
     env:
       discovery.type: "{{ elasticsearch_discovery_type }}"
       ES_JAVA_OPTS: "-Xms{{ elasticsearch_heap_size }} -Xmx{{ elasticsearch_heap_size }}"
-      ELASTIC_password: "{{ vault_databases_database_password }}"
+      ELASTIC_PASSWORD: "{{ vault_databases_database_password }}"
       xpack.security.enabled: "{{ elasticsearch_xpack_security_enabled | lower }}"
       xpack.security.transport.ssl.enabled: "{{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}"
       xpack.security.http.ssl.enabled: "{{ elasticsearch_xpack_security_http_ssl_enabled | lower }}"
@@ -70,7 +70,7 @@
       - "{{ docker_dir }}/elasticsearch/backup:/usr/share/elasticsearch/backup"
       - "{{ logs_dir }}/elasticsearch:/usr/share/elasticsearch/logs"
     healthcheck:
-      test: ["CMD", "curl", "-s", "-k", "https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_cluster/health"]
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:{{ elasticsearch_web_port }}/_cluster/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -100,4 +100,4 @@
     mode: "0644"
   when: elasticsearch_homepage_enabled | default(true)
 
-# Security and SSL tasks can be added here as needed 
+# Security and SSL tasks can be added here as needed

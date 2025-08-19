@@ -1,0 +1,331 @@
+# External Servers Configuration for HomelabOS Integration
+# This file defines external servers to be integrated into your homelab ecosystem
+
+# =============================================================================
+# SERVER DEFINITIONS
+# =============================================================================
+
+servers:
+  # Example: Synology NAS
+  - name: "synology"
+    ip_address: "{{ synology_ip | default('192.168.1.100') }}"
+    port: {{ synology_port | default(5000) }}
+    protocol: "http"
+    subdomain: "{{ synology_subdomain | default('nas') }}"
+    description: "Synology NAS - File Storage and Media Server"
+    category: "storage"
+    ssl_enabled: {{ synology_ssl_enabled | default(true) }}
+    auth_enabled: {{ synology_auth_enabled | default(true) }}
+    monitoring_enabled: {{ synology_monitoring_enabled | default(true) }}
+    backup_enabled: {{ synology_backup_enabled | default(true) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ synology_auth_method | default('authentik') }}"
+    health_check_path: "{{ synology_health_check_path | default('/webapi/entry.cgi') }}"
+    health_check_timeout: {{ synology_health_check_timeout | default(15) }}
+    backup_paths:
+      - "{{ synology_backup_path1 | default('/volume1/homes') }}"
+      - "{{ synology_backup_path2 | default('/volume1/shared') }}"
+    backup_schedule: "{{ synology_backup_schedule | default('0 2 * * *') }}"
+
+  # Example: Unraid Server
+  - name: "unraid"
+    ip_address: "{{ unraid_ip | default('192.168.1.101') }}"
+    port: {{ unraid_port | default(80) }}
+    protocol: "http"
+    subdomain: "{{ unraid_subdomain | default('unraid') }}"
+    description: "Unraid Server - Storage and Virtualization"
+    category: "storage"
+    ssl_enabled: {{ unraid_ssl_enabled | default(true) }}
+    auth_enabled: {{ unraid_auth_enabled | default(true) }}
+    monitoring_enabled: {{ unraid_monitoring_enabled | default(true) }}
+    backup_enabled: {{ unraid_backup_enabled | default(false) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ unraid_auth_method | default('basic') }}"
+    username: "{{ unraid_username | default('root') }}"
+    password: "{{ vault_unraid_password | default('') }}"
+    health_check_path: "{{ unraid_health_check_path | default('/Main') }}"
+    health_check_timeout: {{ unraid_health_check_timeout | default(10) }}
+
+  # Example: Proxmox Server
+  - name: "proxmox"
+    ip_address: "{{ proxmox_ip | default('192.168.1.102') }}"
+    port: {{ proxmox_port | default(8006) }}
+    protocol: "https"
+    subdomain: "{{ proxmox_subdomain | default('proxmox') }}"
+    description: "Proxmox VE - Virtualization Platform"
+    category: "virtualization"
+    ssl_enabled: {{ proxmox_ssl_enabled | default(true) }}
+    auth_enabled: {{ proxmox_auth_enabled | default(true) }}
+    monitoring_enabled: {{ proxmox_monitoring_enabled | default(true) }}
+    backup_enabled: {{ proxmox_backup_enabled | default(false) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ proxmox_auth_method | default('authentik') }}"
+    health_check_path: "{{ proxmox_health_check_path | default('/api2/json/version') }}"
+    health_check_timeout: {{ proxmox_health_check_timeout | default(15) }}
+
+  # Example: TrueNAS Server
+  - name: "truenas"
+    ip_address: "{{ truenas_ip | default('192.168.1.103') }}"
+    port: {{ truenas_port | default(80) }}
+    protocol: "http"
+    subdomain: "{{ truenas_subdomain | default('truenas') }}"
+    description: "TrueNAS - Network Attached Storage"
+    category: "storage"
+    ssl_enabled: {{ truenas_ssl_enabled | default(true) }}
+    auth_enabled: {{ truenas_auth_enabled | default(true) }}
+    monitoring_enabled: {{ truenas_monitoring_enabled | default(true) }}
+    backup_enabled: {{ truenas_backup_enabled | default(true) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ truenas_auth_method | default('authentik') }}"
+    health_check_path: "{{ truenas_health_check_path | default('/api/v2.0/system/info') }}"
+    health_check_timeout: {{ truenas_health_check_timeout | default(10) }}
+    backup_paths:
+      - "{{ truenas_backup_path1 | default('/mnt/pool1') }}"
+      - "{{ truenas_backup_path2 | default('/mnt/pool2') }}"
+    backup_schedule: "{{ truenas_backup_schedule | default('0 3 * * *') }}"
+
+  # Example: Home Assistant
+  - name: "homeassistant"
+    ip_address: "{{ homeassistant_ip | default('192.168.1.104') }}"
+    port: {{ homeassistant_port | default(8123) }}
+    protocol: "http"
+    subdomain: "{{ homeassistant_subdomain | default('home') }}"
+    description: "Home Assistant - Home Automation"
+    category: "automation"
+    ssl_enabled: {{ homeassistant_ssl_enabled | default(true) }}
+    auth_enabled: {{ homeassistant_auth_enabled | default(true) }}
+    monitoring_enabled: {{ homeassistant_monitoring_enabled | default(true) }}
+    backup_enabled: {{ homeassistant_backup_enabled | default(true) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ homeassistant_auth_method | default('authentik') }}"
+    health_check_path: "{{ homeassistant_health_check_path | default('/api/') }}"
+    health_check_timeout: {{ homeassistant_health_check_timeout | default(10) }}
+    backup_paths:
+      - "{{ homeassistant_backup_path | default('/config') }}"
+    backup_schedule: "{{ homeassistant_backup_schedule | default('0 4 * * *') }}"
+
+  # Example: Pi-hole DNS
+  - name: "pihole"
+    ip_address: "{{ pihole_ip | default('192.168.1.105') }}"
+    port: {{ pihole_port | default(80) }}
+    protocol: "http"
+    subdomain: "{{ pihole_subdomain | default('dns') }}"
+    description: "Pi-hole - DNS Ad Blocker"
+    category: "network"
+    ssl_enabled: {{ pihole_ssl_enabled | default(true) }}
+    auth_enabled: {{ pihole_auth_enabled | default(false) }}
+    monitoring_enabled: {{ pihole_monitoring_enabled | default(true) }}
+    backup_enabled: {{ pihole_backup_enabled | default(false) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    health_check_path: "{{ pihole_health_check_path | default('/admin/api.php?status') }}"
+    health_check_timeout: {{ pihole_health_check_timeout | default(5) }}
+
+  # Example: Router/Network Device
+  - name: "router"
+    ip_address: "{{ router_ip | default('192.168.1.1') }}"
+    port: {{ router_port | default(80) }}
+    protocol: "http"
+    subdomain: "{{ router_subdomain | default('router') }}"
+    description: "Network Router - Network Management"
+    category: "network"
+    ssl_enabled: {{ router_ssl_enabled | default(false) }}
+    auth_enabled: {{ router_auth_enabled | default(true) }}
+    monitoring_enabled: {{ router_monitoring_enabled | default(true) }}
+    backup_enabled: {{ router_backup_enabled | default(false) }}
+    auth_method: "{{ router_auth_method | default('basic') }}"
+    username: "{{ router_username | default('admin') }}"
+    password: "{{ vault_router_password | default('') }}"
+    health_check_path: "{{ router_health_check_path | default('/') }}"
+    health_check_timeout: {{ router_health_check_timeout | default(5) }}
+
+  # Example: Security Camera NVR
+  - name: "nvr"
+    ip_address: "{{ nvr_ip | default('192.168.1.106') }}"
+    port: {{ nvr_port | default(80) }}
+    protocol: "http"
+    subdomain: "{{ nvr_subdomain | default('cameras') }}"
+    description: "Network Video Recorder - Security Cameras"
+    category: "security"
+    ssl_enabled: {{ nvr_ssl_enabled | default(true) }}
+    auth_enabled: {{ nvr_auth_enabled | default(true) }}
+    monitoring_enabled: {{ nvr_monitoring_enabled | default(true) }}
+    backup_enabled: {{ nvr_backup_enabled | default(true) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ nvr_auth_method | default('authentik') }}"
+    health_check_path: "{{ nvr_health_check_path | default('/') }}"
+    health_check_timeout: {{ nvr_health_check_timeout | default(10) }}
+    backup_paths:
+      - "{{ nvr_backup_path | default('/recordings') }}"
+    backup_schedule: "{{ nvr_backup_schedule | default('0 5 * * *') }}"
+
+  # Example: 3D Printer (OctoPrint)
+  - name: "octoprint"
+    ip_address: "{{ octoprint_ip | default('192.168.1.107') }}"
+    port: {{ octoprint_port | default(5000) }}
+    protocol: "http"
+    subdomain: "{{ octoprint_subdomain | default('printer') }}"
+    description: "OctoPrint - 3D Printer Management"
+    category: "automation"
+    ssl_enabled: {{ octoprint_ssl_enabled | default(true) }}
+    auth_enabled: {{ octoprint_auth_enabled | default(true) }}
+    monitoring_enabled: {{ octoprint_monitoring_enabled | default(true) }}
+    backup_enabled: {{ octoprint_backup_enabled | default(false) }}
+    ssl_email: "{{ admin_email | default('admin@' + domain) }}"
+    auth_method: "{{ octoprint_auth_method | default('authentik') }}"
+    health_check_path: "{{ octoprint_health_check_path | default('/api/version') }}"
+    health_check_timeout: {{ octoprint_health_check_timeout | default(10) }}
+
+  # Example: Game Server
+  - name: "gameserver"
+    ip_address: "{{ gameserver_ip | default('192.168.1.108') }}"
+    port: {{ gameserver_port | default(25565) }}
+    protocol: "tcp"
+    subdomain: "{{ gameserver_subdomain | default('minecraft') }}"
+    description: "Minecraft Server - Game Server"
+    category: "gaming"
+    ssl_enabled: {{ gameserver_ssl_enabled | default(false) }}
+    auth_enabled: {{ gameserver_auth_enabled | default(false) }}
+    monitoring_enabled: {{ gameserver_monitoring_enabled | default(true) }}
+    backup_enabled: {{ gameserver_backup_enabled | default(true) }}
+    health_check_path: "{{ gameserver_health_check_path | default('/') }}"
+    health_check_timeout: {{ gameserver_health_check_timeout | default(5) }}
+    backup_paths:
+      - "{{ gameserver_backup_path | default('/opt/minecraft/world') }}"
+    backup_schedule: "{{ gameserver_backup_schedule | default('0 6 * * *') }}"
+
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+# Global settings for all servers
+global_settings:
+  # SSL Configuration
+  ssl_provider: "{{ ssl_provider | default('letsencrypt') }}"
+  ssl_staging: "{{ ssl_staging | default(false) }}"
+
+  # Authentication
+  default_auth_method: "{{ default_auth_method | default('authentik') }}"
+
+  # Monitoring
+  default_monitoring_interval: "{{ default_monitoring_interval | default('30s') }}"
+  default_health_check_timeout: "{{ default_health_check_timeout | default(10) }}"
+
+  # Backup
+  default_backup_retention_days: "{{ default_backup_retention_days | default(7) }}"
+  backup_encryption: "{{ backup_encryption | default(true) }}"
+
+  # Security
+  rate_limiting_enabled: "{{ rate_limiting_enabled | default(true) }}"
+  security_headers_enabled: "{{ security_headers_enabled | default(true) }}"
+
+  # Performance
+  caching_enabled: "{{ caching_enabled | default(true) }}"
+  compression_enabled: "{{ compression_enabled | default(true) }}"
+
+# =============================================================================
+# NOTIFICATION SETTINGS
+# =============================================================================
+
+notifications:
+  email:
+    enabled: "{{ email_notifications_enabled | default(true) }}"
+    smtp_server: "{{ smtp_server | default('smtp.gmail.com') }}"
+    smtp_port: "{{ smtp_port | default(587) }}"
+    from_email: "{{ from_email | default('homelab@' + domain) }}"
+    to_email: "{{ admin_email | default('admin@' + domain) }}"
+
+  discord:
+    enabled: "{{ discord_notifications_enabled | default(false) }}"
+    webhook_url: "{{ discord_webhook_url | default('') }}"
+
+  slack:
+    enabled: "{{ slack_notifications_enabled | default(false) }}"
+    webhook_url: "{{ slack_webhook_url | default('') }}"
+
+  telegram:
+    enabled: "{{ telegram_notifications_enabled | default(false) }}"
+    bot_token: "{{ telegram_bot_token | default('') }}"
+    chat_id: "{{ telegram_chat_id | default('') }}"
+
+# =============================================================================
+# MONITORING ALERTS
+# =============================================================================
+
+alerts:
+  # Server down alert
+  server_down:
+    enabled: "{{ server_down_alert_enabled | default(true) }}"
+    threshold: "{{ server_down_threshold | default('5m') }}"
+    severity: "{{ server_down_severity | default('critical') }}"
+
+  # High response time alert
+  high_response_time:
+    enabled: "{{ high_response_time_alert_enabled | default(true) }}"
+    threshold: "{{ high_response_time_threshold | default('5s') }}"
+    severity: "{{ high_response_time_severity | default('warning') }}"
+
+  # SSL certificate expiration
+  ssl_expiration:
+    enabled: "{{ ssl_expiration_alert_enabled | default(true) }}"
+    warning_days: "{{ ssl_expiration_warning_days | default(30) }}"
+    critical_days: "{{ ssl_expiration_critical_days | default(7) }}"
+    severity: "{{ ssl_expiration_severity | default('warning') }}"
+
+  # Backup failure alert
+  backup_failure:
+    enabled: "{{ backup_failure_alert_enabled | default(true) }}"
+    threshold: "{{ backup_failure_threshold | default('24h') }}"
+    severity: "{{ backup_failure_severity | default('critical') }}"
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+
+backup:
+  # Storage locations
+  local_storage: "{{ backup_local_storage | default('/home/backups/external_servers') }}"
+  cloud_storage: "{{ backup_cloud_storage | default('') }}"
+
+  # Encryption
+  encryption_enabled: "{{ backup_encryption_enabled | default(true) }}"
+  encryption_key: "{{ vault_backup_encryption_key | default('') }}"
+
+  # Retention
+  retention_days: "{{ backup_retention_days | default(30) }}"
+  retention_weeks: "{{ backup_retention_weeks | default(4) }}"
+  retention_months: "{{ backup_retention_months | default(12) }}"
+
+  # Compression
+  compression_enabled: "{{ backup_compression_enabled | default(true) }}"
+  compression_level: "{{ backup_compression_level | default(6) }}"
+
+  # Verification
+  verify_backups: "{{ backup_verify_enabled | default(true) }}"
+  test_restore: "{{ backup_test_restore_enabled | default(false) }}"
+
+# =============================================================================
+# SECURITY SETTINGS
+# =============================================================================
+
+security:
+  # Rate limiting
+  rate_limit_requests: "{{ security_rate_limit_requests | default(100) }}"
+  rate_limit_window: "{{ security_rate_limit_window | default('1m') }}"
+
+  # Security headers
+  security_headers:
+    - "X-Frame-Options: DENY"
+    - "X-Content-Type-Options: nosniff"
+    - "X-XSS-Protection: 1; mode=block"
+    - "Referrer-Policy: strict-origin-when-cross-origin"
+    - "Content-Security-Policy: default-src 'self'"
+
+  # Access control
+  allowed_networks:
+    - "{{ internal_subnet | default('192.168.1.0/24') }}"
+    - "{{ vpn_subnet | default('10.0.0.0/8') }}"
+
+  # Authentication
+  session_timeout: "{{ security_session_timeout | default('24h') }}"
+  max_login_attempts: "{{ security_max_login_attempts | default(5) }}"
+  lockout_duration: "{{ security_lockout_duration | default('15m') }}"

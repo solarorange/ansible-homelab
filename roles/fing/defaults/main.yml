@@ -1,3 +1,4 @@
+---
 # Fing Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,22 @@ fing_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+fing_manage_secret_files: true
+
+fing_secret_files:
+  - { name: "FING_DB_PASSWORD", value: "{{ fing_database_password | default('') }}" }
+  - { name: "FING_ADMIN_PASSWORD", value: "{{ fing_admin_password | default('') }}" }
+  - { name: "FING_API_KEY", value: "{{ fing_api_key | default('') }}" }
+  - { name: "FING_SMTP_PASSWORD", value: "{{ fing_smtp_password | default('') }}" }
+
+fing_required_secrets:
+  - FING_DB_PASSWORD
+  - FING_ADMIN_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+fing_direct_expose_enabled: false

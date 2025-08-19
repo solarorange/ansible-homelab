@@ -1,6 +1,5 @@
 ---
 # Paperless-ngx Service Deployment
-# Deploy and configure the Paperless-ngx container
 
 - name: Pull Paperless-ngx Docker image
   community.docker.docker_image:
@@ -34,6 +33,13 @@
   failed_when: docker_compose_result.rc != 0
   tags: [paperless-ngx, deploy]
   notify: restart paperless-ngx
+
+- name: Validate Paperless-ngx env maps use *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ paperless_ngx_environment | default({}) }}"
+  when: paperless_ngx_manage_secret_files | default(true) | bool
+  tags: [paperless-ngx, deploy, validate]
 
 - name: Wait for Paperless-ngx to start
   ansible.builtin.wait_for:
@@ -70,6 +76,7 @@
   retries: 10
   delay: 10
   tags: [paperless-ngx, deploy]
+  when: paperless_ngx_direct_expose_enabled | default(false)
 
 - name: Create Paperless-ngx admin user if not exists
   block:
@@ -100,63 +107,62 @@
         status_code: [201, 400]
         timeout: 30
       register: admin_create
-      when: 
+      when:
         - paperless_ngx_auth_method != "authentik"
         - admin_check.status == 401 or admin_check.status == 403
       ignore_errors: true
-
-  when: 
-    - paperless_ngx_auth_method != "authentik"
-    - paperless_ngx_admin_password: "{{ vault_paperless_ngx_password }}"bcrypt") }}"http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
-        method: PATCH
-        headers:
-          Content-Type: "application/json"
-          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
-        body_format: json
-        body:
-          TIME_ZONE: "{{ timezone | default('UTC') }}"
-        status_code: [200, 401, 403]
-        timeout: 30
-      register: timezone_setting
-      ignore_errors: true
-      when: paperless_ngx_admin_token | default('') != ''
-
-    - name: Set Paperless-ngx OCR language
-      ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
-        method: PATCH
-        headers:
-          Content-Type: "application/json"
-          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
-        body_format: json
-        body:
-          OCR_LANGUAGE: "{{ paperless_ngx_ocr_language }}"
-        status_code: [200, 401, 403]
-        timeout: 30
-      register: ocr_setting
-      ignore_errors: true
-      when: paperless_ngx_admin_token | default('') != ''
-
-    - name: Set Paperless-ngx consumer polling
-      ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
-        method: PATCH
-        headers:
-          Content-Type: "application/json"
-          Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
-        body_format: json
-        body:
-          CONSUMER_POLLING: "{{ paperless_ngx_consumer_polling }}"
-        status_code: [200, 401, 403]
-        timeout: 30
-      register: polling_setting
-      ignore_errors: true
-      when: paperless_ngx_admin_token | default('') != ''
-
-  when: 
+  when:
     - paperless_ngx_auth_method != "authentik"
     - paperless_ngx_admin_token | default('') != ''
   tags: [paperless-ngx, deploy]
+
+- name: Set Paperless-ngx timezone
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+    method: PATCH
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+    body_format: json
+    body:
+      TIME_ZONE: "{{ timezone | default('UTC') }}"
+    status_code: [200, 401, 403]
+    timeout: 30
+  register: timezone_setting
+  ignore_errors: true
+  when: paperless_ngx_admin_token | default('') != ''
+
+- name: Set Paperless-ngx OCR language
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+    method: PATCH
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+    body_format: json
+    body:
+      OCR_LANGUAGE: "{{ paperless_ngx_ocr_language }}"
+    status_code: [200, 401, 403]
+    timeout: 30
+  register: ocr_setting
+  ignore_errors: true
+  when: paperless_ngx_admin_token | default('') != ''
+
+- name: Set Paperless-ngx consumer polling
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/admin/paperless/settings/"
+    method: PATCH
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Token {{ paperless_ngx_admin_token | default('') }}"
+    body_format: json
+    body:
+      CONSUMER_POLLING: "{{ paperless_ngx_consumer_polling }}"
+    status_code: [200, 401, 403]
+    timeout: 30
+  register: polling_setting
+  ignore_errors: true
+  when: paperless_ngx_admin_token | default('') != ''
 
 - name: Create Paperless-ngx consume directory symlink
   ansible.builtin.file:
@@ -217,38 +223,50 @@
     timeout: 10
   register: final_health_check
   tags: [paperless-ngx, deploy]
+  when: paperless_ngx_direct_expose_enabled | default(false)
+
+- name: Verify Paperless-ngx via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ paperless_ngx_domain }}{{ paperless_ngx_health_check_url }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (paperless_ngx_direct_expose_enabled | default(false))
+  tags: [paperless-ngx, deploy]
 
 - name: Display Paperless-ngx deployment status
   ansible.builtin.debug:
     msg: |
       Paperless-ngx deployment completed successfully!
-      
+
       Service Information:
       - Container: {{ paperless_ngx_container_name }}
       - Status: {{ paperless_ngx_container_info.container.State.Status }}
       - Health: {{ paperless_ngx_container_info.container.State.Health.Status }}
       - Web Port: {{ paperless_ngx_web_port }}
       - Domain: {{ paperless_ngx_domain }}
-      
+
       Access Information:
       - Web Interface: https://{{ paperless_ngx_domain }}
       - API Endpoint: https://{{ paperless_ngx_domain }}/api/
       - Health Check: https://{{ paperless_ngx_domain }}{{ paperless_ngx_health_check_url }}
-      
+
       Configuration:
       - Database: {{ paperless_ngx_database_type }}
       - Authentication: {{ paperless_ngx_auth_method }}
       - OCR Language: {{ paperless_ngx_ocr_language }}
       - Consumer Polling: {{ paperless_ngx_consumer_polling }}s
-      
+
       Data Directories:
       - Documents: {{ data_dir }}/paperless-ngx/documents
       - Consume: {{ data_dir }}/paperless-ngx/consume
       - Export: {{ docker_dir }}/paperless-ngx/export
       - Backup: {{ backup_dir }}/paperless-ngx
-      
+
       Logs:
       - Application: {{ logs_dir }}/paperless-ngx/application
       - Nginx: {{ logs_dir }}/paperless-ngx/nginx
       - OCR: {{ logs_dir }}/paperless-ngx/ocr
-  tags: [paperless-ngx, deploy] 
+  tags: [paperless-ngx, deploy]

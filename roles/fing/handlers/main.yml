@@ -3,13 +3,13 @@
 # Handles service restarts and reloads for Fing
 
 - name: restart fing
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/fing"
     state: present
     restarted: true
 
 - name: reload fing
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/fing"
     state: present
     restarted: true
@@ -39,25 +39,25 @@
     daemon_reload: true
 
 - name: restart monitoring services
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring"
     state: present
     restarted: true
 
 - name: reload monitoring services
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring"
     state: present
     restarted: true
 
 - name: restart homepage
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/homepage"
     state: present
     restarted: true
 
 - name: reload homepage
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/homepage"
     state: present
     restarted: true
@@ -79,13 +79,13 @@
     - crowdsec
 
 - name: restart traefik
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/traefik"
     state: present
     restarted: true
 
 - name: reload traefik
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/traefik"
     state: present
     restarted: true
@@ -106,8 +106,9 @@
     state: restarted
 
 - name: reload ufw
-  ansible.builtin.ufw:
+  community.general.ufw:
     state: reloaded
+  when: not (firewall.centralized | default(false))
 
 - name: restart cron
   ansible.builtin.systemd:
@@ -117,4 +118,4 @@
 - name: reload cron
   ansible.builtin.systemd:
     name: cron
-    state: reloaded 
+    state: reloaded

@@ -10,7 +10,7 @@
         method: GET
         status_code: 200
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: prometheus_targets
       when: "'prometheus' in enabled_services"
 
@@ -25,7 +25,7 @@
         method: GET
         status_code: 200
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
         headers:
           Authorization: "Bearer {{ vault_grafana_api_key }}"
       register: grafana_datasources
@@ -38,11 +38,11 @@
 
     - name: Check Loki targets
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/loki/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/loki/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: loki_targets
       when: "'loki' in enabled_services"
 
@@ -53,11 +53,11 @@
 
     - name: Check Alertmanager configuration
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
         method: GET
         status_code: 200
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: alertmanager_status
       when: "'alertmanager' in enabled_services"
 
@@ -98,11 +98,11 @@
 
     - name: Validate monitoring metrics collection
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up"
         method: GET
         status_code: 200
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: prometheus_metrics
       when: "'prometheus' in enabled_services"
 
@@ -111,4 +111,4 @@
         msg: "Prometheus metrics collection: {{ 'OK' if prometheus_metrics.status == 200 else 'FAILED' }}"
       when: "'prometheus' in enabled_services"
 
-  tags: [validation, monitoring] 
+  tags: [validation, monitoring]

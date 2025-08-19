@@ -58,7 +58,7 @@
     method: GET
     status_code: [200, 401, 403]
     timeout: 30
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: n8n_traefik_check
   tags: [n8n, validation]
 
@@ -81,7 +81,7 @@
 
 - name: Verify n8n Homepage integration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/services"
     method: GET
     status_code: 200
     timeout: 10
@@ -109,27 +109,27 @@
   ansible.builtin.debug:
     msg: |
       n8n Deployment Validation Results:
-      
+
       Container Status:
       - App Container: {{ 'Running' if n8n_app_status.exists else 'Not Running' }}
       - Postgres Container: {{ 'Running' if n8n_postgres_status.exists else 'Not Running' }}
-      
+
       Service Health:
       - Health Endpoint: {{ n8n_health_check.status | default('Unknown') }}
       - Web Interface: {{ n8n_web_check.status | default('Unknown') }}
       - Database: {{ 'Connected' if n8n_db_check.rc == 0 else 'Not Connected' }}
-      
+
       Integration Status:
       - Traefik: {{ n8n_traefik_check.status | default('Unknown') }}
       - Monitoring: {{ n8n_metrics_check.status | default('Unknown') }}
       - Homepage: {{ n8n_homepage_check.status | default('Unknown') }}
       - Backup: {{ 'Working' if n8n_backup_validation.rc == 0 else 'Not Working' }}
-      
+
       Configuration:
       - Docker Compose: {{ 'Exists' if n8n_config_files.results[0].stat.exists else 'Missing' }}
       - Backup Directory: {{ 'Exists' if n8n_config_files.results[1].stat.exists else 'Missing' }}
       - Logs Directory: {{ 'Exists' if n8n_config_files.results[2].stat.exists else 'Missing' }}
-      
+
       Access Information:
       - Local URL: http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}
       - External URL: https://{{ n8n_subdomain }}.{{ domain }}
@@ -143,8 +143,8 @@
       - App Container: {{ n8n_app_status.exists }}
       - Health Check: {{ n8n_health_check.status | default('Unknown') }}
       - Database: {{ n8n_db_check.rc }}
-  when: 
+  when:
     - not n8n_app_status.exists
     - n8n_health_check.status != 200
     - n8n_db_check.rc != 0
-  tags: [n8n, validation] 
+  tags: [n8n, validation]

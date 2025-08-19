@@ -1,6 +1,68 @@
 ---
 # This task includes the firewall sub-role.
 
+- name: Configure host firewall (UFW) from `group_vars/all/firewall.yml`
+  when: firewall.enabled | default(true)
+  tags: [security, firewall]
+  block:
+    - name: Ensure UFW is installed
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Ensure UFW is disabled while configuring rules
+      community.general.ufw:
+        state: disabled
+
+    - name: Allow SSH access
+      when: firewall.ssh.enabled | default(true)
+      community.general.ufw:
+        rule: allow
+        port: "{{ firewall.ssh.port | default('22') }}"
+        proto: "{{ firewall.ssh.proto | default('tcp') }}"
+        from: "{{
+          firewall.ssh.from
+            if firewall.ssh.from is defined and firewall.ssh.from | lower != 'any'
+          else omit
+        }}"
+        comment: "{{ firewall.ssh.comment | default('SSH access') }}"
+
+    - name: Build list of ports from enabled features
+      ansible.builtin.set_fact:
+        firewall_ports_to_allow: >-
+          {{
+            (firewall.enabled_features | default([]))
+            | map('extract', firewall.features)
+            | map(attribute='ports')
+            | list
+            | flatten
+            | list
+          }}
+
+    - name: Append additional explicit firewall rules
+      ansible.builtin.set_fact:
+        firewall_ports_to_allow: "{{ (firewall_ports_to_allow | default([])) + (firewall.additional_rules | default([])) }}"
+
+    - name: Allow feature-defined ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.port | default(omit) }}"
+        proto: "{{ item.proto | default(omit) }}"
+        from: "{{ item.from | default(item.src | default(omit)) }}"
+        comment: "{{ item.comment | default(omit) }}"
+      loop: "{{ firewall_ports_to_allow | default([]) }}"
+
+    - name: Set UFW default policies
+      community.general.ufw:
+        direction: "{{ item.key }}"
+        policy: "{{ item.value }}"
+      loop: "{{ firewall.default_policies | dict2items }}"
+
+    - name: Enable UFW with logging
+      community.general.ufw:
+        state: enabled
+        logging: "{{ firewall.logging | default('on') }}"
+
 - name: Deploy security firewall stack
   ansible.builtin.include_role:
     name: security/firewall

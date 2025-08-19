@@ -44,7 +44,7 @@
       BACKUP_DIR="{{ backup_root }}/nextcloud"
       mkdir -p "$BACKUP_DIR"
       tar -czf "$BACKUP_DIR/nextcloud_data_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/nextcloud data config html/custom_apps html/themes
-      docker exec nextcloud-db mysqldump -u root -p{{ nextcloud_db_root_password }} nextcloud > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
+      docker exec nextcloud-db bash -lc 'mysqldump -u root -p"$(cat /run/secrets/nextcloud_db_root_password)" nextcloud' > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
 
 - name: Add Nextcloud backup to crontab
   ansible.builtin.cron:
@@ -94,4 +94,4 @@
           missingok
           notifempty
           create 0640 root root
-      } 
+      }

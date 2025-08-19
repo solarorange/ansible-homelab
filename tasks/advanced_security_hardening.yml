@@ -53,7 +53,8 @@
       tags: [security, system]
 
     - name: Configure firewall rules
-      ansible.builtin.ufw:
+      when: not (firewall.centralized | default(false))
+      community.general.ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
@@ -65,7 +66,8 @@
       tags: [security, firewall]
 
     - name: Enable UFW firewall
-      ansible.builtin.ufw:
+      when: not (firewall.centralized | default(false))
+      community.general.ufw:
         state: enabled
         policy: deny
       tags: [security, firewall]
@@ -376,44 +378,44 @@
           ========================================
           SECURITY HARDENING SUMMARY
           ========================================
-          
+
           System Hardening:
           - Unused services disabled
           - Firewall configured and enabled
           - System packages updated
           - Audit logging configured
           - SSH hardened
-          
+
           Docker Security:
           - Content trust enabled
           - Seccomp profiles configured
           - Security policies applied
           - Container capabilities limited
-          
+
           Application Security:
           - SSL/TLS enabled
           - Authentication configured
           - Rate limiting implemented
           - Audit logging enabled
           - Backup encryption configured
-          
+
           Compliance Frameworks:
           - CIS Docker Benchmark: {{ 'Enabled' if 'cis_docker_benchmark' in compliance.frameworks else 'Disabled' }}
           - NIST Cybersecurity Framework: {{ 'Enabled' if 'nist_cybersecurity_framework' in compliance.frameworks else 'Disabled' }}
           - ISO 27001: {{ 'Enabled' if 'iso_27001' in compliance.frameworks else 'Disabled' }}
           - GDPR: {{ 'Enabled' if 'gdpr_compliance' in compliance.frameworks else 'Disabled' }}
-          
+
           Security Monitoring:
           - Fail2ban configured
           - Rkhunter configured
           - ClamAV configured
           - Security scanning completed
-          
+
           Security Scan Results:
           - Lynis Score: {{ lynis_score }}/100
           - Rkhunter: {{ 'PASS' if 'Warning: No rootkits found' in rkhunter_scan.stdout else 'FAIL' }}
           - ClamAV: {{ 'PASS' if 'Infected files: 0' in clamav_scan.stdout else 'FAIL' }}
-          
+
           Overall Security Status: {{ 'SECURE' if (lynis_score >= 70 and 'Warning: No rootkits found' in rkhunter_scan.stdout and 'Infected files: 0' in clamav_scan.stdout) else 'NEEDS_ATTENTION' }}
           ========================================
       tags: [security, reporting]
@@ -442,25 +444,25 @@
           hour: "2"
           day: "*"
           job: "apt update && apt upgrade -y"
-        
+
         - name: "Weekly Security Scan"
           minute: "0"
           hour: "3"
           day: "0"
           job: "cd /etc/security/hardening && ./security_scan.sh"
-        
+
         - name: "Monthly Compliance Check"
           minute: "0"
           hour: "4"
           day: "1"
           job: "cd /etc/security/hardening && ./compliance_check.sh"
-        
+
         - name: "Update Virus Definitions"
           minute: "0"
           hour: "*/6"
           day: "*"
           job: "freshclam"
-        
+
         - name: "Update Rkhunter Database"
           minute: "0"
           hour: "*/12"
@@ -547,7 +549,7 @@
       ========================================
       ADVANCED SECURITY HARDENING CONFIGURED
       ========================================
-      
+
       Security Directory: {{ docker_dir }}/security/hardening
       System Policies: {{ docker_dir }}/security/hardening/system-policies.yml
       Docker Security: {{ docker_dir }}/security/hardening/docker-security.yml
@@ -555,9 +557,9 @@
       Access Controls: {{ docker_dir }}/security/hardening/access-controls.yml
       Audit Configuration: {{ docker_dir }}/security/hardening/audit-config.yml
       Security Monitor: {{ docker_dir }}/security/hardening/security-monitor.sh
-      
+
       Monitoring Schedule: Every 15 minutes
       Security Level: Production
-      
+
       ========================================
-  tags: [security, hardening, summary] 
+  tags: [security, hardening, summary]

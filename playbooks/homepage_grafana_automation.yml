@@ -6,22 +6,22 @@
   hosts: all
   become: true
   gather_facts: true
-  
+
   vars:
     # Enable automation features
     homepage_automation_enabled: true
     grafana_automation_enabled: true
-    
+
     # Integration settings
     monitoring_integration_enabled: true
     authentication_integration_enabled: true
     traefik_integration_enabled: true
-    
+
     # Validation settings
     validate_deployment: true
     validate_integrations: true
     validate_monitoring: true
-    
+
     # Error handling
     max_retries: 3
     retry_delay: 30
@@ -34,12 +34,12 @@
           ansible.builtin.command: python3 --version
           register: python_check
           changed_when: false
-          
+
         - name: Check Docker availability
           ansible.builtin.command: docker --version
           register: docker_check
           changed_when: false
-          
+
         - name: Check required directories
           ansible.builtin.file:
             path: "{{ item }}"
@@ -50,32 +50,32 @@
             - "{{ data_dir }}"
             - "{{ logs_dir }}"
             - "{{ backup_dir }}"
-            
+
         - name: Display prerequisite validation results
           ansible.builtin.debug:
             msg: |
               ========================================
               PREREQUISITE VALIDATION RESULTS
               ========================================
-              
+
               Python: {{ 'AVAILABLE' if python_check.rc == 0 else 'MISSING' }}
               Docker: {{ 'AVAILABLE' if docker_check.rc == 0 else 'MISSING' }}
-              
+
               Required Directories:
               - Docker: {{ docker_dir }}
               - Data: {{ data_dir }}
               - Logs: {{ logs_dir }}
               - Backup: {{ backup_dir }}
-              
+
               ========================================
-              
+
       tags: [prerequisites, validation]
 
   tasks:
     # =============================================================================
     # PHASE 1: PRE-DEPLOYMENT PREPARATION
     # =============================================================================
-    
+
     - name: Phase 1 - Pre-deployment Preparation
       block:
         - name: Create automation directories
@@ -91,7 +91,7 @@
             - "{{ docker_dir }}/monitoring/grafana/scripts"
             - "{{ logs_dir }}/monitoring/grafana"
           tags: [preparation, directories]
-          
+
         - name: Install Python dependencies for automation
           ansible.builtin.package:
             name:
@@ -103,7 +103,7 @@
               - python3-psycopg2-binary
             state: present
           tags: [preparation, dependencies]
-          
+
         - name: Install Python packages for automation
           ansible.builtin.pip:
             name:
@@ -118,7 +118,7 @@
               - prometheus-api-client
             state: present
           tags: [preparation, dependencies]
-          
+
         - name: Backup existing configurations
           ansible.builtin.copy:
             src: "{{ item }}"
@@ -133,13 +133,13 @@
             - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/dashboards.yml"
           when: item is file
           tags: [preparation, backup]
-          
+
       tags: [phase1, preparation]
-      
+
     # =============================================================================
     # PHASE 2: HOMEPAGE DEPLOYMENT AND AUTOMATION
     # =============================================================================
-    
+
     - name: Phase 2 - Homepage Deployment and Automation
       block:
         - name: Deploy Homepage with automation
@@ -148,7 +148,7 @@
           vars:
             homepage_automation_enabled: true
           tags: [phase2, homepage, deploy]
-          
+
         - name: Wait for Homepage to be ready
           ansible.builtin.uri:
             url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
@@ -160,22 +160,22 @@
           delay: 10
           until: homepage_health_check.status in [200, 302, 401]
           tags: [phase2, homepage, wait]
-          
+
         - name: Run Homepage automation integration
           ansible.builtin.include_tasks: "{{ role_path }}/roles/homepage/tasks/automation_integration.yml"
           tags: [phase2, homepage, automation]
-          
+
         - name: Validate Homepage automation
           ansible.builtin.include_tasks: "{{ role_path }}/roles/homepage/tasks/validation.yml"
           when: validate_deployment | bool
           tags: [phase2, homepage, validation]
-          
+
       tags: [phase2, homepage]
-      
+
     # =============================================================================
     # PHASE 3: GRAFANA DEPLOYMENT AND AUTOMATION
     # =============================================================================
-    
+
     - name: Phase 3 - Grafana Deployment and Automation
       block:
         - name: Deploy Grafana with automation
@@ -184,7 +184,7 @@
           vars:
             grafana_automation_enabled: true
           tags: [phase3, grafana, deploy]
-          
+
         - name: Wait for Grafana to be ready
           ansible.builtin.uri:
             url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
@@ -196,22 +196,22 @@
           delay: 10
           until: grafana_health_check.status == 200
           tags: [phase3, grafana, wait]
-          
+
         - name: Run Grafana automation integration
           ansible.builtin.include_tasks: "{{ role_path }}/roles/grafana/tasks/automation_integration.yml"
           tags: [phase3, grafana, automation]
-          
+
         - name: Validate Grafana automation
           ansible.builtin.include_tasks: "{{ role_path }}/roles/grafana/tasks/validation.yml"
           when: validate_deployment | bool
           tags: [phase3, grafana, validation]
-          
+
       tags: [phase3, grafana]
-      
+
     # =============================================================================
     # PHASE 4: INTEGRATION CONFIGURATION
     # =============================================================================
-    
+
     - name: Phase 4 - Integration Configuration
       block:
         - name: Configure Homepage-Grafana integration
@@ -222,7 +222,7 @@
             group: "{{ username }}"
             mode: "0640"
           tags: [phase4, integration, config]
-          
+
         - name: Configure Grafana-Homepage integration
           ansible.builtin.template:
             src: grafana_homepage_integration.yml.j2
@@ -231,81 +231,81 @@
             group: "{{ username }}"
             mode: "0640"
           tags: [phase4, integration, config]
-          
+
         - name: Configure monitoring stack integration
           ansible.builtin.include_tasks: tasks/monitoring_integration.yml
           when: monitoring_integration_enabled | bool
           tags: [phase4, integration, monitoring]
-          
+
         - name: Configure authentication integration
           ansible.builtin.include_tasks: tasks/authentication_integration.yml
           when: authentication_integration_enabled | bool
           tags: [phase4, integration, auth]
-          
+
         - name: Configure Traefik integration
           ansible.builtin.include_tasks: tasks/traefik_integration.yml
           when: traefik_integration_enabled | bool
           tags: [phase4, integration, traefik]
-          
+
       tags: [phase4, integration]
-      
+
     # =============================================================================
     # PHASE 5: VALIDATION AND TESTING
     # =============================================================================
-    
+
     - name: Phase 5 - Validation and Testing
       block:
         - name: Validate service health
           ansible.builtin.include_tasks: tasks/service_validation.yml
           when: validate_deployment | bool
           tags: [phase5, validation, health]
-          
+
         - name: Validate integrations
           ansible.builtin.include_tasks: tasks/integration_validation.yml
           when: validate_integrations | bool
           tags: [phase5, validation, integrations]
-          
+
         - name: Validate monitoring
           ansible.builtin.include_tasks: tasks/monitoring_validation.yml
           when: validate_monitoring | bool
           tags: [phase5, validation, monitoring]
-          
+
         - name: Run performance tests
           ansible.builtin.include_tasks: tasks/performance_tests.yml
           tags: [phase5, validation, performance]
-          
+
         - name: Run security tests
           ansible.builtin.include_tasks: tasks/security_tests.yml
           tags: [phase5, validation, security]
-          
+
       tags: [phase5, validation]
-      
+
     # =============================================================================
     # PHASE 6: POST-DEPLOYMENT CONFIGURATION
     # =============================================================================
-    
+
     - name: Phase 6 - Post-deployment Configuration
       block:
         - name: Configure automated backups
           ansible.builtin.include_tasks: tasks/backup_configuration.yml
           tags: [phase6, post_deployment, backup]
-          
+
         - name: Configure monitoring alerts
           ansible.builtin.include_tasks: tasks/alert_configuration.yml
           tags: [phase6, post_deployment, alerts]
-          
+
         - name: Configure log aggregation
           ansible.builtin.include_tasks: tasks/log_configuration.yml
           tags: [phase6, post_deployment, logging]
-          
+
         - name: Configure maintenance schedules
           ansible.builtin.include_tasks: tasks/maintenance_configuration.yml
           tags: [phase6, post_deployment, maintenance]
-          
+
         - name: Generate deployment documentation
           ansible.builtin.include_tasks: tasks/documentation_generation.yml
           tags: [phase6, post_deployment, documentation]
-          
+
       tags: [phase6, post_deployment]
 
   post_tasks:
@@ -315,67 +315,67 @@
           ========================================
           HOMEPAGE AND GRAFANA AUTOMATION SUMMARY
           ========================================
-          
+
           Deployment Status: {{ 'SUCCESS' if ansible_play_hosts | length > 0 else 'FAILED' }}
-          
+
           Services Deployed:
           - Homepage: {{ 'SUCCESS' if homepage_health_check.status in [200, 302, 401] else 'FAILED' }}
           - Grafana: {{ 'SUCCESS' if grafana_health_check.status == 200 else 'FAILED' }}
-          
+
           Automation Features:
           - Homepage Automation: {{ 'ENABLED' if homepage_automation_enabled else 'DISABLED' }}
           - Grafana Automation: {{ 'ENABLED' if grafana_automation_enabled else 'DISABLED' }}
           - Service Discovery: {{ 'ENABLED' if homepage_automation_enabled else 'DISABLED' }}
           - Dashboard Import: {{ 'ENABLED' if grafana_automation_enabled else 'DISABLED' }}
           - Alerting Configuration: {{ 'ENABLED' if grafana_automation_enabled else 'DISABLED' }}
-          
+
           Integration Status:
           - Monitoring Integration: {{ 'ENABLED' if monitoring_integration_enabled else 'DISABLED' }}
           - Authentication Integration: {{ 'ENABLED' if authentication_integration_enabled else 'DISABLED' }}
           - Traefik Integration: {{ 'ENABLED' if traefik_integration_enabled else 'DISABLED' }}
-          
+
           Validation Results:
           - Deployment Validation: {{ 'ENABLED' if validate_deployment else 'DISABLED' }}
           - Integration Validation: {{ 'ENABLED' if validate_integrations else 'DISABLED' }}
           - Monitoring Validation: {{ 'ENABLED' if validate_monitoring else 'DISABLED' }}
-          
+
           Access Information:
           - Homepage: https://{{ homepage_subdomain }}.{{ domain }}
           - Grafana: https://{{ grafana_subdomain }}.{{ domain }}
           - Homepage API: http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api
           - Grafana API: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api
-          
+
           Configuration Files:
           - Homepage Config: {{ homepage_config_dir }}
           - Grafana Config: {{ docker_dir }}/monitoring/grafana/config
           - Automation Scripts: {{ homepage_docker_dir }}/scripts, {{ docker_dir }}/monitoring/grafana/scripts
-          
+
           Log Files:
           - Homepage Logs: {{ homepage_logs_dir }}
           - Grafana Logs: {{ logs_dir }}/monitoring/grafana
           - Automation Logs: {{ logs_dir }}/automation
-          
+
           Backup Location:
           - Backup Directory: {{ backup_dir }}/automation
-          
+
           ========================================
       tags: [summary]
 
   handlers:
     - name: restart homepage
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ homepage_docker_dir }}"
         state: present
         restarted: true
       listen: "restart homepage"
-      
+
     - name: restart grafana
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/monitoring/grafana"
         state: present
         restarted: true
       listen: "restart grafana"
-      
+
     - name: reload traefik
       ansible.builtin.uri:
         url: "http://traefik:8080/api/http/routers"
@@ -390,21 +390,21 @@
           ========================================
           DEPLOYMENT FAILURE DETECTED
           ========================================
-          
+
           Error occurred during deployment. Check the logs for details.
-          
+
           Common troubleshooting steps:
           1. Check service logs: docker logs <container_name>
           2. Verify configuration files
           3. Check network connectivity
           4. Validate prerequisites
           5. Review automation logs
-          
+
           ========================================
-          
+
     - name: Attempt automatic recovery
       ansible.builtin.include_tasks: tasks/recovery.yml
       when: continue_on_error | bool
-      
+
     - name: Generate failure report
-      ansible.builtin.include_tasks: tasks/failure_report.yml 
+      ansible.builtin.include_tasks: tasks/failure_report.yml

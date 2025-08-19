@@ -148,6 +148,13 @@
     mode: "0640"
   register: fing_env_created
 
+- name: Validate Fing env variables use *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ fing_environment | default({}) }}"
+  when: fing_manage_secret_files | default(true) | bool
+  tags: [fing, validate]
+
 - name: Create Fing configuration files
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -234,7 +241,7 @@
     name: "fing.timer"
     enabled: true
     state: started
-  when: 
+  when:
     - fing_maintenance_enabled | default(true)
     - fing_service_created.changed
 
@@ -280,12 +287,12 @@
   ansible.builtin.debug:
     msg: |
       Fing Prerequisites Setup Complete:
-      
+
       Directories Created: {{ fing_dirs_created.results | length }}
       Packages Installed: {{ fing_packages_installed.results | length }}
       User Created: {{ fing_user_created.changed }}
       Service Created: {{ fing_service_created.changed }}
-      
+
       Configuration Files:
       - Environment: {{ docker_dir }}/fing/.env
       - Config: {{ docker_dir }}/fing/config/config.yml
@@ -294,15 +301,15 @@
       - Security: {{ docker_dir }}/fing/security/security.yml
       - Alerts: {{ docker_dir }}/fing/alerts/alerts.yml
       - Backup: {{ docker_dir }}/fing/backup/backup.yml
-      
+
       Scripts:
       - Health Check: {{ docker_dir }}/fing/health_check.sh
       - Maintenance: {{ docker_dir }}/fing/maintenance.sh
       - Backup: {{ docker_dir }}/fing/backup.sh
       - Restore: {{ docker_dir }}/fing/restore.sh
-      
+
       System Integration:
       - Systemd Service: /etc/systemd/system/fing.service
       - Systemd Timer: /etc/systemd/system/fing.timer
       - Log Rotation: /etc/logrotate.d/fing
-      - Cron Jobs: {{ fing_backup_enabled | default(true) | ternary('Backup & Maintenance', 'None') }} 
+      - Cron Jobs: {{ fing_backup_enabled | default(true) | ternary('Backup & Maintenance', 'None') }}

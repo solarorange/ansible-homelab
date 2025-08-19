@@ -112,7 +112,7 @@
   block:
     - name: Check Prometheus targets
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
         method: GET
         status_code: 200
         timeout: 10
@@ -122,13 +122,13 @@
     - name: Validate Prometheus targets
       ansible.builtin.fail:
         msg: "Prometheus has unhealthy targets"
-      when: 
+      when:
         - prometheus_targets.json.targets | selectattr('health', 'equalto', 'up') | list | length < prometheus_targets.json.targets | length
       tags: [validation, monitoring]
 
     - name: Check Grafana datasources
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/datasources"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/datasources"
         method: GET
         status_code: 200
         timeout: 10
@@ -150,7 +150,7 @@
   block:
     - name: Check Traefik configuration
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/routers"
         method: GET
         status_code: 200
         timeout: 10
@@ -165,7 +165,7 @@
 
     - name: Check Authentik configuration
       ansible.builtin.uri:
-        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
         method: GET
         status_code: [200, 302]
         timeout: 10
@@ -178,8 +178,10 @@
       when: authentik_validation is failed
       tags: [validation, security]
 
-    - name: Check firewall rules
-      ansible.builtin.shell: "ufw status"
+    - name: Check UFW is enabled (no changes)
+      community.general.ufw:
+        state: enabled
+      check_mode: true
       register: firewall_status
       changed_when: false
       tags: [validation, security]
@@ -187,10 +189,10 @@
     - name: Validate firewall status
       ansible.builtin.fail:
         msg: "Firewall is not active"
-      when: "'Status: active' not in firewall_status.stdout"
+      when: firewall_status.changed | default(true)
       tags: [validation, security]
 
-  when: "'traefik' in enabled_services and 'authentik' in enabled_services"
+  when: "'traefik' in enabled_services and 'authentik' in enabled_services and not (firewall.centralized | default(false))"
   tags: [validation, security]
 
 - name: Validate backup configuration
@@ -255,22 +257,22 @@
           ========================================
           SERVICE VALIDATION SUMMARY
           ========================================
-          
+
           Timestamp: {{ validation_summary.timestamp }}
           Host: {{ validation_summary.host }}
           Services Checked: {{ validation_summary.services_checked }}
-          
+
           Configuration Validation:
           - Docker Compose: {{ validation_summary.compose_validation }}
           - Port Connectivity: {{ validation_summary.port_validation }}
           - Endpoint Health: {{ validation_summary.endpoint_validation }}
-          
+
           Service Validation:
           - Database: {{ validation_summary.database_validation }}
           - Monitoring: {{ validation_summary.monitoring_validation }}
           - Security: {{ validation_summary.security_validation }}
           - Backup: {{ validation_summary.backup_validation }}
-          
+
           ========================================
       tags: [validation, summary]
 
@@ -280,4 +282,4 @@
         dest: "{{ logs_dir }}/validation_report_{{ ansible_date_time.epoch }}.yml"
       tags: [validation, report]
 
-  tags: [validation, summary] 
+  tags: [validation, summary]

@@ -1,12 +1,4 @@
 ---
-# Fail2Ban and CrowdSec Deployment and Management
-
-# All logic from tasks/fail2ban.yml and tasks/crowdsec.yml is migrated here.
-# Includes: directory creation, config, filters, management, healthcheck, logrotate, cron, validation.
-
-# ... (full migrated content from tasks/fail2ban.yml and tasks/crowdsec.yml) ... 
-
----
 # Fail2ban Configuration
 - name: Create Fail2ban directories
   ansible.builtin.file:
@@ -39,7 +31,7 @@
       pidfile = /var/run/fail2ban/fail2ban.pid
       dbfile = /var/lib/fail2ban/fail2ban.sqlite3
       dbpurgeage = 86400
-      
+
       [sshd]
       enabled = true
       port = ssh
@@ -48,7 +40,7 @@
       maxretry = 3
       findtime = 300
       bantime = 3600
-      
+
       [nginx-http-auth]
       enabled = true
       filter = nginx-http-auth
@@ -57,7 +49,7 @@
       maxretry = 3
       findtime = 300
       bantime = 3600
-      
+
       [traefik-auth]
       enabled = true
       filter = traefik-auth
@@ -66,7 +58,7 @@
       maxretry = 3
       findtime = 300
       bantime = 3600
-      
+
       [authentik]
       enabled = true
       filter = authentik
@@ -167,7 +159,7 @@
     minute: "0"
     user: "{{ vault_security_user }}"
 
----
+
 # CrowdSec Configuration
 - name: Create CrowdSec directories
   ansible.builtin.file:
@@ -197,7 +189,7 @@
         server:
           listen_uri: {{ ansible_default_ipv4.address }}:8080
           profiles_path: /etc/crowdsec/profiles.yaml
-          online_client: 
+          online_client:
             credentials_path: /etc/crowdsec/online_api_credentials.yaml
       prometheus:
         enabled: true
@@ -293,4 +285,4 @@
     job: "{{ docker_dir }}/crowdsec/scripts/manage.sh update"
     hour: "*/6"
     minute: "0"
-    user: "{{ vault_security_user }}" 
+    user: "{{ vault_security_user }}"

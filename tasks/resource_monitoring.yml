@@ -84,10 +84,10 @@
         "load_average": "{{ system_resources.stdout_lines[4] | regex_search('Load Average: (.+)') | regex_replace('Load Average: (.+)', '\\1') }}",
         "active_connections": {{ system_resources.stdout_lines[5] | regex_search('Active Connections: (\\d+)') | regex_replace('Active Connections: (\\d+)', '\\1') | int }}
       }
-  when: 
+  when:
     - notification_webhook_url is defined
-    - (cpu_usage >= resource_thresholds.cpu_warning or 
-       memory_usage >= resource_thresholds.memory_warning or 
+    - (cpu_usage >= resource_thresholds.cpu_warning or
+       memory_usage >= resource_thresholds.memory_warning or
        disk_usage >= resource_thresholds.disk_warning)
   tags: [monitoring, resources, notifications]
 
@@ -129,7 +129,7 @@
           {% endfor %}
         ]
       }
-  when: 
+  when:
     - notification_webhook_url is defined
     - high_resource_containers | length > 0
   tags: [monitoring, resources, docker, notifications]
@@ -155,4 +155,4 @@
       - Disk Usage: {{ disk_usage }}% ({{ 'WARNING' if disk_usage >= resource_thresholds.disk_warning else 'OK' }})
       - Active Containers: {{ container_stats | length }}
       - High Resource Containers: {{ high_resource_containers | length }}
-  tags: [monitoring, resources] 
+  tags: [monitoring, resources]

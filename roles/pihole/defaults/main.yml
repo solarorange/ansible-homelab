@@ -1,3 +1,4 @@
+---
 # Pihole Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,19 @@ pihole_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+# Toggle to manage secret files (kept backward compatible with existing envs)
+pihole_manage_secret_files: true
+
+# Secret files written to {{ docker_dir }}/pihole/secrets (0600)
+pihole_secret_files:
+  - name: "WEBPASSWORD"
+    value: "{{ pihole_admin_password }}"
+
+# Optional list of required secrets for validation in role tasks
+pihole_required_secrets:
+  - WEBPASSWORD

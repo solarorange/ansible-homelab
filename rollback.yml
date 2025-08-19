@@ -6,7 +6,7 @@
   hosts: all
   become: true
   gather_facts: true
-  
+
   vars:
     rollback_backup_dir: "/home/{{ username }}/backups/rollback"
     rollback_confirm: "{{ rollback_confirm | default(false) }}"
@@ -35,7 +35,7 @@
       ansible.builtin.fail:
         msg: |
           ROLLBACK OPERATION REQUIRES CONFIRMATION
-          
+
           This will rollback the following roles:
           {% if 'security' in ansible_run_tags or 'all' in ansible_run_tags %}
           - Security services (Traefik, Authentik, Pi-hole, etc.)
@@ -55,7 +55,7 @@
           {% if 'utilities' in ansible_run_tags or 'all' in ansible_run_tags %}
           - Utility services (Homepage, Grafana, etc.)
           {% endif %}
-          
+
           Set rollback_confirm=true to proceed
       when: not rollback_confirm
 
@@ -91,7 +91,8 @@
             - pihole
           ignore_errors: true
 
-      when: 'security' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'security' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, security]
 
     - name: Rollback database services
@@ -128,7 +129,8 @@
             - kibana
           ignore_errors: true
 
-      when: 'databases' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'databases' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, databases]
 
     - name: Rollback storage services
@@ -161,7 +163,8 @@
             - nextcloud
           ignore_errors: true
 
-      when: 'storage' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'storage' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, storage]
 
     - name: Rollback media services
@@ -222,7 +225,8 @@
             - tdarr
           ignore_errors: true
 
-      when: 'media' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'media' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, media]
 
     - name: Rollback automation services
@@ -259,7 +263,8 @@
             - nodered
           ignore_errors: true
 
-      when: 'automation' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'automation' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, automation]
 
     - name: Rollback utility services
@@ -302,7 +307,8 @@
             - influxdb
           ignore_errors: true
 
-      when: 'utilities' in ansible_run_tags or 'all' in ansible_run_tags
+      when:
+        - "'utilities' in ansible_run_tags or 'all' in ansible_run_tags"
       tags: [rollback, utilities]
 
   post_tasks:
@@ -326,9 +332,9 @@
               ===============
               Date: {{ ansible_date_time.iso8601 }}
               Host: {{ inventory_hostname }}
-              
+
               {{ rollback_status.stdout }}
             dest: "/home/{{ username }}/logs/rollback_report_$(date +%Y%m%d_%H%M%S).txt"
             mode: '0644'
 
-      tags: [rollback, validation] 
+      tags: [rollback, validation]

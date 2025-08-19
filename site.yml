@@ -6,7 +6,7 @@
   hosts: all
   become: true
   gather_facts: true
-  
+
   # Configuration loading
   vars_files:
     - group_vars/all/common.yml
@@ -14,7 +14,7 @@
     - group_vars/all/advanced_config.yml
     - group_vars/all/notifications.yml
     - group_vars/all/monitoring_thresholds.yml
-  
+
   # Pre-flight checks and system preparation
   pre_tasks:
     - name: Load advanced configuration
@@ -47,106 +47,75 @@
     - name: security
       tags: [security, infrastructure, stage1]
       when: security_enabled | default(true)
-      
+
     # Stage 2: Core Services (depends on infrastructure)
     - name: databases
       tags: [databases, core_services, stage2]
       when: databases_enabled | default(true)
-      
+
     - name: storage
       tags: [storage, core_services, stage2]
       when: storage_enabled | default(true)
-      
+
     - name: logging
       tags: [logging, core_services, stage2]
       when: logging_enabled | default(true)
-      
+
     - name: certificate_management
       tags: [certificates, core_services, stage2]
       when: certificate_management_enabled | default(true)
-      
+
     # Stage 3: Applications (depends on core services)
     - name: media
       tags: [media, applications, stage3]
       when: media_enabled | default(true)
-      
+
     - name: paperless_ngx
       tags: [paperless, applications, stage3]
       when: paperless_ngx_enabled | default(true)
-      
+
     - name: fing
       tags: [fing, applications, stage3]
       when: fing_enabled | default(true)
-      
+
     - name: utilities
       tags: [utilities, applications, stage3]
       when: utilities_enabled | default(true)
-      
+
     - name: automation
       tags: [automation, applications, stage3]
       when: automation_enabled | default(true)
-      
+
     # Stage 3.5: Dashboard and Management (depends on applications)
     - name: homepage
       tags: [homepage, dashboard, stage3.5]
       when: homepage_enabled | default(true)
 
-    - name: testapp
-      tags: [testapp, utilities, stage3]
-      when: testapp_enabled | default(true)
-      
-    - name: testservice
-      tags: [testservice, utilities, stage3]
-      when: testservice_enabled | default(true)
-      
+    # Additional Services
+    - name: gluetun
+      tags: [gluetun, security, stage1]
+      when: gluetun_enabled | default(true)
+
+    - name: pinchflat
+      tags: [pinchflat, media, stage3]
+      when: pinchflat_enabled | default(true)
+
     - name: dumbassets
       tags: [dumbassets, utilities, stage3]
       when: dumbassets_enabled | default(true)
-      
+
     - name: reconya
       tags: [reconya, network, stage3]
       when: reconya_enabled | default(true)
-      
-    - name: testservice
-      tags: [testservice, utilities, stage3]
-      when: testservice_enabled | default(true)
-      
+
     - name: jellyfin
-      tags: [jellyfin, utilities, stage3]
+      tags: [jellyfin, media, stage3]
       when: jellyfin_enabled | default(true)
-      
-    - name: testservice
-      tags: [testservice, utilities, stage3]
-      when: testservice_enabled | default(true)
-      
+
     - name: romm
       tags: [romm, media, stage3]
       when: romm_enabled | default(true)
-      
-    - name: testservice
-      tags: [testservice, utilities, stage3]
-      when: testservice_enabled | default(true)
-      
-    - name: romm
-      tags: [romm, utilities, stage3]
-      when: romm_enabled | default(true)
-      
-    - name: romm
-      tags: [romm, utilities, stage3]
-      when: romm_enabled | default(true)
-      
-    - name: romm
-      tags: [romm, utilities, stage3]
-      when: romm_enabled | default(true)
-      
-    - name: jellyfin
-      tags: [jellyfin, utilities, stage3]
-      when: jellyfin_enabled | default(true)
-      
-    - name: testservice2
-      tags: [testservice2, utilities, stage3]
-      when: testservice2_enabled | default(true)
-      
+
   # Post-deployment validation and optimization
   post_tasks:
     - name: Validate all services
@@ -202,20 +171,20 @@
           ========================================
           HOMELAB DEPLOYMENT SUMMARY
           ========================================
-          
+
           Deployment Information:
           - Environment: {{ environment | default('production') }}
           - Deployment ID: {{ ansible_date_time.epoch }}
           - Ansible Version: {{ ansible_version.full }}
           - Execution Time: {{ ansible_date_time.iso8601 }}
-          
+
           Stage Deployment Status:
           - Stage 1 (Infrastructure): {{ 'COMPLETED' if security_enabled | default(false) else 'SKIPPED' }}
           - Stage 2 (Core Services): {{ 'COMPLETED' if databases_enabled | default(false) else 'SKIPPED' }}
           - Stage 3 (Applications): {{ 'COMPLETED' if media_enabled | default(false) else 'SKIPPED' }}
           - Stage 3.5 (Dashboard): {{ 'COMPLETED' if homepage_enabled | default(false) else 'SKIPPED' }}
           - Stage 4 (Validation): COMPLETED
-          
+
           Role Deployment Status:
           - Security: {{ 'ENABLED' if security_enabled | default(false) else 'DISABLED' }}
           - Databases: {{ 'ENABLED' if databases_enabled | default(false) else 'DISABLED' }}
@@ -227,18 +196,18 @@
           - Utilities: {{ 'ENABLED' if utilities_enabled | default(false) else 'DISABLED' }}
           - Automation: {{ 'ENABLED' if automation_enabled | default(false) else 'DISABLED' }}
           - Homepage: {{ 'ENABLED' if homepage_enabled | default(false) else 'DISABLED' }}
-          
+
           Security Status:
           - Fail2ban: {{ 'ENABLED' if fail2ban_enabled | default(false) else 'DISABLED' }}
           - CrowdSec: {{ 'ENABLED' if crowdsec_enabled | default(false) else 'DISABLED' }}
           - SSL/TLS: {{ 'ENABLED' if ssl_enabled | default(false) else 'DISABLED' }}
-          
+
           Monitoring Integration:
           - Prometheus: {{ 'ENABLED' if prometheus_enabled | default(false) else 'DISABLED' }}
           - Grafana: {{ 'ENABLED' if grafana_enabled | default(false) else 'DISABLED' }}
           - Loki: {{ 'ENABLED' if loki_enabled | default(false) else 'DISABLED' }}
           - AlertManager: {{ 'ENABLED' if alertmanager_enabled | default(false) else 'DISABLED' }}
-          
+
           Notification Channels:
           - Email: {{ 'ENABLED' if notifications.email.enabled | default(false) else 'DISABLED' }}
           - Slack: {{ 'ENABLED' if notifications.slack.enabled | default(false) else 'DISABLED' }}
@@ -246,29 +215,29 @@
           - Telegram: {{ 'ENABLED' if notifications.telegram.enabled | default(false) else 'DISABLED' }}
           - PagerDuty: {{ 'ENABLED' if notifications.pagerduty.enabled | default(false) else 'DISABLED' }}
           - Webhook: {{ 'ENABLED' if notifications.webhook.enabled | default(false) else 'DISABLED' }}
-          
+
           Monitoring Thresholds:
           - System CPU: {{ monitoring_thresholds.system.cpu.warning | default(80) }}% / {{ monitoring_thresholds.system.cpu.critical | default(90) }}%
           - System Memory: {{ monitoring_thresholds.system.memory.warning | default(85) }}% / {{ monitoring_thresholds.system.memory.critical | default(95) }}%
           - System Disk: {{ monitoring_thresholds.system.disk.warning | default(80) }}% / {{ monitoring_thresholds.system.disk.critical | default(90) }}%
           - Web Response: {{ monitoring_thresholds.services.web.response_time.warning | default(1000) }}ms / {{ monitoring_thresholds.services.web.response_time.critical | default(3000) }}ms
-          
+
           Backup Configuration:
           - Backup Enabled: {{ 'YES' if backup_enabled | default(false) else 'NO' }}
           - Retention Days: {{ backup_retention_days | default(7) }}
           - Compression: {{ 'ENABLED' if backup_compression | default(false) else 'DISABLED' }}
-          
+
           Access Information:
           - Homepage Dashboard: https://homepage.{{ domain }}
           - Traefik Dashboard: https://traefik.{{ domain }}
           - Grafana Dashboard: https://grafana.{{ domain }}
           - Authentik: https://auth.{{ domain }}
           - Portainer: https://portainer.{{ domain }}
-          
+
           ========================================
           DEPLOYMENT COMPLETED SUCCESSFULLY
           ========================================
-          
+
           Next Steps:
           1. Access Homepage at: https://homepage.{{ domain }}
           2. Configure service API keys in Homepage settings
@@ -277,10 +246,10 @@
           5. Test all service integrations
           6. Review monitoring dashboards
           7. Configure backup schedules
-          
+
           For support and documentation:
           - GitHub: https://github.com/your-repo/ansible-homelab
           - Documentation: https://docs.your-domain.com
           - Community: https://discord.gg/homelab
-          
-          ======================================== 
+
+          ========================================

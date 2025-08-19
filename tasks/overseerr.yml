@@ -10,14 +10,14 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   loop:
-    - "{{ docker_root }}/overseerr/config"
-    - "{{ docker_root }}/overseerr/data"
+    - "{{ docker_dir }}/overseerr/config"
+    - "{{ docker_dir }}/overseerr/data"
   tags: [media, overseerr]
 
 - name: Create Overseerr docker-compose configuration
   ansible.builtin.template:
     src: templates/overseerr/docker-compose.yml.j2
-    dest: "{{ docker_root }}/overseerr/docker-compose.yml"
+    dest: "{{ docker_dir }}/overseerr/docker-compose.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -26,7 +26,7 @@
 - name: Create Overseerr environment file
   ansible.builtin.template:
     src: templates/overseerr/.env.j2
-    dest: "{{ docker_root }}/overseerr/.env"
+    dest: "{{ docker_dir }}/overseerr/.env"
     mode: '0600'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -35,21 +35,22 @@
 - name: Create Traefik configuration for Overseerr
   ansible.builtin.template:
     src: templates/overseerr/traefik.yml.j2
-    dest: "{{ docker_root }}/overseerr/traefik.yml"
+    dest: "{{ docker_dir }}/overseerr/traefik.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
   tags: [media, overseerr]
 
-- name: Start Overseerr container
-  community.docker.docker_compose:
-    project_src: "{{ docker_root }}/overseerr"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
-  register: overseerr_result
-  tags: [media, overseerr]
+- name: Start Overseerr container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "overseerr"
+    project_src: "{{ docker_dir }}/overseerr"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 5055
+  tags: [media, overseerr, rollback]
 
 - name: Wait for Overseerr to be ready
   ansible.builtin.uri:
@@ -78,7 +79,7 @@
 
 - name: Configure Overseerr notifications
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/notifications"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -91,7 +92,7 @@
 
 - name: Configure Overseerr users
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/user"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/user"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -104,7 +105,7 @@
 
 - name: Configure Overseerr permissions
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/permissions"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/permissions"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -117,7 +118,7 @@
 
 - name: Configure Overseerr webhooks
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/webhooks"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/webhooks"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -130,7 +131,7 @@
 
 - name: Verify Overseerr configuration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
     method: GET
     status_code: 200
     register: overseerr_verify
@@ -142,4 +143,4 @@
       Overseerr deployment completed successfully
       URL: https://overseerr.{{ domain }}
       Status: {{ overseerr_verify.json.status }}
-  tags: [media, overseerr] 
+  tags: [media, overseerr]

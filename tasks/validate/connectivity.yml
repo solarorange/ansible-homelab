@@ -24,7 +24,7 @@
         method: GET
         status_code: [200, 201, 202, 401, 403]
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       loop: "{{ service_api_endpoints | default([]) }}"
       register: api_checks
       when: service_api_endpoints is defined
@@ -74,4 +74,4 @@
       ansible.builtin.debug:
         var: ssl_validation.stdout_lines
 
-  tags: [validation, connectivity] 
+  tags: [validation, connectivity]

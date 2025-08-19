@@ -1,3 +1,4 @@
+---
 # Homepage Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -203,6 +204,9 @@ homepage_environment:
   HOMEPAGE_ENCRYPTION_KEY: "{{ homepage_encryption_key }}"
   HOMEPAGE_JWT_SECRET: "{{ homepage_jwt_secret }}"
 
+# Direct port exposure (prefer Traefik ingress by default)
+homepage_direct_expose_enabled: false
+
 # =============================================================================
 # VALIDATION & TESTING
 # =============================================================================
@@ -257,3 +261,24 @@ homepage_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+homepage_manage_secret_files: true
+
+homepage_secret_files:
+  - { name: "WEATHER_API_KEY", value: "{{ homepage_weather_api_key | default('') }}" }
+  - { name: "HOMEPAGE_API_SECRET", value: "{{ homepage_api_secret | default('') }}" }
+  - { name: "HOMEPAGE_API_KEY", value: "{{ homepage_api_key | default('') }}" }
+  - { name: "HOMEPAGE_SECRET_KEY", value: "{{ homepage_secret_key | default('') }}" }
+  - { name: "HOMEPAGE_ENCRYPTION_KEY", value: "{{ homepage_encryption_key | default('') }}" }
+  - { name: "HOMEPAGE_JWT_SECRET", value: "{{ homepage_jwt_secret | default('') }}" }
+  - { name: "HOMEPAGE_SMTP_PASSWORD", value: "{{ homepage_smtp_password | default('') }}" }
+
+homepage_required_secrets:
+  - HOMEPAGE_API_KEY
+  - HOMEPAGE_SECRET_KEY
+  - HOMEPAGE_ENCRYPTION_KEY
+  - HOMEPAGE_JWT_SECRET

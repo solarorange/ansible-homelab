@@ -284,14 +284,16 @@ class ServiceWizard:
     def collect_service_info(self) -> ServiceInfo:
         """Collect service information from user input."""
         print("\n" + "="*60)
-        print("ANSIBLE HOMELAB SERVICE INTEGRATION WIZARD")
+        print("HOMELABOS INTEGRATION WIZARD")
         print("="*60)
         
         # Basic service information
-        print("\n📋 SERVICE INFORMATION")
+        print("\n📋 SERVICE DETAILS")
         print("-" * 40)
         
-        service_name = input("Service Name (lowercase, no spaces): ").strip().lower()
+        print("What is the name of the service you want to add?")
+        print("This will be used for the URL and configuration files.")
+        service_name = input("Service name (lowercase only, no spaces): ").strip().lower()
         if not service_name:
             raise ValueError("Service name is required")
         
@@ -299,7 +301,9 @@ class ServiceWizard:
         print(f"  ✓ Examples: jellyfin, postgres, homepage, portainer")
         print(f"  ✓ Your service will be accessible at: {service_name}.yourdomain.com")
         
-        repository_url = input("Repository URL: ").strip()
+        print("What is the GitHub repository URL for this service?")
+        print("This helps us understand the service configuration.")
+        repository_url = input("GitHub repository URL: ").strip()
         if not repository_url:
             raise ValueError("Repository URL is required")
         
@@ -307,13 +311,16 @@ class ServiceWizard:
         print(f"  ✓ Examples: https://github.com/jellyfin/jellyfin")
         print(f"  ✓ Examples: https://github.com/docker-library/postgres")
         
-        display_name = input("Display Name (for homepage): ").strip() or service_name.title()
-        description = input("Description: ").strip() or f"{display_name} service"
+        print("What should this service be called on your homepage dashboard?")
+        display_name = input("Display name (for homepage): ").strip() or service_name.title()
+        
+        print("Briefly describe what this service does:")
+        description = input("Service description: ").strip() or f"{display_name} service"
         
         # Category selection with detailed examples
         print("\n📂 SERVICE CATEGORY")
         print("-" * 40)
-        print("Select the category that best describes your service:")
+        print("What type of service is this? Choose the category that best fits:")
         
         categories = ["media", "automation", "utilities", "security", "databases", "storage", "monitoring"]
         category_examples = {
@@ -333,7 +340,7 @@ class ServiceWizard:
         
         while True:
             try:
-                cat_choice = int(input(f"Select category (1-{len(categories)}): "))
+                cat_choice = int(input(f"Enter category number (1-{len(categories)}): "))
                 if 1 <= cat_choice <= len(categories):
                     category = categories[cat_choice - 1]
                     print(f"  ✓ Selected: {category} - {category_examples[category]}")
@@ -346,7 +353,7 @@ class ServiceWizard:
         # Stage selection with detailed explanations
         print("\n🚀 DEPLOYMENT STAGE")
         print("-" * 40)
-        print("Select when this service should be deployed:")
+        print("When should this service be deployed? Choose the deployment stage:")
         
         stages = ["stage1", "stage2", "stage3", "stage3.5"]
         stage_descriptions = {
@@ -367,7 +374,7 @@ class ServiceWizard:
             print(f"     Examples: {stage_examples[stage]}")
             print()
         
-        stage_input = input("Select stage (default: stage3): ").strip() or "stage3"
+        stage_input = input("Enter stage number (default: stage3): ").strip() or "stage3"
         
         # Handle both stage names and numbers
         if stage_input in stages:
@@ -964,6 +971,7 @@ class ServiceWizard:
     
     def _generate_defaults(self, service_info: ServiceInfo, role_dir: Path):
         """Generate defaults/main.yml for the role."""
+        # Create defaults content using string concatenation
         defaults_content = f"""---
 # {service_info.display_name} Role Default Variables
 # Enhanced for seamless automatic deployment
@@ -987,7 +995,7 @@ class ServiceWizard:
 {service_info.name}_internal_port: "{service_info.ports[0] if service_info.ports else 8080}"
 
 # Domain configuration
-{service_info.name}_domain: "{service_info.name}.{{{{ domain | default('{{ ansible_default_ipv4.address }}') }}}}"
+{service_info.name}_domain: "{service_info.name}.{{{{ domain | default(ansible_default_ipv4.address) }}}}"
 {service_info.name}_subdomain: "{service_info.name}"
 
 # =============================================================================
@@ -996,8 +1004,8 @@ class ServiceWizard:
 
 {service_info.name}_auth_enabled: {str(service_info.auth_enabled).lower()}
 {service_info.name}_auth_method: "{service_info.auth_method}"
-{service_info.name}_admin_email: "{{{{ admin_email | default('{{ admin_email | default("admin@" + domain) }} + domain) }}}}"
-{service_info.name}_admin_password: "{{ vault_service_password }}"') }}}}"
+{service_info.name}_admin_email: "{{{{ admin_email | default('admin@' + domain) }}}}"
+{service_info.name}_admin_password: "{{{{ vault_{service_info.name}_admin_password | default('') }}}}"
 {service_info.name}_secret_key: "{{{{ vault_{service_info.name}_secret_key | default('') }}}}"
 
 # =============================================================================
@@ -1006,209 +1014,11 @@ class ServiceWizard:
 
 {service_info.name}_database_enabled: {str(service_info.database_enabled).lower()}
 {service_info.name}_database_type: "{service_info.database_type}"
-{service_info.name}_database_host: "{{{{ postgresql_host | default('{{ ansible_default_ipv4.address }}') }}}}"
+{service_info.name}_database_host: "{{{{ postgresql_host | default(ansible_default_ipv4.address) }}}}"
 {service_info.name}_database_port: {service_info.database_port}
 {service_info.name}_database_name: "{service_info.database_name}"
-{service_info.name}_database_user: "{{ vault_service_user }}"
-{service_info.name}_database_password: "{{ vault_service_password }}"') }}}}"
-
-# =============================================================================
-# TRAEFIK INTEGRATION
-# =============================================================================
-
-{service_info.name}_traefik_enabled: true
-{service_info.name}_traefik_middleware: ""
-{service_info.name}_traefik_network: "homelab"
-{service_info.name}_traefik_ssl_enabled: true
-
-# =============================================================================
-# MONITORING CONFIGURATION
-# =============================================================================
-
-{service_info.name}_monitoring_enabled: {str(service_info.monitoring_enabled).lower()}
-{service_info.name}_healthcheck_enabled: true
-{service_info.name}_healthcheck_interval: "30s"
-{service_info.name}_healthcheck_timeout: "10s"
-{service_info.name}_healthcheck_retries: 3
-{service_info.name}_healthcheck_start_period: "40s"
-{service_info.name}_metrics_enabled: {str(service_info.metrics_enabled).lower()}
-{service_info.name}_metrics_port: {service_info.metrics_port}
-
-# =============================================================================
-# SECURITY CONFIGURATION
-# =============================================================================
-
-{service_info.name}_security_enabled: {str(service_info.security_enabled).lower()}
-{service_info.name}_read_only: false
-{service_info.name}_no_new_privileges: true
-{service_info.name}_security_headers: {str(service_info.security_headers).lower()}
-{service_info.name}_rate_limiting: {str(service_info.rate_limiting).lower()}
-{service_info.name}_rate_limit_requests: {service_info.rate_limit_requests}
-{service_info.name}_rate_limit_window: {service_info.rate_limit_window}
-{service_info.name}_cors_enabled: {str(service_info.cors_enabled).lower()}
-{service_info.name}_crowdsec_enabled: {str(service_info.crowdsec_enabled).lower()}
-{service_info.name}_fail2ban_enabled: {str(service_info.fail2ban_enabled).lower()}
-
-# =============================================================================
-# BACKUP CONFIGURATION
-# =============================================================================
-
-{service_info.name}_backup_enabled: true
-{service_info.name}_backup_retention_days: 30
-{service_info.name}_backup_include_data: true
-{service_info.name}_backup_include_config: true
-{service_info.name}_backup_schedule: "{service_info.backup_schedule}"
-
-# =============================================================================
-# HOMEPAGE INTEGRATION
-# =============================================================================
-
-{service_info.name}_homepage_enabled: true
-{service_info.name}_homepage_group: "{service_info.category}"
-{service_info.name}_homepage_icon: "{service_info.name}"
-{service_info.name}_homepage_title: "{service_info.homepage_title}"
-{service_info.name}_homepage_description: "{service_info.homepage_description}"
-
-# =============================================================================
-# ALERTING CONFIGURATION
-# =============================================================================
-
-{service_info.name}_alerting_enabled: true
-{service_info.name}_alert_severity: "warning"
-{service_info.name}_alert_channels: {service_info.alert_channels}
-
-# =============================================================================
-# RESOURCE LIMITS
-# =============================================================================
-
-{service_info.name}_memory_limit: "512M"
-{service_info.name}_memory_reservation: "256M"
-{service_info.name}_cpu_limit: "0.5"
-{service_info.name}_cpu_reservation: "0.25"
-{service_info.name}_storage_limit: "10G"
-
-# =============================================================================
-# ENVIRONMENT VARIABLES
-# =============================================================================
-
-{service_info.name}_environment:
-"""
-        
-        # Add environment variables
-        for key, value in service_info.environment_vars.items():
-            defaults_content += f"  {key}: \"{value}\"\n"
-        
-        # Add comprehensive environment variables
-        defaults_content += f"""  TZ: "{{{{ timezone | default('UTC') }}}}"
-  PUID: "{{{{ ansible_user_id | default(1000) }}}}"
-  PGID: "{{{{ ansible_user_id | default(1000) }}}}"
-  {service_info.name.upper()}_DOMAIN: "{{{{ {service_info.name}_domain }}}}"
-  {service_info.name.upper()}_SECRET_KEY: "{{{{ vault_{service_info.name}_secret_key | default('') }}}}"
-  {service_info.name.upper()}_ADMIN_EMAIL: "{{{{ {service_info.name}_admin_email }}}}"
-  {service_info.name.upper()}_ADMIN_password: "{{ vault_service_password }}"') }}}}"
-  {service_info.name.upper()}_DATABASE_TYPE: "{{{{ {service_info.name}_database_type }}}}"
-"""
-        
-        # Add database environment variables if database is enabled
-        if service_info.database_enabled and service_info.database_type == "postgresql":
-            defaults_content += f"""  {service_info.name.upper()}_DATABASE_HOST: "{{{{ {service_info.name}_database_host }}}}"
-  {service_info.name.upper()}_DATABASE_PORT: "{{{{ {service_info.name}_database_port }}}}"
-  {service_info.name.upper()}_DATABASE_NAME: "{{{{ {service_info.name}_database_name }}}}"
-  {service_info.name.upper()}_DATABASE_user: "{{ vault_service_user }}"
-  {service_info.name.upper()}_DATABASE_password: "{{ vault_service_password }}"') }}}}"
-"""
-        
-        # Add API environment variables
-        defaults_content += f"""  {service_info.name.upper()}_AUTH_ENABLED: "{{{{ {service_info.name}_auth_enabled | lower }}}}"
-  {service_info.name.upper()}_AUTH_METHOD: "{{{{ {service_info.name}_auth_method }}}}"
-  {service_info.name.upper()}_MONITORING_ENABLED: "{{{{ {service_info.name}_monitoring_enabled | lower }}}}"
-  {service_info.name.upper()}_METRICS_ENABLED: "{{{{ {service_info.name}_metrics_enabled | lower }}}}"
-  {service_info.name.upper()}_SECURITY_HEADERS: "{{{{ {service_info.name}_security_headers | lower }}}}"
-  {service_info.name.upper()}_RATE_LIMITING: "{{{{ {service_info.name}_rate_limiting | lower }}}}"
-  {service_info.name.upper()}_RATE_LIMIT_REQUESTS: "{{{{ {service_info.name}_rate_limit_requests }}}}"
-  {service_info.name.upper()}_RATE_LIMIT_WINDOW: "{{{{ {service_info.name}_rate_limit_window }}}}"
-  {service_info.name.upper()}_CORS_ENABLED: "{{{{ {service_info.name}_cors_enabled | lower }}}}"
-
-# =============================================================================
-# VOLUME CONFIGURATION
-# =============================================================================
-
-{service_info.name}_volumes:
-"""
-        
-        # Add volumes
-        for volume in service_info.volumes:
-            defaults_content += f"  - {volume}\n"
-        
-        # Add common volumes
-        defaults_content += f"""  - "{{{{ docker_data_root }}}}/{service_info.name}:/data"
-  - "{{{{ docker_config_root }}}}/{service_info.name}:/config"
-  - "{{{{ docker_logs_root }}}}/{service_info.name}:/logs"
-  - "{{{{ docker_backup_root }}}}/{service_info.name}:/backups"
-
-# =============================================================================
-# NETWORK CONFIGURATION
-# =============================================================================
-
-{service_info.name}_networks:
-  - homelab
-  - default
-
-# =============================================================================
-# DEPENDENCIES
-# =============================================================================
-
-{service_info.name}_dependencies:
-"""
-        
-        for dependency in service_info.dependencies:
-            defaults_content += f"  - {dependency}\n"
-        
-        # Add comprehensive configuration sections
-        defaults_content += f"""
-# =============================================================================
-# LOGGING CONFIGURATION
-# =============================================================================
-
-{service_info.name}_log_level: "{service_info.log_level}"
-{service_info.name}_log_format: "{service_info.log_format}"
-{service_info.name}_log_retention: {service_info.log_retention}
-
-# =============================================================================
-# PERFORMANCE CONFIGURATION
-# =============================================================================
-
-{service_info.name}_cache_enabled: {str(service_info.cache_enabled).lower()}
-{service_info.name}_cache_size: "{service_info.cache_size}"
-{service_info.name}_cache_ttl: {service_info.cache_ttl}
-{service_info.name}_compression_enabled: {str(service_info.compression_enabled).lower()}
-{service_info.name}_compression_level: {service_info.compression_level}
-
-# =============================================================================
-# API CONFIGURATION
-# =============================================================================
-
-{service_info.name}_api_enabled: {str(service_info.api_enabled).lower()}
-{service_info.name}_api_version: "{service_info.api_version}"
-{service_info.name}_api_key: "{{{{ vault_{service_info.name}_api_key | default('') }}}}"
-{service_info.name}_api_rate_limit: {service_info.api_rate_limit}
-{service_info.name}_api_rate_limit_window: {service_info.api_rate_limit_window}
-
-# =============================================================================
-# NOTIFICATION CONFIGURATION
-# =============================================================================
-
-{service_info.name}_notifications_enabled: {str(service_info.notifications_enabled).lower()}
-{service_info.name}_email_enabled: {str(service_info.email_enabled).lower()}
-{service_info.name}_email_host: "{{{{ smtp_host | default('') }}}}"
-{service_info.name}_email_port: {service_info.email_port}
-{service_info.name}_email_username: "{{{{ vault_smtp_username | default('') }}}}"
-{service_info.name}_email_password: "{{ vault_service_password }}"') }}}}"
-{service_info.name}_email_from: "{service_info.name}@{{{{ domain }}}}"
-{service_info.name}_discord_enabled: {str(service_info.discord_enabled).lower()}
-{service_info.name}_discord_webhook: "{{{{ vault_discord_webhook | default('') }}}}"
-{service_info.name}_slack_enabled: {str(service_info.slack_enabled).lower()}
-{service_info.name}_slack_webhook: "{{{{ vault_slack_webhook | default('') }}}}"
+{service_info.name}_database_user: "{{{{ vault_{service_info.name}_database_user | default('{service_info.name}') }}}}"
+{service_info.name}_database_password: "{{{{ vault_{service_info.name}_database_password | default('') }}}}"
 """
         
         with open(role_dir / "defaults" / "main.yml", 'w') as f:
@@ -1287,7 +1097,7 @@ class ServiceWizard:
 - name: Deploy {service_info.display_name} Docker Compose
   template:
     src: docker-compose.yml.j2
-    dest: "{{{{ docker_root }}}}/{service_info.name}/docker-compose.yml"
+    dest: "{{{{ docker_dir }}}}/{service_info.name}/docker-compose.yml"
     mode: '0644'
     owner: "{{{{ ansible_user }}}}"
     group: "{{{{ ansible_user }}}}"
@@ -1296,7 +1106,7 @@ class ServiceWizard:
 
 - name: Start {service_info.display_name} container
   docker_compose:
-    project_src: "{{{{ docker_root }}}}/{service_info.name}"
+    project_src: "{{{{ docker_dir }}}}/{service_info.name}"
     state: present
     restarted: yes
   tags: [{service_info.name}, deploy]
@@ -1690,8 +1500,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   homelab:
@@ -1956,13 +1766,13 @@ PGID={{{{ ansible_user_id | default(1000) }}}}
 
 - name: restart {service_info.name}
   community.docker.docker_compose:
-    project_src: "{{{{ docker_root }}}}/{service_info.name}"
+    project_src: "{{{{ docker_dir }}}}/{service_info.name}"
     state: present
   listen: "restart {service_info.name}"
 
 - name: reload {service_info.name}
   community.docker.docker_compose:
-    project_src: "{{{{ docker_root }}}}/{service_info.name}"
+    project_src: "{{{{ docker_dir }}}}/{service_info.name}"
     state: present
   listen: "reload {service_info.name}"
 """
@@ -2275,23 +2085,35 @@ Generated by Ansible Homelab Service Integration Wizard
         
         # Load existing vault configuration
         if vault_file.exists():
-            with open(vault_file, 'r') as f:
-                vault_config = yaml.safe_load(f) or {}
+            try:
+                with open(vault_file, 'r') as f:
+                    vault_config = yaml.safe_load(f) or {}
+            except yaml.YAMLError:
+                # Vault files contain unquoted Jinja2 expressions, so we'll create a new config
+                print(f"   ⚠️  Skipping vault file validation (contains Jinja2 expressions)")
+                vault_config = {}
         else:
             vault_config = {}
         
-        # Add service-specific vault variables
-        vault_config[f"vault_{service_info.name}_admin_password"] = f"your_secure_{service_info.name}_admin_password"
-        vault_config[f"vault_{service_info.name}_secret_key"] = f"your_secure_{service_info.name}_secret_key"
-        vault_config[f"vault_{service_info.name}_api_key"] = f"your_secure_{service_info.name}_api_key"
+        # Add service-specific vault variables to the existing vault file
+        vault_variables = [
+            f"vault_{service_info.name}_admin_password: {{ vault_{service_info.name}_admin_password | password_hash('bcrypt') }}",
+            f"vault_{service_info.name}_database_password: {{ vault_{service_info.name}_database_password | password_hash('bcrypt') }}",
+            f"vault_{service_info.name}_api_token: {{ vault_{service_info.name}_api_token | default('') }}",
+            f"vault_{service_info.name}_secret_key: {{ vault_{service_info.name}_secret_key | default('') }}",
+            f"vault_{service_info.name}_encryption_key: {{ vault_{service_info.name}_encryption_key | default('') }}",
+            f"vault_{service_info.name}_jwt_secret: {{ vault_{service_info.name}_jwt_secret | default('') }}",
+            f"vault_{service_info.name}_redis_password: {{ vault_{service_info.name}_redis_password | password_hash('bcrypt') }}",
+            f"vault_{service_info.name}_smtp_password: {{ vault_{service_info.name}_smtp_password | default('') }}",
+            f"vault_{service_info.name}_email_password: {{ vault_{service_info.name}_email_password | default('') }}",
+            f"vault_{service_info.name}_database_user: {{ vault_{service_info.name}_database_user | default('{service_info.name}') }}"
+        ]
         
-        # Add database password if database is enabled
-        if service_info.database_enabled and service_info.database_type == "postgresql":
-            vault_config[f"vault_{service_info.name}_database_password"] = f"your_secure_{service_info.name}_database_password"
-        
-        # Save updated vault configuration
-        with open(vault_file, 'w') as f:
-            yaml.dump(vault_config, f, default_flow_style=False, sort_keys=False)
+        # Append vault variables to the existing vault file
+        with open(vault_file, 'a') as f:
+            f.write(f"\n# {service_info.display_name} Configuration\n")
+            for var in vault_variables:
+                f.write(f"{var}\n")
         
         print(f"   ✓ Generated vault variables for {service_info.name}")
         

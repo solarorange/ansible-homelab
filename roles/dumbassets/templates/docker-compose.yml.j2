@@ -5,8 +5,10 @@ services:
     container_name: {{ dumbassets_container_name }}
     image: {{ dumbassets_image }}
     restart: {{ dumbassets_restart_policy }}
+    {% if dumbassets_direct_expose_enabled | default(false) %}
     ports:
       - "{{ dumbassets_external_port }}:3000"
+    {% endif %}
     volumes:
       - {{ dumbassets_data_dir }}:/app/data
       - {{ dumbassets_logs_dir }}:/app/logs
@@ -37,31 +39,27 @@ services:
       - "com.docker.compose.project=dumbassets"
       - "com.docker.compose.service=dumbassets"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:3000/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ dumbassets_cpus }}'
-          memory: {{ dumbassets_memory_limit }}
-        reservations:
-          cpus: '0.5'
-          memory: {{ dumbassets_memory_reservation }}
+    mem_limit: {{ dumbassets_memory_limit }}
+    cpus: '{{ dumbassets_cpus }}'
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     read_only: true
     tmpfs:
       - /tmp
       - /var/tmp
-    user: "1000:1000"
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   {{ dumbassets_network }}:

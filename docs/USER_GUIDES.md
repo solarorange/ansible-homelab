@@ -295,7 +295,7 @@ server_ips:
   - "192.168.1.101"
 
 # Docker configuration
-docker_root: "/opt/docker"
+docker_dir: "/opt/docker"
 docker_data_root: "/opt/docker/data"
 ```
 

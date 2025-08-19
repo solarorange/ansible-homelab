@@ -1,3 +1,4 @@
+---
 # Vaultwarden Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,21 @@ vaultwarden_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+vaultwarden_manage_secret_files: true
+
+vaultwarden_secret_files:
+  - { name: "ADMIN_TOKEN", value: "{{ vault_vaultwarden_admin_token | default('') }}" }
+  - { name: "DATABASE_PASSWORD", value: "{{ vault_vaultwarden_database_password }}" }
+  - { name: "SMTP_PASSWORD", value: "{{ vault_vaultwarden_smtp_password }}" }
+
+vaultwarden_required_secrets:
+  - ADMIN_TOKEN
+  - DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+vaultwarden_direct_expose_enabled: false

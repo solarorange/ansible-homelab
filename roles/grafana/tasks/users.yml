@@ -71,24 +71,24 @@
   ansible.builtin.debug:
     msg: |
       Grafana Users Configuration:
-      
+
       Users Created:
       {% for user in grafana_default_users %}
       - {{ user.username }} ({{ user.role }})
       {% endfor %}
-      
+
       Teams Created:
       {% for team in grafana_teams %}
       - {{ team.name }} ({{ team.members | length }} members)
       {% endfor %}
-      
+
       Validation Results:
       - Users API: {{ users_validation.status == 200 | ternary('OK', 'Failed') }}
       - Teams API: {{ teams_validation.status == 200 | ternary('OK', 'Failed') }}
       - Total Users: {{ users_validation.json | length }}
       - Total Teams: {{ teams_validation.json | length }}
-      
+
       Configuration Files:
       - Users Config: {{ docker_dir }}/monitoring/grafana/config/users.json
       - Teams Config: {{ docker_dir }}/monitoring/grafana/config/teams.json
-  tags: [grafana, users, summary] 
+  tags: [grafana, users, summary]

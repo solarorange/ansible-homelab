@@ -13,14 +13,15 @@
   tags: [dumbassets, security, config]
 
 - name: Configure DumbAssets firewall rules
-  ansible.builtin.ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ dumbassets_port }}"
     proto: tcp
     from_ip: "{{ item }}"
-  loop: "{{ server_ips | default(['{{ ansible_default_ipv4.address }}']) }}"
+  loop: "{{ server_ips | default([ansible_default_ipv4.address]) }}"
   register: dumbassets_firewall_rules
   tags: [dumbassets, security, firewall]
+  when: not (firewall.centralized | default(false))
 
 - name: Set DumbAssets container security options
   ansible.builtin.lineinfile:
@@ -106,4 +107,4 @@
       - SSL Config: {{ dumbassets_ssl_config.changed }}
       - ACL Config: {{ dumbassets_acl_config.changed }}
       - Fail2Ban Config: {{ dumbassets_fail2ban_config.changed }}
-  tags: [dumbassets, security, summary] 
+  tags: [dumbassets, security, summary]

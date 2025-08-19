@@ -33,11 +33,12 @@
             "text": "Critical Ansible task failed on {{ inventory_hostname }}: {{ ansible_failed_task.name }}"
           }
         status_code: [200, 201, 202]
-      when: 
+      when:
         - ansible_failed_task is defined
         - notification_webhook_url is defined
         - ansible_failed_task.tags is defined
-        - 'critical' in ansible_failed_task.tags
+        - "'critical' in ansible_failed_task.tags"
+
 
     - name: Attempt automatic recovery
       ansible.builtin.include_tasks: recovery.yml
@@ -49,6 +50,6 @@
 
     - name: Execute rollback if needed
       ansible.builtin.include_tasks: rollback.yml
-      when: 
+      when:
         - ansible_failed_task is defined
-        - rollback_required | default(false) | bool 
+        - rollback_required | default(false) | bool

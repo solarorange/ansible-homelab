@@ -1,3 +1,4 @@
+---
 # Romm Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,23 @@ romm_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+romm_manage_secret_files: true
+
+romm_secret_files:
+  - { name: "ROMM_ADMIN_PASSWORD", value: "{{ romm_admin_password }}" }
+  - { name: "ROMM_SECRET_KEY", value: "{{ romm_secret_key }}" }
+  - { name: "ROMM_DATABASE_PASSWORD", value: "{{ romm_database_password }}" }
+  - { name: "ROMM_SMTP_PASSWORD", value: "{{ romm_smtp_password }}" }
+
+romm_required_secrets:
+  - ROMM_ADMIN_PASSWORD
+  - ROMM_SECRET_KEY
+  - ROMM_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+romm_direct_expose_enabled: false

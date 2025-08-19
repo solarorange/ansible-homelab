@@ -1,0 +1,109 @@
+---
+# Pinchflat Deployment Tasks
+
+- name: Create Pinchflat directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/pinchflat"
+    - "{{ docker_config_root }}/pinchflat"
+    - "{{ docker_logs_root }}/pinchflat"
+    - "{{ docker_backup_root }}/pinchflat"
+  tags: [pinchflat, deploy]
+
+- name: Generate Pinchflat environment file
+  template:
+    src: env.j2
+    dest: "{{ docker_config_root }}/pinchflat/.env"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart pinchflat
+  tags: [pinchflat, deploy]
+
+- name: Deploy Pinchflat Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/pinchflat/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart pinchflat
+  tags: [pinchflat, deploy]
+
+- name: Prepare Pinchflat secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "pinchflat"
+    secret_dir_root: "{{ docker_dir }}/pinchflat"
+    secret_files: "{{ pinchflat_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ pinchflat_environment | default({}) }}"
+  when: pinchflat_manage_secret_files | default(true) | bool
+  tags: [pinchflat, deploy, setup]
+
+- name: Validate required Pinchflat secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/pinchflat/secrets/{{ item }}"
+  register: pinchflat_secret_stats
+  loop: "{{ pinchflat_required_secrets | default([]) }}"
+  when: pinchflat_manage_secret_files | default(true) | bool and (pinchflat_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Pinchflat secret files are missing
+  ansible.builtin.assert:
+    that: "{{ pinchflat_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/pinchflat/secrets.
+      Missing: {{ (pinchflat_required_secrets | default([])) | reject('in', (pinchflat_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: pinchflat_manage_secret_files | default(true) | bool and (pinchflat_required_secrets | default([]) | length > 0)
+
+- name: Start Pinchflat container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/pinchflat"
+    state: present
+    restarted: yes
+  tags: [pinchflat, deploy]
+
+- name: Wait for Pinchflat to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ pinchflat_external_port }}"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+  tags: [pinchflat, deploy]
+  when: pinchflat_direct_expose_enabled | default(false)
+
+- name: Verify Pinchflat via Traefik route
+  ansible.builtin.uri:
+    url: "https://{{ pinchflat_domain }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+    validate_certs: true
+  register: pinchflat_route_health
+  retries: 10
+  delay: 10
+  until: pinchflat_route_health.status in [200, 302, 401]
+  tags: [pinchflat, deploy]
+  when: not (pinchflat_direct_expose_enabled | default(false))
+
+- name: Setup Pinchflat authentication
+  include_tasks: auth_setup.yml
+  when: pinchflat_auth_enabled | default(true)
+  tags: [pinchflat, deploy, auth]
+
+- name: Setup Pinchflat database
+  include_tasks: database_setup.yml
+  when: pinchflat_database_enabled | default(true)
+  tags: [pinchflat, deploy, database]
+
+- name: Setup Pinchflat API
+  include_tasks: api_setup.yml
+  when: pinchflat_api_enabled | default(true)
+  tags: [pinchflat, deploy, api]

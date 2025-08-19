@@ -38,14 +38,14 @@ subdomains:
   traefik: "traefik"
   authentik: "auth"
   portainer: "portainer"
-  
+
   # Monitoring
   grafana: "grafana"
   prometheus: "prometheus"
   loki: "loki"
   promtail: "logs"
   alertmanager: "alerts"
-  
+
   # Media
   sonarr: "sonarr"
   radarr: "radarr"
@@ -54,32 +54,32 @@ subdomains:
   overseerr: "overseerr"
   jellyfin: "jellyfin"
   tautulli: "tautulli"
-  
+
   # Development
   gitlab: "git"
   harbor: "registry"
   code: "code"
-  
+
   # Storage
   nextcloud: "cloud"
   minio: "s3"
   paperless: "docs"
   immich: "photos"
-  
+
   # Automation
   homeassistant: "hass"
   nodered: "flows"
   n8n: "n8n"
-  
+
   # Security
   vault: "vault"
   vaultwarden: "passwords"
   wireguard: "vpn"
-  
+
   # Network
   pihole: "dns"
   nginx_proxy_manager: "proxy"
-  
+
   # Utilities
   dash: "dash"
   files: "files"
@@ -151,7 +151,7 @@ enabled_services:
   - traefik
   - authentik
   - portainer
-  
+
   # Monitoring stack
   - grafana
   - prometheus
@@ -161,7 +161,7 @@ enabled_services:
   - promtail
   - alertmanager
   - blackbox_exporter
-  
+
   # Media services (following TRASH guides)
   - sonarr
   - radarr
@@ -173,48 +173,48 @@ enabled_services:
   - komga
   - audiobookshelf
   - ersatztv
-  
+
   # File services
   - nextcloud
   - samba
   - syncthing
-  
+
   # Development tools
   - gitlab
   - harbor
   - code_server
-  
+
   # AI and Development
   - pezzo
-  
+
   # Storage and files
   - minio
   - paperless
   - bookstack
   - immich
   - filebrowser
-  
+
   # Automation and smart home
   - homeassistant
   - mosquitto
   - zigbee2mqtt
   - nodered
   - n8n
-  
+
   # Security services
   - vault
   - crowdsec
   - fail2ban
   - wireguard
-  
+
   # Network services
   - pihole
   - nginx_proxy_manager
-  
+
   # Backup solutions
   - kopia
   - duplicati
-  
+
   # Utilities
   - watchtower
   - dashdot
@@ -253,14 +253,14 @@ docker_networks:
     ipam_config:
       - subnet: "{{ ansible_default_ipv4.address }}/16"
         gateway: "{{ ansible_default_ipv4.address }}"
-  
+
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
       - subnet: "{{ ansible_default_ipv4.address }}/16"
         gateway: "{{ ansible_default_ipv4.address }}"
-  
+
   - name: media
     driver: bridge
     ipam_config:
@@ -397,7 +397,7 @@ backup_priority_levels:
       - vault
       - databases
       - system_configs
-  
+
   high:
     description: "Important services with moderate data"
     time_slot: "2:00 AM"
@@ -406,7 +406,7 @@ backup_priority_levels:
       - zigbee2mqtt
       - mosquitto
       - monitoring_infrastructure
-  
+
   media_core:
     description: "Core media management services"
     time_slot: "3:00 AM"
@@ -417,7 +417,7 @@ backup_priority_levels:
       - readarr
       - prowlarr
       - bazarr
-  
+
   media_download:
     description: "Download and processing services"
     time_slot: "4:00 AM"
@@ -427,7 +427,7 @@ backup_priority_levels:
       - tdarr
       - komga
       - audiobookshelf
-  
+
   media_playback:
     description: "Media playback and streaming services"
     time_slot: "5:00 AM"
@@ -436,7 +436,7 @@ backup_priority_levels:
       - emby
       - tautulli
       - overseerr
-  
+
   file_services:
     description: "File storage and sharing services"
     time_slot: "6:00 AM"
@@ -446,7 +446,7 @@ backup_priority_levels:
       - syncthing
       - paperless_ngx
       - immich
-  
+
   utilities:
     description: "Utility and monitoring services"
     time_slot: "7:00 AM"
@@ -467,14 +467,14 @@ backup_schedules:
   postgresql: "15 1 * * *"
   mariadb: "20 1 * * *"
   redis: "25 1 * * *"
-  
+
   # High priority services (2:00 AM)
   homeassistant: "0 2 * * *"
   zigbee2mqtt: "5 2 * * *"
   mosquitto: "10 2 * * *"
   influxdb: "15 2 * * *"
   telegraf: "20 2 * * *"
-  
+
   # Media core services (3:00 AM)
   sonarr: "0 3 * * *"
   radarr: "5 3 * * *"
@@ -482,27 +482,27 @@ backup_schedules:
   readarr: "15 3 * * *"
   prowlarr: "20 3 * * *"
   bazarr: "25 3 * * *"
-  
+
   # Media download services (4:00 AM)
   qbittorrent: "0 4 * * *"
   sabnzbd: "5 4 * * *"
   tdarr: "10 4 * * *"
   komga: "15 4 * * *"
   audiobookshelf: "20 4 * * *"
-  
+
   # Media playback services (5:00 AM)
   jellyfin: "0 5 * * *"
   emby: "5 5 * * *"
   tautulli: "10 5 * * *"
   overseerr: "15 5 * * *"
-  
+
   # File services (6:00 AM)
   nextcloud: "0 6 * * *"
   samba: "5 6 * * *"
   syncthing: "10 6 * * *"
   paperless_ngx: "15 6 * * *"
   immich: "20 6 * * *"
-  
+
   # Utility services (7:00 AM)
   portainer: "0 7 * * *"
   grafana: "5 7 * * *"
@@ -516,7 +516,7 @@ weekend_backup_schedules:
   # Saturday - Extended backup window
   saturday_start: "2:00 AM"
   saturday_end: "10:00 AM"
-  
+
   # Sunday - System maintenance and verification
   sunday_start: "2:00 AM"
   sunday_end: "8:00 AM"

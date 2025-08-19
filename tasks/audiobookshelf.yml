@@ -34,9 +34,9 @@
     dest: "{{ docker_dir }}/audiobookshelf/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Audiobookshelf Management Script
-      
+
       function show_help {
           echo "Audiobookshelf Management Script"
           echo "Usage: $0 [command]"
@@ -49,14 +49,14 @@
           echo "  restore   - Restore Audiobookshelf data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up Audiobookshelf data..."
           tar -czf "{{ docker_dir }}/audiobookshelf/backup/audiobookshelf_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/audiobookshelf" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -66,7 +66,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/audiobookshelf"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep audiobookshelf
@@ -96,19 +96,19 @@
     dest: "{{ docker_dir }}/audiobookshelf/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Audiobookshelf is running
       if ! docker ps | grep -q audiobookshelf; then
           echo "Audiobookshelf is not running"
           exit 1
       fi
-      
+
       # Check if Audiobookshelf is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:13378 | grep -q "Audiobookshelf"; then
           echo "Audiobookshelf is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -157,7 +157,37 @@
       AUDIOBOOKSHELF_MAX_LOG_SIZE=5
       AUDIOBOOKSHELF_MAX_LOG_FILES=5
       AUDIOBOOKSHELF_ADMIN_USER={{ audiobookshelf_username }}
-      AUDIOBOOKSHELF_ADMIN_PASSWORD={{ audiobookshelf_password }}
+      # AUDIOBOOKSHELF_ADMIN_PASSWORD provided via /run/secrets at runtime
     owner: "{{ username }}"
     group: "{{ username }}"
-    mode: "0640" 
+    mode: "0640"
+
+- name: Ensure Audiobookshelf secrets directory and secret
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/audiobookshelf/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+
+- name: Write Audiobookshelf admin password secret (0600)
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/audiobookshelf/secrets/AUDIOBOOKSHELF_ADMIN_PASSWORD"
+    content: "{{ audiobookshelf_password }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+
+- name: Inject Audiobookshelf secret mount and entrypoint
+  ansible.builtin.blockinfile:
+    path: "{{ docker_dir }}/audiobookshelf/docker-compose.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - audiobookshelf secrets"
+    block: |
+      services:
+        audiobookshelf:
+          volumes:
+            - {{ docker_dir }}/audiobookshelf/secrets:/run/secrets:ro
+          entrypoint: ["/bin/sh","-lc"]
+          command: >
+            export AUDIOBOOKSHELF_ADMIN_PASSWORD="$(cat /run/secrets/AUDIOBOOKSHELF_ADMIN_PASSWORD)" && \
+            exec /entrypoint.sh

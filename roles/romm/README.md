@@ -210,3 +210,36 @@ Enhanced by Ansible Homelab Service Integration Wizard
 ## 🔄 **Updates**
 - **v2.0**: Enhanced for automatic variable management
 - **v1.0**: Initial RomM role implementation
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores last-known-good Compose and pre-change snapshot automatically if a deployment fails.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., romm
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```

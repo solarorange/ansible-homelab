@@ -4,23 +4,29 @@
 
 - name: Include downloader deployment tasks
   block:
-    - name: Deploy SABnzbd
-      community.docker.docker_compose:
+    - name: Deploy SABnzbd safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "sabnzbd"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - sabnzbd
-        state: present
+        wait_for_ports: "{{ [ media_downloaders.sabnzbd.port ] if (media_downloaders.sabnzbd.port is defined) else [] }}"
       when: media_downloaders.sabnzbd.enabled | default(true)
       register: sabnzbd_deploy
 
-    - name: Deploy qBittorrent
-      community.docker.docker_compose:
+    - name: Deploy qBittorrent safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "qbittorrent"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - qbittorrent
-        state: present
+        wait_for_ports: "{{ [ media_downloaders.qbittorrent.port ] if (media_downloaders.qbittorrent.port is defined) else [] }}"
       when: media_downloaders.qbittorrent.enabled | default(true)
       register: qbittorrent_deploy
 
@@ -84,7 +90,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_downloaders | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_monitoring_enabled | default(true)
 
@@ -106,7 +112,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_downloaders | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_backup_enabled | default(true)
 
@@ -118,7 +124,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_downloaders | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_homepage_enabled | default(true)
 
@@ -130,7 +136,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_downloaders | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_alerting_enabled | default(true)
 
@@ -143,4 +149,4 @@
       when: item.value.enabled | default(false)
       register: downloader_verification
 
-  tags: [media, downloaders, deploy] 
+  tags: [media, downloaders, deploy]

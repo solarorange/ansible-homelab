@@ -28,10 +28,19 @@
   when: security_authentik.enabled | default(true)
   notify: Restart authentik stack
 
-- name: Start authentik stack
-  community.docker.docker_compose:
+- name: Start authentik stack safely with rollback
+  ansible.builtin.include_tasks: "automation_integration.yml"
+  when: false
+
+- name: Start authentik stack safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "authentik"
     project_src: "{{ docker_dir }}/security/authentik"
-    build: false
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ security_authentik.port }}"
   register: authentik_result
   when: security_authentik.enabled | default(true)
 
@@ -43,8 +52,8 @@
 # Include automation integration if enabled
 - name: Include Authentik automation integration
   ansible.builtin.include_tasks: automation_integration.yml
-  when: 
+  when:
     - security_authentik.automation_enabled | default(true)
     - security_authentik.enabled | default(true)
     - authentik_result.changed or authentik_result.state == "present"
-  tags: [authentik, automation] 
+  tags: [authentik, automation]

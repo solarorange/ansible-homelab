@@ -30,11 +30,21 @@
           - MYSQL_HOST=nextcloud-db
           - MYSQL_DATABASE=nextcloud
           - MYSQL_USER=nextcloud
-          - MYSQL_PASSWORD={{ nextcloud_db_password }}
           - REDIS_HOST=nextcloud-redis
           - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.{{ domain }}
           - NEXTCLOUD_ADMIN_USER={{ nextcloud_admin_user }}
-          - NEXTCLOUD_ADMIN_PASSWORD={{ nextcloud_admin_password }}
+        volumes:
+          - {{ docker_data_root }}/nextcloud/html:/var/www/html
+          - {{ docker_data_root }}/nextcloud/data:/var/www/html/data
+          - {{ docker_data_root }}/nextcloud/config:/var/www/html/config
+          - {{ docker_data_root }}/nextcloud/custom_apps:/var/www/html/custom_apps
+          - {{ docker_data_root }}/nextcloud/themes:/var/www/html/themes
+          - {{ docker_dir }}/nextcloud/secrets:/run/secrets:ro
+        entrypoint: ["/bin/sh","-lc"]
+        command: >
+          export MYSQL_PASSWORD="$(cat /run/secrets/nextcloud_db_password)" && \
+          export NEXTCLOUD_ADMIN_PASSWORD="$(cat /run/secrets/nextcloud_admin_password)" && \
+          exec /entrypoint.sh apache2-foreground
         depends_on:
           - nextcloud-db
           - nextcloud-redis
@@ -53,11 +63,12 @@
         container_name: nextcloud-db
         volumes:
           - {{ docker_data_root }}/nextcloud/db:/var/lib/mysql
+          - {{ docker_dir }}/nextcloud/secrets:/run/secrets:ro
         environment:
-          - MYSQL_ROOT_PASSWORD={{ nextcloud_db_root_password }}
+          - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/nextcloud_db_root_password
           - MYSQL_DATABASE=nextcloud
           - MYSQL_USER=nextcloud
-          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+          - MYSQL_PASSWORD_FILE=/run/secrets/nextcloud_db_password
         command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
         restart: unless-stopped
         networks:
@@ -70,4 +81,4 @@
           - {{ docker_data_root }}/nextcloud/redis:/data
         restart: unless-stopped
         networks:
-          - traefik_network 
+          - traefik_network

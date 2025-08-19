@@ -179,11 +179,11 @@
   when: fing_alerting_enabled | default(true)
 
 - name: Restart monitoring services to apply configuration
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring"
     state: present
     restarted: true
-  when: 
+  when:
     - fing_monitoring_enabled | default(true)
     - (fing_telegraf_enabled | default(true) or fing_prometheus_enabled | default(true) or fing_loki_enabled | default(true) or fing_grafana_enabled | default(true))
   register: monitoring_restart_result
@@ -240,35 +240,35 @@
   ansible.builtin.debug:
     msg: |
       Fing Monitoring Integration Complete:
-      
+
       Metrics Collection:
       - Telegraf: {{ fing_telegraf_enabled | default(true) }}
       - Prometheus: {{ fing_prometheus_enabled | default(true) }}
       - Metrics Port: {{ fing_metrics_port }}
       - Metrics Endpoint: {{ fing_metrics_check.status | default('N/A') }}
-      
+
       Log Aggregation:
       - Loki: {{ fing_loki_enabled | default(true) }}
       - Promtail: {{ fing_loki_enabled | default(true) }}
       - Log Level: {{ fing_log_level }}
       - Log Format: {{ fing_log_format }}
-      
+
       Visualization:
       - Grafana: {{ fing_grafana_enabled | default(true) }}
       - Dashboard: {{ docker_dir }}/monitoring/grafana/provisioning/dashboards/fing.json
       - Datasource: {{ docker_dir }}/monitoring/grafana/provisioning/datasources/fing.yml
-      
+
       Alerting:
       - Alertmanager: {{ fing_alerting_enabled | default(true) }}
       - Prometheus Rules: {{ docker_dir }}/monitoring/prometheus/rules/fing.yml
       - Alert Provider: {{ fing_alerting_provider }}
       - Webhook: {{ fing_alerting_webhook }}
-      
+
       Health Checks:
       - Web Health: {{ fing_health_check.status | default('N/A') }}
       - API Health: {{ fing_api_check.status | default('N/A') }}
       - Metrics Health: {{ fing_metrics_check.status | default('N/A') }}
-      
+
       Monitoring Scripts:
       - Metrics Collection: {{ docker_dir }}/fing/metrics.sh
       - Log Collection: {{ docker_dir }}/fing/logs.sh
@@ -276,7 +276,7 @@
       - Network Monitoring: {{ docker_dir }}/fing/network-monitor.sh
       - Device Monitoring: {{ docker_dir }}/fing/device-monitor.sh
       - Alert Monitoring: {{ docker_dir }}/fing/alert-monitor.sh
-      
+
       Cron Jobs:
       - Metrics Collection: Every 5 minutes
       - Log Collection: Every 2 minutes
@@ -284,16 +284,16 @@
       - Network Monitoring: Every 15 minutes
       - Device Monitoring: Every 30 minutes
       - Alert Monitoring: Every minute
-      
+
       Access URLs:
       - Grafana Dashboard: https://grafana.{{ domain }}/d/fing
       - Prometheus Targets: https://prometheus.{{ domain }}/targets
       - Loki Logs: https://loki.{{ domain }}
       - Alertmanager: https://alerts.{{ domain }}
-      
+
       Next Steps:
       1. Access Grafana dashboard for Fing metrics
       2. Configure alerting rules in Alertmanager
       3. Set up log queries in Loki
       4. Monitor device discovery and network status
-      5. Configure custom dashboards and alerts 
+      5. Configure custom dashboards and alerts

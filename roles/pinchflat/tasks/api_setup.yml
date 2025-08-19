@@ -1,0 +1,34 @@
+---
+# Pinchflat API Setup
+
+- name: Generate Pinchflat API key
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/admin/keys"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_pinchflat_api_key | default('') }}"
+    body_format: json
+    body:
+      name: "ansible-generated"
+      permissions: ["read", "write", "admin"]
+  register: api_key_result
+  tags: [pinchflat, api]
+
+- name: Store Pinchflat API key in vault
+  set_fact:
+    vault_pinchflat_api_key: "{{ api_key_result.json.key }}"
+  tags: [pinchflat, api]
+
+- name: Configure Pinchflat API rate limiting
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/admin/config/api"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_pinchflat_api_key | default('') }}"
+    body_format: json
+    body:
+      rate_limit_requests: "{{ pinchflat_api_rate_limit }}"
+      rate_limit_window: "{{ pinchflat_api_rate_limit_window }}"
+  tags: [pinchflat, api]

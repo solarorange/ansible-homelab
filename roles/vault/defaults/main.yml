@@ -1,3 +1,4 @@
+---
 # Vault Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,25 @@ vault_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+# Toggle to manage secret files
+vault_manage_secret_files: true
+
+vault_secret_files:
+  - { name: "VAULT_API_KEY", value: "{{ vault_api_key | default('') }}" }
+  - { name: "VAULT_SECRET_KEY", value: "{{ vault_secret_key | default('') }}" }
+  - { name: "VAULT_ENCRYPTION_KEY", value: "{{ vault_encryption_key | default('') }}" }
+  - { name: "VAULT_JWT_SECRET", value: "{{ vault_jwt_secret | default('') }}" }
+  - { name: "VAULT_DATABASE_PASSWORD", value: "{{ vault_database_password | default('') }}" }
+  - { name: "VAULT_REDIS_PASSWORD", value: "{{ vault_redis_password | default('') }}" }
+  - { name: "VAULT_SMTP_PASSWORD", value: "{{ vault_smtp_password | default('') }}" }
+
+vault_required_secrets:
+  - VAULT_SECRET_KEY
+  - VAULT_ENCRYPTION_KEY
+  - VAULT_JWT_SECRET
+  - VAULT_DATABASE_PASSWORD

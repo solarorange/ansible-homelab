@@ -69,7 +69,7 @@ notifications:
 
 # HTTP health check with explicit exit codes
 http_health_check:
-  test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ service_port }}/health || exit 1"]
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/health || exit 1"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -78,7 +78,7 @@ http_health_check:
 
 # API health check with explicit exit codes
 api_health_check:
-  test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ service_port }}/api/v3/health || exit 1"]
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/api/v3/health || exit 1"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -105,7 +105,7 @@ redis_health_check:
 
 # Prometheus metrics health check with explicit exit codes
 prometheus_health_check:
-  test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://{{ ansible_default_ipv4.address }}:{{ service_port }}/metrics || exit 1"]
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/metrics || exit 1"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -124,7 +124,7 @@ docker_health_check:
 # Service-specific health checks with enhanced configuration
 service_health_checks:
   traefik:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/ping || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ping || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -132,7 +132,7 @@ service_health_checks:
     disable: false
   
   authentik:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/if/user/ || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/if/user/ || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -140,7 +140,7 @@ service_health_checks:
     disable: false
   
   grafana:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -148,7 +148,7 @@ service_health_checks:
     disable: false
   
   prometheus:
-    test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://{{ ansible_default_ipv4.address }}:/-/healthy || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -156,7 +156,7 @@ service_health_checks:
     disable: false
   
   sonarr:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/v3/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8989/api/v3/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -164,7 +164,7 @@ service_health_checks:
     disable: false
   
   radarr:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/v3/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7878/api/v3/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -172,7 +172,7 @@ service_health_checks:
     disable: false
   
   prowlarr:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/v1/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9696/api/v1/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -180,7 +180,7 @@ service_health_checks:
     disable: false
   
   bazarr:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/v1/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6767/api/v1/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -188,7 +188,7 @@ service_health_checks:
     disable: false
   
   jellyfin:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8096/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -196,7 +196,7 @@ service_health_checks:
     disable: false
   
   nextcloud:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/status.php || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/status.php || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -204,7 +204,7 @@ service_health_checks:
     disable: false
   
   portainer:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:/api/status || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/api/status || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -249,7 +249,7 @@ health_check_script: |
   check_response() {
     local attempt=1
     while [ $attempt -le $RETRIES ]; do
-      if curl -f -s --max-time "$TIMEOUT" "http://{{ ansible_default_ipv4.address }}:$PORT$ENDPOINT" > /dev/null 2>&1; then
+      if wget -qO- --timeout="$TIMEOUT" "http://127.0.0.1:$PORT$ENDPOINT" > /dev/null 2>&1; then
         return 0
       fi
       

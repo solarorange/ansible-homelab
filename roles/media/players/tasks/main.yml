@@ -4,27 +4,33 @@
 
 - name: Include media players deployment tasks
   block:
-    - name: Deploy Jellyfin (Media Server)
-      community.docker.docker_compose:
+    - name: Deploy Jellyfin (Media Server) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "jellyfin"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - jellyfin
-        state: present
+        wait_for_ports: "{{ [ media_players.jellyfin.port ] if (media_players.jellyfin.port is defined) else [] }}"
       when: media_players.jellyfin.enabled | default(true)
       register: jellyfin_deploy
 
-    - name: Deploy Immich components
-      community.docker.docker_compose:
+    - name: Deploy Immich components safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "immich"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - immich-postgres
           - immich-redis
           - immich-server
           - immich-web
           - immich-machine-learning
-        state: present
+        wait_for_ports: "{{ media_immich_components | dict2items | selectattr('value.port', 'defined') | map(attribute='value.port') | list }}"
       when: media_players.immich.enabled | default(true)
       register: immich_deploy
 
@@ -49,7 +55,7 @@
       delay: 10
       until: immich_health.status == 200
       loop: "{{ media_immich_components | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - item.value.port is defined
 
@@ -116,7 +122,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_players | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_monitoring_enabled | default(true)
 
@@ -138,7 +144,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_players | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_backup_enabled | default(true)
 
@@ -150,7 +156,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_players | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_homepage_enabled | default(true)
 
@@ -162,7 +168,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_players | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_alerting_enabled | default(true)
 
@@ -209,8 +215,8 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_players | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - item.key == "jellyfin"
 
-  tags: [media, players, deploy] 
+  tags: [media, players, deploy]

@@ -23,7 +23,7 @@
         - "{{ data_dir }}/media/comics"
         - "{{ data_dir }}/media/podcasts"
         - "{{ data_dir }}/media/photos"
-        
+
         # Download directories
         - "{{ data_dir }}/downloads"
         - "{{ data_dir }}/downloads/usenet"
@@ -32,7 +32,7 @@
         - "{{ data_dir }}/downloads/torrents"
         - "{{ data_dir }}/downloads/torrents/incomplete"
         - "{{ data_dir }}/downloads/torrents/complete"
-        
+
         # Service-specific directories
         - "{{ data_dir }}/downloads/sabnzbd"
         - "{{ data_dir }}/downloads/qbittorrent"
@@ -42,7 +42,7 @@
         - "{{ data_dir }}/downloads/readarr"
         - "{{ data_dir }}/downloads/prowlarr"
         - "{{ data_dir }}/downloads/bazarr"
-        
+
         # Docker configuration directories
         - "{{ docker_dir }}/media"
         - "{{ docker_dir }}/sabnzbd/config"
@@ -63,7 +63,7 @@
         - "{{ docker_dir }}/immich/postgres"
         - "{{ docker_dir }}/immich/redis"
         - "{{ docker_dir }}/immich/ml"
-        
+
         # Log directories
         - "{{ logs_dir }}/media"
         - "{{ logs_dir }}/media/health"
@@ -148,6 +148,28 @@
         group: "{{ username }}"
         mode: "0644"
 
+    - name: Prepare Media secret files
+      ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+      vars:
+        service_name: "media"
+        secret_files: "{{ media_secret_files if media_manage_secret_files else [] }}"
+      when: media_manage_secret_files | bool
+
+    - name: Validate required Media secret files exist
+      ansible.builtin.stat:
+        path: "{{ docker_dir }}/media/secrets/{{ item }}"
+      register: media_secret_stats
+      loop: "{{ media_required_secrets | default([]) }}"
+      when: media_manage_secret_files | bool and (media_required_secrets | default([]) | length > 0)
+
+    - name: Fail if required Media secret files are missing
+      ansible.builtin.assert:
+        that: "{{ media_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+        fail_msg: >-
+          One or more required secret files are missing under {{ docker_dir }}/media/secrets.
+          Missing: {{ (media_required_secrets | default([])) | reject('in', (media_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+      when: media_manage_secret_files | bool and (media_required_secrets | default([]) | length > 0)
+
     - name: Create media stack health check script
       ansible.builtin.template:
         src: healthcheck.sh.j2
@@ -180,4 +202,4 @@
         user: "{{ vault_media_user }}"
       when: media_backup_enabled | default(true)
 
-  tags: [media, setup] 
+  tags: [media, setup]

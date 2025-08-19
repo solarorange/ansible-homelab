@@ -22,7 +22,7 @@
       ansible.builtin.include_tasks: tasks/configure_authentik_integration.yml
       become: true
       become_user: root
-      when: 
+      when:
         - nginx_proxy_manager_enabled | default(true)
         - authentik_enabled | default(true)
       tags: [nginx_proxy_manager, authentik, integration]
@@ -31,7 +31,7 @@
       ansible.builtin.include_tasks: tasks/configure_monitoring_integration.yml
       become: true
       become_user: root
-      when: 
+      when:
         - nginx_proxy_manager_enabled | default(true)
         - grafana_enabled | default(true)
       tags: [nginx_proxy_manager, monitoring, integration]
@@ -40,7 +40,7 @@
       ansible.builtin.include_tasks: tasks/configure_backup_integration.yml
       become: true
       become_user: root
-      when: 
+      when:
         - nginx_proxy_manager_enabled | default(true)
         - backup_enabled | default(true)
       tags: [nginx_proxy_manager, backup, integration]
@@ -52,7 +52,7 @@
   ansible.builtin.debug:
     msg: |
       🚀 Nginx Proxy Manager Enhanced Deployment Complete!
-      
+
       📊 Deployment Summary:
       - Service Discovery: {{ nginx_proxy_manager_service_discovery_enabled | default(true) }}
       - Auto SSL: {{ nginx_proxy_manager_auto_ssl_enabled | default(true) }}
@@ -61,12 +61,12 @@
       - WAF Rules: {{ nginx_proxy_manager_waf_enabled | default(true) }}
       - Monitoring: {{ nginx_proxy_manager_monitoring_enabled | default(true) }}
       - Backup: {{ nginx_proxy_manager_backup_enabled | default(true) }}
-      
+
       🔗 Access Information:
       - Admin URL: http://{{ ansible_default_ipv4.address }}:{{ nginx_proxy_manager_ports.admin | default(81) }}
       - Username: {{ vault_npm_admin_username | default('{{ admin_email | default("admin@" + domain) }} + domain) }}
       - API URL: {{ nginx_proxy_manager_api_url }}
-      
+
       🔐 Security Features:
       - Vault Integration: ✅ Enabled
       - SSL Automation: ✅ Enabled
@@ -74,13 +74,13 @@
       - Security Headers: ✅ Enabled
       - Rate Limiting: ✅ Enabled
       - WAF Protection: ✅ Enabled
-      
+
       📈 Automation Features:
       - Service Discovery: {{ nginx_proxy_manager_discovery_services | default([]) | length }} services
       - SSL Provider: {{ nginx_proxy_manager_ssl_provider | default('letsencrypt') }}
       - Health Checks: {{ nginx_proxy_manager_health_check_enabled | default(true) }}
       - Cron Jobs: ✅ Scheduled
-      
+
       🎯 Next Steps:
       1. Access NPM admin interface
       2. Review discovered services
@@ -88,4 +88,4 @@
       4. Test security features
       5. Monitor automation logs
   when: nginx_proxy_manager_enabled | default(true)
-  tags: [nginx_proxy_manager, info] 
+  tags: [nginx_proxy_manager, info]

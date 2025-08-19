@@ -97,3 +97,55 @@ Add new automation services by creating a new sub-role or task file and updating
 
 ---
 For detailed configuration, see the documentation in the `docs/` directory and the example playbooks. 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores last-known-good Compose files and the pre-change snapshot automatically when a deployment fails.
+
+- Manual rollback (a specific automation component/service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., automation
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback (entire repository):
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```
+
+### Secrets & Health Checks
+
+- Shared secrets automation:
+  - Secrets directory per service: `{{ docker_dir }}/<service>/secrets`.
+  - Opt-in variables:
+    ```yaml
+    <role>_manage_secret_files: true
+    <role>_secret_files:
+      - name: EXAMPLE_SECRET
+        from_vault_var: vault_example_secret
+    <role>_required_secrets:
+      - EXAMPLE_SECRET
+    ```
+  - Use `KEY_FILE=/run/secrets/KEY` in templates for keys containing `PASSWORD|SECRET|TOKEN|API`. See `docs/SECRETS_CONVENTIONS.md`.
+
+- Route-based health checks:
+  - Use `roles/automation/tasks/route_health_check.yml` with `route_health_check_url` like `https://<sub>.<domain>/api/health` and acceptable codes `[200, 302, 401]`.
+  - See `docs/POST_DEPLOY_SMOKE_TESTS.md`.

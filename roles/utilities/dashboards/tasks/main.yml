@@ -47,13 +47,15 @@
     vault_homepage_api_keys: "{{ homepage_api_keys }}"
   no_log: true
 
-- name: Deploy Homepage container
-  community.docker.docker_compose:
+- name: Deploy Homepage container safely with rollback
+  ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "homepage"
     project_src: "{{ homepage_dir }}"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 3000
   register: homepage_deploy
 
 - name: Wait for Homepage to be ready
@@ -100,13 +102,15 @@
     owner: "{{ username }}"
     group: "{{ username }}"
 
-- name: Start Tautulli container
-  community.docker.docker_compose:
+- name: Start Tautulli container safely with rollback
+  ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "tautulli"
     project_src: "{{ tautulli_config_dir }}"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8181
   register: tautulli_result
 
 - name: Wait for Tautulli to be ready
@@ -118,4 +122,4 @@
   register: tautulli_status
   until: tautulli_status.status == 200
   retries: 30
-  delay: 10 
+  delay: 10

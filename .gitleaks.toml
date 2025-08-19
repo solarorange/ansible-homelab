@@ -1,0 +1,36 @@
+title = "ansible_homelab gitleaks configuration"
+
+# Include Gitleaks' default rule set, then apply our customizations below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for known noisy paths and patterns"
+
+# Ignore clearly binary or compressed artifacts where patterns are meaningless
+files = [
+  '''(.*)\.(jpg|jpeg|png|gif|webp|pdf|docx?|xlsx?|pptx?)$''',
+  '''(.*)\.(tar|tar\.gz|tgz|zip)$''',
+]
+
+# Ignore certain paths that commonly contain generated or noisy content
+paths = [
+  '''^logs/''',
+  '''^tests?/''',
+  '''^docs?/''',
+  '''^tests?/''',
+]
+
+# Ignore specific benign patterns
+regexes = [
+  '''ANSIBLE_VAULT;\d+\.\d+;''',
+]
+
+# Example: add custom rule tweaks below if needed
+# [[rules]]
+# id = "custom-generic-api-key"
+# description = "Custom API key pattern"
+# regex = '''(?i)api[_-]?key['"]?\s*[:=]\s*['"]?[a-z0-9-_]{24,64}['"]?'''
+# tags = ["apikey"]
+
+

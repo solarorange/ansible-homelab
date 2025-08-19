@@ -80,7 +80,7 @@
   ansible.builtin.debug:
     msg: |
       Grafana Data Sources Configuration:
-      
+
       Configured Data Sources:
       {% for name, config in grafana_datasources.items() %}
       {% if config.enabled | default(false) %}
@@ -91,12 +91,12 @@
           Status: {{ datasource_health.results[loop.index0].status | default('Unknown') }}
       {% endif %}
       {% endfor %}
-      
+
       Validation Results:
       - API Access: {{ datasources_check.status == 200 | ternary('OK', 'Failed') }}
       - Health Checks: {{ datasource_health.results | length }} data sources tested
-      
+
       Configuration Files:
       - Main Config: {{ docker_dir }}/monitoring/grafana/provisioning/datasources/datasources.yml
       - Individual Configs: {{ docker_dir }}/monitoring/grafana/provisioning/datasources/*.yml
-  tags: [grafana, datasources, summary] 
+  tags: [grafana, datasources, summary]

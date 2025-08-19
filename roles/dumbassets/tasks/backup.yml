@@ -38,7 +38,7 @@
     hour: "2"
     minute: "0"
     job: "{{ dumbassets_docker_dir }}/scripts/backup.sh"
-    user: "{{ vault_dumbassets_user }}"homelab') }}"
+    user: "{{ vault_dumbassets_user | default('homelab') }}"
     state: present
   register: dumbassets_backup_cron
   tags: [dumbassets, backup, cron]
@@ -103,4 +103,4 @@
       - Backup Directories: {{ dumbassets_backup_dirs.results | length }}
       - Backup Retention: {{ dumbassets_backup_retention_days }} days
       - Backup Compression: {{ dumbassets_backup_compression }}
-  tags: [dumbassets, backup, summary] 
+  tags: [dumbassets, backup, summary]

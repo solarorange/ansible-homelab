@@ -299,7 +299,37 @@
       JELLYFIN_MAX_LOG_SIZE=5
       JELLYFIN_MAX_LOG_FILES=5
       JELLYFIN_ADMIN_USER={{ jellyfin_username }}
-      JELLYFIN_ADMIN_PASSWORD={{ jellyfin_password }}
+      # JELLYFIN_ADMIN_PASSWORD provided via /run/secrets; do not template plaintext
+
+- name: Ensure Jellyfin secrets directory and secret
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/jellyfin/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+
+- name: Write Jellyfin admin password secret (0600)
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/jellyfin/secrets/JELLYFIN_ADMIN_PASSWORD"
+    content: "{{ jellyfin_password }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+
+- name: Inject Jellyfin secret mount and entrypoint
+  ansible.builtin.blockinfile:
+    path: "{{ docker_dir }}/jellyfin/docker-compose.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - jellyfin secrets"
+    block: |
+      services:
+        jellyfin:
+          volumes:
+            - {{ docker_dir }}/jellyfin/secrets:/run/secrets:ro
+          entrypoint: ["/bin/sh","-lc"]
+          command: >
+            export JELLYFIN_ADMIN_PASSWORD="$(cat /run/secrets/JELLYFIN_ADMIN_PASSWORD)" && \
+            exec /entrypoint.sh
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -309,9 +339,9 @@
     dest: "{{ docker_dir }}/jellyfin/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Jellyfin Management Script
-      
+
       function show_help {
           echo "Jellyfin Management Script"
           echo "Usage: $0 [command]"
@@ -324,14 +354,14 @@
           echo "  restore   - Restore Jellyfin data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up Jellyfin data..."
           tar -czf "{{ docker_dir }}/jellyfin/backup/jellyfin_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/jellyfin" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -341,7 +371,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/jellyfin"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep jellyfin
@@ -371,19 +401,19 @@
     dest: "{{ docker_dir }}/jellyfin/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Jellyfin is running
       if ! docker ps | grep -q jellyfin; then
           echo "Jellyfin is not running"
           exit 1
       fi
-      
+
       # Check if Jellyfin is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8096 | grep -q "Jellyfin"; then
           echo "Jellyfin is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -420,4 +450,4 @@
     job: "{{ docker_dir }}/jellyfin/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ vault_jellyfin_user }}" 
+    user: "{{ vault_jellyfin_user }}"

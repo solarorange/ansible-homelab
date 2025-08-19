@@ -85,6 +85,39 @@
     group: "{{ username }}"
   tags: [pezzo, setup]
 
+- name: Prepare Pezzo secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "pezzo"
+    secret_dir_root: "{{ pezzo_config_dir }}"
+    secret_files: "{{ pezzo_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ pezzo_components.server.environment | default({}) }}"
+      - "{{ pezzo_components.console.environment | default({}) }}"
+      - "{{ pezzo_components.proxy.environment | default({}) }}"
+      - "{{ pezzo_components.postgres.environment | default({}) }}"
+      - "{{ pezzo_components.redis.environment | default({}) }}"
+      - "{{ pezzo_components.clickhouse.environment | default({}) }}"
+      - "{{ pezzo_components.supertokens.environment | default({}) }}"
+      - "{{ pezzo_components['local-kms'].environment | default({}) }}"
+  when: pezzo_manage_secret_files | default(true) | bool
+  tags: [pezzo, setup, secrets]
+
+- name: Validate required Pezzo secret files exist
+  ansible.builtin.stat:
+    path: "{{ pezzo_config_dir }}/secrets/{{ item }}"
+  register: pezzo_secret_stats
+  loop: "{{ pezzo_required_secrets | default([]) }}"
+  when: pezzo_manage_secret_files | default(true) | bool and (pezzo_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Pezzo secret files are missing
+  ansible.builtin.assert:
+    that: "{{ pezzo_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ pezzo_config_dir }}/secrets.
+      Missing: {{ (pezzo_required_secrets | default([])) | reject('in', (pezzo_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: pezzo_manage_secret_files | default(true) | bool and (pezzo_required_secrets | default([]) | length > 0)
+
 - name: Set proper permissions on Pezzo configuration files
   ansible.builtin.file:
     path: "{{ pezzo_config_dir }}"
@@ -175,4 +208,4 @@
       - Health Check Script: {{ pezzo_config_dir }}/health_check.sh
       - Backup Script: {{ pezzo_config_dir }}/backup.sh
       - Logrotate Config: /etc/logrotate.d/pezzo
-  tags: [pezzo, setup] 
+  tags: [pezzo, setup]

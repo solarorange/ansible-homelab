@@ -1,0 +1,56 @@
+---
+# Validates that only approved public ports are allowed by UFW
+- name: Get UFW status (numbered)
+  ansible.builtin.command: ufw status numbered
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Extract allowed ports open to Anywhere (IPv4/IPv6)
+  ansible.builtin.set_fact:
+    ufw_public_ports_raw: >-
+      {{
+        (ufw_status.stdout | default(''))
+        | regex_findall('^\[\s*\d+\]\s+([^\n]+?)\s+ALLOW(?:\s+IN)?\s+Anywhere(?:\s+\(v6\))?$', multiline=True)
+      }}
+
+- name: Normalize to numeric port/proto list (default proto tcp)
+  ansible.builtin.set_fact:
+    ufw_public_port_entries: >-
+      {{
+        ufw_public_ports_raw
+        | map('regex_search', '([0-9]+)/?(tcp|udp)?', '\\1/\\2')
+        | map('regex_replace', '/$', '/tcp')
+        | list | unique
+      }}
+
+- name: Build approved public ports list
+  ansible.builtin.set_fact:
+    approved_public_ports: >-
+      {{
+        (
+          firewall_approved_public_ports
+          if (firewall_approved_public_ports is defined)
+          else [ '80/tcp', '443/tcp' ]
+        )
+      }}
+
+- name: Merge user-provided extra approvals if any
+  ansible.builtin.set_fact:
+    approved_public_ports: >-
+      {{
+        (approved_public_ports + (firewall_approved_public_ports_extra | default([])))
+        | unique
+      }}
+
+- name: Detect unexpected public ports
+  ansible.builtin.set_fact:
+    unexpected_public_ports: >-
+      {{ ufw_public_port_entries | reject('in', approved_public_ports) | list }}
+
+- name: Fail if unexpected public ports are present
+  ansible.builtin.fail:
+    msg: >-
+      Unexpected public ports open: {{ unexpected_public_ports | join(', ') }}.
+      Approved: {{ approved_public_ports | join(', ') }}
+  when: unexpected_public_ports | length > 0

@@ -146,16 +146,15 @@
         mode: "0644"
       notify: restart paperless-ngx
 
-    {% if paperless_ngx_auth_method == "authentik" %}
-    - name: Configure Authentik integration for Paperless-ngx
+    - name: Configure Authentik integration for Paperless-ngx (conditional)
       ansible.builtin.template:
         src: authentik.conf.j2
         dest: "{{ config_dir }}/paperless-ngx/nginx/authentik.conf"
         owner: "{{ username }}"
         group: "{{ username }}"
         mode: "0644"
+      when: paperless_ngx_auth_method == 'authentik'
       notify: restart paperless-ngx
-    {% endif %}
 
   tags: [paperless-ngx, security]
 
@@ -254,21 +253,21 @@
       ansible.builtin.debug:
         msg: |
           Paperless-ngx security configuration completed!
-          
+
           Security Components:
           - CrowdSec: {{ paperless_ngx_crowdsec_enabled | default(true) }}
           - Fail2ban: {{ paperless_ngx_fail2ban_enabled | default(true) }}
           - Security Headers: {{ paperless_ngx_security_headers | default(true) }}
           - SSL/TLS: {{ paperless_ngx_traefik_ssl_enabled | default(true) }}
           - Authentication: {{ paperless_ngx_auth_method }}
-          
+
           Security Test Results:
           - HTTPS Access: {{ security_test.status }}
           - SSL Certificate: Valid
-          
+
           Security Monitoring:
           - Security Log: {{ logs_dir }}/paperless-ngx/security.log
           - Fail2ban Log: /var/log/fail2ban.log
           - CrowdSec Log: /var/log/crowdsec.log
 
-  tags: [paperless-ngx, security] 
+  tags: [paperless-ngx, security]

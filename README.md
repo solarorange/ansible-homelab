@@ -168,6 +168,53 @@ python3 scripts/service_wizard.py --service-name "postgres" --repository-url "ht
 
 **📖 Documentation:** [Service Integration Wizard Guide](docs/SERVICE_INTEGRATION_WIZARD.md) - Complete documentation and examples
 
+## 🏠 **✨ NEW: External Server Integration - Unify Your Entire Homelab!**
+
+**🚀 Seamlessly integrate external servers (Synology, Unraid, Proxmox, etc.) into your HomelabOS ecosystem!**
+
+### **🎯 What It Does**
+- ✅ **SSL Certificate Management** - Automatic Let's Encrypt certificates for external servers
+- ✅ **DNS Configuration** - Automatic subdomain creation via Cloudflare API
+- ✅ **Grafana Monitoring** - Custom dashboards for each external server
+- ✅ **Traefik Proxy** - Reverse proxy with authentication and security
+- ✅ **Health Monitoring** - Automated health checks and alerting
+- ✅ **Backup Integration** - Automated backup configuration
+- ✅ **Homepage Integration** - Unified dashboard access for all servers
+
+### **🚀 Quick Integration**
+
+**Interactive Setup (Recommended):**
+```bash
+./scripts/integrate_server.sh
+```
+
+**Command Line Setup:**
+```bash
+./scripts/integrate_server.sh --name synology --ip 192.168.1.100 --port 5000
+```
+
+**Configuration File Setup:**
+```bash
+./scripts/integrate_server.sh --config config/external_servers.yml
+```
+
+### **📋 Supported External Servers**
+- **Storage**: Synology, TrueNAS, Unraid
+- **Virtualization**: Proxmox, VMware ESXi
+- **Home Automation**: Home Assistant, OpenHAB
+- **Network**: Routers, Pi-hole, Firewalls
+- **Security**: NVR systems, IP cameras
+- **Development**: Git servers, CI/CD systems
+- **Gaming**: Game servers, Steam servers
+
+### **🌐 Unified Access**
+After integration, access all your servers at:
+- **Homepage Dashboard**: `https://dash.yourdomain.com`
+- **Grafana Monitoring**: `https://grafana.yourdomain.com`
+- **Individual Servers**: `https://server-name.yourdomain.com`
+
+**📖 Documentation:** [External Server Integration Guide](docs/EXTERNAL_SERVER_INTEGRATION.md) - Complete guide and examples
+
 ## 🏗️ **Complete Service Stack (30+ Services)**
 
 > 📋 **See [CURRENT_SERVICE_STACK.md](CURRENT_SERVICE_STACK.md) for the complete service inventory and setup process.**

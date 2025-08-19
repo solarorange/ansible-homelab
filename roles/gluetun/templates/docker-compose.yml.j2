@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  gluetun:
+    image: {{ gluetun_image }}
+    container_name: {{ gluetun_container_name }}
+    restart: {{ gluetun_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in gluetun_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
+      - {{ key }}={{ value }}
+      {% endif %}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in gluetun_volumes %}
+      - {{ volume }}
+      {% endfor %}
+      - "{{ logs_dir }}/gluetun:/logs"
+      {% if gluetun_manage_secret_files | default(true) %}
+      {% for key, value in gluetun_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ docker_dir }}/gluetun/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+    
+    # Ports
+    {% if gluetun_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ gluetun_external_port }}:{{ gluetun_internal_port }}"
+    {% endif %}
+    
+    # Networks
+    networks:
+      {% for network in gluetun_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if gluetun_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.gluetun.rule=Host(`{{ gluetun_domain }}`)"
+      - "traefik.http.routers.gluetun.entrypoints=https"
+      - "traefik.http.routers.gluetun.tls=true"
+      - "traefik.http.routers.gluetun.tls.certresolver=cloudflare"
+      - "traefik.http.services.gluetun.loadbalancer.server.port={{ gluetun_internal_port }}"
+      {% if gluetun_traefik_middleware is defined %}
+      - "traefik.http.routers.gluetun.middlewares={{ gluetun_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if gluetun_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ gluetun_internal_port }}/ || exit 1"]
+      interval: {{ gluetun_healthcheck_interval }}
+      timeout: {{ gluetun_healthcheck_timeout }}
+      retries: {{ gluetun_healthcheck_retries }}
+      start_period: {{ gluetun_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    {% if gluetun_security_enabled | default(true) %}
+    security_opt:
+      - no-new-privileges:{{ gluetun_no_new_privileges | default(true) }}
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    {% endif %}
+    
+    # Read-only root filesystem
+    read_only: {{ gluetun_read_only | default(false) }}
+    tmpfs:
+      - /tmp
+    
+    # Resource limits
+    mem_limit: {{ gluetun_memory_limit }}
+    cpus: '{{ gluetun_cpu_limit }}'
+    
+    # Dependencies
+    {% if gluetun_dependencies is defined %}
+    depends_on:
+      {% for dependency in gluetun_dependencies %}
+      {{ dependency }}:
+        condition: service_healthy
+      {% endfor %}
+    {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  homelab:
+    external: true
+  default:
+    driver: bridge

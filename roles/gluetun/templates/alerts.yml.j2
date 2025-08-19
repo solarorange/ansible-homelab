@@ -1,0 +1,14 @@
+---
+# Gluetun Alerting Rules
+
+groups:
+  - name: Gluetun
+    rules:
+      - alert: GluetunDown
+        expr: up{job="gluetun"} == 0
+        for: 1m
+        labels:
+          severity: {{ gluetun_alert_severity | default('warning') }}
+        annotations:
+          summary: "Gluetun is down"
+          description: "Gluetun has been down for more than 1 minute"

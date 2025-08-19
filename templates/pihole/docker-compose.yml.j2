@@ -6,7 +6,7 @@ services:
     container_name: pihole
     environment:
       TZ: '{{ timezone | default("UTC") }}'
-      WEBPASSWORD: '{{ pihole_web_password }}'
+      WEBPASSWORD_FILE: '/run/secrets/WEBPASSWORD'
       VIRTUAL_HOST: '{{ pihole_domain | default("pihole." + domain) }}'
       PROXY_LOCATION: pihole
       ServerIP: '{{ ansible_default_ipv4.address }}'
@@ -20,11 +20,12 @@ services:
     volumes:
       - '{{ docker_data_root }}/pihole/etc-pihole:/etc/pihole'
       - '{{ docker_data_root }}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
-      - '{{ docker_data_root }}/pihole/logs:/var/log'
+      - '{{ logs_dir }}/pihole:/var/log'
+      - '{{ docker_dir }}/pihole/secrets:/run/secrets:ro'
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "67:67/udp"
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:53:53/tcp"
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:53:53/udp"
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:67:67/udp"
     restart: unless-stopped
     networks:
       - traefik_network
@@ -41,8 +42,14 @@ services:
       - "logging=promtail"
       - "promtail-job=security"
       - "promtail-service=pihole"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Secrets directory mounted above
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:80/admin/api.php?status"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/admin/api.php?status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

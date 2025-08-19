@@ -69,9 +69,9 @@
     dest: "{{ docker_dir }}/sonarr/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Sonarr Management Script
-      
+
       function show_help {
         echo "Sonarr Management Script"
         echo "Usage: $0 [command]"
@@ -84,51 +84,51 @@
         echo "  restore   - Restore Sonarr data"
         echo "  help      - Show this help"
       }
-      
+
       function backup_data {
         local backup_dir="{{ docker_dir }}/sonarr/backup"
         local timestamp=$(date +%Y%m%d_%H%M%S)
         local backup_file="$backup_dir/sonarr_backup_$timestamp.tar.gz"
-        
+
         # Create backup directory if it doesn't exist
         mkdir -p "$backup_dir"
-        
+
         # Stop Sonarr
         docker stop sonarr
-        
+
         # Create backup
         tar -czf "$backup_file" -C "{{ docker_dir }}/sonarr" config/ data/
-        
+
         # Start Sonarr
         docker start sonarr
-        
+
         echo "Backup created: $backup_file"
       }
-      
+
       function restore_data {
         if [ -z "$1" ]; then
           echo "Please specify backup file"
           exit 1
         fi
-      
+
         local backup_file="$1"
         if [ ! -f "$backup_file" ]; then
           echo "Backup file not found: $backup_file"
           exit 1
         fi
-      
+
         # Stop Sonarr
         docker stop sonarr
-      
+
         # Restore backup
         tar -xzf "$backup_file" -C "{{ docker_dir }}/sonarr"
-      
+
         # Start Sonarr
         docker start sonarr
-      
+
         echo "Backup restored from: $backup_file"
       }
-      
+
       case "$1" in
         status)
           docker ps -f name=sonarr
@@ -159,26 +159,26 @@
     dest: "{{ docker_dir }}/sonarr/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Sonarr is running
       if ! docker ps -f name=sonarr -f status=running | grep -q sonarr; then
         echo "Sonarr is not running"
         exit 1
       fi
-      
+
       # Check if Sonarr is responding
       if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8989/api/v3/health > /dev/null; then
         echo "Sonarr is not responding"
         exit 1
       fi
-      
+
       # Check Sonarr status
-      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v3/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v3/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Sonarr status is $STATUS"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -215,4 +215,4 @@
     job: "{{ docker_dir }}/sonarr/scripts/manage.sh backup"
     minute: "{{ backup_schedules.sonarr.split(' ')[0] }}"
     hour: "{{ backup_schedules.sonarr.split(' ')[1] }}"
-    user: "{{ vault_sonarr_user }}" 
+    user: "{{ vault_sonarr_user }}"

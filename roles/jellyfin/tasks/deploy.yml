@@ -17,16 +17,21 @@
 - name: Deploy Jellyfin Docker Compose
   template:
     src: docker-compose.yml.j2
-    dest: "{{ docker_root }}/jellyfin/docker-compose.yml"
+    dest: "{{ docker_dir }}/jellyfin/docker-compose.yml"
     mode: '0644'
   notify: restart jellyfin
   tags: [jellyfin, deploy]
 
-- name: Start Jellyfin services
-  community.docker.docker_compose:
-    project_src: "{{ docker_root }}/jellyfin"
-    state: present
-  tags: [jellyfin, deploy]
+- name: Start Jellyfin services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "jellyfin"
+    project_src: "{{ docker_dir }}/jellyfin"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ jellyfin_external_port }}"
+  tags: [jellyfin, deploy, rollback]
 
 - name: Wait for Jellyfin to be ready
   uri:
@@ -37,3 +42,18 @@
   retries: 30
   delay: 10
   tags: [jellyfin, deploy]
+  when: jellyfin_direct_expose_enabled | default(false)
+
+- name: Verify Jellyfin via Traefik route
+  ansible.builtin.uri:
+    url: "https://jellyfin.{{ domain }}"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+    validate_certs: true
+  register: jellyfin_route_health
+  retries: 10
+  delay: 10
+  until: jellyfin_route_health.status in [200, 302, 401]
+  tags: [jellyfin, deploy]
+  when: not (jellyfin_direct_expose_enabled | default(false))

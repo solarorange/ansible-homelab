@@ -5,8 +5,9 @@ services:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
     restart: unless-stopped
-    ports:
-      - "{{ homepage_port | default('3000') }}:3000"
+    # Prefer Traefik ingress; disable direct host mapping by default
+    # ports:
+    #   - "{{ homepage_port | default('3000') }}:3000"
     volumes:
       - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -27,6 +28,12 @@ services:
       - "logging=promtail"
       - "promtail-job=homepage"
       - "promtail-service=homepage"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   {{ homepage_network | default('watchtower') }}:

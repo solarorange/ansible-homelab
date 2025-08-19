@@ -7,15 +7,9 @@ services:
     container_name: {{ service_container_name }}
     restart: {{ service_restart_policy | default('unless-stopped') }}
     
-    # ✅ CRITICAL FIX: Comprehensive resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ service_memory_limit | default("512M") }}
-          cpus: '{{ service_cpu_limit | default(0.5) }}'
-        reservations:
-          memory: {{ service_memory_reservation | default("256M") }}
-          cpus: '{{ service_cpu_reservation | default(0.25) }}'
+    # ✅ Resource limits compatible with Docker Engine (non-Swarm)
+    mem_limit: {{ service_memory_limit | default("512M") }}
+    cpus: '{{ service_cpu_limit | default(0.5) }}'
     
     # ✅ CRITICAL FIX: Security hardening
     security_opt:
@@ -58,7 +52,7 @@ services:
     
     # ✅ CRITICAL FIX: Comprehensive health check
     healthcheck:
-      test: {{ service_healthcheck_test | default('["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ service_port | default(8080) }}/health || exit 1"]') }}
+      test: {{ service_healthcheck_test | default('["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port | default(8080) }}/health || exit 1"]') }}
       interval: "{{ service_healthcheck_interval | default('30s') }}"
       timeout: "{{ service_healthcheck_timeout | default('10s') }}"
       retries: {{ service_healthcheck_retries | default(3) }}
@@ -75,8 +69,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "{{ service_log_max_size | default('10m') }}"
-        max-file: "{{ service_log_max_files | default(3) }}"
+        max-size: "{{ service_log_max_size | default('50m') }}"
+        max-file: "{{ service_log_max_files | default(5) }}"
     
     # ✅ CRITICAL FIX: Labels for orchestration
     labels:
@@ -120,16 +114,16 @@ networks:
     {% endif %}
   {% endfor %}
 
-# ✅ CRITICAL FIX: Resource monitoring
-x-resource-limits: &resource-limits
-  deploy:
-    resources:
-      limits:
-        memory: 1g
-        cpus: '0.5'
-      reservations:
-        memory: 512m
-        cpus: '0.25'
+# NOTE: Swarm-only resource section intentionally commented to avoid non-Swarm Compose misuse.
+# x-resource-limits: &resource-limits
+#   deploy:
+#     resources:
+#       limits:
+#         memory: 1g
+#         cpus: '0.5'
+#       reservations:
+#         memory: 512m
+#         cpus: '0.25'
 
 # ✅ CRITICAL FIX: Security policies
 x-security-policy: &security-policy
@@ -143,7 +137,7 @@ x-security-policy: &security-policy
 # ✅ CRITICAL FIX: Health check policies
 x-healthcheck-policy: &healthcheck-policy
   healthcheck:
-    test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:8080/health || exit 1"]
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -154,5 +148,5 @@ x-logging-policy: &logging-policy
   logging:
     driver: "json-file"
     options:
-      max-size: "10m"
-      max-file: "3" 
+      max-size: "50m"
+      max-file: "5"

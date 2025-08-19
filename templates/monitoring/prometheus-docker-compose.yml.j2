@@ -20,7 +20,7 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      - '{{ "--web.enable-admin-api" if prometheus_admin_api_enabled | default(false) else "" }}'
       - '--storage.tsdb.no-lockfile'
       - '--web.external-url=https://prometheus.{{ domain }}'
     volumes:
@@ -28,8 +28,9 @@ services:
       - "{{ config_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
       - "{{ config_dir }}/prometheus/rules:/etc/prometheus/rules"
       - "{{ logs_dir }}/prometheus:/var/log/prometheus"
-    ports:
-      - "9090:9090"
+    # Host port exposure is disabled by default; use Traefik for ingress
+    # ports:
+    #   - "9090:9090"
     networks:
       - monitoring
     labels:
@@ -44,7 +45,7 @@ services:
       - "traefik.http.middlewares.prometheus-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.routers.prometheus.middlewares=prometheus-auth"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9090/-/healthy"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -60,14 +61,7 @@ services:
       nofile:
         soft: 26677
         hard: 46677
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.
 
   prometheus-config-reloader:
     image: jimmidyson/configmap-reload:latest
@@ -82,11 +76,4 @@ services:
       - monitoring
     security_opt:
       - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-          cpus: '0.1'
-        reservations:
-          memory: 32M
-          cpus: '0.05' 
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.

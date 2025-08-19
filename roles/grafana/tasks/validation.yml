@@ -147,7 +147,6 @@
       - Dashboards: {{ dashboards_validation.json | length }} found
   tags: [grafana, validation, summary]
 
----
 # Grafana Automation Integration Validation Tasks
 # Validates configuration, connectivity, and integration status
 
@@ -256,7 +255,7 @@
     method: GET
     status_code: [200, 302, 401, 404]
     timeout: 30
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: grafana_traefik_validation
   tags: [grafana, automation, validate]
 
@@ -290,45 +289,45 @@
       ========================================
       GRAFANA VALIDATION SUMMARY
       ========================================
-      
+
       Service Health:
       - API Health: {{ grafana_health_validation.status | default('Unknown') }}
       - Container Status: {{ grafana_container_info.container.State.Status | default('Unknown') }}
       - Container Health: {{ grafana_container_info.container.State.Health.Status | default('Unknown') }}
       - Database Connection: {{ grafana_db_validation.status | default('Unknown') }}
-      
+
       Configuration Files:
       - Main Config: {{ grafana_config_validation.results[0].stat.exists | default(false) }}
       - Data Sources: {{ grafana_config_validation.results[1].stat.exists | default(false) }}
       - Dashboards: {{ grafana_config_validation.results[2].stat.exists | default(false) }}
       - Alerting: {{ grafana_config_validation.results[3].stat.exists | default(false) }}
       - Automation Config: {{ grafana_config_validation.results[4].stat.exists | default(false) }}
-      
+
       Automation Scripts:
       - Automation Script: {{ grafana_scripts_validation.results[0].stat.exists | default(false) }}
       - Dashboard Import: {{ grafana_scripts_validation.results[1].stat.exists | default(false) }}
       - Config File: {{ grafana_scripts_validation.results[2].stat.exists | default(false) }}
-      
+
       Script Tests:
       - Automation Test: {{ grafana_automation_test.rc == 0 if grafana_automation_test.rc is defined else 'Not Run' }}
       - Dashboard Import Test: {{ grafana_dashboard_import_test.rc == 0 if grafana_dashboard_import_test.rc is defined else 'Not Run' }}
-      
+
       API Endpoints:
       - Data Sources API: {{ grafana_api_validation.results[0].status | default('Unknown') }}
       - Dashboards API: {{ grafana_api_validation.results[1].status | default('Unknown') }}
       - Folders API: {{ grafana_api_validation.results[2].status | default('Unknown') }}
       - Alerting API: {{ grafana_api_validation.results[3].status | default('Unknown') }}
-      
+
       Integration Status:
       - Data Sources: {{ grafana_datasources_validation.status | default('Unknown') }}
       - Dashboards: {{ grafana_dashboards_validation.status | default('Unknown') }}
       - Alerting: {{ grafana_alerting_validation.status | default('Unknown') }}
       - Authentication: {{ grafana_auth_validation.status | default('Unknown') }}
       - Traefik: {{ grafana_traefik_validation.status | default('Unknown') }}
-      
+
       Data Source Count: {{ grafana_datasources_validation.json | length if grafana_datasources_validation.json else 0 }}
       Dashboard Count: {{ grafana_dashboards_validation.json | length if grafana_dashboards_validation.json else 0 }}
-      
+
       Validation Results:
       - All Config Files Present: {{ grafana_config_validation.results | map(attribute='stat.exists') | list | all }}
       - All Scripts Present: {{ grafana_scripts_validation.results | map(attribute='stat.exists') | list | all }}
@@ -336,13 +335,13 @@
       - Container Healthy: {{ grafana_container_info.container.State.Health.Status in ['healthy', 'none'] if grafana_container_info.container.State.Health.Status is defined else false }}
       - Data Sources Configured: {{ grafana_datasources_validation.json | length > 0 if grafana_datasources_validation.json else false }}
       - Dashboards Available: {{ grafana_dashboards_validation.json | length > 0 if grafana_dashboards_validation.json else false }}
-      
+
       ========================================
   tags: [grafana, automation, validate, summary]
 
 - name: Set Grafana validation result
   ansible.builtin.set_fact:
-    grafana_validation_success: "{{ 
+    grafana_validation_success: "{{
       grafana_health_validation.status in [200, 302, 401] and
       grafana_config_validation.results | map(attribute='stat.exists') | list | all and
       grafana_scripts_validation.results | map(attribute='stat.exists') | list | all and
@@ -355,4 +354,4 @@
   ansible.builtin.fail:
     msg: "Grafana validation failed. Check the validation summary above for details."
   when: not grafana_validation_success
-  tags: [grafana, automation, validate] 
+  tags: [grafana, automation, validate]

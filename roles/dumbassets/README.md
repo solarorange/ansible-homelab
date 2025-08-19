@@ -122,7 +122,7 @@ Include this role in your playbook:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `dumbassets_docker_dir` | `{{ docker_root }}/dumbassets` | Docker compose directory |
+| `dumbassets_docker_dir` | `{{ docker_dir }}/dumbassets` | Docker compose directory |
 | `dumbassets_data_dir` | `{{ docker_data_root }}/dumbassets` | Data storage directory |
 | `dumbassets_backup_dir` | `{{ backup_dir }}/dumbassets` | Backup storage directory |
 | `dumbassets_logs_dir` | `{{ docker_logs_root }}/dumbassets` | Log storage directory |
@@ -296,3 +296,59 @@ This role is part of the Ansible Homelab Stack and follows the same licensing te
 ## Author
 
 Auto-generated for the DumbAssets service integration into the homelab stack. 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores the last-known-good Compose and pre-change snapshot automatically if a deployment fails.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., dumbassets
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```
+
+### Secrets & Health Checks
+
+- Secrets directory: `{{ dumbassets_docker_dir }}/secrets`.
+- If using secrets, enable file-based secrets:
+  ```yaml
+  dumbassets_manage_secret_files: true
+  dumbassets_secret_files:
+    - name: DUMBASSETS_API_TOKEN
+      from_vault_var: vault_dumbassets_api_token
+  dumbassets_required_secrets:
+    - DUMBASSETS_API_TOKEN
+  ```
+  Compose templates must map secret-like env keys to `KEY_FILE=/run/secrets/KEY` and mount the file. See `docs/SECRETS_CONVENTIONS.md`.
+
+- Post-deploy route health check:
+  ```yaml
+  - ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+    vars:
+      route_health_check_url: "https://{{ dumbassets_subdomain }}.{{ domain }}/"
+      route_health_check_status_codes: [200, 302]
+  ```
+  See `docs/POST_DEPLOY_SMOKE_TESTS.md`.

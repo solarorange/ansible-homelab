@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  testservice:
+    image: {{ testservice_image }}
+    container_name: {{ testservice_container_name }}
+    restart: {{ testservice_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in testservice_environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in testservice_volumes %}
+      - {{ volume }}
+      {% endfor %}
+      - "{{ logs_dir }}/testservice:/logs"
+    
+    # Ports removed (Traefik provides ingress). Enable direct exposure with flag.
+    {% if testservice_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ testservice_external_port }}:{{ testservice_internal_port }}"
+    {% endif %}
+    
+    # Networks
+    networks:
+      {% for network in testservice_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if testservice_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.testservice.rule=Host(`{{ testservice_domain }}`)"
+      - "traefik.http.routers.testservice.entrypoints=https"
+      - "traefik.http.routers.testservice.tls=true"
+      - "traefik.http.routers.testservice.tls.certresolver=cloudflare"
+      - "traefik.http.services.testservice.loadbalancer.server.port={{ testservice_internal_port }}"
+      {% if testservice_traefik_middleware is defined %}
+      - "traefik.http.routers.testservice.middlewares={{ testservice_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if testservice_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ testservice_internal_port }}/health || exit 1"]
+      interval: {{ testservice_healthcheck_interval }}
+      timeout: {{ testservice_healthcheck_timeout }}
+      retries: {{ testservice_healthcheck_retries }}
+      start_period: {{ testservice_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    {% if testservice_security_enabled | default(true) %}
+    security_opt:
+      - no-new-privileges:{{ testservice_no_new_privileges | default(true) }}
+    cap_drop:
+      - ALL
+    {% endif %}
+    
+    # Read-only root filesystem
+    read_only: {{ testservice_read_only | default(true) }}
+    tmpfs:
+      - /tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+    
+    # Resource limits (Docker Engine supported)
+    mem_limit: {{ testservice_memory_limit }}
+    cpus: '{{ testservice_cpu_limit }}'
+    
+    # Dependencies
+    {% if testservice_dependencies is defined %}
+    depends_on:
+      {% for dependency in testservice_dependencies %}
+      {{ dependency }}:
+        condition: service_healthy
+      {% endfor %}
+    {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  homelab:
+    external: true
+  default:
+    driver: bridge

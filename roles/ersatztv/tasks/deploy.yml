@@ -51,17 +51,16 @@
   ignore_errors: yes
   tags: [ersatztv, deploy]
 
-- name: Deploy ErsatzTV using Docker Compose
-  community.docker.docker_compose:
+- name: Deploy ErsatzTV safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "ersatztv"
     project_src: "{{ ersatztv_config_dir }}"
-    files: docker-compose.yml
-    state: present
-    pull: yes
-    build: no
-    remove_orphans: yes
-  environment:
-    COMPOSE_PROJECT_NAME: ersatztv
-  tags: [ersatztv, deploy]
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ ersatztv_port }}"
+  tags: [ersatztv, deploy, rollback]
 
 - name: Wait for ErsatzTV service to start
   ansible.builtin.wait_for:
@@ -99,6 +98,7 @@
   delay: 10
   until: ersatztv_web_check.status in [200, 302, 404]
   tags: [ersatztv, deploy]
+  when: ersatztv_direct_expose_enabled | default(false)
 
 - name: Display ErsatzTV web interface status
   ansible.builtin.debug:
@@ -107,6 +107,17 @@
       - Status Code: {{ ersatztv_web_check.status }}
       - Response Time: {{ ersatztv_web_check.elapsed }}s
       - URL: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}
+  tags: [ersatztv, deploy]
+
+- name: Verify ErsatzTV via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ ersatztv_domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (ersatztv_direct_expose_enabled | default(false))
   tags: [ersatztv, deploy]
 
 - name: Create ErsatzTV service health check
@@ -413,4 +424,4 @@
       - Hardware Acceleration: {{ ersatztv_hardware_acceleration }}
       - Streaming Mode: {{ ersatztv_streaming_mode }}
       - Transcoding: {{ ersatztv_transcode_enabled }}
-  tags: [ersatztv, deploy] 
+  tags: [ersatztv, deploy]

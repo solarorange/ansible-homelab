@@ -1,0 +1,17 @@
+---
+# Test Service Homepage Integration Tasks
+
+- name: Add Test Service to homepage services
+  template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/testservice.yml"
+    mode: '0644'
+  when: testservice_homepage_enabled | default(true)
+  tags: [testservice, homepage]
+
+- name: Reload homepage configuration
+  uri:
+    url: "http://{ ansible_default_ipv4.address }:{{ homepage_port | default(3000) }}/api/reload"
+    method: POST
+  when: testservice_homepage_enabled | default(true)
+  tags: [testservice, homepage]

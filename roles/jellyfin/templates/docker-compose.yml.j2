@@ -17,10 +17,13 @@ services:
       {% for volume in jellyfin_volumes %}
       - {{ volume }}
       {% endfor %}
+      - "{{ logs_dir }}/jellyfin:/logs"
     
-    # Ports
+    # Ports removed (Traefik provides ingress). Enable to expose directly.
+    {% if jellyfin_direct_expose_enabled | default(false) %}
     ports:
       - "{{ jellyfin_external_port }}:{{ jellyfin_internal_port }}"
+    {% endif %}
     
     # Networks
     networks:
@@ -46,7 +49,7 @@ services:
     # Health check
     {% if jellyfin_healthcheck_enabled | default(true) %}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ jellyfin_internal_port }}/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ jellyfin_internal_port }}/ || exit 1"]
       interval: {{ jellyfin_healthcheck_interval }}
       timeout: {{ jellyfin_healthcheck_timeout }}
       retries: {{ jellyfin_healthcheck_retries }}
@@ -57,22 +60,19 @@ services:
     {% if jellyfin_security_enabled | default(true) %}
     security_opt:
       - no-new-privileges:{{ jellyfin_no_new_privileges | default(true) }}
+    cap_drop:
+      - ALL
     {% endif %}
     
     # Read-only root filesystem
-    read_only: {{ jellyfin_read_only | default(false) }}
+    read_only: {{ jellyfin_read_only | default(true) }}
     tmpfs:
       - /tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     
     # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ jellyfin_memory_limit }}
-          cpus: '{{ jellyfin_cpu_limit }}'
-        reservations:
-          memory: {{ jellyfin_memory_reservation }}
-          cpus: '{{ jellyfin_cpu_reservation }}'
+    mem_limit: {{ jellyfin_memory_limit }}
+    cpus: '{{ jellyfin_cpu_limit }}'
     
     # Dependencies
     {% if jellyfin_dependencies is defined %}
@@ -87,8 +87,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   homelab:

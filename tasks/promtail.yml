@@ -21,13 +21,13 @@
       server:
         http_listen_port: 9080
         grpc_listen_port: 0
-      
+
       positions:
         filename: /tmp/positions.yaml
-      
+
       clients:
         - url: http://loki:3100/loki/api/v1/push
-      
+
       scrape_configs:
         - job_name: system
           static_configs:
@@ -37,7 +37,7 @@
                 job: varlogs
                 __path__: /var/log/*log
                 host: {{ inventory_hostname }}
-          
+
         - job_name: docker
           static_configs:
             - targets:
@@ -46,14 +46,14 @@
                 job: docker
                 __path__: /var/lib/docker/containers/*/*-json.log
                 host: {{ inventory_hostname }}
-          
+
         - job_name: journal
           journal:
             max_age: 12h
             labels:
               job: systemd-journal
               host: {{ inventory_hostname }}
-          
+
         - job_name: monitoring
           static_configs:
             - targets:
@@ -62,7 +62,7 @@
                 job: monitoring
                 __path__: /var/log/monitoring/*.log
                 host: {{ inventory_hostname }}
-          
+
         - job_name: applications
           static_configs:
             - targets:
@@ -80,9 +80,9 @@
     dest: "{{ docker_dir }}/monitoring/promtail/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Promtail Management Script
-      
+
       function show_help {
         echo "Promtail Management Script"
         echo "Usage: $0 [command]"
@@ -94,10 +94,10 @@
         echo "  config    - Show current config"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
-          curl -s http://{{ ansible_default_ipv4.address }}:/ready
+          curl -s http://{{ ansible_default_ipv4.address }}:/ready
           ;;
         logs)
           docker logs promtail --tail 100 -f
@@ -121,19 +121,19 @@
     dest: "{{ docker_dir }}/monitoring/promtail/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Promtail is responding
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/ready > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/ready > /dev/null; then
         echo "Promtail is not responding"
         exit 1
       fi
-      
+
       # Check if we can access metrics
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/metrics > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/metrics > /dev/null; then
         echo "Promtail metrics endpoint is not responding"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -162,4 +162,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/promtail/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ vault_promtail_user }}" 
+    user: "{{ vault_promtail_user }}"

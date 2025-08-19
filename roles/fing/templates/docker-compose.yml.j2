@@ -23,7 +23,7 @@ services:
       - FING_DB_PORT={{ fing_database_port }}
       - FING_DB_NAME={{ fing_database_name }}
       - FING_DB_USER={{ fing_database_user }}
-      - FING_DB_PASSWORD={{ fing_database_password }}
+      - FING_DB_PASSWORD_FILE=/run/secrets/FING_DB_PASSWORD
       {% endif %}
       
       # Network discovery
@@ -37,12 +37,12 @@ services:
       - FING_AUTH_ENABLED={{ fing_auth_enabled | lower }}
       - FING_AUTH_METHOD={{ fing_auth_method }}
       - FING_ADMIN_EMAIL={{ fing_admin_email }}
-      - FING_ADMIN_PASSWORD={{ fing_admin_password }}
+      - FING_ADMIN_PASSWORD_FILE=/run/secrets/FING_ADMIN_PASSWORD
       
       # API configuration
       - FING_API_ENABLED={{ fing_api_enabled | lower }}
       - FING_API_VERSION={{ fing_api_version }}
-      - FING_API_KEY={{ fing_api_key }}
+      - FING_API_KEY_FILE=/run/secrets/FING_API_KEY
       - FING_API_RATE_LIMIT={{ fing_api_rate_limit }}
       - FING_API_RATE_LIMIT_WINDOW={{ fing_api_rate_limit_window }}
       
@@ -73,7 +73,7 @@ services:
       - FING_SMTP_HOST={{ fing_smtp_host }}
       - FING_SMTP_PORT={{ fing_smtp_port }}
       - FING_SMTP_USERNAME={{ fing_smtp_username }}
-      - FING_SMTP_PASSWORD={{ fing_smtp_password }}
+      - FING_SMTP_PASSWORD_FILE=/run/secrets/FING_SMTP_PASSWORD
       - FING_SMTP_ENCRYPTION={{ fing_smtp_encryption }}
       {% endif %}
       
@@ -102,7 +102,11 @@ services:
       
       # Custom environment variables
       {% for key, value in fing_environment_variables.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
       
       # System environment
@@ -125,9 +129,18 @@ services:
       - {{ docker_dir }}/fing/database:/app/database
       - {{ docker_dir }}/fing/cache:/app/cache
       - {{ docker_dir }}/fing/backups:/app/backups
+      - {{ docker_dir }}/fing/secrets/FING_DB_PASSWORD:/run/secrets/FING_DB_PASSWORD:ro
+      - {{ docker_dir }}/fing/secrets/FING_ADMIN_PASSWORD:/run/secrets/FING_ADMIN_PASSWORD:ro
+      - {{ docker_dir }}/fing/secrets/FING_API_KEY:/run/secrets/FING_API_KEY:ro
+      - {{ docker_dir }}/fing/secrets/FING_SMTP_PASSWORD:/run/secrets/FING_SMTP_PASSWORD:ro
+      {% for key, value in fing_environment_variables.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ docker_dir }}/fing/secrets/{{ key }}:/run/secrets/{{ key }}:ro
+      {% endif %}
+      {% endfor %}
       
       # Logs
-      - {{ docker_dir }}/fing/logs:/app/logs
+      - {{ logs_dir }}/fing/app:/app/logs
       - {{ logs_dir }}/fing:/var/log/fing
       
       # Network access (required for discovery)
@@ -140,7 +153,8 @@ services:
       - {{ mount }}
       {% endfor %}
     
-    # Port mappings
+    # Port mappings (enable only if direct exposure is needed)
+    {% if fing_direct_expose_enabled | default(false) %}
     ports:
       - "{{ fing_web_port }}:{{ fing_web_port }}"
       - "{{ fing_api_port }}:{{ fing_api_port }}"
@@ -150,20 +164,15 @@ services:
       {% if fing_debug_enabled | default(false) %}
       - "{{ fing_debug_port }}:{{ fing_debug_port }}"
       {% endif %}
+    {% endif %}
     
     # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ fing_memory_limit }}
-          cpus: '{{ fing_cpu_limit }}'
-        reservations:
-          memory: {{ (fing_memory_limit | regex_replace('([0-9]+)m', '\\1') | int * 0.5) | int }}m
-          cpus: '{{ (fing_cpu_limit | float * 0.5) | round(2) }}'
+    mem_limit: {{ fing_memory_limit }}
+    cpus: '{{ fing_cpu_limit }}'
     
     # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}{{ fing_health_check_url }}"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ fing_web_port }}{{ fing_health_check_url }} || exit 1"]
       interval: {{ fing_health_check_interval }}s
       timeout: {{ fing_health_check_timeout }}s
       retries: {{ fing_health_check_retries }}
@@ -173,12 +182,15 @@ services:
     security_opt:
       - no-new-privileges:true
       - seccomp:unconfined
+    cap_drop:
+      - ALL
     
     # Capabilities (required for network discovery)
     cap_add:
       - NET_ADMIN
       - NET_RAW
       - NET_BROADCAST
+    # runs with extended network capabilities; user remains default
     
     # Labels for Traefik
     labels:
@@ -258,8 +270,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
         labels: "service=fing"
         env: "TZ"
 

@@ -18,7 +18,7 @@
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: '0640'
-  when: 'email' in ersatztv_alerting_channels
+  when: ersatztv_alerting_channels is defined and ('email' in ersatztv_alerting_channels)
   tags: [ersatztv, alerts]
 
 - name: Create ErsatzTV Slack alerting configuration
@@ -28,7 +28,7 @@
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: '0640'
-  when: 'slack' in ersatztv_alerting_channels
+  when: ersatztv_alerting_channels is defined and ('slack' in ersatztv_alerting_channels)
   tags: [ersatztv, alerts]
 
 - name: Create ErsatzTV Discord alerting configuration
@@ -38,7 +38,7 @@
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: '0640'
-  when: 'discord' in ersatztv_alerting_channels
+  when: ersatztv_alerting_channels is defined and ('discord' in ersatztv_alerting_channels)
   tags: [ersatztv, alerts]
 
 - name: Create ErsatzTV alerting script
@@ -75,4 +75,4 @@
       - Alerting Enabled: {{ ersatztv_alerting_enabled }}
       - Alerting Channels: {{ ersatztv_alerting_channels | join(', ') }}
       - Alerting Conditions: {{ ersatztv_alerting_conditions | join(', ') }}
-  tags: [ersatztv, alerts] 
+  tags: [ersatztv, alerts]

@@ -333,7 +333,7 @@
   when: fing_debug_enabled | default(false)
 
 - name: Restart Homepage to apply Fing configuration
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/homepage"
     state: present
     restarted: true
@@ -362,26 +362,26 @@
   ansible.builtin.debug:
     msg: |
       Fing Homepage Integration Complete:
-      
+
       Service Configuration:
       - Service File: {{ docker_dir }}/homepage/config/services/fing.yml
       - Category: {{ fing_homepage_category }}
       - Description: {{ fing_homepage_description }}
       - Icon: {{ fing_homepage_icon }}
-      
+
       Widget Configuration:
       - Widget Enabled: {{ fing_homepage_widget_enabled | default(true) }}
       - Widget File: {{ docker_dir }}/homepage/config/widgets/fing.yml
       - API Key: Configured
-      
+
       Bookmark Configuration:
       - Bookmark File: {{ docker_dir }}/homepage/config/bookmarks/fing.yml
       - Quick Access: Enabled
-      
+
       Health Check:
       - Health File: {{ docker_dir }}/homepage/config/health/fing.yml
       - Status: Active
-      
+
       Additional Configurations:
       - Settings: {{ docker_dir }}/homepage/config/settings/fing.yml
       - Theme: {{ docker_dir }}/homepage/config/themes/fing.yml
@@ -415,17 +415,17 @@
       - Performance: {{ docker_dir }}/homepage/config/performance/fing.yml
       - Cache: {{ docker_dir }}/homepage/config/cache/fing.yml
       - Debug: {{ docker_dir }}/homepage/config/debug/fing.yml
-      
+
       Access Information:
       - Homepage URL: https://homepage.{{ domain }}
       - Fing Service: Available in Network category
       - Widget Status: {{ fing_homepage_widget_enabled | default(true) | ternary('Enabled', 'Disabled') }}
       - Health Status: Active
-      
+
       Icon Status:
       - Icon Downloaded: {{ fing_icon_download.changed | default(false) }}
       - Icon Path: {{ docker_dir }}/homepage/config/icons/fing.png
-      
+
       Next Steps:
       1. Access Homepage at https://homepage.{{ domain }}
       2. Navigate to the Network category
@@ -434,4 +434,4 @@
       5. Configure network discovery settings
       6. Set up monitoring dashboards
       7. Configure alerting rules
-      8. Test network discovery functionality 
+      8. Test network discovery functionality

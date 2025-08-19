@@ -35,7 +35,7 @@
 - name: Create Grafana automation configuration
   ansible.builtin.template:
     src: automation_config.yml.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/scripts/automation_config.yml"
+    dest: "{{ docker_dir }}/grafana/scripts/automation_config.yml"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -45,7 +45,7 @@
 - name: Create Grafana configuration automation script
   ansible.builtin.template:
     src: grafana_automation.py.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/scripts/grafana_automation.py"
+    dest: "{{ docker_dir }}/grafana/scripts/grafana_automation.py"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0755"
@@ -55,7 +55,7 @@
 - name: Create Grafana dashboard import script
   ansible.builtin.template:
     src: dashboard_import.py.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/scripts/dashboard_import.py"
+    dest: "{{ docker_dir }}/grafana/scripts/dashboard_import.py"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0755"
@@ -65,7 +65,7 @@
 - name: Create Grafana alerting configuration script
   ansible.builtin.template:
     src: alerting_config.py.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/scripts/alerting_config.py"
+    dest: "{{ docker_dir }}/grafana/scripts/alerting_config.py"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0755"
@@ -110,48 +110,48 @@
   tags: [grafana, automation, admin]
 
 - name: Run Grafana data source configuration
-  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/datasource_config.py --config automation_config.yml"
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/datasource_config.py --config automation_config.yml"
   args:
-    chdir: "{{ docker_dir }}/monitoring/grafana/scripts"
+    chdir: "{{ docker_dir }}/grafana/scripts"
   register: grafana_datasource_config_result
   environment:
-    PYTHONPATH: "{{ docker_dir }}/monitoring/grafana/scripts"
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
   retries: 3
   delay: 30
   until: grafana_datasource_config_result.rc == 0
   tags: [grafana, automation, datasources]
 
 - name: Run Grafana dashboard import
-  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/dashboard_import.py --config automation_config.yml"
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/dashboard_import.py --config automation_config.yml"
   args:
-    chdir: "{{ docker_dir }}/monitoring/grafana/scripts"
+    chdir: "{{ docker_dir }}/grafana/scripts"
   register: grafana_dashboard_import_result
   environment:
-    PYTHONPATH: "{{ docker_dir }}/monitoring/grafana/scripts"
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
   retries: 3
   delay: 30
   until: grafana_dashboard_import_result.rc == 0
   tags: [grafana, automation, dashboards]
 
 - name: Run Grafana alerting configuration
-  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/alerting_config.py --config automation_config.yml"
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/alerting_config.py --config automation_config.yml"
   args:
-    chdir: "{{ docker_dir }}/monitoring/grafana/scripts"
+    chdir: "{{ docker_dir }}/grafana/scripts"
   register: grafana_alerting_config_result
   environment:
-    PYTHONPATH: "{{ docker_dir }}/monitoring/grafana/scripts"
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
   retries: 3
   delay: 30
   until: grafana_alerting_config_result.rc == 0
   tags: [grafana, automation, alerting]
 
 - name: Run Grafana configuration automation
-  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/grafana_automation.py --config automation_config.yml"
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/grafana_automation.py --config automation_config.yml"
   args:
-    chdir: "{{ docker_dir }}/monitoring/grafana/scripts"
+    chdir: "{{ docker_dir }}/grafana/scripts"
   register: grafana_automation_result
   environment:
-    PYTHONPATH: "{{ docker_dir }}/monitoring/grafana/scripts"
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
   retries: 3
   delay: 30
   until: grafana_automation_result.rc == 0
@@ -193,7 +193,7 @@
 - name: Configure Grafana monitoring integration
   ansible.builtin.template:
     src: monitoring_integration.yml.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/monitoring.yml"
+    dest: "{{ docker_dir }}/grafana/provisioning/monitoring.yml"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -203,7 +203,7 @@
 - name: Configure Grafana authentication integration
   ansible.builtin.template:
     src: auth_integration.yml.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/auth.yml"
+    dest: "{{ docker_dir }}/grafana/provisioning/auth.yml"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -213,7 +213,7 @@
 - name: Configure Grafana Traefik integration
   ansible.builtin.template:
     src: traefik_integration.yml.j2
-    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/traefik.yml"
+    dest: "{{ docker_dir }}/grafana/provisioning/traefik.yml"
     owner: "{{ username }}"
     group: "{{ username }}"
     mode: "0640"
@@ -221,8 +221,8 @@
   tags: [grafana, automation, traefik]
 
 - name: Restart Grafana to apply configuration changes
-  community.docker.docker_compose:
-    project_src: "{{ docker_dir }}/monitoring/grafana"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/grafana"
     state: present
     restarted: true
   register: grafana_restart_result
@@ -250,9 +250,9 @@
       ========================================
       GRAFANA AUTOMATION INTEGRATION SUMMARY
       ========================================
-      
+
       Automation Status: {{ 'SUCCESS' if grafana_automation_result.rc == 0 else 'FAILED' }}
-      
+
       Configuration Files Created:
       - Automation Config: {{ grafana_automation_config_creation.changed }}
       - Automation Script: {{ grafana_automation_script_creation.changed }}
@@ -262,25 +262,25 @@
       - Monitoring Integration: {{ grafana_monitoring_integration_creation.changed }}
       - Auth Integration: {{ grafana_auth_integration_creation.changed }}
       - Traefik Integration: {{ grafana_traefik_integration_creation.changed }}
-      
+
       Configuration Results:
       - Admin Password Set: {{ grafana_admin_password_set.status | default('Unknown') }}
       - Data Sources Configured: {{ grafana_datasource_config_result.rc == 0 }}
       - Dashboards Imported: {{ grafana_dashboard_import_result.rc == 0 }}
       - Alerting Configured: {{ grafana_alerting_config_result.rc == 0 }}
       - General Configuration: {{ grafana_automation_result.rc == 0 }}
-      
+
       Validation Status:
       - API Health: {{ grafana_post_restart_health_check.status | default('Unknown') }}
       - Data Sources Validation: {{ grafana_datasources_validation.status | default('Unknown') }}
       - Dashboards Validation: {{ grafana_dashboards_validation.status | default('Unknown') }}
       - Alerting Validation: {{ grafana_alerting_validation.status | default('Unknown') }}
-      
+
       Integration Status:
       - Monitoring Integration: {{ grafana_monitoring_integration_creation.changed }}
       - Authentication Integration: {{ grafana_auth_integration_creation.changed }}
       - Traefik Integration: {{ grafana_traefik_integration_creation.changed }}
-      
+
       Automation Features:
       - Data Source Auto-Configuration: Enabled
       - Dashboard Auto-Import: Enabled
@@ -290,51 +290,6 @@
       - Authentication Integration: Enabled
       - Traefik Integration: Enabled
       - Health Monitoring: Enabled
-      
+
       ========================================
   tags: [grafana, automation, summary]
-
-rescue:
-  - name: Log Grafana automation integration failure
-    ansible.builtin.debug:
-      msg: |
-        Grafana automation integration failed:
-        - Automation config creation: {{ grafana_automation_config_creation | default('N/A') }}
-        - Automation script creation: {{ grafana_automation_script_creation | default('N/A') }}
-        - Dashboard import creation: {{ grafana_dashboard_import_creation | default('N/A') }}
-        - Alerting config creation: {{ grafana_alerting_config_creation | default('N/A') }}
-        - Datasource config creation: {{ grafana_datasource_config_creation | default('N/A') }}
-        - API health check: {{ grafana_api_health_check | default('N/A') }}
-        - Admin password set: {{ grafana_admin_password_set | default('N/A') }}
-        - Datasource config result: {{ grafana_datasource_config_result | default('N/A') }}
-        - Dashboard import result: {{ grafana_dashboard_import_result | default('N/A') }}
-        - Alerting config result: {{ grafana_alerting_config_result | default('N/A') }}
-        - Automation result: {{ grafana_automation_result | default('N/A') }}
-        - Monitoring integration: {{ grafana_monitoring_integration_creation | default('N/A') }}
-        - Auth integration: {{ grafana_auth_integration_creation | default('N/A') }}
-        - Traefik integration: {{ grafana_traefik_integration_creation | default('N/A') }}
-        - Restart result: {{ grafana_restart_result | default('N/A') }}
-        - Post-restart health check: {{ grafana_post_restart_health_check | default('N/A') }}
-
-  - name: Attempt Grafana automation recovery
-    ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
-    vars:
-      failed_config_files:
-        - "{{ docker_dir }}/monitoring/grafana/scripts/automation_config.yml"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/grafana_automation.py"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/dashboard_import.py"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/alerting_config.py"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/datasource_config.py"
-        - "{{ docker_dir }}/monitoring/grafana/provisioning/monitoring.yml"
-        - "{{ docker_dir }}/monitoring/grafana/provisioning/auth.yml"
-        - "{{ docker_dir }}/monitoring/grafana/provisioning/traefik.yml"
-      config_verification_commands:
-        - "{{ docker_dir }}/monitoring/grafana/scripts/healthcheck.sh"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/grafana_automation.py --validate"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/datasource_config.py --test"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/dashboard_import.py --test"
-        - "{{ docker_dir }}/monitoring/grafana/scripts/alerting_config.py --test" 
-  - name: Fail playbook if recovery and rollback failed
-    ansible.builtin.fail:
-      msg: "Grafana automation integration failed and rollback was unsuccessful. Manual intervention required."
-    when: recovery_complete | default(false) | bool == false 

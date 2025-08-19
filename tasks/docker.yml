@@ -32,7 +32,7 @@
         state: absent
       register: docker_removal
       ignore_errors: true
-      
+
     - name: Handle Docker removal errors
       ansible.builtin.debug:
         msg: "Docker removal completed with warnings: {{ docker_removal.stderr | default('None') }}"
@@ -125,8 +125,8 @@
           {
             "log-driver": "json-file",
             "log-opts": {
-              "max-size": "10m",
-              "max-file": "3"
+              "max-size": "50m",
+              "max-file": "5"
             },
             "storage-driver": "overlay2",
             "data-root": "{{ docker_dir }}/docker-data",
@@ -183,7 +183,7 @@
     - name: Wait for Docker to be ready
       ansible.builtin.wait_for:
         port: 2375
-        host: {{ ansible_default_ipv4.address }}
+        host: "{{ ansible_default_ipv4.address }}"
         timeout: 60
       register: docker_ready
       retries: 3
@@ -237,10 +237,10 @@
       ansible.builtin.copy:
         content: |
           version: '3.8'
-          
+
           # Global Docker Compose configuration for homelab
           # This file contains shared services and networks
-          
+
           networks:
             homelab:
               name: homelab
@@ -251,7 +251,7 @@
             media:
               name: media
               external: true
-          
+
           # Shared volume definitions
           volumes:
             portainer_data:
@@ -266,27 +266,27 @@
               name: postgres_data
             redis_data:
               name: redis_data
-          
+
           # Global service defaults
           x-common-variables: &common-variables
             TZ: ${TZ:-UTC}
             PUID: ${PUID:-1000}
             PGID: ${PGID:-1000}
-          
+
           x-security-labels: &security-labels
             - "traefik.enable=true"
             - "traefik.docker.network=homelab"
-          
+
           x-restart-policy: &restart-policy
             restart: unless-stopped
-          
+
           x-logging: &logging
             logging:
               driver: "json-file"
               options:
-                max-size: "10m"
-                max-file: "3"
-          
+                max-size: "50m"
+                max-file: "5"
+
           # Services will be added by individual task files
           services: {}
         dest: "{{ docker_dir }}/docker-compose.yml"

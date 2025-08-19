@@ -10,15 +10,15 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   loop:
-    - "{{ docker_root }}/bazarr/config"
-    - "{{ docker_root }}/bazarr/data"
-    - "{{ docker_root }}/bazarr/scripts"
+    - "{{ docker_dir }}/bazarr/config"
+    - "{{ docker_dir }}/bazarr/data"
+    - "{{ docker_dir }}/bazarr/scripts"
   tags: [media, bazarr]
 
 - name: Create Bazarr docker-compose configuration
   ansible.builtin.template:
     src: templates/bazarr/docker-compose.yml.j2
-    dest: "{{ docker_root }}/bazarr/docker-compose.yml"
+    dest: "{{ docker_dir }}/bazarr/docker-compose.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -27,7 +27,7 @@
 - name: Create Bazarr environment file
   ansible.builtin.template:
     src: templates/bazarr/.env.j2
-    dest: "{{ docker_root }}/bazarr/.env"
+    dest: "{{ docker_dir }}/bazarr/.env"
     mode: '0600'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -36,21 +36,22 @@
 - name: Create Traefik configuration for Bazarr
   ansible.builtin.template:
     src: templates/bazarr/traefik.yml.j2
-    dest: "{{ docker_root }}/bazarr/traefik.yml"
+    dest: "{{ docker_dir }}/bazarr/traefik.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
   tags: [media, bazarr]
 
-- name: Start Bazarr container
-  community.docker.docker_compose:
-    project_src: "{{ docker_root }}/bazarr"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
-  register: bazarr_result
-  tags: [media, bazarr]
+- name: Start Bazarr container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "bazarr"
+    project_src: "{{ docker_dir }}/bazarr"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 6767
+  tags: [media, bazarr, rollback]
 
 - name: Wait for Bazarr to be ready
   ansible.builtin.uri:
@@ -79,7 +80,7 @@
 
 - name: Configure Bazarr Radarr
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/radarr"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/radarr"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -92,7 +93,7 @@
 
 - name: Configure Bazarr subtitle providers
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/providers"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/providers"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -105,7 +106,7 @@
 
 - name: Configure Bazarr languages
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/languages"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/languages"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -118,7 +119,7 @@
 
 - name: Configure Bazarr notifications
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/notifications"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/notifications"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -131,7 +132,7 @@
 
 - name: Verify Bazarr configuration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
     method: GET
     status_code: 200
     register: bazarr_verify
@@ -143,4 +144,4 @@
       Bazarr deployment completed successfully
       URL: https://bazarr.{{ domain }}
       Status: {{ bazarr_verify.json.status }}
-  tags: [media, bazarr] 
+  tags: [media, bazarr]

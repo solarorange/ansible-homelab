@@ -22,6 +22,17 @@
         mode: "0600"
       register: reconya_env_file
 
+    - name: Prepare Reconya secret files
+      ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+      vars:
+        service_name: "reconya"
+        secret_dir_root: "{{ reconya_config_dir }}"
+        secret_files: "{{ reconya_secret_files | default([]) }}"
+        secret_env_maps:
+          - "{{ reconya_components.backend.environment | default({}) }}"
+      when: reconya_manage_secret_files | default(true) | bool
+      tags: [reconya, deploy, setup]
+
     - name: Pull Reconya Docker images
       community.docker.docker_image:
         name: "{{ reconya_components.backend.image }}"
@@ -30,7 +41,7 @@
       register: reconya_image_pull
 
     - name: Deploy Reconya containers
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ reconya_config_dir }}"
         state: present
         pull: true
@@ -56,13 +67,24 @@
 
     - name: Display Reconya deployment status
       ansible.builtin.debug:
-        msg: 
+        msg:
           - "Reconya deployment completed successfully"
           - "Container: {{ reconya_container_info.container.State.Status }}"
           - "Port: {{ reconya_port }}"
           - "URL: https://{{ reconya_subdomain }}.{{ domain }}"
 
   tags: [reconya, deploy]
+
+- name: Verify Reconya via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ reconya_subdomain }}.{{ domain }}/health"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (reconya_direct_expose_enabled | default(false))
+  tags: [reconya, deploy, health]
 
 - name: Configure Reconya post-deployment
   block:
@@ -116,4 +138,4 @@
         mode: "0644"
       when: reconya_grafana_enabled | default(true)
 
-  tags: [reconya, deploy] 
+  tags: [reconya, deploy]

@@ -31,7 +31,7 @@ The DumbAssets role is designed for zero-configuration deployment with sensible 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DUMBASSETS_DOCKER_DIR` | `{{ docker_root }}/dumbassets` | Docker Compose directory |
+| `DUMBASSETS_DOCKER_DIR` | `{{ docker_dir }}/dumbassets` | Docker Compose directory |
 | `DUMBASSETS_CONFIG_DIR` | `{{ dumbassets_docker_dir }}/config` | Configuration directory |
 | `DUMBASSETS_DATA_DIR` | `{{ docker_data_root }}/dumbassets` | Data storage directory |
 | `DUMBASSETS_BACKUP_DIR` | `{{ backup_dir }}/dumbassets` | Backup directory |

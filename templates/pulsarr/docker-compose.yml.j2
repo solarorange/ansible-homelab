@@ -12,8 +12,9 @@ services:
       - PORT=8080
       - HOST=0.0.0.0
     volumes:
-      - {{ docker_root }}/pulsarr/config:/config
-      - {{ docker_root }}/pulsarr/data:/data
+      - {{ docker_dir }}/pulsarr/config:/config
+      - {{ docker_dir }}/pulsarr/data:/data
+      - {{ logs_dir }}/pulsarr:/logs
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -36,8 +37,13 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=pulsarr"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -59,6 +59,15 @@ groups:
           summary: "Container {{ $labels.name }} is restarting on {{ $labels.instance }}"
           description: "Container has restarted in the last 5 minutes"
 
+      - alert: ContainerFrequentRestarts
+        expr: increase(docker_container_restart_count[10m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} restarted >3 times in 10m"
+          description: "Frequent restarts detected over the last 10 minutes"
+
       - alert: ContainerHighMemory
         expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
         for: 5m
@@ -69,6 +78,15 @@ groups:
           description: "Container memory usage is above 90% for 5 minutes"
 
       # Network Alerts
+      - alert: HealthcheckFailing
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Healthcheck failing for {{ $labels.instance }}"
+          description: "HTTP health probe has been failing for 5 minutes"
+
       - alert: HighNetworkErrors
         expr: rate(node_network_transmit_errs_total[5m]) > 0
         for: 5m
@@ -98,6 +116,14 @@ groups:
           description: "No successful backup in the last 24 hours"
 
       # Security Alerts
+      - alert: SSLCertExpiringIn14Days
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL certificate for {{ $labels.instance }} expires in <14 days"
+          description: "Certificate expires in less than 14 days"
       - alert: HighFailedLogins
         expr: rate(failed_login_attempts_total[5m]) > 5
         for: 5m

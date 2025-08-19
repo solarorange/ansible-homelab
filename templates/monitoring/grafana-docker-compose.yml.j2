@@ -15,8 +15,8 @@ services:
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER={{ vault_grafana_admin_user | default('admin') }}
-      - GF_SECURITY_ADMIN_PASSWORD={{ vault_grafana_admin_password }}
-      - GF_SECURITY_SECRET_KEY={{ vault_grafana_secret_key }}
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/GF_SECURITY_ADMIN_PASSWORD
+      - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/GF_SECURITY_SECRET_KEY
       - GF_SERVER_ROOT_URL=https://grafana.{{ domain }}
       - GF_SERVER_SERVE_FROM_SUB_PATH=false
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -28,7 +28,7 @@ services:
       - GF_SMTP_HOST={{ notifications.email.smtp_host | default('') }}
       - GF_SMTP_PORT={{ notifications.email.smtp_port | default(587) }}
       - GF_SMTP_USER={{ vault_smtp_username | default('') }}
-      - GF_SMTP_PASSWORD={{ vault_smtp_password | default('') }}
+      - GF_SMTP_PASSWORD__FILE=/run/secrets/GF_SMTP_PASSWORD
       - GF_SMTP_FROM_ADDRESS={{ notifications.email.from_address | default('grafana@' + domain) }}
       - GF_SMTP_FROM_NAME=Grafana
       - GF_SMTP_STARTTLS_POLICY=MandatoryStartTLS
@@ -36,10 +36,10 @@ services:
       - GF_DATABASE_HOST=postgresql:5432
       - GF_DATABASE_NAME=grafana
       - GF_DATABASE_USER={{ vault_postgresql_user | default('homelab') }}
-      - GF_DATABASE_PASSWORD={{ vault_postgresql_password }}
-      - GF_DATABASE_SSL_MODE=disable
+      - GF_DATABASE_PASSWORD__FILE=/run/secrets/GF_DATABASE_PASSWORD
+      - GF_DATABASE_SSL_MODE=verify-full
       - GF_SESSION_PROVIDER=postgres
-      - GF_SESSION_PROVIDER_CONFIG="user={{ vault_postgresql_user | default('homelab') }} password={{ vault_postgresql_password }} host=postgresql port=5432 dbname=grafana sslmode=disable"
+      - GF_SESSION_PROVIDER_CONFIG="user={{ vault_postgresql_user | default('homelab') }} host=postgresql port=5432 dbname=grafana sslmode=verify-full sslrootcert=/etc/ssl/certs/ca-certificates.crt"
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
@@ -49,8 +49,10 @@ services:
       - "{{ config_dir }}/grafana/provisioning:/etc/grafana/provisioning"
       - "{{ config_dir }}/grafana/dashboards:/var/lib/grafana/dashboards"
       - "{{ logs_dir }}/grafana:/var/log/grafana"
-    ports:
-      - "3000:3000"
+      - "{{ docker_dir }}/grafana/secrets:/run/secrets:ro"
+    # Host port exposure disabled by default; Traefik provides ingress
+    # ports:
+    #   - "3000:3000"
     networks:
       - homelab
       - monitoring
@@ -66,14 +68,14 @@ services:
       - "traefik.http.middlewares.grafana-auth.forwardauth.trustForwardHeader=true"
       - "traefik.http.routers.grafana.middlewares=grafana-auth"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: true
     tmpfs:
       - /tmp
     user: "472:472"
@@ -82,14 +84,9 @@ services:
       nofile:
         soft: 26677
         hard: 46677
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
+    # Resource controls for Docker Engine
+    mem_limit: 1g
+    cpus: '1.0'
     depends_on:
       postgresql:
-        condition: service_healthy 
+        condition: service_healthy

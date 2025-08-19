@@ -14,6 +14,8 @@
     - "{{ docker_dir }}/monitoring/grafana/data"
     - "{{ docker_dir }}/monitoring/grafana/provisioning/datasources"
     - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/alerting"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/notifiers"
     - "{{ docker_dir }}/monitoring/grafana/scripts"
     - "{{ logs_dir }}/monitoring/grafana"
 
@@ -33,8 +35,15 @@
             - {{ logs_dir }}/monitoring/grafana:/var/log/grafana
           environment:
             - GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
-            - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
+            - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/GF_SECURITY_ADMIN_PASSWORD
+            - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/GF_SECURITY_SECRET_KEY
             - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+          volumes:
+            - {{ docker_dir }}/monitoring/grafana/config:/etc/grafana
+            - {{ docker_dir }}/monitoring/grafana/data:/var/lib/grafana
+            - {{ docker_dir }}/monitoring/grafana/provisioning:/etc/grafana/provisioning
+            - {{ logs_dir }}/monitoring/grafana:/var/log/grafana
+            - {{ docker_dir }}/monitoring/grafana/secrets:/run/secrets:ro
           ports:
             - "3000:3000"
           restart: unless-stopped
@@ -50,7 +59,7 @@
             - "traefik.http.routers.grafana.middlewares=authentik@docker"
             - "traefik.http.services.grafana.loadbalancer.server.port=3000"
           healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:3000/api/health"]
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -78,19 +87,20 @@
       enable_gzip = true
       cert_file = /etc/grafana/certs/grafana.crt
       cert_key = /etc/grafana/certs/grafana.key
-      
+
       # Security
-      [security]
-      admin_user = admin
-      admin_password = {{ grafana_admin_password }}
-      secret_key = {{ grafana_secret_key }}
+       [security]
+       admin_user = admin
+       # read from docker secrets via env in container; do not template plaintext here
+       # admin_password
+       # secret_key
       disable_initial_admin_creation = false
       cookie_secure = true
       allow_embedding = false
       strict_transport_security = true
       strict_transport_security_max_age_seconds = 31536000
       content_security_policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self';"
-      
+
       # Database
       [database]
       type = sqlite3
@@ -98,7 +108,7 @@
       max_idle_conn = 100
       max_open_conn = 100
       conn_max_lifetime = 14400
-      
+
       # Session
       [session]
       provider = file
@@ -106,19 +116,19 @@
       cookie_name = grafana_sess
       cookie_secure = true
       session_life_time = 86400
-      
+
       # Logging
       [log]
       mode = file
       level = info
       format = json
       output = /var/log/grafana/grafana.log
-      
+
       # Metrics
       [metrics]
       enabled = true
       interval_seconds = 10
-      
+
       # Alerting
       [alerting]
       enabled = true
@@ -128,7 +138,7 @@
       evaluation_timeout_seconds = 30
       notification_timeout_seconds = 30
       max_attempts = 3
-      
+
       # SMTP
       [smtp]
       enabled = true
@@ -139,21 +149,21 @@
       from_name = Grafana
       ehlo_identity = {{ ansible_default_ipv4.address }}
       startTLS_policy = MandatoryStartTLS
-      
+
       # Auth
       [auth]
       disable_login_form = false
       disable_signout_menu = false
       oauth_auto_login = false
-      
+
       [auth.anonymous]
       enabled = true
       org_name = Main Org.
       org_role = Viewer
-      
+
       [auth.basic]
       enabled = true
-      
+
       # Security
       [security]
       allow_embedding = false
@@ -161,7 +171,7 @@
       disable_gravatar = true
       strict_transport_security = true
       strict_transport_security_max_age_seconds = 31536000
-      
+
       # Paths
       [paths]
       data = /var/lib/grafana
@@ -174,7 +184,7 @@
 
 - name: Create Grafana datasource configuration
   ansible.builtin.copy:
-    dest: "{{ docker_dir }}/monitoring/grafana/datasources/datasources.yml"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/datasources/datasources.yml"
     content: |
       apiVersion: 1
 
@@ -266,7 +276,7 @@
     dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/default.yml"
     content: |
       apiVersion: 1
-      
+
       providers:
         - name: 'Default'
           orgId: 1
@@ -498,9 +508,9 @@
     dest: "{{ docker_dir }}/monitoring/grafana/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Grafana Management Script
-      
+
       function show_help {
         echo "Grafana Management Script"
         echo "Usage: $0 [command]"
@@ -513,10 +523,10 @@
         echo "  restore   - Restore from backup"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
-          curl -s http://{{ ansible_default_ipv4.address }}:/api/health
+          curl -s http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/health
           ;;
         logs)
           docker logs grafana --tail 100 -f
@@ -547,27 +557,27 @@
     dest: "{{ docker_dir }}/monitoring/grafana/scripts/health.sh"
     content: |
       #!/bin/bash
-      
+
       # Grafana Health Check Script
-      
+
       # Check if Grafana is running
       if ! docker ps | grep -q grafana; then
         echo "Grafana is not running"
         exit 1
       fi
-      
+
       # Check Grafana API health
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/health | grep -q "ok"; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/health | grep -q "ok"; then
         echo "Grafana API health check failed"
         exit 1
       fi
-      
+
       # Check disk space
       if [ $(df -h {{ docker_dir }}/monitoring/grafana/data | awk 'NR==2 {print $5}' | sed 's/%//') -gt 90 ]; then
         echo "Grafana data directory is running out of space"
         exit 1
       fi
-      
+
       echo "Grafana is healthy"
       exit 0
     owner: "{{ username }}"
@@ -596,21 +606,21 @@
     dest: "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
     content: |
       #!/bin/bash
-      
+
       # Grafana Backup Script
-      
+
       BACKUP_DIR="{{ docker_dir }}/monitoring/grafana/backup"
       TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-      
+
       # Create backup directory if it doesn't exist
       mkdir -p "$BACKUP_DIR"
-      
+
       # Backup Grafana data
       tar -czf "$BACKUP_DIR/grafana_data_$TIMESTAMP.tar.gz" -C {{ docker_dir }}/monitoring/grafana data
-      
+
       # Backup Grafana configuration
       tar -czf "$BACKUP_DIR/grafana_config_$TIMESTAMP.tar.gz" -C {{ docker_dir }}/monitoring/grafana config
-      
+
       # Remove backups older than 30 days
       find "$BACKUP_DIR" -type f -mtime +30 -delete
     owner: "{{ username }}"
@@ -622,22 +632,22 @@
     dest: "{{ docker_dir }}/monitoring/grafana/scripts/restore.sh"
     content: |
       #!/bin/bash
-      
+
       # Grafana Restore Script
-      
+
       if [ -z "$1" ]; then
         echo "Please specify backup file"
         exit 1
       fi
-      
+
       BACKUP_FILE="$1"
-      
+
       # Stop Grafana
       docker stop grafana
-      
+
       # Restore data
       tar -xzf "$BACKUP_FILE" -C {{ docker_dir }}/monitoring/grafana
-      
+
       # Start Grafana
       docker start grafana
     owner: "{{ username }}"
@@ -650,4 +660,83 @@
     job: "{{ docker_dir }}/monitoring/grafana/scripts/health.sh >> {{ logs_dir }}/monitoring/grafana/health.log 2>&1"
     minute: "*/5"
     hour: "*"
-    user: "{{ vault_grafana_user }}" 
+    user: "{{ vault_grafana_user }}"
+
+# Ensure core dashboards are deployed to the mounted provisioning path used by the turnkey stack
+- name: Deploy core Grafana dashboards (containers, network, security, overview, backup, media)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  loop:
+    - { src: "roles/grafana/templates/dashboards/homelab-overview.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/homelab-overview.json" }
+    - { src: "roles/grafana/templates/dashboards/docker-services.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/docker-services.json" }
+    - { src: "roles/grafana/templates/dashboards/network-infrastructure.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/network-infrastructure.json" }
+    - { src: "roles/grafana/templates/dashboards/security-monitoring.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/security-monitoring.json" }
+    - { src: "roles/grafana/templates/dashboards/media-stack.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/media-stack.json" }
+    - { src: "roles/grafana/templates/dashboards/backup-storage.json.j2", dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/backup-storage.json" }
+  notify: restart grafana
+
+# Deploy Logs Overview dashboard (Loki/Promtail)
+- name: Deploy Logs Overview dashboard
+  ansible.builtin.template:
+    src: "roles/logging/templates/grafana-dashboards/logs-overview.json.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/logs-overview.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: logging_enabled | default(true)
+  notify: restart grafana
+
+# Deploy alert rules and notification channels
+- name: Deploy Grafana alert rules
+  ansible.builtin.template:
+    src: "roles/grafana/templates/alert-rules.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/alerting/alert-rules.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+
+- name: Deploy Grafana notification channels
+  ansible.builtin.template:
+    src: "roles/grafana/templates/notification-channels.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/alerting/notification-channels.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: restart grafana
+
+# Validate that critical dashboards are available without disrupting running services
+- name: Wait for Grafana API to be ready for dashboard validation
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_health_for_validation
+  retries: 10
+  delay: 5
+
+- name: Validate required dashboards are present
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/search"
+    method: GET
+    user: "{{ vault_grafana_admin_user | default(vault_grafana_user) }}"
+    password: "{{ vault_grafana_admin_password | default(vault_grafana_password) }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  when: grafana_health_for_validation.status == 200
+  register: grafana_dashboards_search
+
+- name: Assert containers/logs/traefik dashboards are available
+  ansible.builtin.assert:
+    that:
+      - "'Docker Services' in (grafana_dashboards_search.json | map(attribute='title') | list)"
+      - "'Logs Overview' in (grafana_dashboards_search.json | map(attribute='title') | list)"
+      - "'Network & Infrastructure' in (grafana_dashboards_search.json | map(attribute='title') | list)"
+    fail_msg: "One or more required dashboards are missing (Docker Services, Logs Overview, Network & Infrastructure)."
+    success_msg: "Required dashboards (containers, logs, Traefik) are available."

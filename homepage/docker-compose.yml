@@ -35,7 +35,7 @@ services:
       - "homepage.icon=homepage.png"
       - "homepage.description=Dashboard & Service Discovery"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:3000/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,7 +62,7 @@ services:
     networks:
       - traefik
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:3000/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -87,7 +87,7 @@ services:
     networks:
       - traefik
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -131,4 +131,4 @@ networks:
 
 volumes:
   homepage_data:
-    driver: local 
+    driver: local

@@ -297,6 +297,10 @@ Reconya requires extensive network access for scanning:
 - **Privileged Capabilities**: NET_ADMIN and NET_RAW for scanning
 - **System Access**: Access to /proc/net and /sys/class/net
 
+### Container Hardening Notes
+- The container sets `security_opt: [no-new-privileges:true]` and `cap_drop: [ALL]` by default.
+- Reconya performs active network scanning and runs in `network_mode: host` with additional capabilities (`NET_ADMIN`, `NET_RAW`). It may need to run as root; therefore the Compose template does not force a non-root `user` and `read_only` may be disabled for required paths.
+
 ### Authentication
 
 - **Default Credentials**: Change admin password after deployment
@@ -369,3 +373,62 @@ For support and questions:
 - **GitHub Issues**: Report bugs and feature requests
 - **Documentation**: Check the main project documentation
 - **Community**: Join the homelab community discussions 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores the last-known-good Compose and pre-change snapshot automatically if a deployment fails.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., reconya
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```
+
+### Secrets & Health Checks
+
+- Secrets directory: `{{ docker_dir }}/reconya/secrets`.
+- Enable file-based secrets by setting:
+  ```yaml
+  reconya_manage_secret_files: true
+  reconya_secret_files:
+    - name: RECONYA_ADMIN_PASSWORD
+      from_vault_var: vault_reconya_admin_password
+    - name: RECONYA_JWT_SECRET
+      from_vault_var: vault_reconya_jwt_secret
+  reconya_required_secrets:
+    - RECONYA_ADMIN_PASSWORD
+    - RECONYA_JWT_SECRET
+  ```
+  Compose templates map secret-like env keys to `KEY_FILE=/run/secrets/KEY` and mount files from the secrets directory. See `docs/SECRETS_CONVENTIONS.md`.
+
+- Post-deploy route health check (ingress default):
+  ```yaml
+  - ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+    vars:
+      route_health_check_url: "https://{{ reconya_subdomain }}.{{ domain }}/api/health"
+      route_health_check_status_codes: [200, 302, 401]
+  ```
+  See `docs/POST_DEPLOY_SMOKE_TESTS.md`.

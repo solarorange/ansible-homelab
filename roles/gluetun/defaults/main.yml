@@ -1,0 +1,230 @@
+---
+# Gluetun Role Default Variables
+# Enhanced for seamless automatic deployment
+
+# =============================================================================
+# CORE CONFIGURATION
+# =============================================================================
+
+# Service enablement
+gluetun_enabled: true
+
+# Container configuration
+gluetun_image: "qmcgaw/gluetun:latest"
+gluetun_version: "latest"
+gluetun_container_name: "gluetun"
+gluetun_restart_policy: "unless-stopped"
+
+# Port configuration
+gluetun_port: 8080
+gluetun_external_port: "8080"
+gluetun_internal_port: "8080"
+
+# Domain configuration
+gluetun_domain: "gluetun.{{ domain | default('{ ansible_default_ipv4.address }') }}"
+gluetun_subdomain: "gluetun"
+
+# =============================================================================
+# AUTHENTICATION CONFIGURATION
+# =============================================================================
+
+gluetun_auth_enabled: true
+gluetun_auth_method: "authentik"
+gluetun_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+gluetun_admin_password: "{{ vault_gluetun_admin_password | default('') }}"
+gluetun_secret_key: "{{ vault_gluetun_secret_key | default('') }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+gluetun_database_enabled: true
+gluetun_database_type: "sqlite"
+gluetun_database_host: "{{ postgresql_host | default('{ ansible_default_ipv4.address }') }}"
+gluetun_database_port: 5432
+gluetun_database_name: "gluetun"
+gluetun_database_user: "{{ vault_gluetun_database_user | default('gluetun') }}"
+gluetun_database_password: "{{ vault_gluetun_database_password | default('') }}"
+
+# =============================================================================
+# TRAEFIK INTEGRATION
+# =============================================================================
+
+gluetun_traefik_enabled: true
+gluetun_traefik_middleware: ""
+gluetun_traefik_network: "homelab"
+gluetun_traefik_ssl_enabled: true
+
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+
+gluetun_monitoring_enabled: true
+gluetun_healthcheck_enabled: true
+gluetun_healthcheck_interval: "30s"
+gluetun_healthcheck_timeout: "10s"
+gluetun_healthcheck_retries: 3
+gluetun_healthcheck_start_period: "40s"
+gluetun_metrics_enabled: true
+gluetun_metrics_port: 9090
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+gluetun_security_enabled: true
+gluetun_read_only: false
+gluetun_no_new_privileges: true
+gluetun_security_headers: true
+gluetun_rate_limiting: true
+gluetun_rate_limit_requests: 100
+gluetun_rate_limit_window: 60
+gluetun_cors_enabled: false
+gluetun_crowdsec_enabled: true
+gluetun_fail2ban_enabled: true
+
+# Prefer Traefik ingress; gate direct host port exposure
+gluetun_direct_expose_enabled: false
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+
+gluetun_backup_enabled: true
+gluetun_backup_retention_days: 30
+gluetun_backup_include_data: true
+gluetun_backup_include_config: true
+gluetun_backup_schedule: "0 2 * * *"
+
+# =============================================================================
+# HOMEPAGE INTEGRATION
+# =============================================================================
+
+gluetun_homepage_enabled: true
+gluetun_homepage_group: "security"
+gluetun_homepage_icon: "gluetun"
+gluetun_homepage_title: "Gluetun"
+gluetun_homepage_description: "Gluetun - Lightweight swiss-army-knife-like VPN client to multiple VPN service providers"
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+gluetun_alerting_enabled: true
+gluetun_alert_severity: "warning"
+gluetun_alert_channels: ['email', 'discord', 'slack']
+
+# =============================================================================
+# RESOURCE LIMITS
+# =============================================================================
+
+gluetun_memory_limit: "512M"
+gluetun_memory_reservation: "256M"
+gluetun_cpu_limit: "0.5"
+gluetun_cpu_reservation: "0.25"
+gluetun_storage_limit: "10G"
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+
+gluetun_environment:
+  TZ: "{{ timezone | default('UTC') }}"
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_user_id | default(1000) }}"
+  GLUETUN_DOMAIN: "{{ gluetun_domain }}"
+  GLUETUN_SECRET_KEY: "{{ vault_gluetun_secret_key | default('') }}"
+  GLUETUN_ADMIN_EMAIL: "{{ gluetun_admin_email }}"
+  GLUETUN_ADMIN_PASSWORD: "{{ vault_gluetun_admin_password | default('') }}"
+  GLUETUN_DATABASE_TYPE: "{{ gluetun_database_type }}"
+  GLUETUN_AUTH_ENABLED: "{{ gluetun_auth_enabled | lower }}"
+  GLUETUN_AUTH_METHOD: "{{ gluetun_auth_method }}"
+  GLUETUN_MONITORING_ENABLED: "{{ gluetun_monitoring_enabled | lower }}"
+  GLUETUN_METRICS_ENABLED: "{{ gluetun_metrics_enabled | lower }}"
+  GLUETUN_SECURITY_HEADERS: "{{ gluetun_security_headers | lower }}"
+  GLUETUN_RATE_LIMITING: "{{ gluetun_rate_limiting | lower }}"
+  GLUETUN_RATE_LIMIT_REQUESTS: "{{ gluetun_rate_limit_requests }}"
+  GLUETUN_RATE_LIMIT_WINDOW: "{{ gluetun_rate_limit_window }}"
+  GLUETUN_CORS_ENABLED: "{{ gluetun_cors_enabled | lower }}"
+
+# =============================================================================
+# VOLUME CONFIGURATION
+# =============================================================================
+
+gluetun_volumes:
+  - "{{ docker_data_root }}/gluetun:/data"
+  - "{{ docker_config_root }}/gluetun:/config"
+  - "{{ docker_logs_root }}/gluetun:/logs"
+  - "{{ docker_backup_root }}/gluetun:/backups"
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+
+gluetun_networks:
+  - homelab
+  - default
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+gluetun_dependencies:
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+gluetun_log_level: "info"
+gluetun_log_format: "json"
+gluetun_log_retention: 30
+
+# =============================================================================
+# PERFORMANCE CONFIGURATION
+# =============================================================================
+
+gluetun_cache_enabled: true
+gluetun_cache_size: "256M"
+gluetun_cache_ttl: 3600
+gluetun_compression_enabled: true
+gluetun_compression_level: 6
+
+# =============================================================================
+# API CONFIGURATION
+# =============================================================================
+
+gluetun_api_enabled: true
+gluetun_api_version: "v1"
+gluetun_api_key: "{{ vault_gluetun_api_key | default('') }}"
+gluetun_api_rate_limit: 100
+gluetun_api_rate_limit_window: 3600
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+gluetun_notifications_enabled: true
+gluetun_email_enabled: false
+gluetun_email_host: "{{ smtp_host | default('') }}"
+gluetun_email_port: 587
+gluetun_email_username: "{{ vault_smtp_username | default('') }}"
+gluetun_email_password: "{{ vault_gluetun_email_password | default('') }}"
+
+# Secrets management
+gluetun_manage_secret_files: true
+
+gluetun_secret_files:
+  - { name: "GLUETUN_ADMIN_PASSWORD", value: "{{ gluetun_admin_password }}" }
+  - { name: "GLUETUN_SECRET_KEY", value: "{{ gluetun_secret_key }}" }
+  - { name: "GLUETUN_DATABASE_PASSWORD", value: "{{ gluetun_database_password }}" }
+  - { name: "GLUETUN_API_KEY", value: "{{ gluetun_api_key }}" }
+  - { name: "GLUETUN_EMAIL_PASSWORD", value: "{{ gluetun_email_password }}" }
+
+gluetun_required_secrets:
+  - GLUETUN_ADMIN_PASSWORD
+  - GLUETUN_SECRET_KEY
+gluetun_email_from: "gluetun@{{ domain }}"
+gluetun_discord_enabled: false
+gluetun_discord_webhook: "{{ vault_discord_webhook | default('') }}"
+gluetun_slack_enabled: false
+gluetun_slack_webhook: "{{ vault_slack_webhook | default('') }}"

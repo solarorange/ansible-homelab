@@ -3,27 +3,27 @@
 # Service restart and reload handlers
 
 - name: restart dumbassets
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ dumbassets_docker_dir }}"
     state: present
     restarted: true
   listen: "restart dumbassets"
 
 - name: reload dumbassets
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ dumbassets_docker_dir }}"
     state: present
     pull: true
   listen: "reload dumbassets"
 
 - name: stop dumbassets
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ dumbassets_docker_dir }}"
     state: absent
   listen: "stop dumbassets"
 
 - name: start dumbassets
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ dumbassets_docker_dir }}"
     state: present
   listen: "start dumbassets"
@@ -62,4 +62,4 @@
   ansible.builtin.service:
     name: fail2ban
     state: restarted
-  listen: "restart fail2ban" 
+  listen: "restart fail2ban"

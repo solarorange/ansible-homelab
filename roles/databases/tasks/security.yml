@@ -64,7 +64,7 @@
           port: "{{ kibana_port }}"
       when: item.name is defined
 
-  when: databases_firewall_enabled | default(true)
+  when: databases_firewall_enabled | default(true) and not (firewall.centralized | default(false))
   tags: [databases, security, firewall]
 
 - name: Configure database access controls
@@ -167,28 +167,51 @@
         success_msg: "SSL path {{ item.item.path }} has correct permissions."
       loop: "{{ ssl_files.results }}"
 
-    - name: Check firewall rules
-      ansible.builtin.command: "ufw status verbose"
-      register: ufw_status
+    - name: Verify UFW is enabled (no changes)
+      community.general.ufw:
+        state: enabled
+      check_mode: true
+      register: ufw_enabled_check
       changed_when: false
 
-    - name: Verify firewall rules are active
+    - name: Assert UFW is already enabled
       ansible.builtin.assert:
         that:
-          - "'{{ postgresql_port }}' in ufw_status.stdout"
-          - "'{{ mariadb_port }}' in ufw_status.stdout"
-          - "'{{ redis_port }}' in ufw_status.stdout"
-          - "'{{ elasticsearch_port }}' in ufw_status.stdout"
-          - "'{{ kibana_port }}' in ufw_status.stdout"
-        fail_msg: "Firewall rules for databases are not correctly configured."
-        success_msg: "Firewall rules for databases are active."
+          - not ufw_enabled_check.changed
+        fail_msg: "UFW firewall is not enabled"
+        success_msg: "UFW firewall is enabled"
       when: databases_firewall_enabled | default(true)
+
+    - name: Check required database ports are allowed (no changes)
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto | default('tcp') }}"
+      check_mode: true
+      loop:
+        - { name: postgresql, port: "{{ postgresql_port }}", proto: tcp }
+        - { name: mariadb, port: "{{ mariadb_port }}", proto: tcp }
+        - { name: redis, port: "{{ redis_port }}", proto: tcp }
+        - { name: elasticsearch, port: "{{ elasticsearch_port }}", proto: tcp }
+        - { name: kibana, port: "{{ kibana_port }}", proto: tcp }
+      register: ufw_db_rule_checks
+      changed_when: false
+      when: databases_firewall_enabled | default(true) and not (firewall.centralized | default(false))
+
+    - name: Validate database firewall rules exist
+      ansible.builtin.assert:
+        that:
+          - not item.changed
+        fail_msg: "Firewall rule missing for {{ item.item.name }} ({{ item.item.port }}/{{ item.item.proto }})"
+        success_msg: "Firewall rule present for {{ item.item.name }} ({{ item.item.port }}/{{ item.item.proto }})"
+      loop: "{{ ufw_db_rule_checks.results }}"
+      when: databases_firewall_enabled | default(true) and not (firewall.centralized | default(false))
 
     - name: Display security configuration status
       ansible.builtin.debug:
         msg: |
           Database Security Configuration Completed!
-          
+
           Security Features:
           - SSL/TLS: {{ 'Configured' if databases_ssl_enabled else 'Disabled' }}
           - Firewall: {{ 'Configured' if databases_firewall_enabled else 'Disabled' }}
@@ -196,9 +219,9 @@
           - Encryption at Rest: {{ 'Configured' if databases_encryption_at_rest_enabled else 'Disabled' }}
           - Intrusion Detection (CrowdSec/Fail2ban): {{ 'Configured' if databases_crowdsec_enabled or databases_fail2ban_enabled else 'Disabled' }}
           - Hardening: Applied
-          
+
           Validation:
           - SSL Permissions: OK
           - Firewall Rules: {{ 'OK' if databases_firewall_enabled else 'N/A' }}
 
-  tags: [databases, security, validation] 
+  tags: [databases, security, validation]

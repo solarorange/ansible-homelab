@@ -131,7 +131,7 @@
   tags: [homepage, automation, traefik]
 
 - name: Restart Homepage to apply configuration changes
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ homepage_docker_dir }}"
     state: present
     restarted: true
@@ -160,9 +160,9 @@
       ========================================
       HOMEPAGE AUTOMATION INTEGRATION SUMMARY
       ========================================
-      
+
       Automation Status: {{ 'SUCCESS' if homepage_automation_result.rc == 0 else 'FAILED' }}
-      
+
       Configuration Files Created:
       - Automation Config: {{ homepage_automation_config_creation.changed }}
       - Service Discovery: {{ homepage_service_discovery_creation.changed }}
@@ -170,18 +170,18 @@
       - Monitoring Integration: {{ homepage_monitoring_integration_creation.changed }}
       - Auth Integration: {{ homepage_auth_integration_creation.changed }}
       - Traefik Integration: {{ homepage_traefik_integration_creation.changed }}
-      
+
       Service Discovery Results:
       - Services Found: {{ homepage_service_discovery_result.stdout_lines | length if homepage_service_discovery_result.stdout_lines else 0 }}
       - Configuration Applied: {{ homepage_automation_result.stdout_lines | length if homepage_automation_result.stdout_lines else 0 }}
-      
+
       Integration Status:
       - API Health: {{ homepage_post_restart_health_check.status | default('Unknown') }}
       - Services Validation: {{ homepage_services_validation.status | default('Unknown') }}
       - Monitoring Integration: {{ homepage_monitoring_integration_creation.changed }}
       - Authentication Integration: {{ homepage_auth_integration_creation.changed }}
       - Traefik Integration: {{ homepage_traefik_integration_creation.changed }}
-      
+
       Automation Features:
       - Service Auto-Discovery: Enabled
       - Configuration Automation: Enabled
@@ -189,43 +189,6 @@
       - Authentication Integration: Enabled
       - Traefik Integration: Enabled
       - Health Monitoring: Enabled
-      
+
       ========================================
   tags: [homepage, automation, summary]
-
-rescue:
-  - name: Log Homepage automation integration failure
-    ansible.builtin.debug:
-      msg: |
-        Homepage automation integration failed:
-        - Automation config creation: {{ homepage_automation_config_creation | default('N/A') }}
-        - Service discovery creation: {{ homepage_service_discovery_creation | default('N/A') }}
-        - Automation script creation: {{ homepage_automation_script_creation | default('N/A') }}
-        - API health check: {{ homepage_api_health_check | default('N/A') }}
-        - Service discovery result: {{ homepage_service_discovery_result | default('N/A') }}
-        - Automation result: {{ homepage_automation_result | default('N/A') }}
-        - Services validation: {{ homepage_services_validation | default('N/A') }}
-        - Monitoring integration: {{ homepage_monitoring_integration_creation | default('N/A') }}
-        - Auth integration: {{ homepage_auth_integration_creation | default('N/A') }}
-        - Traefik integration: {{ homepage_traefik_integration_creation | default('N/A') }}
-        - Restart result: {{ homepage_restart_result | default('N/A') }}
-        - Post-restart health check: {{ homepage_post_restart_health_check | default('N/A') }}
-
-  - name: Attempt Homepage automation recovery
-    ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
-    vars:
-      failed_config_files:
-        - "{{ homepage_docker_dir }}/scripts/automation_config.yml"
-        - "{{ homepage_docker_dir }}/scripts/service_discovery.py"
-        - "{{ homepage_docker_dir }}/scripts/homepage_automation.py"
-        - "{{ homepage_config_dir }}/monitoring.yml"
-        - "{{ homepage_config_dir }}/auth.yml"
-        - "{{ homepage_config_dir }}/traefik.yml"
-      config_verification_commands:
-        - "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
-        - "{{ homepage_docker_dir }}/scripts/service_discovery.py --test"
-        - "{{ homepage_docker_dir }}/scripts/homepage_automation.py --validate" 
-  - name: Fail playbook if recovery and rollback failed
-    ansible.builtin.fail:
-      msg: "Homepage automation integration failed and rollback was unsuccessful. Manual intervention required."
-    when: recovery_complete | default(false) | bool == false 

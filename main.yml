@@ -3,7 +3,7 @@
 # Production-ready Ansible playbook for homelab deployment
 - name: Seamless Homelab Setup
   hosts: all
-  become: false  # ✅ CRITICAL FIX: Start without privileges, escalate only where needed
+  become: false  # OK CRITICAL FIX: Start without privileges, escalate only where needed
   gather_facts: true
   serial: "{{ serial | default(0) }}"  # Control parallel execution
   max_fail_percentage: 25  # Allow some failures in parallel execution
@@ -17,72 +17,107 @@
       - monitoring_infrastructure
     validation_timeout: 300
     validation_retries: 3
-    # ✅ CRITICAL FIX: Add security validation variables
+    # OK CRITICAL FIX: Add security validation variables
     security_validation_enabled: true
     privilege_escalation_required: true
 
   pre_tasks:
-    # ✅ CRITICAL FIX: Validate privilege requirements before any escalation
+    # OK CRITICAL FIX: Validate privilege requirements before any escalation
+    - name: Check sudo group membership
+      ansible.builtin.command: id -nG
+      register: user_groups
+      changed_when: false
+
+    - name: Gather root filesystem free space (GB)
+      ansible.builtin.command: df -BG --output=avail /
+      register: root_fs
+      changed_when: false
+
     - name: Validate privilege escalation requirements
       ansible.builtin.assert:
         that:
-          - ansible_user in sudoers or ansible_user == 'root'
-          - ansible_become_available
+          - (ansible_user_id == '0') or (user_groups is defined and 'sudo' in user_groups.stdout.split())
           - ansible_become_method is defined
-          - ansible_memtotal_mb >= 4096
-          - ansible_diskspace_available >= 50
-          - ansible_processor_cores >= 2
+          - (ansible_memtotal_mb | int) >= 4096
+          - (root_fs is defined and ((root_fs.stdout_lines[-1] | regex_replace('[^0-9]', '')) | int) >= 40)
+          - (ansible_processor_cores | int) >= 2
         fail_msg: |
           Deployment prerequisites not met:
           - User must have sudo privileges or be root
-          - Privilege escalation must be available
           - Minimum 4GB RAM required ({{ ansible_memtotal_mb }}MB available)
-          - Minimum 50GB disk space required ({{ ansible_diskspace_available }}GB available)
+          - Minimum 40GB free on root filesystem
           - Minimum 2 CPU cores required ({{ ansible_processor_cores }} available)
       tags: [always, critical, validation]
 
-    # ✅ CRITICAL FIX: Validate required variables with proper error handling
+    # OK CRITICAL FIX: Validate required variables with proper error handling
     - name: Validate required variables
       ansible.builtin.assert:
         that:
           - username is defined
           - domain is defined
-          - cloudflare_email is defined
-          - cloudflare_api_key is defined
         fail_msg: "Required variables are not defined. Check group_vars/all/vars.yml"
       tags: [always, critical]
 
-    # ✅ CRITICAL FIX: Validate port conflicts before deployment
+    # CRITICAL: Validate Cloudflare DNS automation is mandatory for SSL
+    - name: Validate Cloudflare DNS automation configuration
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'CLOUDFLARE_ENABLED') == 'true'
+          - lookup('env', 'CLOUDFLARE_EMAIL') != ''
+          - lookup('env', 'CLOUDFLARE_API_TOKEN') != ''
+        fail_msg: |
+          Cloudflare DNS automation is MANDATORY for SSL certificates.
+          
+          Your .env file must have:
+          CLOUDFLARE_ENABLED=true
+          CLOUDFLARE_EMAIL=your_email@domain.com
+          CLOUDFLARE_API_TOKEN=your_api_token_here
+          
+          Current values:
+          CLOUDFLARE_ENABLED={{ lookup('env', 'CLOUDFLARE_ENABLED') | default('NOT_SET') }}
+          CLOUDFLARE_EMAIL={{ lookup('env', 'CLOUDFLARE_EMAIL') | default('NOT_SET') }}
+          CLOUDFLARE_API_TOKEN={{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('NOT_SET') }}
+          
+          Please update your .env file with valid Cloudflare credentials.
+          The deployment will fail without proper DNS automation for SSL.
+      tags: [always, critical, cloudflare]
+
+    # OK CRITICAL FIX: Validate port conflicts before deployment
     - name: Validate port assignments
       ansible.builtin.include_tasks: tasks/port_validation.yml
       tags: [always, critical, validation]
 
-    # ✅ CRITICAL FIX: Setup prerequisites with explicit privilege escalation
+    # OK CRITICAL FIX: Setup prerequisites with explicit privilege escalation
     - name: Setup prerequisites
-      ansible.builtin.include_tasks: tasks/setup.yml
-      become: true  # ✅ Explicit privilege escalation only where needed
+      block:
+        - ansible.builtin.include_tasks: tasks/setup.yml
+        - ansible.builtin.include_tasks: tasks/logs_setup.yml
+      become: true
       become_user: root
       tags: [setup, always]
 
-    # ✅ CRITICAL FIX: Create backup with proper permissions
+    # OK CRITICAL FIX: Create backup with proper permissions
     - name: Create backup before deployment
-      ansible.builtin.include_tasks: tasks/backup.yml
-      become: true  # ✅ Explicit privilege escalation for backup operations
+      block:
+        - ansible.builtin.include_tasks: tasks/backup.yml
+      become: true
       become_user: root
       tags: [always, backup]
 
-    # ✅ CRITICAL FIX: Deploy Proxmox VM with explicit privileges
+    # OK CRITICAL FIX: Deploy Proxmox VM with explicit privileges
     - name: Deploy Proxmox VM
-      ansible.builtin.include_tasks: tasks/proxmox.yml
-      become: true  # ✅ Explicit privilege escalation for VM operations
+      block:
+        - ansible.builtin.include_tasks: tasks/proxmox.yml
+      become: true
       become_user: root
       when: deploy_proxmox_vm | default(false)
       tags: [proxmox, always]
 
-    # ✅ CRITICAL FIX: Setup error handling with proper escalation
+    # OK CRITICAL FIX: Setup error handling with proper escalation
     - name: Setup error handling
-      ansible.builtin.include_tasks: handlers/error_handling/main.yml
-      become: true  # ✅ Explicit privilege escalation for error handling
+      block:
+        - ansible.builtin.include_tasks: handlers/error_handling/main.yml
+      become: true
       become_user: root
       tags: always
 
@@ -96,15 +131,16 @@
           Security Validation: {{ 'ENABLED' if security_validation_enabled else 'DISABLED' }}
       tags: always
 
-    # ✅ CRITICAL FIX: Pre-deployment infrastructure validation with privileges
+    # OK CRITICAL FIX: Pre-deployment infrastructure validation with privileges
     - name: Pre-deployment infrastructure validation
-      ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
-      become: true  # ✅ Explicit privilege escalation for validation
+      block:
+        - ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
+      become: true
       become_user: root
       tags: [validation, pre-deployment, always]
       when: validation_enabled | default(true)
 
-    # ✅ CRITICAL FIX: Create cache directories with proper permissions
+    # OK CRITICAL FIX: Create cache directories with proper permissions
     - name: Create cache directories
       ansible.builtin.file:
         path: "{{ item }}"
@@ -117,462 +153,490 @@
         - "{{ ansible_inventory_cache_connection | dirname }}"
       tags: always
 
-    # ✅ CRITICAL FIX: Setup automation infrastructure with explicit privileges
+    # OK CRITICAL FIX: Setup automation infrastructure with explicit privileges
     - name: Setup automation infrastructure
-      ansible.builtin.include_tasks: tasks/automation.yml
-      become: true  # ✅ Explicit privilege escalation for automation setup
+      block:
+        - name: Include automation tasks
+          ansible.builtin.include_tasks: tasks/automation.yml
+          register: automation_result
+      become: true
       become_user: root
       tags: [automation]
-      register: automation_result
       rescue:
         - name: Handle automation failure
-          ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
-          become: true  # ✅ Explicit privilege escalation for recovery
+          block:
+            - name: Include recovery tasks
+              ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+          become: true
           become_user: root
           vars:
             failed_config_files: "{{ automation_result.failed_config_files | default([]) }}"
             config_verification_commands: "{{ automation_result.verification_commands | default([]) }}"
 
-    # ✅ CRITICAL FIX: Setup service management with explicit privileges
+    # OK CRITICAL FIX: Setup service management with explicit privileges
     - name: Setup service management
-      ansible.builtin.include_tasks: tasks/service_management.yml
-      become: true  # ✅ Explicit privilege escalation for service management
+      block:
+        - ansible.builtin.include_tasks: tasks/service_management.yml
+      become: true
       become_user: root
       tags: [service_management]
 
   tasks:
     # Phase 1: Infrastructure Foundation
-    # ✅ CRITICAL FIX: System essentials with explicit privileges and monitoring
+    # OK CRITICAL FIX: System essentials with explicit privileges and monitoring
     - name: System essentials and hardening
-      ansible.builtin.include_tasks: tasks/essential.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/essential.yml
+      become: true
       become_user: root
       tags: [foundation, essential]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: essential_result
+      vars:
+        essential_result: "{{ essential_result | default({}) }}"
 
-    # ✅ CRITICAL FIX: Docker configuration with explicit privileges
+    # OK CRITICAL FIX: Docker configuration with explicit privileges
     - name: Configure Docker environment
-      ansible.builtin.include_tasks: tasks/docker.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/docker.yml
+      become: true
       become_user: root
       tags: [foundation, docker]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: docker_result
+      vars:
+        docker_result: "{{ docker_result | default({}) }}"
 
-    # ✅ CRITICAL FIX: Network configuration with explicit privileges
+    # OK CRITICAL FIX: Network configuration with explicit privileges
     - name: Setup network configuration
-      ansible.builtin.include_tasks: tasks/network.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/network.yml
+      become: true
       become_user: root
       tags: [foundation, network]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: network_result
+      vars:
+        network_result: "{{ network_result | default({}) }}"
 
-    # ✅ CRITICAL FIX: Storage configuration with explicit privileges
+    # OK CRITICAL FIX: Storage configuration with explicit privileges
     - name: Configure storage systems
-      ansible.builtin.include_tasks: tasks/storage.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/storage.yml
+      become: true
       become_user: root
       tags: [foundation, storage]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: storage_result
+      vars:
+        storage_result: "{{ storage_result | default({}) }}"
 
-    # ✅ CRITICAL FIX: Security hardening with explicit privileges
+    # OK CRITICAL FIX: Security hardening with explicit privileges
     - name: Apply security hardening
-      ansible.builtin.include_tasks: tasks/security.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/security.yml
+      become: true
       become_user: root
       tags: [foundation, security]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: security_result
+      vars:
+        security_result: "{{ security_result | default({}) }}"
 
     # Phase 2: Core Infrastructure Services
-    # ✅ CRITICAL FIX: Core services with explicit privileges and validation
+    # OK CRITICAL FIX: Core services with explicit privileges and validation
     - name: Deploy core infrastructure services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - traefik
-        - authentik
-        - monitoring_infrastructure
-      when: 
-        - item in enabled_services
-        - item != 'monitoring_infrastructure' or monitoring_enabled | default(true)
       tags: [infrastructure]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: core_services_result
+      block:
+        - name: Include core service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - traefik
+            - authentik
+            - monitoring_infrastructure
+          when:
+            - item in enabled_services
+            - item != 'monitoring_infrastructure' or monitoring_enabled | default(true)
+          register: core_services_result
 
-    # ✅ CRITICAL FIX: Validate core services with proper error handling
+    # OK CRITICAL FIX: Validate core services with proper error handling
     - name: Validate core services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ core_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: core_services_result is success
       tags: [infrastructure, validation]
+      when: core_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ core_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 3: Monitoring Stack (TIG + Prometheus)
-    # ✅ CRITICAL FIX: Monitoring services with explicit privileges
+    # OK CRITICAL FIX: Monitoring services with explicit privileges
     - name: Deploy monitoring services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - influxdb
-        - telegraf
-        - prometheus
-        - grafana
-        - loki
-        - promtail
-        - alertmanager
-        - blackbox_exporter
-      when: 
-        - monitoring_enabled | default(true)
-        - item in enabled_services
       tags: [monitoring]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: monitoring_services_result
+      block:
+        - name: Include monitoring service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - influxdb
+            - telegraf
+            - prometheus
+            - grafana
+            - loki
+            - promtail
+            - alertmanager
+            - blackbox_exporter
+          when:
+            - monitoring_enabled | default(true)
+            - item in enabled_services
+          register: monitoring_services_result
 
-    # ✅ CRITICAL FIX: Validate monitoring services
+    # OK CRITICAL FIX: Validate monitoring services
     - name: Validate monitoring services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ monitoring_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: monitoring_services_result is success
       tags: [monitoring, validation]
+      when: monitoring_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ monitoring_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
-    # ✅ CRITICAL FIX: Configure enhanced monitoring with explicit privileges
+    # OK CRITICAL FIX: Configure enhanced monitoring with explicit privileges
     - name: Configure enhanced monitoring
-      ansible.builtin.include_tasks: tasks/monitoring_enhancements.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/monitoring_enhancements.yml
+      become: true
       become_user: root
       when: monitoring_enabled | default(true)
       tags: [monitoring]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
 
     # Phase 4: Security Services
-    # ✅ CRITICAL FIX: Security services with explicit privileges
+    # OK CRITICAL FIX: Security services with explicit privileges
     - name: Deploy security services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - crowdsec
-        - fail2ban
-        - vault
-        - wireguard
-      when: item in enabled_services
       tags: [security]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: security_services_result
+      block:
+        - name: Include security service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - crowdsec
+            - fail2ban
+            - vault
+            - wireguard
+          when: item in enabled_services
+          register: security_services_result
 
-    # ✅ CRITICAL FIX: Validate security services
+    # OK CRITICAL FIX: Validate security services
     - name: Validate security services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ security_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: security_services_result is success
       tags: [security, validation]
+      when: security_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ security_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 5: Network Services
-    # ✅ CRITICAL FIX: Network services with explicit privileges
+    # OK CRITICAL FIX: Network services with explicit privileges
     - name: Deploy network services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - pihole
-        - nginx_proxy_manager
-        - fing
-      when: item in enabled_services
       tags: [network]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: network_services_result
+      block:
+        - name: Include network service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - pihole
+            - nginx_proxy_manager
+            - fing
+          when: item in enabled_services
+          register: network_services_result
 
-    # ✅ CRITICAL FIX: Validate network services
+    # OK CRITICAL FIX: Validate network services
     - name: Validate network services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ network_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: network_services_result is success
       tags: [network, validation]
+      when: network_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ network_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 6: Media Stack
-    # ✅ CRITICAL FIX: Media services with explicit privileges
+    # OK CRITICAL FIX: Media services with explicit privileges
     - name: Deploy media services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - sabnzbd
-        - qbittorrent
-        - sonarr
-        - radarr
-        - lidarr
-        - readarr
-        - prowlarr
-        - bazarr
-        - jellyfin
-        - emby
-        - tdarr
-        - overseerr
-        - tautulli
-        - immich
-        - calibre-web
-        - audiobookshelf
-        - komga
-        - ersatztv
-      when: 
-        - media_enabled | default(true)
-        - item in enabled_services
       tags: [media]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: media_services_result
+      block:
+        - name: Include media service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - sabnzbd
+            - qbittorrent
+            - sonarr
+            - radarr
+            - lidarr
+            - readarr
+            - prowlarr
+            - bazarr
+            - jellyfin
+            - emby
+            - tdarr
+            - overseerr
+            - tautulli
+            - immich
+            - calibre-web
+            - audiobookshelf
+            - komga
+            - ersatztv
+          when:
+            - media_enabled | default(true)
+            - item in enabled_services
+          register: media_services_result
 
-    # ✅ CRITICAL FIX: Validate media services
+    # OK CRITICAL FIX: Validate media services
     - name: Validate media services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ media_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: media_services_result is success
       tags: [media, validation]
+      when: media_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ media_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Configure Lidarr automatically
-    # ✅ CRITICAL FIX: Configure Lidarr with explicit privileges
+    # OK CRITICAL FIX: Configure Lidarr with explicit privileges
     - name: Configure Lidarr with all variables and integrations
-      ansible.builtin.include_tasks: tasks/configure_lidarr.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      when: 
-        - media_enabled | default(true)
-        - 'lidarr' in enabled_services
       tags: [media, lidarr, configuration]
+      when:
+        - media_enabled | default(true)
+        - raw: '"lidarr" in enabled_services'
+      block:
+        - ansible.builtin.include_tasks: tasks/configure_lidarr.yml
 
     # Phase 7: File Services
-    # ✅ CRITICAL FIX: File services with explicit privileges
+    # OK CRITICAL FIX: File services with explicit privileges
     - name: Deploy file services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - nextcloud
-        - samba
-        - syncthing
-      when: item in enabled_services
       tags: [storage]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: file_services_result
+      block:
+        - name: Include file service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - nextcloud
+            - samba
+            - syncthing
+          when: item in enabled_services
+          register: file_services_result
 
-    # ✅ CRITICAL FIX: Validate file services
+    # OK CRITICAL FIX: Validate file services
     - name: Validate file services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ file_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: file_services_result is success
       tags: [storage, validation]
+      when: file_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ file_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 8: Development & Storage
-    # ✅ CRITICAL FIX: Development services with explicit privileges
+    # OK CRITICAL FIX: Development services with explicit privileges
     - name: Deploy development and storage services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - gitlab
-        - harbor
-        - minio
-        - paperless
-        - bookstack
-        - immich
-        - filebrowser
-        - linkwarden
-        - vaultwarden
-      when: item in enabled_services
       tags: [development, storage]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: dev_services_result
+      block:
+        - name: Include development/storage service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - gitlab
+            - harbor
+            - minio
+            - paperless
+            - bookstack
+            - immich
+            - filebrowser
+            - linkwarden
+            - vaultwarden
+          when: item in enabled_services
+          register: dev_services_result
 
-    # ✅ CRITICAL FIX: Validate development services
+    # OK CRITICAL FIX: Validate development services
     - name: Validate development services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ dev_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: dev_services_result is success
       tags: [development, storage, validation]
+      when: dev_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ dev_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 8.5: Utility Services
-    # ✅ CRITICAL FIX: Utility services with explicit privileges
+    # OK CRITICAL FIX: Utility services with explicit privileges
     - name: Deploy utility services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ utility_services }}"
-      when: item in enabled_services
       tags: [utility]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: utility_services_result
+      block:
+        - name: Include utility service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop: "{{ utility_services }}"
+          when: item in enabled_services
+          register: utility_services_result
 
-    # ✅ CRITICAL FIX: Validate utility services
+    # OK CRITICAL FIX: Validate utility services
     - name: Validate utility services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ utility_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: utility_services_result is success
       tags: [utility, validation]
+      when: utility_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ utility_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 9: Automation & Smart Home
-    # ✅ CRITICAL FIX: Automation services with explicit privileges
+    # OK CRITICAL FIX: Automation services with explicit privileges
     - name: Deploy automation services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - mosquitto
-        - zigbee2mqtt
-        - home_assistant
-        - nodered
-      when: 
-        - automation_enabled | default(true)
-        - item in enabled_services
       tags: [automation]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: automation_services_result
+      block:
+        - name: Include automation service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - mosquitto
+            - zigbee2mqtt
+            - home_assistant
+            - nodered
+          when:
+            - automation_enabled | default(true)
+            - item in enabled_services
+          register: automation_services_result
 
     # Deploy n8n workflow automation
-    # ✅ CRITICAL FIX: Deploy n8n with explicit privileges
+    # OK CRITICAL FIX: Deploy n8n with explicit privileges
     - name: Deploy n8n workflow automation
-      ansible.builtin.include_role:
-        name: n8n
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      when: 
-        - automation_enabled | default(true)
-        - 'n8n' in enabled_services
       tags: [automation, n8n]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
+      when:
+        - automation_enabled | default(true)
+        - raw: '"n8n" in enabled_services'
+      block:
+        - name: Include n8n role
+          ansible.builtin.include_role:
+            name: n8n
 
     # Deploy Pezzo AI prompt management
-    # ✅ CRITICAL FIX: Deploy Pezzo with explicit privileges
+    # OK CRITICAL FIX: Deploy Pezzo with explicit privileges
     - name: Deploy Pezzo AI prompt management
-      ansible.builtin.include_role:
-        name: pezzo
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      when: 
-        - automation_enabled | default(true)
-        - 'pezzo' in enabled_services
       tags: [automation, pezzo]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
+      when:
+        - automation_enabled | default(true)
+        - raw: '"pezzo" in enabled_services'
+      block:
+        - name: Include pezzo role
+          ansible.builtin.include_role:
+            name: pezzo
 
-    # ✅ CRITICAL FIX: Validate automation services
+    # OK CRITICAL FIX: Validate automation services
     - name: Validate automation services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ automation_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: automation_services_result is success
       tags: [automation, validation]
+      when: automation_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ automation_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
     # Phase 10: Backup & Maintenance
-    # ✅ CRITICAL FIX: Backup services with explicit privileges
+    # OK CRITICAL FIX: Backup services with explicit privileges
     - name: Deploy backup services
-      ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop:
-        - backup
-        - kopia
-      when: item in enabled_services
       tags: [backup]
-      async: 300
-      poll: 10  # ✅ CRITICAL FIX: Add polling for better monitoring
-      register: backup_services_result
+      block:
+        - name: Include backup service task
+          ansible.builtin.include_tasks: "tasks/{{ item }}.yml"
+          loop:
+            - backup
+            - kopia
+          when: item in enabled_services
+          register: backup_services_result
 
-    # ✅ CRITICAL FIX: Validate backup services
+    # OK CRITICAL FIX: Validate backup services
     - name: Validate backup services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ backup_services_result.results | map(attribute='item') | list }}"
-      loop_control:
-        loop_var: service_name
-      when: backup_services_result is success
       tags: [backup, validation]
+      when: backup_services_result is success
+      block:
+        - name: Validate service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ backup_services_result.results | map(attribute='item') | list }}"
+          loop_control:
+            loop_var: service_name
 
   post_tasks:
-    # ✅ CRITICAL FIX: Post-deployment validation with explicit privileges
+    # OK CRITICAL FIX: Post-deployment validation with explicit privileges
     - name: Post-deployment infrastructure validation
-      ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
-      become: true  # ✅ Explicit privilege escalation
+      block:
+        - ansible.builtin.include_tasks: tasks/validate/infrastructure.yml
+      become: true
       become_user: root
       tags: [validation, post-deployment, always]
       when: validation_enabled | default(true)
 
-    # ✅ CRITICAL FIX: Verify critical services with explicit privileges
+    # OK CRITICAL FIX: Verify critical services with explicit privileges
     - name: Verify all critical services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      become: true  # ✅ Explicit privilege escalation
+      become: true
       become_user: root
-      loop: "{{ critical_services }}"
-      loop_control:
-        loop_var: service_name
       tags: [always, validation]
+      block:
+        - name: Validate critical service
+          ansible.builtin.include_tasks: tasks/validate.yml
+          loop: "{{ critical_services }}"
+          loop_control:
+            loop_var: service_name
 
-    # ✅ CRITICAL FIX: Monitor system resources
+    # OK CRITICAL FIX: Monitor system resources
     - name: Monitor system resources
       ansible.builtin.include_tasks: tasks/resource_monitoring.yml
       tags: [always, monitoring, resources]
 
-    # ✅ CRITICAL FIX: Perform secret rotation if needed
+    # OK CRITICAL FIX: Perform secret rotation if needed
     - name: Perform secret rotation
       ansible.builtin.include_tasks: tasks/secret_rotation.yml
       tags: [always, security, secrets, rotation]
 
-    # ✅ CRITICAL FIX: Send deployment notification with proper error handling
+    # OK CRITICAL FIX: Send deployment notification with proper error handling
     - name: Send deployment notification
       ansible.builtin.uri:
         url: "{{ notification_webhook_url }}"
@@ -590,7 +654,7 @@
       when: notification_webhook_url is defined
       tags: [always, notification]
 
-# Handlers for service management
+  # Handlers for service management
   handlers:
     - name: restart docker
       ansible.builtin.systemd:

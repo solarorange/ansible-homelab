@@ -26,14 +26,14 @@
           bind {{ ansible_default_ipv4.address }}
           port 6379
           protected-mode yes
-          
+
           # General
           daemonize no
           supervised no
           pidfile /var/run/redis/redis-server.pid
           loglevel notice
           logfile /var/log/redis/redis.log
-          
+
           # Snapshotting
           dir /data
           dbfilename dump.rdb
@@ -43,12 +43,12 @@
           stop-writes-on-bgsave-error yes
           rdbcompression yes
           rdbchecksum yes
-          
+
           # Memory Management
           maxmemory {{ redis_maxmemory }}
           maxmemory-policy {{ redis_maxmemory_policy }}
           maxmemory-samples {{ redis_maxmemory_samples }}
-          
+
           # Append Only Mode
           appendonly {{ redis_appendonly }}
           appendfilename "appendonly.aof"
@@ -56,17 +56,17 @@
           no-appendfsync-on-rewrite no
           auto-aof-rewrite-percentage 100
           auto-aof-rewrite-min-size 64mb
-          
+
           # Slow Log
           slowlog-log-slower-than 10000
           slowlog-max-len 128
-          
+
           # Latency Monitor
           latency-monitor-threshold 0
-          
+
           # Event Notification
           notify-keyspace-events ""
-          
+
           # Advanced Config
           hash-max-ziplist-entries 512
           hash-max-ziplist-value 64
@@ -90,23 +90,23 @@
         dest: "{{ docker_dir }}/redis/scripts/backup.sh"
         content: |
           #!/bin/bash
-          
+
           # Redis Backup Script
-          
+
           BACKUP_DIR="{{ docker_dir }}/redis/backup"
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           BACKUP_FILE="$BACKUP_DIR/redis_backup_$TIMESTAMP.rdb"
-          
+
           # Create backup directory if it doesn't exist
           mkdir -p "$BACKUP_DIR"
-          
+
           # Perform backup
           docker exec redis redis-cli SAVE
           docker cp redis:/data/dump.rdb "$BACKUP_FILE"
-          
+
           # Remove backups older than 7 days
           find "$BACKUP_DIR" -name "redis_backup_*.rdb" -mtime +7 -delete
-          
+
           echo "Backup created: $BACKUP_FILE"
         owner: "{{ username }}"
         group: "{{ username }}"
@@ -117,29 +117,29 @@
         dest: "{{ docker_dir }}/redis/scripts/restore.sh"
         content: |
           #!/bin/bash
-          
+
           # Redis Restore Script
-          
+
           if [ -z "$1" ]; then
             echo "Please specify backup file"
             exit 1
           fi
-          
+
           BACKUP_FILE="$1"
           if [ ! -f "$BACKUP_FILE" ]; then
             echo "Backup file not found: $BACKUP_FILE"
             exit 1
           fi
-          
+
           # Stop Redis
           docker stop redis
-          
+
           # Copy backup file
           docker cp "$BACKUP_FILE" redis:/data/dump.rdb
-          
+
           # Start Redis
           docker start redis
-          
+
           echo "Backup restored from: $BACKUP_FILE"
         owner: "{{ username }}"
         group: "{{ username }}"
@@ -150,9 +150,9 @@
         dest: "{{ docker_dir }}/redis/scripts/manage.sh"
         content: |
           #!/bin/bash
-          
+
           # Redis Management Script
-          
+
           function show_help {
             echo "Redis Management Script"
             echo "Usage: $0 [command]"
@@ -167,7 +167,7 @@
             echo "  monitor   - Monitor Redis commands"
             echo "  help      - Show this help"
           }
-          
+
           case "$1" in
             status)
               docker ps -f name=redis
@@ -204,26 +204,26 @@
         dest: "{{ docker_dir }}/redis/scripts/healthcheck.sh"
         content: |
           #!/bin/bash
-          
+
           # Check if Redis is running
           if ! docker ps -f name=redis -f status=running | grep -q redis; then
             echo "Redis is not running"
             exit 1
           fi
-          
+
           # Check if Redis is responding
           if ! docker exec redis redis-cli ping > /dev/null 2>&1; then
             echo "Redis is not responding"
             exit 1
           fi
-          
+
           # Check Redis status
           STATUS=$(docker exec redis redis-cli ping)
           if [ "$STATUS" != "PONG" ]; then
             echo "Redis status is not PONG"
             exit 1
           fi
-          
+
           exit 0
         owner: "{{ username }}"
         group: "{{ username }}"
@@ -276,34 +276,35 @@
 
 - name: Configure Redis security
   block:
-    - name: Create Redis security configuration
+    - name: Create Redis security configuration (no inline secrets)
       ansible.builtin.copy:
         dest: "{{ docker_dir }}/redis/config/security.conf"
         content: |
           # Security Configuration
-          
+
           # Authentication
-          requirepass {{ redis_password }}
-          
+          # Supply password at runtime via REDIS_PASSWORD_FILE and docker secrets
+          # Example: set REDIS_PASSWORD_FILE=/run/secrets/REDIS_PASSWORD
+
           # Network Security
           bind {{ ansible_default_ipv4.address }}
           protected-mode yes
-          
+
           # Command Security
           rename-command FLUSHDB ""
           rename-command FLUSHALL ""
           rename-command DEBUG ""
           rename-command CONFIG ""
           rename-command SHUTDOWN ""
-          
+
           # Memory Security
           maxmemory {{ redis_maxmemory }}
           maxmemory-policy {{ redis_maxmemory_policy }}
-          
+
           # Connection Limits
           maxclients 10000
           timeout 300
-          
+
           # SSL/TLS (if enabled)
           {% if databases_ssl_enabled %}
           tls-port 6380
@@ -315,34 +316,34 @@
         group: "{{ username }}"
         mode: "0640"
 
-    - name: Create Redis access control script
+    - name: Create Redis access control script (secrets via *_FILE)
       ansible.builtin.copy:
         dest: "{{ docker_dir }}/redis/scripts/access-control.sh"
         content: |
           #!/bin/bash
-          
+
           # Redis Access Control Script
-          
+
           # Check client connections
-          CONNECTIONS=$(docker exec redis redis-cli -a "{{ redis_password }}" client list | wc -l)
-          
+          CONNECTIONS=$(docker exec redis bash -lc 'redis-cli -a "$(cat /run/secrets/redis_password)" client list | wc -l')
+
           # Check memory usage
-          MEMORY=$(docker exec redis redis-cli -a "{{ redis_password }}" info memory | grep used_memory_human | cut -d: -f2)
-          
+          MEMORY=$(docker exec redis bash -lc 'redis-cli -a "$(cat /run/secrets/redis_password)" info memory | grep used_memory_human | cut -d: -f2')
+
           # Check slow queries
-          SLOW_QUERIES=$(docker exec redis redis-cli -a "{{ redis_password }}" slowlog len)
-          
+          SLOW_QUERIES=$(docker exec redis bash -lc 'redis-cli -a "$(cat /run/secrets/redis_password)" slowlog len')
+
           echo "Redis Access Control Report"
           echo "=========================="
           echo "Active Connections: $CONNECTIONS"
           echo "Memory Usage: $MEMORY"
           echo "Slow Queries: $SLOW_QUERIES"
-          
+
           # Alert if connections exceed limit
           if [ "$CONNECTIONS" -gt 1000 ]; then
             echo "WARNING: High number of connections detected"
           fi
-          
+
           # Alert if memory usage is high
           if [[ "$MEMORY" == *"G"* ]]; then
             echo "WARNING: High memory usage detected"
@@ -363,34 +364,34 @@
 
 - name: Configure Redis monitoring
   block:
-    - name: Create Redis monitoring script
+    - name: Create Redis monitoring script (secrets via *_FILE)
       ansible.builtin.copy:
         dest: "{{ docker_dir }}/redis/scripts/monitor.sh"
         content: |
           #!/bin/bash
-          
+
           # Redis Monitoring Script
-          
+
           # Get Redis info
-          INFO=$(docker exec redis redis-cli -a "{{ redis_password }}" info)
-          
+          INFO=$(docker exec redis bash -lc 'redis-cli -a "$(cat /run/secrets/redis_password)" info')
+
           # Extract metrics
           CONNECTED_CLIENTS=$(echo "$INFO" | grep connected_clients | cut -d: -f2)
           USED_MEMORY=$(echo "$INFO" | grep used_memory_human | cut -d: -f2)
           TOTAL_COMMANDS=$(echo "$INFO" | grep total_commands_processed | cut -d: -f2)
           KEYS_HIT=$(echo "$INFO" | grep keyspace_hits | cut -d: -f2)
           KEYS_MISS=$(echo "$INFO" | grep keyspace_misses | cut -d: -f2)
-          
+
           # Calculate hit rate
           if [ "$KEYS_HIT" -gt 0 ] || [ "$KEYS_MISS" -gt 0 ]; then
             HIT_RATE=$(echo "scale=2; $KEYS_HIT * 100 / ($KEYS_HIT + $KEYS_MISS)" | bc)
           else
             HIT_RATE=0
           fi
-          
+
           # Log metrics
           echo "$(date): Redis Metrics - Clients: $CONNECTED_CLIENTS, Memory: $USED_MEMORY, Commands: $TOTAL_COMMANDS, Hit Rate: ${HIT_RATE}%"
-          
+
           # Send to monitoring system if available
           if command -v curl > /dev/null 2>&1; then
             curl -X POST "http://{{ ansible_default_ipv4.address }}:9091/metrics/job/redis/instance/{{ ansible_hostname }}" \
@@ -425,7 +426,7 @@
       ansible.builtin.debug:
         msg: |
           Cache Databases deployment completed!
-          
+
           Redis Status:
           - Enabled: {{ redis_enabled | default(true) }}
           - Health Check: {{ redis_health.rc == 0 if redis_health is defined else 'N/A' }}
@@ -434,16 +435,16 @@
           - Backup Directory: {{ docker_dir }}/redis/backup
           - Max Memory: {{ redis_maxmemory }}
           - Memory Policy: {{ redis_maxmemory_policy }}
-          
+
           Management Scripts:
           - Redis: {{ docker_dir }}/redis/scripts/manage.sh
-          
+
           Backup Scripts:
           - Redis: {{ docker_dir }}/redis/scripts/backup.sh
-          
+
           Security Features:
           - Authentication: {{ redis_auth_enabled | default(true) }}
           - Access Control: {{ databases_security_enabled | default(true) }}
           - Monitoring: {{ databases_monitoring_enabled | default(true) }}
 
-  tags: [databases, cache, validation] 
+  tags: [databases, cache, validation]

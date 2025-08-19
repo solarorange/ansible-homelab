@@ -6,7 +6,7 @@
   hosts: monitoring
   become: true
   gather_facts: false
-  
+
   tasks:
     - name: Create alerting rules directory
       file:
@@ -15,7 +15,7 @@
         mode: '0755'
         owner: prometheus
         group: prometheus
-    
+
     - name: Configure Prometheus alerting rules
       template:
         src: templates/monitoring/health-alerts.yml.j2
@@ -24,7 +24,7 @@
         group: prometheus
         mode: '0644'
       notify: restart prometheus
-    
+
     - name: Update Prometheus configuration
       template:
         src: templates/monitoring/prometheus.yml.j2
@@ -33,10 +33,10 @@
         group: prometheus
         mode: '0644'
       notify: restart prometheus
-    
+
     - name: Restart Prometheus
       systemd:
         name: prometheus
         state: restarted
         enabled: yes
-      when: prometheus_service_exists.stat.exists | default(false) 
+      when: prometheus_service_exists.stat.exists | default(false)

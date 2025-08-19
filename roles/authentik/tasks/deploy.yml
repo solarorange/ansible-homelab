@@ -1,0 +1,26 @@
+---
+# Authentik Deployment Tasks
+
+- name: Prepare Authentik secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "authentik"
+    secret_dir_root: "{{ docker_dir }}/authentik"
+    secret_files: "{{ authentik_secret_files if authentik_manage_secret_files else [] }}"
+  when: authentik_manage_secret_files | bool
+
+- name: Validate required Authentik secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/authentik/secrets/{{ item }}"
+  register: authentik_secret_stats
+  loop: "{{ authentik_required_secrets | default([]) }}"
+  when: authentik_manage_secret_files | bool and (authentik_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Authentik secret files are missing
+  ansible.builtin.assert:
+    that: "{{ authentik_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/authentik/secrets.
+      Missing: {{ (authentik_required_secrets | default([])) | reject('in', (authentik_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: authentik_manage_secret_files | bool and (authentik_required_secrets | default([]) | length > 0)
+

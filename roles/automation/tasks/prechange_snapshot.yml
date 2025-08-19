@@ -1,0 +1,67 @@
+---
+# Create a pre-change snapshot of service config and data before risky tasks
+- name: Determine pre-change backup root
+  ansible.builtin.set_fact:
+    prechange_backup_root: "{{ backup_root | default(backup_dir) }}"
+  tags: [backup, prechange]
+
+- name: Ensure service pre-change backup directory exists
+  ansible.builtin.file:
+    path: "{{ prechange_backup_root }}/{{ service_name }}"
+    state: directory
+    mode: "0700"
+    owner: "{{ username | default(ansible_user) }}"
+    group: "{{ username | default(ansible_user) }}"
+  tags: [backup, prechange]
+- name: Build candidate paths for snapshot
+  ansible.builtin.set_fact:
+    prechange_candidate_paths: >-
+      {{ []
+         | union((docker_config_root is defined and (docker_config_root | length > 0))
+                  | ternary([docker_config_root ~ '/' ~ service_name], []))
+         | union((docker_data_root is defined and (docker_data_root | length > 0))
+                  | ternary([docker_data_root ~ '/' ~ service_name], []))
+         | union((config_dir is defined and (config_dir | length > 0))
+                  | ternary([config_dir ~ '/' ~ service_name], []))
+         | union((data_dir is defined and (data_dir | length > 0))
+                  | ternary([data_dir ~ '/' ~ service_name], []))
+         | union(additional_paths | default([]))
+      }}
+  tags: [backup, prechange]
+
+- name: Check which candidate paths exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ prechange_candidate_paths | select('string') | select('match', '^/.+') | list }}"
+  register: prechange_path_stats
+  ignore_errors: true
+  tags: [backup, prechange]
+
+- name: Collect existing paths to include in snapshot
+  ansible.builtin.set_fact:
+    prechange_paths: "{{ prechange_path_stats.results | selectattr('stat.exists', 'defined') | selectattr('stat.exists') | map(attribute='item') | list }}"
+  tags: [backup, prechange]
+
+- name: Create pre-change snapshot archive
+  ansible.builtin.archive:
+    path: "{{ prechange_paths }}"
+    dest: "{{ prechange_backup_root }}/{{ service_name }}/prechange_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+    format: gz
+  when: prechange_paths | length > 0
+  tags: [backup, prechange]
+
+- name: Write pre-change snapshot manifest
+  ansible.builtin.copy:
+    content: |
+      Snapshot created: {{ ansible_date_time.iso8601 }}
+      Host: {{ inventory_hostname }}
+      Service: {{ service_name }}
+      Included paths ({{ prechange_paths | length }}):
+      {% for p in prechange_paths %}- {{ p }}
+      {% endfor %}
+    dest: "{{ prechange_backup_root }}/{{ service_name }}/prechange_{{ ansible_date_time.iso8601_basic_short }}.manifest.txt"
+    mode: "0600"
+    owner: "{{ username | default(ansible_user) }}"
+    group: "{{ username | default(ansible_user) }}"
+  when: prechange_paths | length > 0
+  tags: [backup, prechange]

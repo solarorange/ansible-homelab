@@ -24,31 +24,31 @@
       listen_addresses = '*'
       max_connections = 100
       superuser_reserved_connections = 3
-      
+
       # Memory Settings
       shared_buffers = '1GB'
       work_mem = '16MB'
       maintenance_work_mem = '256MB'
       effective_cache_size = '3GB'
-      
+
       # Write Ahead Log
       wal_level = replica
       max_wal_senders = 10
       max_wal_size = '1GB'
       min_wal_size = '80MB'
-      
+
       # Query Planning
       random_page_cost = 1.1
       effective_io_concurrency = 200
-      
+
       # Background Writer
       bgwriter_delay = '200ms'
       bgwriter_lru_maxpages = 100
       bgwriter_lru_multiplier = 2.0
-      
+
       # Asynchronous Behavior
       synchronous_commit = off
-      
+
       # Logging
       log_destination = 'stderr'
       logging_collector = on
@@ -63,7 +63,7 @@
       log_lock_waits = on
       log_temp_files = 0
       log_autovacuum_min_duration = 0
-      
+
       # Autovacuum
       autovacuum = on
       autovacuum_max_workers = 3
@@ -74,12 +74,12 @@
       autovacuum_analyze_scale_factor = 0.1
       autovacuum_vacuum_cost_delay = '20ms'
       autovacuum_vacuum_cost_limit = 200
-      
+
       # Client Connection Defaults
       statement_timeout = '60s'
       lock_timeout = '60s'
       idle_in_transaction_session_timeout = '60s'
-      
+
       # Locale and Formatting
       datestyle = 'iso, mdy'
       timezone = 'UTC'
@@ -87,7 +87,7 @@
       lc_monetary = 'en_US.utf8'
       lc_numeric = 'en_US.utf8'
       lc_time = 'en_US.utf8'
-      
+
       # Other Defaults
       default_text_search_config = 'pg_catalog.english'
     owner: "{{ username }}"
@@ -113,22 +113,22 @@
     dest: "{{ docker_dir }}/postgresql/scripts/backup.sh"
     content: |
       #!/bin/bash
-      
+
       # PostgreSQL Backup Script
-      
+
       BACKUP_DIR="{{ docker_dir }}/postgresql/backup"
       TIMESTAMP=$(date +%Y%m%d_%H%M%S)
       BACKUP_FILE="$BACKUP_DIR/postgresql_backup_$TIMESTAMP.sql.gz"
-      
+
       # Create backup directory if it doesn't exist
       mkdir -p "$BACKUP_DIR"
-      
+
       # Perform backup
       docker exec postgresql pg_dumpall -U postgres | gzip > "$BACKUP_FILE"
-      
+
       # Remove backups older than 7 days
       find "$BACKUP_DIR" -name "postgresql_backup_*.sql.gz" -mtime +7 -delete
-      
+
       echo "Backup created: $BACKUP_FILE"
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -139,23 +139,23 @@
     dest: "{{ docker_dir }}/postgresql/scripts/restore.sh"
     content: |
       #!/bin/bash
-      
+
       # PostgreSQL Restore Script
-      
+
       if [ -z "$1" ]; then
         echo "Please specify backup file"
         exit 1
       fi
-      
+
       BACKUP_FILE="$1"
       if [ ! -f "$BACKUP_FILE" ]; then
         echo "Backup file not found: $BACKUP_FILE"
         exit 1
       fi
-      
+
       # Restore backup
       gunzip -c "$BACKUP_FILE" | docker exec -i postgresql psql -U postgres
-      
+
       echo "Backup restored from: $BACKUP_FILE"
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -166,9 +166,9 @@
     dest: "{{ docker_dir }}/postgresql/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # PostgreSQL Management Script
-      
+
       function show_help {
         echo "PostgreSQL Management Script"
         echo "Usage: $0 [command]"
@@ -182,7 +182,7 @@
         echo "  vacuum    - Run VACUUM ANALYZE"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
           docker ps -f name=postgresql
@@ -216,19 +216,19 @@
     dest: "{{ docker_dir }}/postgresql/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if PostgreSQL is running
       if ! docker ps -f name=postgresql -f status=running | grep -q postgresql; then
         echo "PostgreSQL is not running"
         exit 1
       fi
-      
+
       # Check if PostgreSQL is accepting connections
       if ! docker exec postgresql pg_isready > /dev/null; then
         echo "PostgreSQL is not accepting connections"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -273,4 +273,4 @@
     job: "{{ docker_dir }}/postgresql/scripts/manage.sh vacuum"
     hour: "4"
     minute: "0"
-    user: "{{ vault_service_user }}" 
+    user: "{{ vault_service_user }}"

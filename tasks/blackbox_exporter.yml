@@ -36,7 +36,7 @@
             headers:
               User-Agent: "Prometheus/Blackbox Exporter"
             body_size_limit: 1048576  # 1MB
-        
+
         # HTTPS-only monitoring with strict SSL validation
         https_2xx:
           prober: http
@@ -54,7 +54,7 @@
             headers:
               User-Agent: "Prometheus/Blackbox Exporter"
             body_size_limit: 1048576  # 1MB
-        
+
         # HTTP POST monitoring for APIs
         http_post_2xx:
           prober: http
@@ -74,7 +74,7 @@
               Content-Type: "application/json"
             body: "{}"
             body_size_limit: 1048576  # 1MB
-        
+
         # TCP connection monitoring
         tcp_connect:
           prober: tcp
@@ -82,7 +82,7 @@
           tcp:
             preferred_ip_protocol: "ip4"
             tls: false
-        
+
         # TCP with TLS monitoring
         tcp_tls:
           prober: tcp
@@ -93,7 +93,7 @@
             tls_config:
               insecure_skip_verify: false
               ca_file: /etc/ssl/certs/ca-certificates.crt
-        
+
         # DNS resolution monitoring
         dns_udp_53:
           prober: dns
@@ -104,7 +104,7 @@
             query_name: "{{ domain }}"
             query_type: "A"
             valid_rcodes: ["NOERROR"]
-        
+
         # ICMP ping monitoring
         icmp:
           prober: icmp
@@ -120,9 +120,9 @@
     dest: "{{ docker_dir }}/monitoring/blackbox/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Enhanced Blackbox Exporter Management Script
-      
+
       function show_help {
         echo "Enhanced Blackbox Exporter Management Script"
         echo "Usage: $0 [command] [target]"
@@ -143,7 +143,7 @@
         echo "  $0 dns {{ domain }}"
         echo "  $0 ping {{ ip_address }}"
       }
-      
+
       case "$1" in
         status)
           curl -s http://{{ ansible_default_ipv4.address }}:9115/-/healthy
@@ -169,7 +169,7 @@
             exit 1
           fi
           echo "Checking SSL certificate for $2..."
-          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=https_2xx" | grep -E "(probe_ssl_earliest_cert_expiry|probe_ssl_validation_success)"
+          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=https_2xx" | grep -E "(probe_ssl_earliest_cert_expiry|probe_ssl_validation_success)"
           ;;
         dns)
           if [ -z "$2" ]; then
@@ -177,7 +177,7 @@
             exit 1
           fi
           echo "Testing DNS resolution for $2..."
-          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=dns_udp_53" | grep -E "(probe_success|probe_duration_seconds)"
+          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=dns_udp_53" | grep -E "(probe_success|probe_duration_seconds)"
           ;;
         ping)
           if [ -z "$2" ]; then
@@ -185,7 +185,7 @@
             exit 1
           fi
           echo "Testing ICMP ping to $2..."
-          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=icmp" | grep -E "(probe_success|probe_duration_seconds)"
+          curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target=$2&module=icmp" | grep -E "(probe_success|probe_duration_seconds)"
           ;;
         help|*)
           show_help
@@ -200,27 +200,27 @@
     dest: "{{ docker_dir }}/monitoring/blackbox/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Enhanced Blackbox Exporter Health Check Script
-      
+
       # Check if Blackbox Exporter is responding
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
         echo "Blackbox Exporter is not responding"
         exit 1
       fi
-      
+
       # Check if we can access metrics
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/metrics > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/metrics > /dev/null; then
         echo "Blackbox Exporter metrics endpoint is not responding"
         exit 1
       fi
-      
+
       # Check if we can perform a test probe
-      if ! curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target={{ ansible_default_ipv4.address }}&module=http_2xx" > /dev/null; then
+      if ! curl -s "http://{{ ansible_default_ipv4.address }}:/probe?target={{ ansible_default_ipv4.address }}&module=http_2xx" > /dev/null; then
         echo "Blackbox Exporter probe endpoint is not responding"
         exit 1
       fi
-      
+
       echo "Blackbox Exporter is healthy"
       exit 0
     owner: "{{ username }}"
@@ -250,4 +250,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/blackbox/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ vault_blackbox_exporter_user }}" 
+    user: "{{ vault_blackbox_exporter_user }}"

@@ -43,7 +43,7 @@ services:
       - "prometheus.job=sonarr"
       - "prometheus.port=8989"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8989/api/v3/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8989/api/v3/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -58,14 +58,7 @@ services:
       nofile:
         soft: 26677
         hard: 46677
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.
     depends_on:
       postgresql:
         condition: service_healthy
@@ -90,21 +83,14 @@ services:
       - "prometheus.job=sonarr_exporter"
       - "prometheus.port=9705"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9705/metrics"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9705/metrics || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     security_opt:
       - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.1'
-        reservations:
-          memory: 64M
-          cpus: '0.05'
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.
     depends_on:
       sonarr:
         condition: service_healthy 

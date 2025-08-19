@@ -149,3 +149,40 @@ This role integrates with the existing monitoring stack:
 - Performance optimization
 - Plugin management
 - Configuration validation 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Deployments use a safe wrapper that restores the last-known-good Compose and pre-change snapshot if a deployment fails. No action required when a task fails; the role reverts automatically.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., grafana
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (run on the target host):
+  ```bash
+  # List rollback IDs created before deployment
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+
+  # Execute rollback to a specific ID
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback (run from repository root):
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  # or rollback to a saved version backup
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```

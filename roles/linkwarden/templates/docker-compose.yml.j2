@@ -18,14 +18,26 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in linkwarden_components.app.environment.items() %}
+      {% if linkwarden_manage_secret_files | default(true) and (key is match('(PASSWORD|TOKEN|SECRET|KEY)')) %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in linkwarden_components.app.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if linkwarden_manage_secret_files | default(true) %}
+      {% for secret in linkwarden_secret_files %}
+      - "{{ docker_dir }}/linkwarden/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
+      - "{{ logs_dir }}/linkwarden/app:/logs"
+    {% if linkwarden_direct_expose_enabled | default(false) %}
     ports:
       - "{{ linkwarden_port }}:{{ linkwarden_port }}"
+    {% endif %}
     labels:
       - "traefik.enable={{ 'true' if linkwarden_traefik_enabled else 'false' }}"
       - "traefik.http.routers.linkwarden.rule=Host(`{{ linkwarden_subdomain }}.{{ domain }}`)"
@@ -48,14 +60,17 @@ services:
       {% for dependency in linkwarden_components.app.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ linkwarden_components.app.resources.limits.cpus }}'
-          memory: {{ linkwarden_components.app.resources.limits.memory }}
-        reservations:
-          cpus: '{{ linkwarden_components.app.resources.reservations.cpus }}'
-          memory: {{ linkwarden_components.app.resources.reservations.memory }}
+    
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ linkwarden_components.app.resources.limits.memory }}
+    cpus: '{{ linkwarden_components.app.resources.limits.cpus }}'
   {% endif %}
 
   # Linkwarden PostgreSQL Database
@@ -71,12 +86,22 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in linkwarden_components.postgres.environment.items() %}
+      {% if linkwarden_manage_secret_files | default(true) and (key is match('(PASSWORD|TOKEN|SECRET|KEY)')) %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in linkwarden_components.postgres.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if linkwarden_manage_secret_files | default(true) %}
+      {% for secret in linkwarden_secret_files %}
+      - "{{ docker_dir }}/linkwarden/secrets/{{ secret.name }}:/run/secrets/{{ secret.name }}:ro"
+      {% endfor %}
+      {% endif %}
+      - "{{ logs_dir }}/linkwarden/postgres:/logs"
     labels:
       # Prometheus scraping labels
       - "linkwarden.prometheus.scrape=true"
@@ -88,12 +113,15 @@ services:
       interval: "{{ linkwarden_components.postgres.healthcheck.interval }}"
       timeout: "{{ linkwarden_components.postgres.healthcheck.timeout }}"
       retries: {{ linkwarden_components.postgres.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ linkwarden_components.postgres.resources.limits.cpus }}'
-          memory: {{ linkwarden_components.postgres.resources.limits.memory }}
-        reservations:
-          cpus: '{{ linkwarden_components.postgres.resources.reservations.cpus }}'
-          memory: {{ linkwarden_components.postgres.resources.reservations.memory }}
+    
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
+    mem_limit: {{ linkwarden_components.postgres.resources.limits.memory }}
+    cpus: '{{ linkwarden_components.postgres.resources.limits.cpus }}'
   {% endif %} 

@@ -71,28 +71,28 @@
   ansible.builtin.debug:
     msg: |
       Grafana Alerting Configuration:
-      
+
       Notification Channels:
       {% for name, config in grafana_notification_channels.items() %}
       {% if config.enabled | default(false) %}
       - {{ name }} ({{ config.type }})
       {% endif %}
       {% endfor %}
-      
+
       Alert Rules:
       {% for name, config in grafana_alert_rules.items() %}
       {% if config.enabled | default(false) %}
       - {{ name }} ({{ config.severity }})
       {% endif %}
       {% endfor %}
-      
+
       Validation Results:
       - Notifications API: {{ notifications_validation.status == 200 | ternary('OK', 'Failed') }}
       - Alerts API: {{ alerts_validation.status == 200 | ternary('OK', 'Failed') }}
       - Total Channels: {{ notifications_validation.json | length }}
       - Total Rules: {{ alerts_validation.json | length }}
-      
+
       Configuration Files:
       - Notifications Config: {{ docker_dir }}/monitoring/grafana/config/notification_channels.json
       - Alert Rules Config: {{ docker_dir }}/monitoring/grafana/config/alert_rules.json
-  tags: [grafana, alerts, summary] 
+  tags: [grafana, alerts, summary]

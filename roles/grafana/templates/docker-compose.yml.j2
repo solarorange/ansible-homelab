@@ -9,7 +9,11 @@ services:
     # Environment variables
     environment:
       {% for key, value in grafana_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
       {% if grafana_plugins_enabled | default(true) %}
       - GF_INSTALL_PLUGINS={{ grafana_plugins | join(',') }}
@@ -22,10 +26,22 @@ services:
       - {{ docker_dir }}/monitoring/grafana/provisioning:/etc/grafana/provisioning
       - {{ docker_dir }}/monitoring/grafana/plugins:/var/lib/grafana/plugins
       - {{ logs_dir }}/monitoring/grafana:/var/log/grafana
+      {% if grafana_manage_secret_files | default(true) %}
+      - {{ docker_dir }}/grafana/secrets/GF_SECURITY_ADMIN_PASSWORD:/run/secrets/GF_SECURITY_ADMIN_PASSWORD:ro
+      - {{ docker_dir }}/grafana/secrets/GF_DATABASE_PASSWORD:/run/secrets/GF_DATABASE_PASSWORD:ro
+      - {{ docker_dir }}/grafana/secrets/GF_SMTP_PASSWORD:/run/secrets/GF_SMTP_PASSWORD:ro
+      {% for key, value in grafana_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ docker_dir }}/grafana/secrets/{{ key }}:/run/secrets/{{ key }}:ro
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     
-    # Ports
+    # Ports removed (Traefik provides ingress). Set grafana_direct_expose_enabled to true to expose directly.
+    {% if grafana_direct_expose_enabled | default(false) %}
     ports:
       - "{{ grafana_external_port }}:{{ grafana_internal_port }}"
+    {% endif %}
     
     # Networks
     networks:
@@ -51,7 +67,7 @@ services:
     # Health check
     {% if grafana_healthcheck_enabled | default(true) %}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ grafana_internal_port }}/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ grafana_internal_port }}/api/health || exit 1"]
       interval: {{ grafana_healthcheck_interval }}
       timeout: {{ grafana_healthcheck_timeout }}
       retries: {{ grafana_healthcheck_retries }}
@@ -61,24 +77,20 @@ services:
     # Security options
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     
     # Read-only root filesystem
-    read_only: false
+    read_only: true
     tmpfs:
       - /tmp
     
     # User
-    user: "472:472"
+    user: "{{ puid | default(472) }}:{{ pgid | default(472) }}"
     
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ grafana_memory_limit }}
-          cpus: '{{ grafana_cpu_limit }}'
-        reservations:
-          memory: {{ grafana_memory_reservation }}
-          cpus: '{{ grafana_cpu_reservation }}'
+    # Resource limits (Docker Engine supported)
+    mem_limit: {{ grafana_memory_limit }}
+    cpus: '{{ grafana_cpu_limit }}'
     
     # Dependencies
     depends_on:
@@ -95,8 +107,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
 # Volumes
 volumes:

@@ -6,7 +6,7 @@
   hosts: monitoring
   become: true
   gather_facts: false
-  
+
   tasks:
     - name: Create notification templates directory
       file:
@@ -15,7 +15,7 @@
         mode: '0755'
         owner: alertmanager
         group: alertmanager
-    
+
     - name: Configure AlertManager
       template:
         src: templates/monitoring/alertmanager.yml.j2
@@ -24,7 +24,7 @@
         group: alertmanager
         mode: '0644'
       notify: restart alertmanager
-    
+
     - name: Create notification templates
       template:
         src: "{{ item.src }}"
@@ -37,10 +37,10 @@
         - { src: 'templates/notifications/slack_test.j2', dest: '/etc/alertmanager/template/slack.json' }
         - { src: 'templates/notifications/discord_test.j2', dest: '/etc/alertmanager/template/discord.json' }
       notify: restart alertmanager
-    
+
     - name: Restart AlertManager
       systemd:
         name: alertmanager
         state: restarted
         enabled: yes
-      when: alertmanager_service_exists.stat.exists | default(false) 
+      when: alertmanager_service_exists.stat.exists | default(false)

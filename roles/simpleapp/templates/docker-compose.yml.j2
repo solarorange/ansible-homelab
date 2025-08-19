@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  simpleapp:
+    image: {{ simpleapp_image }}
+    container_name: {{ simpleapp_container_name }}
+    restart: {{ simpleapp_restart_policy }}
+    
+    # Environment variables
+    environment:
+      {% for key, value in simpleapp_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
+      - {{ key }}={{ value }}
+      {% endif %}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in simpleapp_volumes %}
+      - {{ volume }}
+      {% endfor %}
+      - "{{ logs_dir }}/simpleapp:/logs"
+      {% if simpleapp_manage_secret_files | default(true) %}
+      {% for key, value in simpleapp_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ docker_dir }}/simpleapp/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+      {% if simpleapp_manage_secret_files | default(true) %}
+      {% for key, value in simpleapp_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ docker_dir }}/simpleapp/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+    
+    # Ports
+    {% if simpleapp_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ simpleapp_external_port }}:{{ simpleapp_internal_port }}"
+    {% endif %}
+    
+    # Networks
+    networks:
+      {% for network in simpleapp_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # Labels for Traefik
+    {% if simpleapp_traefik_enabled | default(true) %}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.simpleapp.rule=Host(`{{ simpleapp_domain }}`)"
+      - "traefik.http.routers.simpleapp.entrypoints=https"
+      - "traefik.http.routers.simpleapp.tls=true"
+      - "traefik.http.routers.simpleapp.tls.certresolver=cloudflare"
+      - "traefik.http.services.simpleapp.loadbalancer.server.port={{ simpleapp_internal_port }}"
+      {% if simpleapp_traefik_middleware is defined %}
+      - "traefik.http.routers.simpleapp.middlewares={{ simpleapp_traefik_middleware }}"
+      {% endif %}
+    {% endif %}
+    
+    # Health check
+    {% if simpleapp_healthcheck_enabled | default(true) %}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ simpleapp_internal_port }}/health || exit 1"]
+      interval: {{ simpleapp_healthcheck_interval }}
+      timeout: {{ simpleapp_healthcheck_timeout }}
+      retries: {{ simpleapp_healthcheck_retries }}
+      start_period: {{ simpleapp_healthcheck_start_period }}
+    {% endif %}
+    
+    # Security options
+    {% if simpleapp_security_enabled | default(true) %}
+    security_opt:
+      - no-new-privileges:{{ simpleapp_no_new_privileges | default(true) }}
+    cap_drop:
+      - ALL
+    {% endif %}
+    
+    # Read-only root filesystem
+    read_only: {{ simpleapp_read_only | default(true) }}
+    tmpfs:
+      - /tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+    
+    # Resource limits (Docker Engine supported)
+    mem_limit: {{ simpleapp_memory_limit }}
+    cpus: '{{ simpleapp_cpu_limit }}'
+    
+    # Dependencies
+    {% if simpleapp_dependencies is defined %}
+    depends_on:
+      {% for dependency in simpleapp_dependencies %}
+      {{ dependency }}:
+        condition: service_healthy
+      {% endfor %}
+    {% endif %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  homelab:
+    external: true
+  default:
+    driver: bridge

@@ -22,7 +22,7 @@ resource_limits:
   memory_threshold: 85
   disk_io_threshold: 70
   network_bandwidth_limit: "100M"
-  
+
   # Enhanced container resource limits
   container_limits:
     # Critical services (high priority)
@@ -39,7 +39,7 @@ resource_limits:
         - grafana
         - postgresql
         - redis
-    
+
     # High-performance services
     high_performance:
       cpu_limit: "2.0"
@@ -53,7 +53,7 @@ resource_limits:
         - emby
         - tdarr
         - immich
-    
+
     # Standard services
     standard:
       cpu_limit: "1.0"
@@ -70,7 +70,7 @@ resource_limits:
         - bazarr
         - sabnzbd
         - qbittorrent
-    
+
     # Background services (low priority)
     background:
       cpu_limit: "0.5"
@@ -103,7 +103,7 @@ docker_optimization:
   live_restore: true
   userland_proxy: false
   experimental: false
-  
+
   # Enhanced resource management
   resource_management:
     # CPU scheduling
@@ -113,14 +113,14 @@ docker_optimization:
       cpu_shares: 1024
       cpu_rt_runtime: 950000
       cpu_rt_period: 1000000
-    
+
     # Memory management
     memory_management:
       memory_swap: "2G"
       memory_swappiness: 10
       kernel_memory: "128M"
       memory_reservation: "256M"
-    
+
     # I/O management
     io_management:
       blkio_weight: 500
@@ -129,7 +129,7 @@ docker_optimization:
       device_write_bps: []
       device_read_iops: []
       device_write_iops: []
-    
+
     # Network management
     network_management:
       network_mode: bridge
@@ -149,7 +149,7 @@ docker_optimization:
 host_capabilities:
   # Auto-detect based on system resources
   auto_detect_resources: true
-  
+
   # Enhanced minimum requirements for each role
   minimum_requirements:
     security:
@@ -189,13 +189,13 @@ conditional_execution:
       - backup
       - media_processing
       - large_downloads
-  
+
   # Weather-based execution (if weather API available)
   weather_based:
     enabled: false
     api_key: "{{ lookup('env', 'WEATHER_API_KEY') | default('') }}"
     skip_on_storm: true
-  
+
   # Network-based execution
   network_based:
     enabled: true
@@ -207,7 +207,7 @@ conditional_execution:
 #==============================================================================
 
 # Environment detection
-environment: "{{ lookup('env', 'ANSIBLE_ENVIRONMENT') | default('production') }}"
+deployment_environment: "{{ lookup('env', 'ANSIBLE_ENVIRONMENT') | default('production') }}"
 
 # Environment-specific configurations
 environments:
@@ -222,7 +222,7 @@ environments:
     backup:
       retention_days: 7
       compression: false
-  
+
   staging:
     resource_limits:
       max_concurrent_containers: 10
@@ -232,7 +232,7 @@ environments:
     backup:
       retention_days: 30
       compression: true
-  
+
   production:
     resource_limits:
       max_concurrent_containers: 20
@@ -257,13 +257,13 @@ preflight_checks:
     - check_network_connectivity
     - check_docker_installation
     - check_ansible_version
-  
+
   security_checks:
     - check_firewall_status
     - check_ssl_certificates
     - check_user_permissions
     - check_system_updates
-  
+
   service_checks:
     - check_database_connectivity
     - check_storage_accessibility
@@ -291,14 +291,14 @@ rollback:
   max_rollback_points: 10
   auto_rollback_on_failure: true
   rollback_timeout: 300
-  
+
   # Rollback triggers
   triggers:
     - service_failure_count: 3
     - health_check_failure: true
     - backup_failure: true
     - security_violation: true
-  
+
   # Rollback procedures
   procedures:
     database:
@@ -306,13 +306,13 @@ rollback:
       - restore_database_backup
       - verify_integrity
       - restart_services
-    
+
     configuration:
       - backup_current_config
       - restore_previous_config
       - validate_configuration
       - restart_affected_services
-    
+
     full_system:
       - create_system_snapshot
       - stop_all_services
@@ -330,40 +330,40 @@ health_monitoring:
   check_interval: 60
   timeout: 30
   retries: 3
-  
+
   # Service health checks
   services:
     - name: "database"
       url: "http://{{ ansible_default_ipv4.address }}:5432/health"
       expected_status: 200
       timeout: 10
-    
+
     - name: "storage"
       command: "df -h"
       expected_exit_code: 0
       timeout: 5
-    
+
     - name: "network"
       command: "ping -c 1 8.8.8.8"
       expected_exit_code: 0
       timeout: 10
-  
+
   # Self-healing actions
   self_healing:
     enabled: true
     max_attempts: 3
-    
+
     actions:
       service_restart:
         - restart_failed_service
         - wait_for_health_check
         - notify_admin
-    
+
       resource_cleanup:
         - cleanup_docker_containers
         - cleanup_log_files
         - restart_if_needed
-    
+
       network_recovery:
         - restart_network_services
         - check_connectivity
@@ -382,7 +382,7 @@ security_hardening:
     - update_system_packages
     - configure_audit_logging
     - harden_ssh_configuration
-  
+
   # Docker security
   docker:
     - enable_content_trust
@@ -390,7 +390,7 @@ security_hardening:
     - limit_container_capabilities
     - enable_selinux
     - configure_network_policies
-  
+
   # Application security
   applications:
     - enable_ssl_tls
@@ -421,13 +421,13 @@ backup_strategies:
     retention_days: 30
     compression: true
     encryption: true
-  
+
   # Differential backup
   differential:
     enabled: false
     base_backup_day: "sunday"
     retention_days: 14
-  
+
   # Snapshot-based backup
   snapshots:
     enabled: true
@@ -456,7 +456,7 @@ documentation:
     - markdown
     - html
     - pdf
-  
+
   # Documentation sections
   sections:
     - architecture_overview
@@ -465,7 +465,7 @@ documentation:
     - troubleshooting_guide
     - api_documentation
     - security_guide
-  
+
   # Auto-generation triggers
   triggers:
     - on_deployment
@@ -481,8 +481,8 @@ diagrams:
     - network_topology
     - data_flow
     - deployment_pipeline
-  
+
   tools:
     - plantuml
     - drawio
-    - mermaid 
+    - mermaid

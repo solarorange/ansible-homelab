@@ -13,9 +13,11 @@ services:
     volumes:
       - "{{ data_dir }}/authentik/postgresql:/var/lib/postgresql/data"
     environment:
-      - POSTGRES_PASSWORD={{ vault_authentik_postgres_password }}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/POSTGRES_PASSWORD
       - POSTGRES_USER=authentik
       - POSTGRES_DB=authentik
+    volumes:
+      - "{{ docker_dir }}/security/secrets:/run/secrets:ro"
     networks:
       - homelab
 
@@ -32,11 +34,11 @@ services:
     restart: unless-stopped
     command: server
     environment:
-      AUTHENTIK_SECRET_KEY: "{{ vault_authentik_secret_key }}"
+      AUTHENTIK_SECRET_KEY_FILE: "/run/secrets/AUTHENTIK_SECRET_KEY"
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: "{{ vault_authentik_postgres_password }}"
+      AUTHENTIK_POSTGRESQL__PASSWORD_FILE: "/run/secrets/POSTGRES_PASSWORD"
       AUTHENTIK_REDIS__HOST: redis
       PUID: "{{ user_id }}"
       PGID: "{{ group_id }}"
@@ -45,6 +47,7 @@ services:
       - "{{ docker_dir }}/authentik/media:/media"
       - "{{ docker_dir }}/authentik/templates:/templates"
       - "{{ docker_dir }}/authentik/certs:/certs"
+      - "{{ docker_dir }}/security/secrets:/run/secrets:ro"
     networks:
       - homelab
     labels:
@@ -61,15 +64,16 @@ services:
     restart: unless-stopped
     command: worker
     environment:
-      AUTHENTIK_SECRET_KEY: "{{ vault_authentik_secret_key }}"
+      AUTHENTIK_SECRET_KEY_FILE: "/run/secrets/AUTHENTIK_SECRET_KEY"
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: "{{ vault_authentik_postgres_password }}"
+      AUTHENTIK_POSTGRESQL__PASSWORD_FILE: "/run/secrets/POSTGRES_PASSWORD"
       AUTHENTIK_REDIS__HOST: redis
     volumes:
       - "{{ docker_dir }}/authentik/media:/media"
       - "{{ docker_dir }}/authentik/templates:/templates"
       - "{{ docker_dir }}/authentik/certs:/certs"
+      - "{{ docker_dir }}/security/secrets:/run/secrets:ro"
     networks:
       - homelab 

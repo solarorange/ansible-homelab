@@ -11,7 +11,7 @@
     api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
     validate_certs: "{{ proxmox_validate_certs | default(true) }}"
   register: proxmox_connection
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox, always]
 
 - name: Check available resources
@@ -25,7 +25,7 @@
     vmid: "{{ proxmox_vmid }}"
     state: present
   register: proxmox_resources
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Validate resource availability
@@ -56,7 +56,7 @@
     template: true
     state: present
   register: template_creation
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Clone VM from template
@@ -73,7 +73,7 @@
     full: true
     state: present
   register: vm_clone
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Configure VM resources
@@ -91,7 +91,7 @@
     netif: "{{ vm_network | default('virtio,bridge=vmbr0') }}"
     state: present
   register: vm_config
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Start VM
@@ -105,7 +105,7 @@
     vmid: "{{ proxmox_vmid }}"
     state: started
   register: vm_start
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Wait for VM to be ready
@@ -115,7 +115,7 @@
     delay: 10
     timeout: 300
   register: vm_ready
-  delegate_to: {{ ansible_default_ipv4.address }}
+  delegate_to: "{{ ansible_default_ipv4.address }}"
   tags: [proxmox]
 
 - name: Display VM deployment status
@@ -129,4 +129,4 @@
         Cores: {{ vm_cores | default(2) }}
         Disk: {{ vm_disk | default(20) }}GB
       Status: {{ vm_start.status }}
-  tags: [proxmox] 
+  tags: [proxmox]

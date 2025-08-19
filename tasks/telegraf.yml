@@ -125,9 +125,9 @@
     dest: "{{ docker_dir }}/monitoring/telegraf/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Telegraf Management Script
-      
+
       function show_help {
         echo "Telegraf Management Script"
         echo "Usage: $0 [command]"
@@ -139,7 +139,7 @@
         echo "  test      - Test configuration"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
           docker exec telegraf telegraf --test
@@ -166,19 +166,19 @@
     dest: "{{ docker_dir }}/monitoring/telegraf/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Telegraf is running
       if ! docker ps | grep -q telegraf; then
         echo "Telegraf container is not running"
         exit 1
       fi
-      
+
       # Check if Telegraf can collect metrics
       if ! docker exec telegraf telegraf --test > /dev/null; then
         echo "Telegraf is not collecting metrics properly"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -207,4 +207,4 @@
     job: "logrotate {{ docker_dir }}/monitoring/telegraf/config/logrotate.conf"
     hour: "0"
     minute: "0"
-    user: "{{ vault_telegraf_user }}" 
+    user: "{{ vault_telegraf_user }}"

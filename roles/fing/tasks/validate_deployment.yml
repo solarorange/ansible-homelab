@@ -110,7 +110,7 @@
     method: GET
     status_code: 200
     timeout: "{{ fing_health_check_timeout }}"
-    validate_certs: false
+    validate_certs: "{{ validate_certs | default(true) }}"
   register: fing_traefik_check
   when: fing_traefik_enabled | default(true)
 
@@ -122,7 +122,7 @@
 
 - name: Verify Fing monitoring integration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ prometheus_port | default(9090) }}/api/v1/targets"
     method: GET
     status_code: 200
     timeout: 10
@@ -137,7 +137,7 @@
 
 - name: Verify Fing Homepage integration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/services"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
     method: GET
     status_code: 200
     timeout: 10
@@ -257,9 +257,9 @@
 
 - name: Assert Fing resource usage is reasonable
   ansible.builtin.assert:
-    that: 
+    that:
       - fing_resource_check.stdout != ""
-      - "0.0%" not in fing_resource_check.stdout
+      - '"0.0%" not in fing_resource_check.stdout'
     fail_msg: "Fing resource usage is not reasonable"
 
 - name: Verify Fing network connectivity
@@ -289,56 +289,56 @@
   ansible.builtin.debug:
     msg: |
       Fing Deployment Validation Complete:
-      
+
       Container Status:
       - Container: {{ fing_container_name }}
       - Status: {{ fing_container_status.container.State.Status }}
       - Health: {{ fing_container_status.container.State.Health.Status | default('N/A') }}
-      
+
       Service Endpoints:
       - Web Interface: {{ fing_web_check.status | default('N/A') }}
       - API Endpoint: {{ fing_api_check.status | default('N/A') }}
       - Metrics Endpoint: {{ fing_metrics_check.status | default('N/A') }}
       - Traefik Integration: {{ fing_traefik_check.status | default('N/A') }}
-      
+
       Database & Discovery:
       - Database Status: {{ fing_db_check.rc | default('N/A') }}
       - Network Discovery: {{ fing_discovery_check.rc | default('N/A') }}
       - Authentication: {{ fing_auth_check.status | default('N/A') }}
-      
+
       Integration Status:
       - Prometheus Targets: {{ prometheus_targets_check.status | default('N/A') }}
       - Homepage Services: {{ homepage_services_check.status | default('N/A') }}
       - Fail2ban Jail: {{ fail2ban_jail_check.rc | default('N/A') }}
-      
+
       Functionality Tests:
       - Backup Test: {{ fing_backup_check.rc | default('N/A') }}
       - Alert Test: {{ fing_alert_check.rc | default('N/A') }}
       - Network Connectivity: {{ fing_network_check.rc | default('N/A') }}
-      
+
       System Integration:
       - Log Files: {{ fing_log_files.files | length }} files
       - Config Files: {{ fing_config_files.files | length }} files
       - Cron Jobs: {{ fing_backup_cron_check.changed | default(false) | ternary('Not Configured', 'Configured') }}
       - Systemd Service: {{ fing_service_check.status.ActiveState }}
       - Systemd Timer: {{ fing_timer_check.status.ActiveState | default('N/A') }}
-      
+
       Resource Usage:
       - CPU & Memory: {{ fing_resource_check.stdout | default('N/A') }}
-      
+
       Port Accessibility:
       - Web Port ({{ fing_web_port }}): Accessible
       - API Port ({{ fing_api_port }}): Accessible
       - Metrics Port ({{ fing_metrics_port }}): Accessible
-      
+
       All validation checks passed successfully!
-      
+
       Fing is now fully deployed and operational:
       - Web Interface: https://{{ fing_domain }}
       - API Endpoint: https://{{ fing_domain }}/api/{{ fing_api_version }}
       - Metrics: https://{{ fing_domain }}/metrics
       - Homepage: Available in Network category
-      
+
       Next Steps:
       1. Access the web interface and configure network discovery
       2. Set up monitoring dashboards in Grafana
@@ -347,4 +347,4 @@
       5. Monitor logs and metrics
       6. Configure additional security rules
       7. Set up backup verification
-      8. Test alert notifications 
+      8. Test alert notifications

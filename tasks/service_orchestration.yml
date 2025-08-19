@@ -16,26 +16,26 @@
       traefik: []
       authentik: []
       portainer: []
-      
+
       # Database services (depend on infrastructure)
       postgresql: [traefik]
       mariadb: [traefik]
       redis: [traefik]
       elasticsearch: [traefik]
-      
+
       # Monitoring services (depend on databases)
       influxdb: [postgresql]
       prometheus: [postgresql]
       grafana: [postgresql, influxdb]
       loki: [postgresql]
       alertmanager: [postgresql]
-      
+
       # Security services (depend on infrastructure)
       crowdsec: [traefik]
       fail2ban: [traefik]
       vault: [traefik]
       wireguard: [traefik]
-      
+
       # Media services (depend on databases and monitoring)
       sonarr: [postgresql, grafana]
       radarr: [postgresql, grafana]
@@ -46,17 +46,17 @@
       jellyfin: [postgresql, grafana]
       plex: [postgresql, grafana]
       emby: [postgresql, grafana]
-      
+
       # Storage services (depend on infrastructure)
       nextcloud: [traefik, postgresql]
       samba: [traefik]
       syncthing: [traefik]
-      
+
       # Utility services (depend on infrastructure)
       watchtower: [traefik]
       tdarr: [traefik, grafana]
       tautulli: [traefik, grafana]
-      
+
       # Application services (depend on databases)
       paperless: [postgresql, grafana]
       fing: [postgresql, grafana]
@@ -149,20 +149,20 @@
       ========================================
       SERVICE ORCHESTRATION STATUS
       ========================================
-      
+
       Orchestration Service: {{ 'RUNNING' if health_check_result.rc == 0 else 'FAILED' }}
       Health Check Output: {{ health_check_result.stdout }}
-      
+
       Service Dependencies Configured:
       {% for service, deps in service_dependencies.items() %}
       - {{ service }}: {{ deps | join(', ') if deps else 'No dependencies' }}
       {% endfor %}
-      
+
       Startup Script: {{ docker_dir }}/orchestration/startup.sh
       Shutdown Script: {{ docker_dir }}/orchestration/shutdown.sh
       Health Check Script: {{ docker_dir }}/orchestration/health-check.sh
-      
+
       Systemd Service: homelab-orchestration.service
-      
+
       ========================================
-  tags: [orchestration, summary] 
+  tags: [orchestration, summary]

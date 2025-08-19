@@ -29,6 +29,18 @@
 
 ## 🔧 **Quick Commands**
 
+### **External Server Integration**
+```bash
+# Integrate external server (interactive)
+./scripts/integrate_server.sh
+
+# Integrate specific server
+./scripts/integrate_server.sh --name synology --ip 192.168.1.100 --port 5000
+
+# Integrate multiple servers
+./scripts/integrate_server.sh --config config/external_servers.yml
+```
+
 ### **System Status**
 ```bash
 # Check all services

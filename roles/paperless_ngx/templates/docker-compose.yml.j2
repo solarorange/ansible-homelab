@@ -10,7 +10,7 @@ services:
     environment:
       # Basic configuration
       - PAPERLESS_URL=https://{{ paperless_ngx_domain }}
-      - PAPERLESS_SECRET_KEY={{ paperless_ngx_secret_key }}
+      - PAPERLESS_SECRET_KEY_FILE=/run/secrets/PAPERLESS_SECRET_KEY
       - PAPERLESS_TIME_ZONE={{ timezone | default('UTC') }}
       - PAPERLESS_DEBUG={{ paperless_ngx_debug_enabled | lower }}
       
@@ -19,12 +19,12 @@ services:
       - PAPERLESS_DBPORT={{ paperless_ngx_database_port }}
       - PAPERLESS_DBNAME={{ paperless_ngx_database_name }}
       - PAPERLESS_DBUSER={{ paperless_ngx_database_user }}
-      - PAPERLESS_DBPASS={{ paperless_ngx_database_password }}
+      - PAPERLESS_DBPASS_FILE=/run/secrets/PAPERLESS_DBPASS
       
       # Redis configuration
       - PAPERLESS_REDIS={{ paperless_ngx_redis_host }}:{{ paperless_ngx_redis_port }}
       {% if paperless_ngx_redis_password %}
-      - PAPERLESS_REDIS_PASSWORD={{ paperless_ngx_redis_password }}
+      - PAPERLESS_REDIS_PASSWORD_FILE=/run/secrets/PAPERLESS_REDIS_PASSWORD
       {% endif %}
       - PAPERLESS_REDIS_DB={{ paperless_ngx_redis_db }}
       
@@ -81,7 +81,7 @@ services:
       - PAPERLESS_EMAIL_HOST={{ paperless_ngx_smtp_host }}
       - PAPERLESS_EMAIL_PORT={{ paperless_ngx_smtp_port }}
       - PAPERLESS_EMAIL_USERNAME={{ paperless_ngx_smtp_username }}
-      - PAPERLESS_EMAIL_PASSWORD={{ paperless_ngx_smtp_password }}
+      - PAPERLESS_EMAIL_PASSWORD_FILE=/run/secrets/PAPERLESS_EMAIL_PASSWORD
       - PAPERLESS_EMAIL_ENCRYPTION={{ paperless_ngx_smtp_encryption }}
       {% endif %}
       
@@ -110,7 +110,11 @@ services:
       
       # Custom environment variables
       {% for key, value in paperless_ngx_environment_variables.items() %}
+      {% if paperless_ngx_manage_secret_files and (key is match('(PASSWORD|TOKEN|SECRET|KEY)')) %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
       
       # System environment
@@ -144,18 +148,29 @@ services:
       # Temporary files
       - {{ docker_dir }}/paperless-ngx/temp:/tmp/paperless
       - {{ docker_dir }}/paperless-ngx/trash:/usr/src/paperless/trash
+      - {{ docker_dir }}/paperless-ngx/secrets/PAPERLESS_SECRET_KEY:/run/secrets/PAPERLESS_SECRET_KEY:ro
+      - {{ docker_dir }}/paperless-ngx/secrets/PAPERLESS_DBPASS:/run/secrets/PAPERLESS_DBPASS:ro
+      - {{ docker_dir }}/paperless-ngx/secrets/PAPERLESS_REDIS_PASSWORD:/run/secrets/PAPERLESS_REDIS_PASSWORD:ro
+      - {{ docker_dir }}/paperless-ngx/secrets/PAPERLESS_EMAIL_PASSWORD:/run/secrets/PAPERLESS_EMAIL_PASSWORD:ro
+      {% for key, value in paperless_ngx_environment_variables.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ docker_dir }}/paperless-ngx/secrets/{{ key }}:/run/secrets/{{ key }}:ro
+      {% endif %}
+      {% endfor %}
       
       # Custom volume mounts
       {% for mount in paperless_ngx_volume_mounts %}
       - {{ mount }}
       {% endfor %}
     
-    # Port mappings
+    # Port mappings (enable only if direct exposure is needed)
+    {% if paperless_ngx_direct_expose_enabled | default(false) %}
     ports:
       - "{{ paperless_ngx_web_port }}:8000"
       {% if paperless_ngx_debug_enabled | default(false) %}
       - "{{ paperless_ngx_debug_port }}:{{ paperless_ngx_debug_port }}"
       {% endif %}
+    {% endif %}
     
     # Networks
     networks:
@@ -163,18 +178,12 @@ services:
       - paperless-internal
     
     # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ paperless_ngx_memory_limit }}
-          cpus: '{{ paperless_ngx_cpu_limit }}'
-        reservations:
-          memory: {{ (paperless_ngx_memory_limit | regex_replace('([0-9]+)g', '\\1') | int * 512) | int }}m
-          cpus: '{{ (paperless_ngx_cpu_limit | float * 0.5) | round(2) }}'
+    mem_limit: {{ paperless_ngx_memory_limit }}
+    cpus: '{{ paperless_ngx_cpu_limit }}'
     
     # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8000{{ paperless_ngx_health_check_url }}"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000{{ paperless_ngx_health_check_url }} || exit 1"]
       interval: {{ paperless_ngx_health_check_interval }}s
       timeout: {{ paperless_ngx_health_check_timeout }}s
       retries: {{ paperless_ngx_health_check_retries }}
@@ -184,6 +193,8 @@ services:
     security_opt:
       - no-new-privileges:true
       - seccomp:unconfined
+    cap_drop:
+      - ALL
     
     # Capabilities
     cap_add:
@@ -264,10 +275,11 @@ services:
     
     # Logging
     logging:
+    # User: runs as root due to OCR and mount requirements
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
         labels: "app=paperless-ngx,service=document-management"
         env: "TZ={{ timezone | default('UTC') }}"
 

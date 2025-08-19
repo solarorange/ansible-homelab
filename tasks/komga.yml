@@ -42,9 +42,9 @@
     dest: "{{ docker_dir }}/komga/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Komga Management Script
-      
+
       function show_help {
           echo "Komga Management Script"
           echo "Usage: $0 [command]"
@@ -57,14 +57,14 @@
           echo "  restore   - Restore Komga data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up Komga data..."
           tar -czf "{{ docker_dir }}/komga/backup/komga_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/komga" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -74,7 +74,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/komga"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep komga
@@ -104,19 +104,19 @@
     dest: "{{ docker_dir }}/komga/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Komga is running
       if ! docker ps | grep -q komga; then
           echo "Komga is not running"
           exit 1
       fi
-      
+
       # Check if Komga is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8080 | grep -q "Komga"; then
           echo "Komga is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -153,4 +153,4 @@
     job: "{{ docker_dir }}/komga/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ vault_komga_user }}" 
+    user: "{{ vault_komga_user }}"

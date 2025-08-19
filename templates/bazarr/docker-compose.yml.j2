@@ -10,8 +10,9 @@ services:
       - TZ={{ timezone | default('UTC') }}
       - DOCKER_MODS=linuxserver/mods:universal-cron
     volumes:
-      - {{ docker_root }}/bazarr/config:/config
-      - {{ docker_root }}/bazarr/data:/data
+      - {{ docker_dir }}/bazarr/config:/config
+      - {{ docker_dir }}/bazarr/data:/data
+      - {{ logs_dir }}/bazarr:/logs
       - {{ media_dir }}/movies:/movies
       - {{ media_dir }}/tv:/tv
       - {{ media_dir }}/anime:/anime
@@ -37,8 +38,13 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=bazarr"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:6767/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6767/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

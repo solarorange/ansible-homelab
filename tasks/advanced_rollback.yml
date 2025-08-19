@@ -23,7 +23,7 @@
     remote_src: yes
     mode: '0644'
   loop: "{{ enabled_services }}"
-  when: 
+  when:
     - item in enabled_services
     - ansible.builtin.stat(path=docker_dir + '/' + item + '/docker-compose.yml').stat.exists
   tags: [rollback, backup]
@@ -35,7 +35,7 @@
     remote_src: yes
     mode: '0600'
   loop: "{{ enabled_services }}"
-  when: 
+  when:
     - item in enabled_services
     - ansible.builtin.stat(path=docker_dir + '/' + item + '/.env').stat.exists
   tags: [rollback, backup]
@@ -71,17 +71,17 @@
       ========================================
       ROLLBACK POINT CREATED
       ========================================
-      
+
       Rollback Point: {{ ansible_date_time.epoch }}
       Rollback Directory: {{ docker_dir }}/rollback/
       Rollback Script: {{ docker_dir }}/rollback/rollback.sh
-      
+
       Configuration:
       - Max Rollback Points: {{ rollback_config.max_rollback_points }}
       - Auto Rollback: {{ 'ENABLED' if rollback_config.auto_rollback_on_failure else 'DISABLED' }}
       - Rollback Timeout: {{ rollback_config.rollback_timeout }}s
-      
+
       To rollback: {{ docker_dir }}/rollback/rollback.sh {{ ansible_date_time.epoch }}
-      
+
       ========================================
-  tags: [rollback, summary] 
+  tags: [rollback, summary]

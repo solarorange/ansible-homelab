@@ -9,7 +9,11 @@ services:
     # Environment variables
     environment:
       {% for key, value in romm_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     
     # Volumes
@@ -17,10 +21,27 @@ services:
       {% for volume in romm_volumes %}
       - {{ volume }}
       {% endfor %}
+      - "{{ logs_dir }}/romm:/logs"
+      {% if romm_manage_secret_files | default(true) %}
+      {% for key, value in romm_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ docker_dir }}/romm/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+      {% if romm_manage_secret_files | default(true) %}
+      {% for key, value in romm_environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ docker_dir }}/romm/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     
-    # Ports
+    # Ports removed (Traefik provides ingress). Enable to expose directly.
+    {% if romm_direct_expose_enabled | default(false) %}
     ports:
       - "{{ romm_external_port }}:{{ romm_internal_port }}"
+    {% endif %}
     
     # Networks
     networks:
@@ -46,7 +67,7 @@ services:
     # Health check
     {% if romm_healthcheck_enabled | default(true) %}
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://{{ ansible_default_ipv4.address }}:{{ romm_internal_port }}/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ romm_internal_port }}/ || exit 1"]
       interval: {{ romm_healthcheck_interval }}
       timeout: {{ romm_healthcheck_timeout }}
       retries: {{ romm_healthcheck_retries }}
@@ -57,22 +78,19 @@ services:
     {% if romm_security_enabled | default(true) %}
     security_opt:
       - no-new-privileges:{{ romm_no_new_privileges | default(true) }}
+    cap_drop:
+      - ALL
     {% endif %}
     
     # Read-only root filesystem
-    read_only: {{ romm_read_only | default(false) }}
+    read_only: {{ romm_read_only | default(true) }}
     tmpfs:
       - /tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     
     # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: {{ romm_memory_limit }}
-          cpus: '{{ romm_cpu_limit }}'
-        reservations:
-          memory: {{ romm_memory_reservation }}
-          cpus: '{{ romm_cpu_reservation }}'
+    mem_limit: {{ romm_memory_limit }}
+    cpus: '{{ romm_cpu_limit }}'
     
     # Dependencies
     {% if romm_dependencies is defined %}
@@ -87,8 +105,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   homelab:

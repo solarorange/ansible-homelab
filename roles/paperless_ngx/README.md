@@ -250,6 +250,10 @@ roles/paperless_ngx/
 - API rate limiting
 - Session management
 
+### Container Hardening Notes
+- Compose applies `security_opt: [no-new-privileges:true]` and `cap_drop: [ALL]` by default.
+- Paperless-ngx requires `SYS_ADMIN` for OCR processing and specific mounts; it may run as root and uses `read_only: false` for required paths.
+
 ## Backup and Recovery
 
 ### Backup Strategy
@@ -363,3 +367,62 @@ For support and questions:
 - Backup and recovery procedures
 - Homepage integration
 - Comprehensive alerting 
+
+## Rollback
+
+- Automatic rollback on failed deploys: The compose deploy wrapper restores last-known-good Compose and the pre-change snapshot automatically on failure.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., paperless_ngx
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```
+
+### Secrets & Health Checks
+
+- Secrets directory: `{{ docker_dir }}/paperless-ngx/secrets`.
+- Enable file-based secrets by setting:
+  ```yaml
+  paperless_ngx_manage_secret_files: true
+  paperless_ngx_secret_files:
+    - name: PAPERLESS_DB_PASSWORD
+      from_vault_var: vault_paperless_ngx_database_password
+    - name: PAPERLESS_SECRET_KEY
+      from_vault_var: vault_paperless_ngx_secret_key
+  paperless_ngx_required_secrets:
+    - PAPERLESS_DB_PASSWORD
+    - PAPERLESS_SECRET_KEY
+  ```
+  Compose templates map secret-like env keys to `KEY_FILE=/run/secrets/KEY` and mount files from the secrets directory. See `docs/SECRETS_CONVENTIONS.md`.
+
+- Post-deploy route health check (ingress default):
+  ```yaml
+  - ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+    vars:
+      route_health_check_url: "https://{{ paperless_ngx_subdomain }}.{{ domain }}/api/health/"
+      route_health_check_status_codes: [200, 302, 401]
+  ```
+  See `docs/POST_DEPLOY_SMOKE_TESTS.md`.

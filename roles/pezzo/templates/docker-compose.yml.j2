@@ -18,12 +18,23 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.server.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.server.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if pezzo_manage_secret_files | default(true) %}
+      {% for key, value in pezzo_components.server.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ pezzo_config_dir }}/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     labels:
       - "traefik.enable={{ 'true' if pezzo_traefik_enabled else 'false' }}"
       - "traefik.http.routers.pezzo-server.rule=Host(`api.{{ pezzo_subdomain }}.{{ domain }}`)"
@@ -46,14 +57,16 @@ services:
       {% for dependency in pezzo_components.server.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.server.resources.limits.cpus }}'
-          memory: {{ pezzo_components.server.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.server.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.server.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.server.resources.limits.memory }}
+    cpus: '{{ pezzo_components.server.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo Console
@@ -69,7 +82,11 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.console.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.console.volumes %}
@@ -97,14 +114,16 @@ services:
       {% for dependency in pezzo_components.console.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.console.resources.limits.cpus }}'
-          memory: {{ pezzo_components.console.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.console.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.console.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.console.resources.limits.memory }}
+    cpus: '{{ pezzo_components.console.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo Proxy
@@ -120,7 +139,11 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.proxy.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.proxy.volumes %}
@@ -148,14 +171,16 @@ services:
       {% for dependency in pezzo_components.proxy.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.proxy.resources.limits.cpus }}'
-          memory: {{ pezzo_components.proxy.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.proxy.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.proxy.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.proxy.resources.limits.memory }}
+    cpus: '{{ pezzo_components.proxy.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo PostgreSQL Database
@@ -171,12 +196,23 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.postgres.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.postgres.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if pezzo_manage_secret_files | default(true) %}
+      {% for key, value in pezzo_components.postgres.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ pezzo_config_dir }}/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     labels:
       # Prometheus scraping labels
       - "pezzo.prometheus.scrape=true"
@@ -188,14 +224,16 @@ services:
       interval: "{{ pezzo_components.postgres.healthcheck.interval }}"
       timeout: "{{ pezzo_components.postgres.healthcheck.timeout }}"
       retries: {{ pezzo_components.postgres.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.postgres.resources.limits.cpus }}'
-          memory: {{ pezzo_components.postgres.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.postgres.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.postgres.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.postgres.resources.limits.memory }}
+    cpus: '{{ pezzo_components.postgres.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo Redis
@@ -211,12 +249,23 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.redis.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.redis.volumes %}
       - "{{ volume }}"
       {% endfor %}
+      {% if pezzo_manage_secret_files | default(true) %}
+      {% for key, value in pezzo_components.redis.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - "{{ pezzo_config_dir }}/secrets/{{ key }}:/run/secrets/{{ key }}:ro"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     labels:
       # Prometheus scraping labels
       - "pezzo.prometheus.scrape=true"
@@ -228,14 +277,16 @@ services:
       interval: "{{ pezzo_components.redis.healthcheck.interval }}"
       timeout: "{{ pezzo_components.redis.healthcheck.timeout }}"
       retries: {{ pezzo_components.redis.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.redis.resources.limits.cpus }}'
-          memory: {{ pezzo_components.redis.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.redis.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.redis.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.redis.resources.limits.memory }}
+    cpus: '{{ pezzo_components.redis.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo ClickHouse
@@ -251,7 +302,11 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.clickhouse.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.clickhouse.volumes %}
@@ -268,14 +323,16 @@ services:
       interval: "{{ pezzo_components.clickhouse.healthcheck.interval }}"
       timeout: "{{ pezzo_components.clickhouse.healthcheck.timeout }}"
       retries: {{ pezzo_components.clickhouse.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.clickhouse.resources.limits.cpus }}'
-          memory: {{ pezzo_components.clickhouse.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.clickhouse.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.clickhouse.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.clickhouse.resources.limits.memory }}
+    cpus: '{{ pezzo_components.clickhouse.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo SuperTokens
@@ -291,7 +348,11 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.supertokens.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.supertokens.volumes %}
@@ -312,14 +373,16 @@ services:
       {% for dependency in pezzo_components.supertokens.depends_on %}
       - {{ dependency }}
       {% endfor %}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.supertokens.resources.limits.cpus }}'
-          memory: {{ pezzo_components.supertokens.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.supertokens.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.supertokens.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components.supertokens.resources.limits.memory }}
+    cpus: '{{ pezzo_components.supertokens.resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %}
 
   # Pezzo Local KMS
@@ -335,7 +398,11 @@ services:
       - PGID={{ PGID | default(1000) }}
       - TZ={{ timezone }}
       {% for key, value in pezzo_components.local-kms.environment.items() %}
+      {% if key is match('(PASSWORD|TOKEN|SECRET|KEY)') %}
+      - {{ key }}_FILE=/run/secrets/{{ key }}
+      {% else %}
       - {{ key }}={{ value }}
+      {% endif %}
       {% endfor %}
     volumes:
       {% for volume in pezzo_components.local-kms.volumes %}
@@ -352,12 +419,14 @@ services:
       interval: "{{ pezzo_components.local-kms.healthcheck.interval }}"
       timeout: "{{ pezzo_components.local-kms.healthcheck.timeout }}"
       retries: {{ pezzo_components.local-kms.healthcheck.retries }}
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ pezzo_components.local-kms.resources.limits.cpus }}'
-          memory: {{ pezzo_components.local-kms.resources.limits.memory }}
-        reservations:
-          cpus: '{{ pezzo_components.local-kms.resources.reservations.cpus }}'
-          memory: {{ pezzo_components.local-kms.resources.reservations.memory }}
+    mem_limit: {{ pezzo_components['local-kms'].resources.limits.memory }}
+    cpus: '{{ pezzo_components['local-kms'].resources.limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "{{ PUID | default(1000) }}:{{ PGID | default(1000) }}"
   {% endif %} 

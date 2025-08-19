@@ -111,7 +111,7 @@
       - Missing Security Headers: {{ 5 - (header_check.headers | dict2items | selectattr('key', 'match', '^X-') | list | length) }}
       - Unnecessary Open Ports: {{ port_scan.stdout | regex_search('open') | list | length - (service_ports | length) }}
   when: >
-    (nikto_scan.stdout | regex_search('OSVDB-') | list | length) + 
+    (nikto_scan.stdout | regex_search('OSVDB-') | list | length) +
     (lynis_scan.stdout | regex_search('Warning') | list | length) > 0 or
     (5 - (header_check.headers | dict2items | selectattr('key', 'match', '^X-') | list | length)) > 0 or
-    (port_scan.stdout | regex_search('open') | list | length - (service_ports | length)) > 0 
+    (port_scan.stdout | regex_search('open') | list | length - (service_ports | length)) > 0

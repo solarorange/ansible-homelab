@@ -1,0 +1,106 @@
+---
+# Simple App Deployment Tasks
+
+- name: Create Simple App directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/simpleapp"
+    - "{{ docker_config_root }}/simpleapp"
+    - "{{ docker_logs_root }}/simpleapp"
+    - "{{ docker_backup_root }}/simpleapp"
+  tags: [simpleapp, deploy]
+
+- name: Generate Simple App environment file
+  template:
+    src: env.j2
+    dest: "{{ docker_config_root }}/simpleapp/.env"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart simpleapp
+  tags: [simpleapp, deploy]
+
+- name: Deploy Simple App Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/simpleapp/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart simpleapp
+  tags: [simpleapp, deploy]
+
+- name: Prepare Simple App secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "simpleapp"
+    secret_dir_root: "{{ docker_dir }}/simpleapp"
+    secret_files: "{{ simpleapp_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ simpleapp_environment | default({}) }}"
+  when: simpleapp_manage_secret_files | default(true) | bool
+  tags: [simpleapp, deploy, setup]
+
+- name: Validate required Simple App secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/simpleapp/secrets/{{ item }}"
+  register: simpleapp_secret_stats
+  loop: "{{ simpleapp_required_secrets | default([]) }}"
+  when: simpleapp_manage_secret_files | default(true) | bool and (simpleapp_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Simple App secret files are missing
+  ansible.builtin.assert:
+    that: "{{ simpleapp_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/simpleapp/secrets.
+      Missing: {{ (simpleapp_required_secrets | default([])) | reject('in', (simpleapp_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: simpleapp_manage_secret_files | default(true) | bool and (simpleapp_required_secrets | default([]) | length > 0)
+
+- name: Start Simple App container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/simpleapp"
+    state: present
+    restarted: yes
+  tags: [simpleapp, deploy]
+
+- name: Wait for Simple App to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ simpleapp_external_port }}"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+  tags: [simpleapp, deploy]
+  when: simpleapp_direct_expose_enabled | default(false)
+
+- name: Verify Simple App via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ simpleapp_subdomain }}.{{ domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [simpleapp, deploy]
+  when: not (simpleapp_direct_expose_enabled | default(false))
+
+- name: Setup Simple App authentication
+  include_tasks: auth_setup.yml
+  when: simpleapp_auth_enabled | default(true)
+  tags: [simpleapp, deploy, auth]
+
+- name: Setup Simple App database
+  include_tasks: database_setup.yml
+  when: simpleapp_database_enabled | default(true)
+  tags: [simpleapp, deploy, database]
+
+- name: Setup Simple App API
+  include_tasks: api_setup.yml
+  when: simpleapp_api_enabled | default(true)
+  tags: [simpleapp, deploy, api]

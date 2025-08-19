@@ -54,4 +54,18 @@
 
     - name: Set emergency mode
       ansible.builtin.set_fact:
-        emergency_mode: true 
+        emergency_mode: true
+
+    - name: Notify rollback success
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "Rollback executed on {{ inventory_hostname }} for task: {{ ansible_failed_task.name }}. Success: {{ rollback_successful | default(false) }}"
+          }
+        status_code: [200, 201, 202]
+      when:
+        - notification_webhook_url is defined
+        - rollback_successful | default(false)

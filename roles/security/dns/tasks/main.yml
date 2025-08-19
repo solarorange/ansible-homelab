@@ -22,12 +22,17 @@
     mode: "0644"
   notify: Restart pihole stack
 
-- name: Start pihole stack
-  community.docker.docker_compose:
+- name: Start pihole stack safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "pihole"
     project_src: "{{ docker_dir }}/pihole"
-    build: false
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 80
   register: pihole_result
 
 - name: Display pihole deployment result
   ansible.builtin.debug:
-    var: pihole_result 
+    var: pihole_result

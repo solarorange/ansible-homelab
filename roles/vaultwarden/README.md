@@ -167,6 +167,10 @@ vault_homepage_api_keys:
 - CrowdSec and Fail2ban integration
 - All secrets are stored with 600 permissions
 
+### Container Hardening Notes
+- The compose template applies `security_opt: [no-new-privileges:true]` and `cap_drop: [ALL]`.
+- `read_only` is disabled due to persistent database and runtime needs; tmpfs is used for `/tmp`.
+
 ## Monitoring
 - Prometheus metrics endpoint: `/metrics`
 - Grafana dashboards and Loki log aggregation
@@ -178,3 +182,36 @@ vault_homepage_api_keys:
 ## License
 
 This role is provided under the MIT License. Vaultwarden is licensed under GPL-3.0. 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Deployments use a safe wrapper that restores the last-known-good Compose and pre-change snapshot if a deployment fails.
+
+- Manual rollback (this service):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., vaultwarden
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```

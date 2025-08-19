@@ -38,9 +38,9 @@
     dest: "{{ docker_dir }}/radarr/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Radarr Management Script
-      
+
       function show_help {
           echo "Radarr Management Script"
           echo "Usage: $0 [command]"
@@ -53,14 +53,14 @@
           echo "  restore   - Restore Radarr data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up Radarr data..."
           tar -czf "{{ docker_dir }}/radarr/backup/radarr_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/radarr" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -70,7 +70,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/radarr"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep radarr
@@ -100,26 +100,26 @@
     dest: "{{ docker_dir }}/radarr/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Radarr is running
       if ! docker ps -f name=radarr -f status=running | grep -q radarr; then
         echo "Radarr is not running"
         exit 1
       fi
-      
+
       # Check if Radarr is responding
       if ! curl -s -f http://{{ ansible_default_ipv4.address }}:7878/api/v3/health > /dev/null; then
         echo "Radarr is not responding"
         exit 1
       fi
-      
+
       # Check Radarr status
       STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:7878/api/v3/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Radarr status is $STATUS"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -156,4 +156,4 @@
     job: "{{ docker_dir }}/radarr/scripts/manage.sh backup"
     minute: "{{ backup_schedules.radarr.split(' ')[0] }}"
     hour: "{{ backup_schedules.radarr.split(' ')[1] }}"
-    user: "{{ vault_radarr_user }}" 
+    user: "{{ vault_radarr_user }}"

@@ -1,0 +1,40 @@
+---
+# Test Service Security Tasks
+
+- name: Configure Test Service security headers
+  uri:
+    url: "https://{{ testservice_domain }}/api/admin/security/headers"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_testservice_api_key | default('') }}"
+    body_format: json
+    body:
+      enabled: "{{ testservice_security_headers | lower }}"
+  tags: [testservice, security]
+
+- name: Configure Test Service rate limiting
+  uri:
+    url: "https://{{ testservice_domain }}/api/admin/security/rate-limit"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_testservice_api_key | default('') }}"
+    body_format: json
+    body:
+      enabled: "{{ testservice_rate_limiting | lower }}"
+      requests: "{{ testservice_rate_limit_requests }}"
+      window: "{{ testservice_rate_limit_window }}"
+  tags: [testservice, security]
+
+- name: Configure Test Service CORS
+  uri:
+    url: "https://{{ testservice_domain }}/api/admin/security/cors"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_testservice_api_key | default('') }}"
+    body_format: json
+    body:
+      enabled: "{{ testservice_cors_enabled | lower }}"
+  tags: [testservice, security]

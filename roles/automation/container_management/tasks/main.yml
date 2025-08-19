@@ -10,11 +10,13 @@
     mode: "0644"
   when: watchtower_enabled | default(true)
 
-- name: Start Watchtower stack
-  community.docker.docker_compose:
+- name: Start Watchtower stack safely with rollback
+  ansible.builtin.include_tasks: "../../tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "watchtower"
     project_src: "{{ docker_dir }}/watchtower"
-    state: present
-    restarted: true
+    compose_files:
+      - docker-compose.yml
   when: watchtower_enabled | default(true)
 
 - name: Ensure Watchtower log rotation
@@ -53,7 +55,7 @@
     dest: "{{ docker_dir }}/watchtower/docker-compose.yml"
     content: |
       version: '3.8'
-      
+
       networks:
         homelab:
           external: true
@@ -69,7 +71,7 @@
           external: true
         development:
           external: true
-      
+
       services:
         traefik:
           image: traefik:v2.10
@@ -109,7 +111,7 @@
             - "traefik.http.middlewares.traefik-auth.forwardauth.trustForwardHeader=true"
             - "traefik.http.routers.traefik.middlewares=traefik-auth"
           healthcheck:
-            test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8080/ping"]
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ping || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -135,11 +137,11 @@
     state: started
     restart_policy: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - "--schedule"
       - "{{ container_updater_schedule }}"
       - "--cleanup"
       - "--log-level"
       - "{{ container_updater_log_level }}"
-  when: container_updater_enabled | default(true) 
+  when: container_updater_enabled | default(true)

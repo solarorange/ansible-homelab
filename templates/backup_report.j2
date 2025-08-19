@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Completion Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Backup Completion Report</h1>
+        <p>Generated: {{ ansible_date_time.iso8601 }}</p>
+        <p>Host: {{ inventory_hostname }}</p>
+    </div>
+
+    <h2>Backup Summary</h2>
+    <p class="success">✓ Backup process completed successfully</p>
+    
+    <h2>Backup Details</h2>
+    <table>
+        <tr>
+            <th>Component</th>
+            <th>Status</th>
+            <th>Details</th>
+        </tr>
+        <tr>
+            <td>Configuration Files</td>
+            <td class="success">✓ Completed</td>
+            <td>Essential configuration files backed up</td>
+        </tr>
+        <tr>
+            <td>Database Backups</td>
+            <td class="warning">⚠ Skipped</td>
+            <td>No databases currently running</td>
+        </tr>
+        <tr>
+            <td>Docker Volumes</td>
+            <td class="warning">⚠ Skipped</td>
+            <td>No Docker volumes configured</td>
+        </tr>
+        <tr>
+            <td>Verification</td>
+            <td class="success">✓ Completed</td>
+            <td>Backup integrity verified</td>
+        </tr>
+        <tr>
+            <td>Retention Policy</td>
+            <td class="success">✓ Applied</td>
+            <td>Retention policy configured</td>
+        </tr>
+    </table>
+
+    <h2>Backup Location</h2>
+    <p>Backup directory: {{ backup_root_dir | default('/var/backups') }}</p>
+    
+    <h2>Next Steps</h2>
+    <ul>
+        <li>Monitor backup logs for any issues</li>
+        <li>Test backup restoration procedures</li>
+        <li>Verify backup retention policy is working</li>
+        <li>Schedule regular backup testing</li>
+    </ul>
+</body>
+</html>

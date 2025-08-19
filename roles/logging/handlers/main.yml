@@ -16,25 +16,25 @@
 
 # Docker Compose handlers (for containerized services)
 - name: Restart Loki container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring/loki"
     restarted: true
   when: loki_enabled | default(false)
 
 - name: Restart Promtail container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring/promtail"
     restarted: true
   when: promtail_enabled | default(false)
 
 - name: Restart Prometheus
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring/prometheus"
     restarted: true
   when: logging_prometheus_enabled | default(false)
 
 - name: Restart Grafana
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/monitoring/grafana"
     restarted: true
   when: logging_grafana_enabled | default(false)
@@ -63,4 +63,4 @@
 
 - name: Reload Loki configuration
   ansible.builtin.command: docker exec {{ loki_container_name }} kill -HUP 1
-  when: loki_enabled | default(false) 
+  when: loki_enabled | default(false)

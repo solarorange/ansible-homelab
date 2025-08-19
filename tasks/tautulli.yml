@@ -10,14 +10,14 @@
     owner: "{{ username }}"
     group: "{{ username }}"
   loop:
-    - "{{ docker_root }}/tautulli/config"
-    - "{{ docker_root }}/tautulli/logs"
+    - "{{ docker_dir }}/tautulli/config"
+    - "{{ docker_dir }}/tautulli/logs"
   tags: [media, tautulli]
 
 - name: Create Tautulli docker-compose configuration
   ansible.builtin.template:
     src: templates/tautulli/docker-compose.yml.j2
-    dest: "{{ docker_root }}/tautulli/docker-compose.yml"
+    dest: "{{ docker_dir }}/tautulli/docker-compose.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -26,7 +26,7 @@
 - name: Create Tautulli environment file
   ansible.builtin.template:
     src: templates/tautulli/.env.j2
-    dest: "{{ docker_root }}/tautulli/.env"
+    dest: "{{ docker_dir }}/tautulli/.env"
     mode: '0600'
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -35,21 +35,22 @@
 - name: Create Traefik configuration for Tautulli
   ansible.builtin.template:
     src: templates/tautulli/traefik.yml.j2
-    dest: "{{ docker_root }}/tautulli/traefik.yml"
+    dest: "{{ docker_dir }}/tautulli/traefik.yml"
     mode: '0644'
     owner: "{{ username }}"
     group: "{{ username }}"
   tags: [media, tautulli]
 
-- name: Start Tautulli container
-  community.docker.docker_compose:
-    project_src: "{{ docker_root }}/tautulli"
-    state: present
-    build: false
-    remove_orphans: true
-    pull: true
-  register: tautulli_result
-  tags: [media, tautulli]
+- name: Start Tautulli container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "tautulli"
+    project_src: "{{ docker_dir }}/tautulli"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8181
+  tags: [media, tautulli, rollback]
 
 - name: Wait for Tautulli to be ready
   ansible.builtin.uri:
@@ -76,7 +77,7 @@
 
 - name: Configure Tautulli notifications
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -87,7 +88,7 @@
 
 - name: Configure Tautulli backup
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
     method: POST
     body_format: json
     body: "{{ item }}"
@@ -98,7 +99,7 @@
 
 - name: Verify Tautulli configuration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
     method: GET
     status_code: 200
     register: tautulli_verify
@@ -110,4 +111,4 @@
       Tautulli deployment completed successfully
       URL: https://tautulli.{{ domain }}
       Status: {{ tautulli_verify.json.response.data }}
-  tags: [media, tautulli] 
+  tags: [media, tautulli]

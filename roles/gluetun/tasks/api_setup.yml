@@ -1,0 +1,34 @@
+---
+# Gluetun API Setup
+
+- name: Generate Gluetun API key
+  uri:
+    url: "https://{{ gluetun_domain }}/api/admin/keys"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_gluetun_api_key | default('') }}"
+    body_format: json
+    body:
+      name: "ansible-generated"
+      permissions: ["read", "write", "admin"]
+  register: api_key_result
+  tags: [gluetun, api]
+
+- name: Store Gluetun API key in vault
+  set_fact:
+    vault_gluetun_api_key: "{{ api_key_result.json.key }}"
+  tags: [gluetun, api]
+
+- name: Configure Gluetun API rate limiting
+  uri:
+    url: "https://{{ gluetun_domain }}/api/admin/config/api"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_gluetun_api_key | default('') }}"
+    body_format: json
+    body:
+      rate_limit_requests: "{{ gluetun_api_rate_limit }}"
+      rate_limit_window: "{{ gluetun_api_rate_limit_window }}"
+  tags: [gluetun, api]

@@ -47,24 +47,33 @@
     group: "{{ username }}"
     mode: "0750"
 
+- name: Write MariaDB root password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/mariadb/secrets/mariadb_root_password"
+    content: "{{ mariadb_root_password }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  notify: restart mariadb
+
 - name: Start MariaDB container
   community.docker.docker_container:
     name: "{{ mariadb_container_name }}"
     image: "{{ mariadb_image }}"
     restart_policy: "{{ mariadb_restart_policy }}"
-    network_mode: "{{ mariadb_network_mode }}"
-    published_ports:
-      - "{{ mariadb_web_port }}:3306"
+    networks:
+      - name: homelab
     env:
-      MARIADB_ROOT_password: "{{ vault_databases_database_password }}"
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
     volumes:
+      - "{{ docker_dir }}/mariadb/secrets/mariadb_root_password:/run/secrets/mariadb_root_password:ro"
       - "{{ docker_dir }}/mariadb/data:/var/lib/mysql"
       - "{{ docker_dir }}/mariadb/config:/etc/mysql/conf.d"
       - "{{ docker_dir }}/mariadb/scripts:/docker-entrypoint-initdb.d"
       - "{{ docker_dir }}/mariadb/backup:/backup"
       - "{{ logs_dir }}/mariadb:/var/log/mysql"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-u", "root", "-p{{ mariadb_root_password }}"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$(cat /run/secrets/mariadb_root_password)\" mysqladmin ping -uroot | grep -q 'mysqld is alive'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -94,4 +103,4 @@
     mode: "0644"
   when: mariadb_homepage_enabled | default(true)
 
-# Security and SSL tasks can be added here as needed 
+# Security and SSL tasks can be added here as needed

@@ -1,0 +1,152 @@
+---
+# Compose deployment with rollback safety
+# Parameters expected:
+# - service_name: string (required)
+# - project_src: string (required) directory containing compose project
+# - compose_files: list(string) (optional) default: ['docker-compose.yml']
+# - wait_for_ports: list(int) (optional)
+# - wait_host: string (optional) default: ansible_default_ipv4.address
+# - additional_paths: list(string) (optional) extra paths to include in snapshot
+# - services: list(string) (optional) limit to specific compose services
+# - compose_project_name: string (optional) set project name explicitly
+- name: Set defaults for compose deploy wrapper
+  ansible.builtin.set_fact:
+    _compose_files: "{{ compose_files | default(['docker-compose.yml']) }}"
+    _wait_host: "{{ wait_host | default(ansible_default_ipv4.address) }}"
+    _last_good_dir: "{{ backup_dir }}/{{ service_name }}/last_good"
+    _prechange_dir: "{{ (backup_root | default(backup_dir)) }}/{{ service_name }}"
+    _safe_deploy_enabled: "{{ safe_deploy_enabled | default(true) | bool }}"
+  tags: [deploy, rollback]
+
+- name: Ensure last-known-good directory exists
+  ansible.builtin.file:
+    path: "{{ _last_good_dir }}"
+    state: directory
+    mode: "0700"
+  tags: [deploy, rollback]
+- name: Take pre-change snapshot including compose directory
+  ansible.builtin.include_tasks: prechange_snapshot.yml
+  vars:
+    service_name: "{{ service_name }}"
+    additional_paths: "{{ (additional_paths | default([])) + [ project_src ] }}"
+  tags: [deploy, rollback, backup, prechange]
+
+- name: Backup current compose files as last-known-good (if present)
+  block:
+    - name: Stat compose file candidates
+      ansible.builtin.stat:
+        path: "{{ project_src }}/{{ item }}"
+      register: _compose_stats
+      loop: "{{ _compose_files }}"
+
+    - name: Copy existing compose files to last-known-good
+      ansible.builtin.copy:
+        src: "{{ project_src }}/{{ item.item }}"
+        dest: "{{ _last_good_dir }}/{{ item.item }}"
+        mode: "0600"
+        remote_src: true
+      loop: "{{ _compose_stats.results | selectattr('stat.exists') | list }}"
+  tags: [deploy, rollback]
+
+- name: Deploy compose project with rollback on failure
+  block:
+    - name: Short-circuit if safe deploy wrapper disabled
+      ansible.builtin.meta: end_play
+      when: not _safe_deploy_enabled
+
+    - name: Apply compose project
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_src }}"
+        files: "{{ _compose_files }}"
+        services: "{{ services | default(omit) }}"
+        project_name: "{{ compose_project_name | default(omit) }}"
+        state: present
+        pull: true
+        build: false
+        remove_orphans: true
+      register: _compose_apply
+
+    - name: Wait for service ports (if provided)
+      ansible.builtin.wait_for:
+        host: "{{ _wait_host }}"
+        port: "{{ item }}"
+        delay: 5
+        timeout: 300
+      loop: "{{ wait_for_ports | default([]) }}"
+      when: (wait_for_ports | default([])) | length > 0
+
+  rescue:
+    - name: Log compose deployment failure
+      ansible.builtin.debug:
+        msg: "Compose deployment failed for {{ service_name }}. Restoring last-known-good compose and pre-change snapshot."
+
+    - name: Restore last-known-good compose files (if available)
+      block:
+        - name: Stat last-known-good compose files
+          ansible.builtin.stat:
+            path: "{{ _last_good_dir }}/{{ item }}"
+          register: _last_good_stats
+          loop: "{{ _compose_files }}"
+
+        - name: Restore compose files from last-known-good
+          ansible.builtin.copy:
+            src: "{{ _last_good_dir }}/{{ item.item }}"
+            dest: "{{ project_src }}/{{ item.item }}"
+            mode: "0600"
+            remote_src: true
+          loop: "{{ _last_good_stats.results | selectattr('stat.exists') | list }}"
+
+        - name: Restore .env if backed up alongside compose
+          ansible.builtin.copy:
+            src: "{{ _last_good_dir }}/.env"
+            dest: "{{ project_src }}/.env"
+            mode: "0600"
+            remote_src: true
+          when: (lookup('ansible.builtin.fileglob', _last_good_dir + '/.env', errors='ignore') | length) > 0
+
+    - name: Find latest pre-change snapshot
+      ansible.builtin.find:
+        paths: "{{ _prechange_dir }}"
+        patterns: "prechange_*.tar.gz"
+        use_regex: false
+        recurse: false
+        file_type: file
+      register: _snapshots
+
+    - name: Set latest snapshot path
+      ansible.builtin.set_fact:
+        _latest_snapshot: "{{ (_snapshots.files | sort(attribute='mtime', reverse=true) | map(attribute='path') | list | first) | default('') }}"
+
+    - name: Restore pre-change snapshot archive
+      ansible.builtin.unarchive:
+        src: "{{ _latest_snapshot }}"
+        dest: "/"
+        remote_src: true
+      when: _latest_snapshot is defined and (_latest_snapshot | length > 0)
+
+    - name: Re-apply last-known-good compose project
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_src }}"
+        files: "{{ _compose_files }}"
+        services: "{{ services | default(omit) }}"
+        project_name: "{{ compose_project_name | default(omit) }}"
+        state: present
+        pull: false
+        build: false
+        remove_orphans: false
+
+    - name: Fail the deployment after rollback
+      ansible.builtin.fail:
+        msg: "Deployment of {{ service_name }} failed. Restored last-known-good state."
+
+  always:
+    - name: Emit compose deploy summary
+      ansible.builtin.debug:
+        msg: |
+          Compose Deploy Summary for {{ service_name }}:
+          - Project: {{ project_src }}
+          - Files: {{ _compose_files | join(', ') }}
+          - Applied: {{ (_compose_apply is defined) | ternary('yes', 'no') }}
+          - Rollback used: {{ (_compose_apply is failed) | ternary('yes', 'no') }}
+          - Safe deploy enabled: {{ _safe_deploy_enabled }}
+  tags: [deploy, rollback]

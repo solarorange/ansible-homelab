@@ -17,6 +17,8 @@
 ### **Service Management**
 - **[COMPREHENSIVE_SERVICE_LIST.md](COMPREHENSIVE_SERVICE_LIST.md)** - Complete list of all 60+ services
 - **[scripts/add_service.sh](scripts/add_service.sh)** - Service integration wizard
+- **[scripts/integrate_server.sh](scripts/integrate_server.sh)** - External server integration wizard
+- **[docs/EXTERNAL_SERVER_INTEGRATION.md](docs/EXTERNAL_SERVER_INTEGRATION.md)** - External server integration guide
 - **[AUTOMATION_CHECKLIST.md](AUTOMATION_CHECKLIST.md)** - Automation status and features
 
 ### **Advanced Configuration**

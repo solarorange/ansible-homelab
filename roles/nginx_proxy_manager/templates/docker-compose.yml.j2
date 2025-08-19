@@ -8,35 +8,50 @@ services:
     restart: {{ nginx_proxy_manager_db_restart_policy }}
     environment:
       {% for key, value in nginx_proxy_manager_db_env.items() %}
+      {% if key in ['MYSQL_PASSWORD', 'MYSQL_ROOT_PASSWORD'] %}
+      {{ key }}_FILE: "/run/secrets/{{ key }}"
+      {% else %}
       {{ key }}: "{{ value }}"
+      {% endif %}
       {% endfor %}
       TZ: {{ timezone }}
     volumes:
       {% for volume in nginx_proxy_manager_db_volumes %}
       - {{ volume }}
       {% endfor %}
+      {% if nginx_proxy_manager_manage_secret_files %}
+      - {{ docker_dir }}/nginx_proxy_manager/secrets/MYSQL_ROOT_PASSWORD:/run/secrets/MYSQL_ROOT_PASSWORD:ro
+      - {{ docker_dir }}/nginx_proxy_manager/secrets/MYSQL_PASSWORD:/run/secrets/MYSQL_PASSWORD:ro
+      {% endif %}
+      - "{{ logs_dir }}/nginx-proxy-manager/db:/logs"
     networks:
       - homelab
     healthcheck:
+      {% if nginx_proxy_manager_manage_secret_files %}
+      test: ["CMD-SHELL", "mysqladmin ping -h {{ ansible_default_ipv4.address }} -u root -p$(cat /run/secrets/MYSQL_ROOT_PASSWORD)"]
+      {% else %}
       test: ["CMD", "mysqladmin", "ping", "-h", "{{ ansible_default_ipv4.address }}", "-u", "root", "-p{{ vault_npm_db_root_password }}"]
+      {% endif %}
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-        reservations:
-          memory: 128M
-          cpus: '0.25'
+    mem_limit: 256M
+    cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    cap_add:
+      - SYS_NICE
 
   # Nginx Proxy Manager
   nginx-proxy-manager:
     image: {{ nginx_proxy_manager_image }}
     container_name: {{ nginx_proxy_manager_container_name }}
     restart: {{ nginx_proxy_manager_restart_policy }}
+    {% if nginx_proxy_manager_direct_expose_enabled | default(false) %}
     ports:
       - "{{ nginx_proxy_manager_ports.web }}:80"
       - "{{ nginx_proxy_manager_ports.ssl }}:443"
@@ -44,12 +59,13 @@ services:
       {% if nginx_proxy_manager_metrics_enabled %}
       - "{{ nginx_proxy_manager_metrics_port }}:{{ nginx_proxy_manager_metrics_port }}"
       {% endif %}
+    {% endif %}
     environment:
       - DB_MYSQL_HOST=npm-db
       - DB_MYSQL_PORT=3306
       - DB_MYSQL_DATABASE={{ nginx_proxy_manager_db_env.MYSQL_DATABASE }}
       - DB_MYSQL_USER={{ nginx_proxy_manager_db_env.MYSQL_USER }}
-      - DB_MYSQL_PASSWORD={{ nginx_proxy_manager_db_env.MYSQL_PASSWORD }}
+      - DB_MYSQL_PASSWORD_FILE=/run/secrets/MYSQL_PASSWORD
       - TZ={{ timezone }}
       {% if nginx_proxy_manager_monitoring_enabled %}
       - ENABLE_METRICS=true
@@ -62,26 +78,32 @@ services:
       {% for volume in nginx_proxy_manager_volumes %}
       - {{ volume }}
       {% endfor %}
+      {% if nginx_proxy_manager_manage_secret_files %}
+      - {{ docker_dir }}/nginx_proxy_manager/secrets/MYSQL_PASSWORD:/run/secrets/MYSQL_PASSWORD:ro
+      - {{ docker_dir }}/nginx_proxy_manager/secrets/NPM_API_TOKEN:/run/secrets/NPM_API_TOKEN:ro
+      {% endif %}
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "{{ logs_dir }}/nginx-proxy-manager/app:/logs"
     networks:
       - homelab
     depends_on:
       npm-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:{{ nginx_proxy_manager_ports.admin }}/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ nginx_proxy_manager_ports.admin }}/api/health || exit 1"]
       interval: {{ nginx_proxy_manager_health_check_interval }}
       timeout: {{ nginx_proxy_manager_health_check_timeout }}
       retries: {{ nginx_proxy_manager_health_check_retries }}
       start_period: 60s
-    deploy:
-      resources:
-        limits:
-          memory: {{ nginx_proxy_manager_resource_limits.memory }}
-          cpus: {{ nginx_proxy_manager_resource_limits.cpus }}
-        reservations:
-          memory: 256M
-          cpus: '0.5'
+    mem_limit: {{ nginx_proxy_manager_resource_limits.memory }}
+    cpus: '{{ nginx_proxy_manager_resource_limits.cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    cap_add:
+      - NET_BIND_SERVICE
     labels:
       - "traefik.enable=false"
       {% if nginx_proxy_manager_monitoring_enabled %}
@@ -108,7 +130,7 @@ services:
     environment:
       - PYTHONPATH=/scripts
       - NPM_API_URL={{ nginx_proxy_manager_api_url }}
-      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+      - NPM_API_TOKEN_FILE=/run/secrets/NPM_API_TOKEN
     working_dir: /scripts
     command: >
       sh -c "
@@ -119,14 +141,13 @@ services:
       - nginx-proxy-manager
     networks:
       - homelab
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.25'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
+    mem_limit: 128M
+    cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
   {% endif %}
 
   # NPM SSL Manager (Optional)
@@ -142,7 +163,7 @@ services:
     environment:
       - PYTHONPATH=/scripts
       - NPM_API_URL={{ nginx_proxy_manager_api_url }}
-      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+      - NPM_API_TOKEN_FILE=/run/secrets/NPM_API_TOKEN
     working_dir: /scripts
     command: >
       sh -c "
@@ -153,14 +174,13 @@ services:
       - nginx-proxy-manager
     networks:
       - homelab
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.25'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
+    mem_limit: 128M
+    cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
   {% endif %}
 
   # NPM Health Checker (Optional)
@@ -175,7 +195,7 @@ services:
     environment:
       - PYTHONPATH=/scripts
       - NPM_API_URL={{ nginx_proxy_manager_api_url }}
-      - NPM_API_TOKEN={{ npm_api_token | default('') }}
+      - NPM_API_TOKEN_FILE=/run/secrets/NPM_API_TOKEN
     working_dir: /scripts
     command: >
       sh -c "
@@ -186,14 +206,13 @@ services:
       - nginx-proxy-manager
     networks:
       - homelab
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.25'
-        reservations:
-          memory: 64M
-          cpus: '0.1'
+    mem_limit: 128M
+    cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
   {% endif %}
 
   # NPM Backup Manager (Optional)
@@ -221,14 +240,13 @@ services:
       - nginx-proxy-manager
     networks:
       - homelab
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-        reservations:
-          memory: 128M
-          cpus: '0.25'
+    mem_limit: 256M
+    cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
   {% endif %}
 
 networks:

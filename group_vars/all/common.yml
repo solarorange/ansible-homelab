@@ -1,121 +1,282 @@
 ---
-# Base Configuration
-domain: "{{ lookup('env', 'HOMELAB_DOMAIN') | default('yourdomain.com') }}"  # Main domain name
-timezone: "{{ lookup('env', 'HOMELAB_TIMEZONE') | default('America/New_York') }}"  # Server timezone
+# Homelab Configuration Variables
+# Comprehensive setup with all variables automatically configured
 
-# Network Configuration
-ansible_server_ip: "{{ lookup('env', 'ANSIBLE_SERVER_IP') | default('{{ ansible_default_ipv4.address }}') }}"
-server_ips:
-  - "{{ lookup('env', 'HOMELAB_IP_1') | default('{{ ansible_default_ipv4.address }}') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_2') | default('{{ ansible_default_ipv4.address }}') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_3') | default('{{ ansible_default_ipv4.address }}') }}"
-  - "{{ lookup('env', 'HOMELAB_IP_4') | default('{{ ansible_default_ipv4.address }}') }}"
+# Basic Configuration
+username: "HomelabOS"
+domain: "zorg.media"
+ip_address: "192.168.1.10"
+gateway: "192.168.1.1"
+timezone: "America/New_York"
+puid: "1111"
+pgid: "1111"
+
+# Directory Structure
+docker_dir: "/home/HomelabOS/docker"
+data_dir: "/home/HomelabOS/data"
+config_dir: "/home/HomelabOS/config"
+backup_dir: "/home/HomelabOS/backups"
+logs_dir: "/home/HomelabOS/logs"
+
+# Service Configuration
+security_enabled: true
+media_enabled: true
+monitoring_enabled: true
+utilities_enabled: true
+productivity_enabled: true
+automation_enabled: true
+
+# Cloudflare Configuration
+cloudflare_enabled: false
+cloudflare_email: ""
+cloudflare_api_token: "{{ vault_cloudflare_api_token | default('') }}"
+
+# Email Configuration
+admin_email: "endlessoul@gmail.com"
+smtp_server: "smtp.gmail.com"
+smtp_port: "587"
+smtp_username: "{{ vault_smtp_username | default('') }}"
+smtp_password: "{{ vault_smtp_password | default('') }}"
+from_email: "endlessoul@gmail.com"
+
+# Notification Configuration
+slack_webhook: "{{ vault_slack_webhook | default('') }}"
+discord_webhook: "{{ vault_discord_webhook | default('') }}"
+telegram_bot_token: "{{ vault_telegram_bot_token | default('') }}"
+telegram_chat_id: "{{ vault_telegram_chat_id | default('') }}"
 
 # DNS Configuration
-pihole_domain: "pihole.{{ domain }}"
-pihole_upstream_dns:
-  - "{{ lookup('env', 'UPSTREAM_DNS_1') | default('8.8.8.8') }}"
-  - "{{ lookup('env', 'UPSTREAM_DNS_2') | default('8.8.4.4') }}"
+primary_dns: "192.168.1.35"
+secondary_dns: "8.8.4.4"
 
 # Docker Configuration
-# Recommended paths:
-# /opt/docker - Main Docker root (requires 100GB+ space)
-# /var/lib/docker - Docker daemon data (system managed)
-# /mnt/docker - Alternative for large storage arrays
-docker_user: "{{ lookup('env', 'DOCKER_ROOT') | default('/opt/docker') }}"
-docker_data_user: "{{ vault_service_user }}"
-docker_config_user: "{{ vault_service_user }}"
-docker_logs_user: "{{ vault_service_user }}"
+docker_user: "HomelabOS"
 
-# Docker networks with proper segmentation
+# Network Configuration
+internal_subnet: "192.168.1.0/24"
+
+# Backup Configuration
+backup_retention_days: 7
+backup_compression: false
+backup_encryption: false
+
+# Monitoring Configuration
+monitoring_retention_days: 30
+alerting_enabled: false
+
+# Security Configuration
+security_enhanced: false
+fail2ban_enabled: false
+crowdsec_enabled: false
+ssl_enabled: false
+
+# System Configuration
+system_updates_enabled: false
+log_retention_days: 30
+
+# Resource Limits
+default_cpu_limit: "2.0"
+default_memory_limit: "2g"
+
+# Subdomain Configuration
+subdomains:
+  traefik: "traefik"
+  authentik: "auth"
+  portainer: "portainer"
+  grafana: "grafana"
+  prometheus: "prometheus"
+  loki: "loki"
+  promtail: "logs"
+  alertmanager: "alerts"
+  sonarr: "sonarr"
+  radarr: "radarr"
+  prowlarr: "prowlarr"
+  bazarr: "bazarr"
+  overseerr: "overseerr"
+  jellyfin: "jellyfin"
+  tautulli: "tautulli"
+  gitlab: "git"
+  harbor: "registry"
+  code: "code"
+  nextcloud: "cloud"
+  minio: "s3"
+  paperless: "docs"
+  immich: "photos"
+  homeassistant: "hass"
+  nodered: "flows"
+  n8n: "n8n"
+  vault: "vault"
+  vaultwarden: "passwords"
+  wireguard: "vpn"
+  pihole: "dns"
+  nginx_proxy_manager: "proxy"
+  dash: "dash"
+  files: "files"
+  watchtower: "updates"
+  dumbassets: "assets"
+  linkwarden: "bookmarks"
+  reconya: "reconya"
+  ersatztv: "tv"
+  pezzo: "pezzo"
+
+# Docker networks
 docker_networks:
-  - name: frontend
+  - name: homelab
     driver: bridge
-    internal: false
     ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
-  - name: backend
-    driver: bridge
-    internal: true
-    ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
-  - name: database
-    driver: bridge
-    internal: true
-    ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
+      - subnet: "192.168.1.0/24"
+        gateway: "192.168.1.1"
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
-  - name: security
-    driver: bridge
-    internal: true
-    ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
+      - subnet: "192.168.1.0/24"
+        gateway: "192.168.1.1"
   - name: media
     driver: bridge
-    internal: true
     ipam_config:
-      - subnet: "{{ ansible_default_ipv4.address }}/24"
-        gateway: "{{ ansible_default_ipv4.address }}"
+      - subnet: "192.168.1.0/24"
+        gateway: "192.168.1.1"
 
-# Service network assignments for security
-service_network_assignments:
-  # Frontend services (public access)
-  frontend:
-    - traefik
-    - homepage
-    - portainer
-  
-  # Backend services (internal only)
-  backend:
-    - authentik
-    - grafana
-    - prometheus
-    - alertmanager
-  
-  # Database services (isolated)
-  database:
-    - postgresql
-    - redis
-    - mariadb
-    - influxdb
-  
-  # Monitoring services (isolated)
-  monitoring:
-    - loki
-    - promtail
-    - blackbox_exporter
-  
-  # Security services (isolated)
-  security:
-    - vault
-    - crowdsec
-    - fail2ban
-  
-  # Media services (isolated)
-  media:
-    - sonarr
-    - radarr
-    - lidarr
-    - jellyfin
-    - plex
+# Media directories structure
+media_directories:
+  - "/home/HomelabOS/data/media"
+  - "/home/HomelabOS/data/media/movies"
+  - "/home/HomelabOS/data/media/tv"
+  - "/home/HomelabOS/data/media/anime"
+  - "/home/HomelabOS/data/media/music"
+  - "/home/HomelabOS/data/media/books"
+  - "/home/HomelabOS/data/media/audiobooks"
+  - "/home/HomelabOS/data/media/podcasts"
+  - "/home/HomelabOS/data/torrents"
+  - "/home/HomelabOS/data/torrents/movies"
+  - "/home/HomelabOS/data/torrents/tv"
+  - "/home/HomelabOS/data/torrents/anime"
+  - "/home/HomelabOS/data/usenet"
+  - "/home/HomelabOS/data/usenet/incomplete"
+  - "/home/HomelabOS/data/usenet/complete"
 
-# Cloudflare Configuration
-cloudflare_enabled: "{{ lookup('env', 'CLOUDFLARE_ENABLED') | default('false') | bool }}"
-cloudflare_email: "{{ lookup('env', 'CLOUDFLARE_EMAIL') | default('') }}"
-cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}"
+# Service enablement list
+enabled_services:
+  # Core infrastructure (always enabled)
+  - traefik
+  - authentik
+  - portainer
+  
+  # Monitoring stack
+  - grafana
+  - prometheus
+  - influxdb
+  - telegraf
+  - loki
+  - promtail
+  - alertmanager
+  - blackbox_exporter
+  
+  # Media services
+  - sonarr
+  - radarr
+  - prowlarr
+  - bazarr
+  - overseerr
+  - jellyfin
+  - tautulli
+  - komga
+  - audiobookshelf
+  - ersatztv
+  
+  # File services
+  - nextcloud
+  - samba
+  - syncthing
+  
+  # Development tools
+  - gitlab
+  - harbor
+  - code_server
+  
+  # AI and Development
+  - pezzo
+  
+  # Storage and files
+  - minio
+  - paperless
+  - bookstack
+  - immich
+  - filebrowser
+  
+  # Automation and smart home
+  - homeassistant
+  - mosquitto
+  - zigbee2mqtt
+  - nodered
+  - n8n
+  
+  # Security services
+  - vault
+  - crowdsec
+  - fail2ban
+  - wireguard
+  
+  # Network services
+  - pihole
+  - nginx_proxy_manager
+  
+  # Backup solutions
+  - kopia
+  - duplicati
+  
+  # Utilities
+  - watchtower
+  - dashdot
+  - guacamole
+  - heimdall
+  - homarr
+  - requestrr
+  - unmanic
+  - vaultwarden
+  - linkwarden
+  - reconya
 
-# Reconya Configuration
-reconya_enabled: "{{ lookup('env', 'RECONYA_ENABLED') | default('false') | bool }}"
-reconya_network_range: "{{ lookup('env', 'RECONYA_NETWORK_RANGE') | default('{{ ansible_default_ipv4.address }}/24') }}"
-reconya_scan_interval: "{{ lookup('env', 'RECONYA_SCAN_INTERVAL') | default(300) | int }}"
-reconya_max_devices: "{{ lookup('env', 'RECONYA_MAX_DEVICES') | default(1000) | int }}"
-reconya_subdomain: "{{ lookup('env', 'RECONYA_SUBDOMAIN') | default('reconya') }}" 
+# Feature toggles
+media_enabled: true
+automation_enabled: true
+backup_enabled: true
+development_enabled: true
+security_enhanced: false
+
+# Deployment options
+verify_deployment: true
+reboot_after_deployment: true
+ssl_enabled: false
+monitoring_external: true
+
+# Traefik configuration
+traefik_pilot_token: ""
+traefik_log_level: "INFO"
+traefik_access_logs: true
+traefik_network: "homelab"
+traefik_ssl_resolver: "cloudflare"
+
+# Monitoring configuration
+prometheus_config_dir: "/home/HomelabOS/docker/prometheus"
+alertmanager_config_dir: "/home/HomelabOS/docker/alertmanager"
+grafana_config_dir: "/home/HomelabOS/docker/grafana"
+grafana_dashboards_dir: "/home/HomelabOS/docker/grafana/provisioning/dashboards"
+
+# Security configuration
+crowdsec_config_dir: "/home/HomelabOS/docker/crowdsec"
+fail2ban_config_dir: "/home/HomelabOS/docker/fail2ban"
+
+# Ansible configuration
+ansible_backup_dir: "/home/HomelabOS/backups/ansible"
+ansible_become_password: "{{ vault_ansible_become_password | default('') }}"
+
+# Homepage configuration
+homepage_config_dir: "/home/HomelabOS/docker/homepage"
+
+# Loki configuration
+loki_config_dir: "/home/HomelabOS/docker/loki"
+
+# Traefik configuration directory
+traefik_config_dir: "/home/HomelabOS/docker/traefik"

@@ -1,3 +1,4 @@
+---
 # Paperless_Ngx Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,28 @@ paperless_ngx_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+# Toggle to manage secret files (kept backward compatible with existing envs)
+paperless_ngx_manage_secret_files: true
+
+# Secret files written to {{ docker_dir }}/paperless-ngx/secrets (0600)
+paperless_ngx_secret_files:
+  - name: "PAPERLESS_SECRET_KEY"
+    value: "{{ paperless_ngx_secret_key }}"
+  - name: "PAPERLESS_DBPASS"
+    value: "{{ paperless_ngx_database_password }}"
+  - name: "PAPERLESS_REDIS_PASSWORD"
+    value: "{{ paperless_ngx_redis_password }}"
+  - name: "PAPERLESS_EMAIL_PASSWORD"
+    value: "{{ paperless_ngx_smtp_password }}"
+
+paperless_ngx_required_secrets:
+  - PAPERLESS_SECRET_KEY
+  - PAPERLESS_DBPASS
+
+# Prefer Traefik ingress; gate direct host port exposure
+paperless_ngx_direct_expose_enabled: false

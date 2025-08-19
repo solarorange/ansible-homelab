@@ -25,3 +25,29 @@ This sub-role manages DNS infrastructure for the security stack, including Pi-ho
 - tasks/homepage.yml        # Homepage integration
 - tasks/alerts.yml          # Alerting integration
 - templates/                # Service and homepage templates 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores last-known-good Compose and pre-change snapshot automatically on failure.
+
+- Manual rollback (DNS component):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=dns
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=dns
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```

@@ -33,8 +33,10 @@ services:
       {% for media_mount in ersatztv_media_mounts %}
       - "{{ media_mount }}"
       {% endfor %}
+    {% if ersatztv_direct_expose_enabled | default(false) %}
     ports:
       - "{{ ersatztv_port }}:{{ ersatztv_port }}"
+    {% endif %}
     {% if ersatztv_hardware_acceleration == "vaapi" %}
     devices:
       - "{{ ersatztv_vaapi_device }}:{{ ersatztv_vaapi_device }}"
@@ -73,27 +75,22 @@ services:
       - "homepage.description={{ ersatztv_homepage_description }}"
       - "homepage.widget={{ ersatztv_homepage_widget }}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ ersatztv_port }}/api/health || exit 1"]
       interval: "{{ ersatztv_healthcheck_interval }}"
       timeout: "{{ ersatztv_healthcheck_timeout }}"
       retries: {{ ersatztv_healthcheck_retries }}
       start_period: "{{ ersatztv_healthcheck_start_period }}"
-    deploy:
-      resources:
-        limits:
-          cpus: '{{ ersatztv_resources.limits.cpus }}'
-          memory: {{ ersatztv_resources.limits.memory }}
-        reservations:
-          cpus: '{{ ersatztv_resources.reservations.cpus }}'
-          memory: {{ ersatztv_resources.reservations.memory }}
+    mem_limit: {{ ersatztv_resources.limits.memory }}
+    cpus: '{{ ersatztv_resources.limits.cpus }}'
     security_opt:
       - no-new-privileges:true
-    read_only: false
+    read_only: {{ ersatztv_read_only | default(false) }}
     tmpfs:
       - /tmp
       - /var/tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3" 
+        max-size: "50m"
+        max-file: "5"

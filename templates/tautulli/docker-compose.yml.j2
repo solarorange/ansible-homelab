@@ -10,8 +10,8 @@ services:
       - TZ={{ timezone | default('UTC') }}
       - DOCKER_MODS=linuxserver/mods:universal-cron
     volumes:
-      - {{ docker_root }}/tautulli/config:/config
-      - {{ docker_root }}/tautulli/logs:/logs
+      - {{ docker_dir }}/tautulli/config:/config
+      - {{ logs_dir }}/tautulli:/logs
     ports:
       - "8181:8181"
     restart: unless-stopped
@@ -34,8 +34,13 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=tautulli"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

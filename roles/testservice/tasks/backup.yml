@@ -1,0 +1,19 @@
+---
+# Test Service Backup Tasks
+
+- name: Create Test Service backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ backup_scripts_dir }}/testservice_backup.sh"
+    mode: '0755'
+  tags: [testservice, backup]
+
+- name: Setup Test Service backup cron job
+  cron:
+    name: "Test Service backup"
+    job: "{{ backup_scripts_dir }}/testservice_backup.sh"
+    hour: "2"
+    minute: "0"
+    user: "{{ vault_service_user }}"
+  when: testservice_backup_enabled | default(true)
+  tags: [testservice, backup]

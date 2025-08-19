@@ -38,19 +38,19 @@
 
 # Docker Compose handlers (for containerized services)
 - name: Restart Samba container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/samba"
     restarted: true
   when: samba_enabled | default(false)
 
 - name: Restart Syncthing container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/syncthing"
     restarted: true
   when: syncthing_enabled | default(false)
 
 - name: Restart Nextcloud container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/nextcloud"
     restarted: true
   when: nextcloud_enabled | default(false)
@@ -73,8 +73,8 @@
 
 - name: Check Nextcloud health
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/status.php"
+    url: "http://{{ ansible_default_ipv4.address }}:/status.php"
     method: GET
     status_code: [200]
   register: nextcloud_health
-  when: nextcloud_enabled | default(false) 
+  when: nextcloud_enabled | default(false)

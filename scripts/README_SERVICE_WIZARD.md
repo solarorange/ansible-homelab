@@ -2,6 +2,33 @@
 
 The Service Integration Wizard automates the process of adding new services to your Ansible homelab stack. It generates complete Ansible roles with full integration including monitoring, backup, security, and homepage integration.
 
+## 🏠 **✨ NEW: External Server Integration**
+
+**`scripts/integrate_server.sh`** - Seamlessly integrate external servers (Synology, Unraid, Proxmox, etc.) into your HomelabOS ecosystem!
+
+### **Quick Integration**
+```bash
+# Interactive setup (recommended)
+./scripts/integrate_server.sh
+
+# Command line setup
+./scripts/integrate_server.sh --name synology --ip 192.168.1.100 --port 5000
+
+# Configuration file setup
+./scripts/integrate_server.sh --config config/external_servers.yml
+```
+
+### **What Gets Integrated**
+- ✅ **SSL Certificates** - Automatic Let's Encrypt certificates
+- ✅ **DNS Management** - Automatic subdomain creation
+- ✅ **Grafana Monitoring** - Custom dashboards for each server
+- ✅ **Traefik Proxy** - Reverse proxy with authentication
+- ✅ **Health Monitoring** - Automated health checks and alerting
+- ✅ **Backup Integration** - Automated backup configuration
+- ✅ **Homepage Integration** - Unified dashboard access
+
+**📖 Complete Guide**: [External Server Integration Guide](../docs/EXTERNAL_SERVER_INTEGRATION.md)
+
 ## Quick Start
 
 ### Interactive Mode (Recommended)

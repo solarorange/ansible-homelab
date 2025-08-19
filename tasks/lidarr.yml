@@ -69,9 +69,9 @@
     dest: "{{ docker_dir }}/lidarr/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Lidarr Management Script
-      
+
       function show_help {
         echo "Lidarr Management Script"
         echo "Usage: $0 [command]"
@@ -84,51 +84,51 @@
         echo "  restore   - Restore Lidarr data"
         echo "  help      - Show this help"
       }
-      
+
       function backup_data {
         local backup_dir="{{ docker_dir }}/lidarr/backup"
         local timestamp=$(date +%Y%m%d_%H%M%S)
         local backup_file="$backup_dir/lidarr_backup_$timestamp.tar.gz"
-        
+
         # Create backup directory if it doesn't exist
         mkdir -p "$backup_dir"
-        
+
         # Stop Lidarr
         docker stop lidarr
-        
+
         # Create backup
         tar -czf "$backup_file" -C "{{ docker_dir }}/lidarr" config/ data/
-        
+
         # Start Lidarr
         docker start lidarr
-        
+
         echo "Backup created: $backup_file"
       }
-      
+
       function restore_data {
         if [ -z "$1" ]; then
           echo "Please specify backup file"
           exit 1
         fi
-      
+
         local backup_file="$1"
         if [ ! -f "$backup_file" ]; then
           echo "Backup file not found: $backup_file"
           exit 1
         fi
-      
+
         # Stop Lidarr
         docker stop lidarr
-      
+
         # Restore backup
         tar -xzf "$backup_file" -C "{{ docker_dir }}/lidarr"
-      
+
         # Start Lidarr
         docker start lidarr
-      
+
         echo "Backup restored from: $backup_file"
       }
-      
+
       case "$1" in
         status)
           docker ps -f name=lidarr
@@ -159,26 +159,26 @@
     dest: "{{ docker_dir }}/lidarr/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Lidarr is running
       if ! docker ps -f name=lidarr -f status=running | grep -q lidarr; then
         echo "Lidarr is not running"
         exit 1
       fi
-      
+
       # Check if Lidarr is responding
       if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8686/api/v1/health > /dev/null; then
         echo "Lidarr is not responding"
         exit 1
       fi
-      
+
       # Check Lidarr status
-      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/health | jq -r .status)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/health | jq -r .status)
       if [ "$STATUS" != "ok" ]; then
         echo "Lidarr status is $STATUS"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -215,4 +215,4 @@
     job: "{{ docker_dir }}/lidarr/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ vault_service_user }}" 
+    user: "{{ vault_service_user }}"

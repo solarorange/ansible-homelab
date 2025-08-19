@@ -1,0 +1,43 @@
+---
+# Test Service Database Setup
+
+- name: Check Test Service database connection
+  ansible.builtin.uri:
+    url: "https://{{ testservice_domain }}/api/health/database"
+    method: GET
+  register: db_check
+  ignore_errors: yes
+  tags: [testservice, database]
+
+- name: Initialize Test Service database
+  ansible.builtin.uri:
+    url: "https://{{ testservice_domain }}/api/admin/database/init"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_testservice_api_key | default('') }}"
+    body_format: json
+    body:
+      database_type: "{{ testservice_database_type }}"
+      host: "{{ testservice_database_host if testservice_database_type == 'postgresql' else '' }}"
+      port: "{{ testservice_database_port if testservice_database_type == 'postgresql' else '' }}"
+      name: "{{ testservice_database_name if testservice_database_type == 'postgresql' else '' }}"
+      user: "{{ vault_service_user if testservice_database_type == 'postgresql' else '' }}"
+      password: "{{ vault_service_password if testservice_database_type == 'postgresql' else '' }}"
+  when: db_check.status is not defined or db_check.status != 200
+  tags: [testservice, database]
+
+- name: Pre-change snapshot (config and data)
+  ansible.builtin.include_tasks: "{{ role_path }}/../automation/tasks/prechange_snapshot.yml"
+  vars:
+    service_name: testservice
+  tags: [backup, prechange]
+
+- name: Run Test Service database migrations
+  ansible.builtin.uri:
+    url: "https://{{ testservice_domain }}/api/admin/database/migrate"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_testservice_api_key | default('') }}"
+  tags: [testservice, database]

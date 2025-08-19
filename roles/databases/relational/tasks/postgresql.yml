@@ -55,25 +55,34 @@
     group: "{{ username }}"
     mode: "0750"
 
+- name: Write PostgreSQL password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/secrets/postgres_password"
+    content: "{{ postgresql_admin_password | default(vault_postgresql_password) }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: postgresql_admin_password is defined or vault_postgresql_password is defined
+
 - name: Start PostgreSQL container
   community.docker.docker_container:
     name: "{{ postgresql_container_name }}"
     image: "{{ postgresql_image }}"
     restart_policy: "{{ postgresql_restart_policy }}"
-    network_mode: "{{ postgresql_network_mode }}"
-    published_ports:
-      - "{{ postgresql_web_port }}:5432"
+    networks:
+      - name: homelab
     env:
-      POSTGRES_user: "{{ vault_databases_user }}"
-      POSTGRES_password: "{{ vault_databases_database_password }}"
+      POSTGRES_USER: "{{ postgresql_admin_user }}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - "{{ docker_dir }}/postgresql/data:/var/lib/postgresql/data"
       - "{{ docker_dir }}/postgresql/config:/etc/postgresql"
       - "{{ docker_dir }}/postgresql/scripts:/docker-entrypoint-initdb.d"
       - "{{ docker_dir }}/postgresql/backup:/backup"
       - "{{ logs_dir }}/postgresql:/var/log/postgresql"
+      - "{{ docker_dir }}/postgresql/secrets/postgres_password:/run/secrets/postgres_password:ro"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "{{ postgresql_admin_user }}"]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$(cat /run/secrets/postgres_password)\" pg_isready -U {{ postgresql_admin_user }} | grep -q 'accepting connections'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -103,4 +112,4 @@
     mode: "0644"
   when: postgresql_homepage_enabled | default(true)
 
-# Security and SSL tasks can be added here as needed 
+# Security and SSL tasks can be added here as needed

@@ -148,25 +148,11 @@ scrape_configs:
   - job_name: 'tautulli'
     static_configs:
       - targets: ['localhost:{{ media_tautulli_port }}']
-    metrics_path: '/api/v2?apikey={{ media_tautulli_api_key: "{{ vault_media_api_token | default("") }}"sabnzbd"} == 0
-        for: 1m
-        labels:
-          severity: critical
-          service: sabnzbd
-        annotations:
-          summary: "SABnzbd is down"
-          description: "SABnzbd has been down for more than 1 minute"
-{% endif %}
-{% if media_enable_qbittorrent %}
-      - alert: QBittorrentDown
-        expr: up{job="qbittorrent"} == 0
-        for: 1m
-        labels:
-          severity: critical
-          service: qbittorrent
-        annotations:
-          summary: "qBittorrent is down"
-          description: "qBittorrent has been down for more than 1 minute"
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+    scheme: http
 {% endif %}
 {% endif %}
 {% if media_enable_arr_services %}

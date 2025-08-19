@@ -3,7 +3,7 @@
 # Deploy Pezzo services using Docker Compose
 
 - name: Stop existing Pezzo containers
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ pezzo_config_dir }}"
     state: absent
   tags: [pezzo, deploy]
@@ -25,7 +25,7 @@
   tags: [pezzo, deploy]
 
 - name: Deploy Pezzo services with Docker Compose
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ pezzo_config_dir }}"
     state: present
     build: no
@@ -78,6 +78,24 @@
     - { port: "{{ pezzo_console_port }}", path: "/health" }
     - { port: "{{ pezzo_proxy_port }}", path: "/health" }
   tags: [pezzo, deploy]
+  when: pezzo_direct_expose_enabled | default(false)
+
+- name: Verify Pezzo route health (Traefik)
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "{{ item.url }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  loop:
+    - { url: "https://api.{{ pezzo_subdomain }}.{{ domain }}/api/healthz" }
+    - { url: "https://{{ pezzo_subdomain }}.{{ domain }}/health" }
+    - { url: "https://proxy.{{ pezzo_subdomain }}.{{ domain }}/health" }
+  loop_control:
+    loop_var: item
+  tags: [pezzo, deploy]
+  when: not (pezzo_direct_expose_enabled | default(false))
 
 - name: Display Pezzo health check results
   ansible.builtin.debug:
@@ -155,4 +173,4 @@
       - Backup: {{ pezzo_backup_dir }}
       - Management Script: {{ pezzo_config_dir }}/manage_service.sh
       - Verification Script: {{ pezzo_config_dir }}/verify_service.sh
-  tags: [pezzo, deploy] 
+  tags: [pezzo, deploy]

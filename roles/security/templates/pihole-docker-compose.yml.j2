@@ -17,12 +17,13 @@ services:
       - "8053:80/tcp" # Port for the web interface
     environment:
       TZ: "{{ timezone }}"
-      WEBPASSWORD: "{{ security_pihole.admin_password }}"
+      WEBPASSWORD_FILE: "/run/secrets/WEBPASSWORD"
       # Other Pi-hole specific environment variables can go here
       # e.g., DNS1, DNS2
     volumes:
       - "{{ docker_dir }}/pihole/etc-pihole:/etc/pihole"
       - "{{ docker_dir }}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d"
+      - "{{ docker_dir }}/security/secrets:/run/secrets:ro"
     cap_add:
       - NET_ADMIN # Required for Pi-hole to function properly
     networks:

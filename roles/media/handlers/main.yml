@@ -3,14 +3,14 @@
 # Handlers for media stack role
 
 - name: restart media stack
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/media"
     files: docker-compose.yml
     state: present
   listen: "restart media stack"
 
 - name: restart downloaders
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/media"
     files: docker-compose.yml
     services:
@@ -20,7 +20,7 @@
   listen: "restart downloaders"
 
 - name: restart arr services
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/media"
     files: docker-compose.yml
     services:
@@ -35,7 +35,7 @@
   listen: "restart arr services"
 
 - name: restart media players
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/media"
     files: docker-compose.yml
     services:
@@ -110,4 +110,4 @@
   ansible.builtin.systemd:
     name: crowdsec
     state: reloaded
-  listen: "reload crowdsec" 
+  listen: "reload crowdsec"

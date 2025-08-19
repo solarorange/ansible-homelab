@@ -103,8 +103,8 @@
         state: present
         login_host: "{{ paperless_ngx_database_host }}"
         login_port: "{{ paperless_ngx_database_port }}"
-        login_user: "{{ vault_paperless_ngx_user }}"postgres') }}"
-        login_password: "{{ vault_paperless_ngx_password }}"') }}"
+        login_user: "{{ vault_paperless_ngx_user }}"
+        login_password: "{{ vault_paperless_ngx_password }}"
         encoding: UTF8
         template: template0
         lc_collate: en_US.UTF-8
@@ -116,8 +116,8 @@
         password: "{{ vault_paperless_ngx_password }}"
         login_host: "{{ paperless_ngx_database_host }}"
         login_port: "{{ paperless_ngx_database_port }}"
-        login_user: "{{ vault_paperless_ngx_user }}"postgres') }}"
-        login_password: "{{ vault_paperless_ngx_password }}"') }}"
+        login_user: "{{ vault_paperless_ngx_user }}"
+        login_password: "{{ vault_paperless_ngx_password }}"
         state: present
         priv: "ALL"
         db: "{{ paperless_ngx_database_name }}"
@@ -146,6 +146,29 @@
     - { src: "nginx.conf.j2", dest: "{{ config_dir }}/paperless-ngx/nginx/nginx.conf", mode: "0644" }
     - { src: "paperless.conf.j2", dest: "{{ config_dir }}/paperless-ngx/paperless.conf", mode: "0644" }
   tags: [paperless-ngx, setup]
+
+- name: Prepare Paperless-ngx secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "paperless-ngx"
+    secret_files: "{{ paperless_ngx_secret_files if paperless_ngx_manage_secret_files else [] }}"
+  when: paperless_ngx_manage_secret_files | bool
+  tags: [paperless-ngx, setup]
+
+- name: Validate required Paperless-ngx secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/paperless-ngx/secrets/{{ item }}"
+  register: paperless_secrets_stats
+  loop: "{{ paperless_ngx_required_secrets | default([]) }}"
+  when: paperless_ngx_manage_secret_files | bool and (paperless_ngx_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Paperless-ngx secret files are missing
+  ansible.builtin.assert:
+    that: "{{ paperless_secrets_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/paperless-ngx/secrets.
+      Missing: {{ (paperless_ngx_required_secrets | default([])) | reject('in', (paperless_secrets_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: paperless_ngx_manage_secret_files | bool and (paperless_ngx_required_secrets | default([]) | length > 0)
 
 - name: Create Paperless-ngx health check script
   ansible.builtin.template:
@@ -235,4 +258,4 @@
     enabled: true
     state: started
   become: true
-  tags: [paperless-ngx, setup] 
+  tags: [paperless-ngx, setup]

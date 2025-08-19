@@ -33,9 +33,9 @@
     dest: "{{ docker_dir }}/calibre-web/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Calibre-Web Management Script
-      
+
       function show_help {
           echo "Calibre-Web Management Script"
           echo "Usage: $0 [command]"
@@ -48,14 +48,14 @@
           echo "  restore   - Restore Calibre-Web data"
           echo "  help      - Show this help message"
       }
-      
+
       function backup_data {
           echo "Backing up Calibre-Web data..."
           tar -czf "{{ docker_dir }}/calibre-web/backup/calibre-web_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
               -C "{{ docker_dir }}/calibre-web" config data
           echo "Backup completed."
       }
-      
+
       function restore_data {
           if [ -z "$1" ]; then
               echo "Please specify backup file to restore"
@@ -65,7 +65,7 @@
           tar -xzf "$1" -C "{{ docker_dir }}/calibre-web"
           echo "Restore completed."
       }
-      
+
       case "$1" in
           status)
               docker ps | grep calibre-web
@@ -95,19 +95,19 @@
     dest: "{{ docker_dir }}/calibre-web/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Calibre-Web is running
       if ! docker ps | grep -q calibre-web; then
           echo "Calibre-Web is not running"
           exit 1
       fi
-      
+
       # Check if Calibre-Web is responding
       if ! curl -s http://{{ ansible_default_ipv4.address }}:8083 | grep -q "Calibre-Web"; then
           echo "Calibre-Web is not responding"
           exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -156,7 +156,37 @@
       CALIBRE_WEB_MAX_LOG_SIZE=5
       CALIBRE_WEB_MAX_LOG_FILES=5
       CALIBRE_WEB_ADMIN_USER={{ calibre_web_username }}
-      CALIBRE_WEB_ADMIN_PASSWORD={{ calibre_web_password }}
+      # CALIBRE_WEB_ADMIN_PASSWORD provided via /run/secrets at runtime
     owner: "{{ username }}"
     group: "{{ username }}"
-    mode: "0640" 
+    mode: "0640"
+
+- name: Ensure secrets directory and admin password secret file
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/calibre-web/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+
+- name: Write Calibre-Web admin password secret (0600)
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/calibre-web/secrets/CALIBRE_WEB_ADMIN_PASSWORD"
+    content: "{{ calibre_web_password }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+
+- name: Inject secret mount and entrypoint for Calibre-Web service
+  ansible.builtin.blockinfile:
+    path: "{{ docker_dir }}/calibre-web/docker-compose.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - calibre-web secrets"
+    block: |
+      services:
+        calibre-web:
+          volumes:
+            - {{ docker_dir }}/calibre-web/secrets:/run/secrets:ro
+          entrypoint: ["/bin/sh","-lc"]
+          command: >
+            export CALIBRE_WEB_ADMIN_PASSWORD="$(cat /run/secrets/CALIBRE_WEB_ADMIN_PASSWORD)" && \
+            exec /entrypoint.sh

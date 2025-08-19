@@ -1,0 +1,20 @@
+#!/bin/bash
+# Test Service Backup Script
+
+BACKUP_DIR="{{ backup_dir }}/testservice"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup data directory
+if [ -d "{{ docker_data_root }}/testservice" ]; then
+    tar -czf "$BACKUP_DIR/data_$DATE.tar.gz" -C "{{ docker_data_root }}" testservice
+fi
+
+# Backup config directory
+if [ -d "{{ docker_config_root }}/testservice" ]; then
+    tar -czf "$BACKUP_DIR/config_$DATE.tar.gz" -C "{{ docker_config_root }}" testservice
+fi
+
+# Cleanup old backups
+find "$BACKUP_DIR" -name "*.tar.gz" -mtime +{{ testservice_backup_retention_days | default(30) }} -delete

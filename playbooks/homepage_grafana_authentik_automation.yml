@@ -6,13 +6,13 @@
   hosts: all
   become: true
   gather_facts: true
-  
+
   vars:
     # Enable automation for all services
     homepage_automation_enabled: true
     grafana_automation_enabled: true
     authentik_automation_enabled: true
-    
+
     # Deployment phases
     deployment_phases:
       - "pre_deployment"
@@ -22,7 +22,7 @@
       - "integration_configuration"
       - "validation_and_testing"
       - "post_deployment"
-    
+
     # Service dependencies
     service_dependencies:
       authentik:
@@ -35,7 +35,7 @@
         - "authentik"
         - "postgresql"
         - "prometheus"
-    
+
     # Integration configuration
     integration_config:
       oauth_providers:
@@ -44,25 +44,25 @@
         - "paperless"
         - "media_services"
         - "monitoring"
-      
+
       monitoring_integration:
         - "prometheus"
         - "grafana"
         - "alertmanager"
         - "loki"
-      
+
       backup_integration:
         - "database"
         - "configuration"
         - "certificates"
         - "user_data"
-      
+
       traefik_integration:
         - "reverse_proxy"
         - "ssl_termination"
         - "forward_auth"
         - "security_headers"
-  
+
   pre_tasks:
     - name: Display deployment information
       ansible.builtin.debug:
@@ -70,16 +70,16 @@
           ========================================
           HOMEPAGE, GRAFANA, AND AUTHENTIK AUTOMATION
           ========================================
-          
+
           Deployment Target: {{ inventory_hostname }}
           Deployment User: {{ ansible_user }}
           Automation Enabled: {{ homepage_automation_enabled and grafana_automation_enabled and authentik_automation_enabled }}
-          
+
           Services to Deploy:
           - Authentik (Identity Provider)
           - Homepage (Dashboard)
           - Grafana (Monitoring)
-          
+
           Integration Features:
           - OAuth/OpenID Connect Authentication
           - Automated Service Discovery
@@ -87,61 +87,61 @@
           - Backup Automation
           - Traefik Integration
           - Security Hardening
-          
+
           ========================================
-      
+
     - name: Validate prerequisites
       ansible.builtin.assert:
         that:
           - ansible_os_family == "Debian" or ansible_os_family == "RedHat"
           - ansible_architecture in ["x86_64", "amd64", "aarch64", "arm64"]
         fail_msg: "Unsupported operating system or architecture"
-      
+
     - name: Check available disk space
       ansible.builtin.stat:
         path: "{{ docker_dir | default('/opt/docker') }}"
       register: docker_dir_stat
-      
+
     - name: Validate disk space
       ansible.builtin.assert:
         that:
           - docker_dir_stat.stat.exists
           - docker_dir_stat.stat.size > 10737418240  # 10GB
         fail_msg: "Insufficient disk space. At least 10GB required."
-      
+
     - name: Check Docker availability
       ansible.builtin.command: "docker --version"
       register: docker_version_check
       changed_when: false
       failed_when: false
-      
+
     - name: Validate Docker installation
       ansible.builtin.assert:
         that:
           - docker_version_check.rc == 0
         fail_msg: "Docker is not installed or not accessible"
-      
+
     - name: Check Docker Compose availability
       ansible.builtin.command: "docker-compose --version"
       register: docker_compose_version_check
       changed_when: false
       failed_when: false
-      
+
     - name: Validate Docker Compose installation
       ansible.builtin.assert:
         that:
           - docker_compose_version_check.rc == 0
         fail_msg: "Docker Compose is not installed or not accessible"
-  
+
   tasks:
     # =============================================================================
     # PHASE 1: PRE-DEPLOYMENT PREPARATION
     # =============================================================================
-    
+
     - name: Phase 1 - Pre-deployment Preparation
       ansible.builtin.debug:
         msg: "Starting Phase 1: Pre-deployment Preparation"
-    
+
     - name: Create required directories
       ansible.builtin.file:
         path: "{{ item }}"
@@ -162,7 +162,7 @@
         - "{{ docker_dir }}/homepage/config"
         - "{{ docker_dir }}/grafana/config"
         - "{{ docker_dir }}/authentik/config"
-    
+
     - name: Install Python dependencies for automation
       ansible.builtin.package:
         name:
@@ -173,7 +173,7 @@
           - python3-docker
           - python3-jinja2
         state: present
-    
+
     - name: Install Python requirements for automation
       ansible.builtin.pip:
         name:
@@ -187,7 +187,7 @@
           - ldap3
           - cryptography
         state: present
-    
+
     - name: Validate network connectivity
       ansible.builtin.uri:
         url: "https://www.google.com"
@@ -195,28 +195,28 @@
         timeout: 30
       register: network_connectivity_check
       failed_when: false
-    
+
     - name: Check network connectivity
       ansible.builtin.assert:
         that:
           - network_connectivity_check.status == 200
         fail_msg: "No internet connectivity. Required for Docker image downloads and SSL certificates."
-    
+
     # =============================================================================
     # PHASE 2: AUTHENTIK DEPLOYMENT AND AUTOMATION
     # =============================================================================
-    
+
     - name: Phase 2 - Authentik Deployment and Automation
       ansible.builtin.debug:
         msg: "Starting Phase 2: Authentik Deployment and Automation"
-    
+
     - name: Deploy Authentik with automation
       ansible.builtin.include_role:
         name: security/authentication
       vars:
         authentik_automation_enabled: true
       register: authentik_deployment_result
-    
+
     - name: Wait for Authentik to be ready
       ansible.builtin.uri:
         url: "http://{{ ansible_default_ipv4.address }}:{{ authentik_port }}/api/v3/core/applications/"
@@ -227,29 +227,29 @@
       retries: 60
       delay: 10
       until: authentik_ready_check.status in [200, 302, 401]
-    
+
     - name: Validate Authentik deployment
       ansible.builtin.assert:
         that:
           - authentik_deployment_result is defined
           - authentik_ready_check.status in [200, 302, 401]
         fail_msg: "Authentik deployment failed or service is not ready"
-    
+
     # =============================================================================
     # PHASE 3: HOMEPAGE DEPLOYMENT AND AUTOMATION
     # =============================================================================
-    
+
     - name: Phase 3 - Homepage Deployment and Automation
       ansible.builtin.debug:
         msg: "Starting Phase 3: Homepage Deployment and Automation"
-    
+
     - name: Deploy Homepage with automation
       ansible.builtin.include_role:
         name: homepage
       vars:
         homepage_automation_enabled: true
       register: homepage_deployment_result
-    
+
     - name: Wait for Homepage to be ready
       ansible.builtin.uri:
         url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
@@ -260,29 +260,29 @@
       retries: 30
       delay: 10
       until: homepage_ready_check.status in [200, 302, 401]
-    
+
     - name: Validate Homepage deployment
       ansible.builtin.assert:
         that:
           - homepage_deployment_result is defined
           - homepage_ready_check.status in [200, 302, 401]
         fail_msg: "Homepage deployment failed or service is not ready"
-    
+
     # =============================================================================
     # PHASE 4: GRAFANA DEPLOYMENT AND AUTOMATION
     # =============================================================================
-    
+
     - name: Phase 4 - Grafana Deployment and Automation
       ansible.builtin.debug:
         msg: "Starting Phase 4: Grafana Deployment and Automation"
-    
+
     - name: Deploy Grafana with automation
       ansible.builtin.include_role:
         name: grafana
       vars:
         grafana_automation_enabled: true
       register: grafana_deployment_result
-    
+
     - name: Wait for Grafana to be ready
       ansible.builtin.uri:
         url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
@@ -293,40 +293,40 @@
       retries: 30
       delay: 10
       until: grafana_ready_check.status in [200, 302, 401]
-    
+
     - name: Validate Grafana deployment
       ansible.builtin.assert:
         that:
           - grafana_deployment_result is defined
           - grafana_ready_check.status in [200, 302, 401]
         fail_msg: "Grafana deployment failed or service is not ready"
-    
+
     # =============================================================================
     # PHASE 5: INTEGRATION CONFIGURATION
     # =============================================================================
-    
+
     - name: Phase 5 - Integration Configuration
       ansible.builtin.debug:
         msg: "Starting Phase 5: Integration Configuration"
-    
+
     - name: Configure Authentik applications for Homepage and Grafana
       ansible.builtin.include_tasks: ../roles/security/authentication/tasks/automation_integration.yml
       vars:
         authentik_automation_enabled: true
       tags: [authentik, automation, integration]
-    
+
     - name: Configure Homepage authentication integration
       ansible.builtin.include_tasks: ../roles/homepage/tasks/automation_integration.yml
       vars:
         homepage_automation_enabled: true
       tags: [homepage, automation, integration]
-    
+
     - name: Configure Grafana authentication integration
       ansible.builtin.include_tasks: ../roles/grafana/tasks/automation_integration.yml
       vars:
         grafana_automation_enabled: true
       tags: [grafana, automation, integration]
-    
+
     - name: Configure Traefik integration for all services
       ansible.builtin.template:
         src: ../templates/traefik-integration.yml.j2
@@ -335,65 +335,65 @@
         group: "{{ username }}"
         mode: "0644"
       register: traefik_integration_creation
-    
+
     - name: Restart Traefik to apply integration changes
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/traefik"
         state: present
         restarted: true
       register: traefik_restart_result
       when: traefik_integration_creation.changed
-    
+
     # =============================================================================
     # PHASE 6: VALIDATION AND TESTING
     # =============================================================================
-    
+
     - name: Phase 6 - Validation and Testing
       ansible.builtin.debug:
         msg: "Starting Phase 6: Validation and Testing"
-    
+
     - name: Validate Authentik automation integration
       ansible.builtin.include_tasks: ../roles/security/authentication/tasks/validation.yml
       tags: [authentik, automation, validate]
-    
+
     - name: Validate Homepage automation integration
       ansible.builtin.include_tasks: ../roles/homepage/tasks/validation.yml
       tags: [homepage, automation, validate]
-    
+
     - name: Validate Grafana automation integration
       ansible.builtin.include_tasks: ../roles/grafana/tasks/validation.yml
       tags: [grafana, automation, validate]
-    
+
     - name: Test OAuth integration
       ansible.builtin.uri:
         url: "https://{{ authentik_subdomain }}.{{ domain }}/api/v3/core/applications/"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: oauth_integration_test
       tags: [integration, test]
-    
+
     - name: Test Homepage authentication
       ansible.builtin.uri:
         url: "https://{{ homepage_subdomain }}.{{ domain }}/api/health"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: homepage_auth_test
       tags: [integration, test]
-    
+
     - name: Test Grafana authentication
       ansible.builtin.uri:
         url: "https://{{ grafana_subdomain }}.{{ domain }}/api/health"
         method: GET
         status_code: [200, 302, 401]
         timeout: 30
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: grafana_auth_test
       tags: [integration, test]
-    
+
     - name: Validate monitoring integration
       ansible.builtin.uri:
         url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
@@ -402,15 +402,15 @@
         timeout: 30
       register: monitoring_integration_test
       tags: [integration, test]
-    
+
     # =============================================================================
     # PHASE 7: POST-DEPLOYMENT CONFIGURATION
     # =============================================================================
-    
+
     - name: Phase 7 - Post-deployment Configuration
       ansible.builtin.debug:
         msg: "Starting Phase 7: Post-deployment Configuration"
-    
+
     - name: Configure backup automation for all services
       ansible.builtin.template:
         src: ../templates/backup-orchestrator.yml.j2
@@ -419,13 +419,13 @@
         group: "{{ username }}"
         mode: "0644"
       register: backup_orchestrator_creation
-    
+
     - name: Start backup orchestrator
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/backup-orchestrator"
         state: present
       when: backup_orchestrator_creation.changed
-    
+
     - name: Configure monitoring dashboards
       ansible.builtin.template:
         src: ../templates/monitoring-dashboard.yml.j2
@@ -434,7 +434,7 @@
         group: "{{ username }}"
         mode: "0644"
       register: monitoring_dashboard_creation
-    
+
     - name: Configure alerting rules
       ansible.builtin.template:
         src: ../templates/alerting-rules.yml.j2
@@ -443,14 +443,14 @@
         group: "{{ username }}"
         mode: "0644"
       register: alerting_rules_creation
-    
+
     - name: Restart Grafana to apply dashboard and alerting changes
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/grafana"
         state: present
         restarted: true
       when: monitoring_dashboard_creation.changed or alerting_rules_creation.changed
-    
+
     - name: Configure service discovery for Homepage
       ansible.builtin.template:
         src: ../templates/service-discovery.yml.j2
@@ -459,40 +459,40 @@
         group: "{{ username }}"
         mode: "0644"
       register: service_discovery_creation
-    
+
     - name: Restart Homepage to apply service discovery changes
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/homepage"
         state: present
         restarted: true
       when: service_discovery_creation.changed
-    
+
     # =============================================================================
     # DEPLOYMENT SUMMARY
     # =============================================================================
-    
+
     - name: Display deployment summary
       ansible.builtin.debug:
         msg: |
           ========================================
           DEPLOYMENT SUMMARY
           ========================================
-          
+
           Deployment Status: SUCCESS
           Deployment Target: {{ inventory_hostname }}
           Deployment Time: {{ ansible_date_time.iso8601 }}
-          
+
           Services Deployed:
           - Authentik: {{ 'SUCCESS' if authentik_deployment_result is defined else 'FAILED' }}
           - Homepage: {{ 'SUCCESS' if homepage_deployment_result is defined else 'FAILED' }}
           - Grafana: {{ 'SUCCESS' if grafana_deployment_result is defined else 'FAILED' }}
-          
+
           Integration Status:
           - OAuth Integration: {{ 'SUCCESS' if oauth_integration_test.status in [200, 302, 401] else 'FAILED' }}
           - Homepage Auth: {{ 'SUCCESS' if homepage_auth_test.status in [200, 302, 401] else 'FAILED' }}
           - Grafana Auth: {{ 'SUCCESS' if grafana_auth_test.status in [200, 302, 401] else 'FAILED' }}
           - Monitoring: {{ 'SUCCESS' if monitoring_integration_test.status in [200, 302, 401] else 'FAILED' }}
-          
+
           Automation Features:
           - Application Auto-Provisioning: Enabled
           - User Management: Enabled
@@ -501,17 +501,17 @@
           - Backup Automation: Enabled
           - Traefik Integration: Enabled
           - Security Hardening: Enabled
-          
+
           Access URLs:
           - Authentik: https://{{ authentik_subdomain }}.{{ domain }}
           - Homepage: https://{{ homepage_subdomain }}.{{ domain }}
           - Grafana: https://{{ grafana_subdomain }}.{{ domain }}
-          
+
           Default Credentials:
           - Authentik Admin: admin / {{ vault_authentik_admin_password }}
           - Homepage: No authentication required (OAuth enabled)
           - Grafana: OAuth via Authentik
-          
+
           Next Steps:
           1. Access Authentik and change default admin password
           2. Configure additional applications in Authentik
@@ -519,9 +519,9 @@
           4. Configure Grafana dashboards and alerts
           5. Set up backup schedules
           6. Configure monitoring thresholds
-          
+
           ========================================
-      
+
   post_tasks:
     - name: Cleanup temporary files
       ansible.builtin.file:
@@ -532,7 +532,7 @@
         - "{{ ansible_env.TMPDIR }}/homepage_temp"
         - "{{ ansible_env.TMPDIR }}/grafana_temp"
       failed_when: false
-    
+
     - name: Log deployment completion
       ansible.builtin.copy:
         content: |
@@ -546,25 +546,25 @@
 
   handlers:
     - name: Restart Authentik
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/authentik"
         state: present
         restarted: true
-    
+
     - name: Restart Homepage
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/homepage"
         state: present
         restarted: true
-    
+
     - name: Restart Grafana
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/grafana"
         state: present
         restarted: true
-    
+
     - name: Restart Traefik
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ docker_dir }}/traefik"
         state: present
-        restarted: true 
+        restarted: true

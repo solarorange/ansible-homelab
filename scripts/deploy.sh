@@ -12,15 +12,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 INVENTORY_FILE="$PROJECT_DIR/inventory.yml"
 VAULT_FILE="$PROJECT_DIR/group_vars/all/vault.yml"
-LOG_FILE="$PROJECT_DIR/deployment.log"
+# LOG_FILE is used by logging_utils if enabled for file logging; keep for future use
+export LOG_FILE="$PROJECT_DIR/deployment.log"
 BACKUP_DIR="$PROJECT_DIR/backups"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+
 
 # Error handling
 error_exit() {
@@ -52,10 +48,12 @@ check_prerequisites() {
         error_exit "check_prerequisites" "ansible-playbook not found. Please install Ansible first."
     fi
     
-    # Check Ansible version
+    # Check Ansible version (use version sort to avoid decimal compare issues)
     ANSIBLE_VERSION=$(ansible --version | head -n1 | awk '{print $2}')
-    if [[ "$ANSIBLE_VERSION" < "2.12" ]]; then
-        log_warning "check_prerequisites" "Ansible version $ANSIBLE_VERSION detected. Version 2.12+ is recommended."
+    REQUIRED_VERSION="2.12.0"
+    if [ "$(printf '%s\n' "$ANSIBLE_VERSION" "$REQUIRED_VERSION" | sort -V | head -n1)" = "$ANSIBLE_VERSION" ] \
+       && [ "$ANSIBLE_VERSION" != "$REQUIRED_VERSION" ]; then
+        log_warning "check_prerequisites" "Ansible version $ANSIBLE_VERSION detected. Version $REQUIRED_VERSION+ is recommended."
     fi
     
     log_success "check_prerequisites" "Prerequisites check completed"
@@ -70,9 +68,9 @@ validate_configuration() {
         error_exit "validate_configuration" "Invalid inventory configuration"
     fi
     
-    # Test vault access
+    # Test vault access without prompting (requires ANSIBLE_VAULT_PASSWORD_FILE)
     if ! ansible-vault view "$VAULT_FILE" &> /dev/null; then
-        error_exit "validate_configuration" "Cannot access vault file. Check your vault password."
+        error_exit "validate_configuration" "Cannot access vault file non-interactively. Ensure ANSIBLE_VAULT_PASSWORD_FILE is set."
     fi
     
     # Test playbook syntax
@@ -87,7 +85,7 @@ validate_configuration() {
 test_connectivity() {
     log_info "test_connectivity" "Testing connectivity to target hosts..."
     
-    if ! ansible all -m ping -i "$INVENTORY_FILE" --ask-vault-pass &> /dev/null; then
+    if ! ansible all -m ping -i "$INVENTORY_FILE" -e "ansible_ssh_common_args='-o BatchMode=yes -o PasswordAuthentication=no'" &> /dev/null; then
         error_exit "test_connectivity" "Cannot connect to target hosts. Check your SSH configuration."
     fi
     
@@ -99,7 +97,8 @@ create_backup() {
     log_info "create_backup" "Creating deployment backup..."
     
     mkdir -p "$BACKUP_DIR"
-    local backup_file="$BACKUP_DIR/deployment_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+    local backup_file
+    backup_file="$BACKUP_DIR/deployment_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
     
     tar -czf "$backup_file" \
         --exclude='*.log' \
@@ -118,7 +117,6 @@ deploy_stage() {
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "stage$stage" \
-        --ask-vault-pass \
         --diff \
         --verbose; then
         log_success "deploy_stage" "Stage $stage ($stage_name) deployed successfully"
@@ -136,7 +134,6 @@ validate_stage() {
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "validation" \
-        --ask-vault-pass \
         --limit "stage$stage"; then
         log_success "validate_stage" "Stage $stage ($stage_name) validation completed"
     else
@@ -200,7 +197,6 @@ role_deployment() {
     
     if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_DIR/site.yml" \
         --tags "$role" \
-        --ask-vault-pass \
         --diff \
         --verbose; then
         log_success "role_deployment" "Role $role deployed successfully"
@@ -250,7 +246,6 @@ main() {
     local command="full"
     local create_backup_flag=false
     local skip_validation_flag=false
-    local verbose_flag=false
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -260,7 +255,7 @@ main() {
                 exit 0
                 ;;
             -v|--verbose)
-                verbose_flag=true
+                # Currently informational only; pass-through to ansible via --verbose already set in calls
                 shift
                 ;;
             -b|--backup)

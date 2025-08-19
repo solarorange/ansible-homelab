@@ -70,14 +70,17 @@
   when: monitoring_enabled | default(true)
   tags: [pihole, monitoring]
 
-- name: Deploy Pi-hole
-  community.docker.docker_compose:
+- name: Deploy Pi-hole safely with rollback
+  ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "pihole"
     project_src: "{{ docker_data_root }}/pihole"
-    state: present
-    remove_orphans: true
-    build: false
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 80
   register: pihole_deploy
-  tags: [pihole, deploy]
+  tags: [pihole, deploy, rollback]
 
 - name: Wait for Pi-hole to be ready
   ansible.builtin.uri:
@@ -106,7 +109,7 @@
 
 - name: Configure Pi-hole blocklists
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php"
+    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php"
     method: POST
     body_format: json
     body: |
@@ -119,7 +122,7 @@
 
 - name: Update Pi-hole gravity
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php?update"
+    url: "http://{{ ansible_default_ipv4.address }}:/admin/api.php?update"
     method: POST
     status_code: 200
   when: pihole_status.status == 200
@@ -127,7 +130,7 @@
 
 - name: Configure Pi-hole monitoring in Prometheus
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/-/reload"
+    url: "http://{{ ansible_default_ipv4.address }}:/-/reload"
     method: POST
     status_code: 200
   when: monitoring_enabled | default(true)
@@ -144,11 +147,11 @@
 
 - name: Reload Traefik configuration
   ansible.builtin.uri:
-    url: "http://{{ ansible_default_ipv4.address }}:/api/rawdata"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/rawdata"
     method: POST
     status_code: 200
   tags: [pihole, traefik]
 
 - name: Verify Pi-hole deployment
   ansible.builtin.include_tasks: tasks/validate/pihole.yml
-  tags: [pihole, validation] 
+  tags: [pihole, validation]

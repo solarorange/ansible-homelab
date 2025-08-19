@@ -34,31 +34,31 @@
 
 # Docker Compose handlers (for containerized databases)
 - name: Restart PostgreSQL container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/postgresql"
     restarted: true
   when: postgresql_enabled | default(false)
 
 - name: Restart MariaDB container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/mariadb"
     restarted: true
   when: mariadb_enabled | default(false)
 
 - name: Restart Redis container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/redis"
     restarted: true
   when: redis_enabled | default(false)
 
 - name: Restart Elasticsearch container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/elasticsearch"
     restarted: true
   when: elasticsearch_enabled | default(false)
 
 - name: Restart Kibana container
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_src: "{{ docker_dir }}/kibana"
     restarted: true
   when: kibana_enabled | default(false)
@@ -72,7 +72,7 @@
   when: postgresql_enabled | default(false)
 
 - name: Check MariaDB health
-  ansible.builtin.command: docker exec {{ mariadb_container_name }} mysqladmin ping -u root -p{{ mariadb_root_password }}
+  ansible.builtin.command: docker exec {{ mariadb_container_name }} bash -lc 'mysqladmin ping -u root -p"$(cat /run/secrets/mariadb_root_password)"'
   register: mariadb_health
   changed_when: false
   failed_when: mariadb_health.rc != 0
@@ -83,4 +83,4 @@
   register: redis_health
   changed_when: false
   failed_when: redis_health.rc != 0
-  when: redis_enabled | default(false) 
+  when: redis_enabled | default(false)

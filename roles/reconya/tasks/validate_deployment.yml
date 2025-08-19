@@ -76,7 +76,7 @@
         method: GET
         status_code: [200, 401, 403, 404]
         timeout: 30
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: reconya_traefik_test
       ignore_errors: true
 
@@ -115,4 +115,4 @@
       - "URL: https://{{ reconya_subdomain }}.{{ domain }}"
       - "Local: http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}"
 
-  tags: [reconya, validation] 
+  tags: [reconya, validation]

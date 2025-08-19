@@ -51,15 +51,15 @@
       ========================================
       PERFORMANCE MONITORING CONFIGURED
       ========================================
-      
+
       Prometheus Configuration: {{ docker_dir }}/monitoring/performance/prometheus.yml
       Grafana Dashboard: {{ docker_dir }}/monitoring/performance/grafana-dashboard.json
       Alert Rules: {{ docker_dir }}/monitoring/performance/alerts.yml
       System Monitor: {{ docker_dir }}/monitoring/performance/system-monitor.sh
-      
+
       Monitoring Schedule: Every 5 minutes
       Dashboard URL: https://grafana.{{ domain }}
-      
+
       ========================================
   tags: [monitoring, performance, summary]
 
@@ -104,13 +104,13 @@
     msg: |
       Performance Metrics:
       {{ system_metrics.stdout_lines | join('\n') }}
-      
+
       Service Resource Usage:
       {{ service_metrics.stdout_lines | join('\n') }}
-      
+
       Network Status:
       {{ network_metrics.stdout_lines | join('\n') }}
-      
+
       {% if 'docker' in enabled_services %}
       Docker Container Resources:
       {{ docker_metrics.stdout_lines | join('\n') }}
@@ -134,8 +134,8 @@
         "host": "{{ inventory_hostname }}",
         "timestamp": "{{ ansible_date_time.iso8601 }}"
       }
-  when: 
+  when:
     - notification_webhook_url is defined
     - system_metrics.stdout_lines[0] | regex_search('CPU Usage: ([0-9]+)%') | int > 80 or
       system_metrics.stdout_lines[1] | regex_search('Memory Usage: ([0-9.]+)%') | float > 80 or
-      system_metrics.stdout_lines[2] | regex_search('Disk Usage: ([0-9]+)%') | int > 80 
+      system_metrics.stdout_lines[2] | regex_search('Disk Usage: ([0-9]+)%') | int > 80

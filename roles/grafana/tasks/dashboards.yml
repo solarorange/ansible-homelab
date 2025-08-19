@@ -199,7 +199,7 @@
   ansible.builtin.debug:
     msg: |
       🎉 Grafana Dashboard and Alert Configuration Deployment Complete!
-      
+
       📊 Dashboards Deployed:
       - Homelab Overview
       - Docker Services
@@ -207,31 +207,31 @@
       - Security Monitoring
       - Network & Infrastructure
       - Backup & Storage
-      
+
       🚨 Alert Rules Configured:
       - Critical Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'critical') | list | length) if alert_validation.status == 200 else 'N/A' }}
       - Warning Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'warning') | list | length) if alert_validation.status == 200 else 'N/A' }}
       - Info Alerts: {{ (alert_validation.json | selectattr('severity', 'equalto', 'info') | list | length) if alert_validation.status == 200 else 'N/A' }}
-      
+
       📧 Notification Channels:
       - Email: {{ 'Enabled' if grafana_email_addresses else 'Disabled' }}
       - Discord: {{ 'Enabled' if grafana_discord_webhook_url else 'Disabled' }}
       - Slack: {{ 'Enabled' if grafana_slack_webhook_url else 'Disabled' }}
       - Telegram: {{ 'Enabled' if (grafana_telegram_bot_token and grafana_telegram_chat_id) else 'Disabled' }}
       - Webhook: {{ 'Enabled' if grafana_webhook_url else 'Disabled' }}
-      
+
       🔗 Access URLs:
       - Grafana Dashboard: http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}
-      - Alertmanager: http://{{ ansible_default_ipv4.address }}:
-      - Prometheus: http://{{ ansible_default_ipv4.address }}:
-      
+      - Alertmanager: http://{{ ansible_default_ipv4.address }}:
+      - Prometheus: http://{{ ansible_default_ipv4.address }}:
+
       📚 Documentation:
       - Dashboard Guide: {{ docker_dir }}/monitoring/grafana/docs/dashboard-documentation.md
       - Alert Guide: {{ docker_dir }}/monitoring/grafana/docs/alert-documentation.md
-      
+
       ✅ Validation Results:
       - Grafana Health: {{ 'OK' if grafana_health.status == 200 else 'Failed' }}
       - Dashboards: {{ 'OK' if dashboard_validation.status == 200 else 'Failed' }}
       - Alert Rules: {{ 'OK' if alert_validation.status == 200 else 'Failed' }}
       - Notifications: {{ 'OK' if notification_validation.status == 200 else 'Failed' }}
-  tags: [grafana, summary] 
+  tags: [grafana, summary]

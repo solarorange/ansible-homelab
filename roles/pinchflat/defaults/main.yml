@@ -1,0 +1,233 @@
+---
+# Pinchflat Role Default Variables
+# Enhanced for seamless automatic deployment
+
+# =============================================================================
+# CORE CONFIGURATION
+# =============================================================================
+
+# Service enablement
+pinchflat_enabled: true
+
+# Container configuration
+pinchflat_image: "pinchflat:latest"
+pinchflat_version: "latest"
+pinchflat_container_name: "pinchflat"
+pinchflat_restart_policy: "unless-stopped"
+
+# Port configuration
+pinchflat_port: 3002
+pinchflat_external_port: "3002"
+pinchflat_internal_port: "3002"
+
+# Domain configuration
+pinchflat_domain: "pinchflat.{{ domain | default(ansible_default_ipv4.address) }}"
+pinchflat_subdomain: "pinchflat"
+
+# =============================================================================
+# AUTHENTICATION CONFIGURATION
+# =============================================================================
+
+pinchflat_auth_enabled: true
+pinchflat_auth_method: "authentik"
+pinchflat_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+pinchflat_admin_password: "{{ vault_pinchflat_admin_password | default('') }}"
+pinchflat_secret_key: "{{ vault_pinchflat_secret_key | default('') }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+pinchflat_database_enabled: true
+pinchflat_database_type: "sqlite"
+pinchflat_database_host: "{{ postgresql_host | default(ansible_default_ipv4.address) }}"
+pinchflat_database_port: 5432
+pinchflat_database_name: "pinchflat"
+pinchflat_database_user: "{{ vault_pinchflat_database_user | default('pinchflat') }}"
+pinchflat_database_password: "{{ vault_pinchflat_database_password | default('') }}"
+
+# =============================================================================
+# TRAEFIK INTEGRATION
+# =============================================================================
+
+pinchflat_traefik_enabled: true
+pinchflat_traefik_middleware: ""
+pinchflat_traefik_network: "homelab"
+pinchflat_traefik_ssl_enabled: true
+
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+
+pinchflat_monitoring_enabled: true
+pinchflat_healthcheck_enabled: true
+pinchflat_healthcheck_interval: "30s"
+pinchflat_healthcheck_timeout: "10s"
+pinchflat_healthcheck_retries: 3
+pinchflat_healthcheck_start_period: "40s"
+pinchflat_metrics_enabled: true
+pinchflat_metrics_port: 9090
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+pinchflat_security_enabled: true
+pinchflat_read_only: false
+pinchflat_no_new_privileges: true
+pinchflat_security_headers: true
+pinchflat_rate_limiting: true
+pinchflat_rate_limit_requests: 100
+pinchflat_rate_limit_window: 60
+pinchflat_cors_enabled: false
+pinchflat_crowdsec_enabled: true
+pinchflat_fail2ban_enabled: true
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+
+pinchflat_backup_enabled: true
+pinchflat_backup_retention_days: 30
+pinchflat_backup_include_data: true
+pinchflat_backup_include_config: true
+pinchflat_backup_schedule: "0 2 * * *"
+
+# =============================================================================
+# HOMEPAGE INTEGRATION
+# =============================================================================
+
+pinchflat_homepage_enabled: true
+pinchflat_homepage_group: "media"
+pinchflat_homepage_icon: "pinchflat"
+pinchflat_homepage_title: "Pinchflat"
+pinchflat_homepage_description: "Pinchflat - https://github.com/kieraneglin/pinchflat"
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+pinchflat_alerting_enabled: true
+pinchflat_alert_severity: "warning"
+pinchflat_alert_channels: ['email', 'discord', 'slack']
+
+# =============================================================================
+# RESOURCE LIMITS
+# =============================================================================
+
+pinchflat_memory_limit: "512M"
+pinchflat_memory_reservation: "256M"
+pinchflat_cpu_limit: "0.5"
+pinchflat_cpu_reservation: "0.25"
+pinchflat_storage_limit: "10G"
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+
+pinchflat_environment:
+  TZ: "{{ timezone | default('UTC') }}"
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_user_id | default(1000) }}"
+  PINCHFLAT_DOMAIN: "{{ pinchflat_domain }}"
+  PINCHFLAT_SECRET_KEY: "{{ vault_pinchflat_secret_key | default('') }}"
+  PINCHFLAT_ADMIN_EMAIL: "{{ pinchflat_admin_email }}"
+  PINCHFLAT_ADMIN_PASSWORD: "{{ vault_service_password }}"
+  PINCHFLAT_DATABASE_TYPE: "{{ pinchflat_database_type }}"
+  PINCHFLAT_AUTH_ENABLED: "{{ pinchflat_auth_enabled | lower }}"
+  PINCHFLAT_AUTH_METHOD: "{{ pinchflat_auth_method }}"
+  PINCHFLAT_MONITORING_ENABLED: "{{ pinchflat_monitoring_enabled | lower }}"
+  PINCHFLAT_METRICS_ENABLED: "{{ pinchflat_metrics_enabled | lower }}"
+  PINCHFLAT_SECURITY_HEADERS: "{{ pinchflat_security_headers | lower }}"
+  PINCHFLAT_RATE_LIMITING: "{{ pinchflat_rate_limiting | lower }}"
+  PINCHFLAT_RATE_LIMIT_REQUESTS: "{{ pinchflat_rate_limit_requests }}"
+  PINCHFLAT_RATE_LIMIT_WINDOW: "{{ pinchflat_rate_limit_window }}"
+  PINCHFLAT_CORS_ENABLED: "{{ pinchflat_cors_enabled | lower }}"
+
+# =============================================================================
+# VOLUME CONFIGURATION
+# =============================================================================
+
+pinchflat_volumes:
+  - "{{ docker_data_root }}/pinchflat:/data"
+  - "{{ docker_config_root }}/pinchflat:/config"
+  - "{{ docker_logs_root }}/pinchflat:/logs"
+  - "{{ docker_backup_root }}/pinchflat:/backups"
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+
+pinchflat_networks:
+  - homelab
+  - default
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+pinchflat_dependencies:
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+pinchflat_log_level: "info"
+pinchflat_log_format: "json"
+pinchflat_log_retention: 30
+
+# =============================================================================
+# PERFORMANCE CONFIGURATION
+# =============================================================================
+
+pinchflat_cache_enabled: true
+pinchflat_cache_size: "256M"
+pinchflat_cache_ttl: 3600
+pinchflat_compression_enabled: true
+pinchflat_compression_level: 6
+
+# =============================================================================
+# API CONFIGURATION
+# =============================================================================
+
+pinchflat_api_enabled: true
+pinchflat_api_version: "v1"
+pinchflat_api_key: "{{ vault_pinchflat_api_key | default('') }}"
+pinchflat_api_rate_limit: 100
+pinchflat_api_rate_limit_window: 3600
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+pinchflat_notifications_enabled: true
+pinchflat_email_enabled: false
+pinchflat_email_host: "{{ smtp_host | default('') }}"
+pinchflat_email_port: 587
+pinchflat_email_username: "{{ vault_smtp_username | default('') }}"
+pinchflat_email_password: "{{ vault_service_password }}"
+pinchflat_email_from: "pinchflat@{{ domain }}"
+pinchflat_discord_enabled: false
+pinchflat_discord_webhook: "{{ vault_discord_webhook | default('') }}"
+pinchflat_slack_enabled: false
+pinchflat_slack_webhook: "{{ vault_slack_webhook | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+pinchflat_manage_secret_files: true
+
+pinchflat_secret_files:
+  - { name: "PINCHFLAT_ADMIN_PASSWORD", value: "{{ pinchflat_admin_password }}" }
+  - { name: "PINCHFLAT_SECRET_KEY", value: "{{ pinchflat_secret_key }}" }
+  - { name: "PINCHFLAT_DATABASE_PASSWORD", value: "{{ pinchflat_database_password }}" }
+  - { name: "PINCHFLAT_API_KEY", value: "{{ pinchflat_api_key }}" }
+  - { name: "PINCHFLAT_EMAIL_PASSWORD", value: "{{ pinchflat_email_password }}" }
+
+pinchflat_required_secrets:
+  - PINCHFLAT_ADMIN_PASSWORD
+  - PINCHFLAT_SECRET_KEY
+
+# Prefer Traefik ingress; gate direct host port exposure
+pinchflat_direct_expose_enabled: false

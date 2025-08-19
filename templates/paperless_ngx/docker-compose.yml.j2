@@ -13,16 +13,18 @@ services:
       - PAPERLESS_DBHOST={{ paperless_ngx_database_host }}
       - PAPERLESS_DBNAME={{ paperless_ngx_database_name }}
       - PAPERLESS_DBUSER={{ paperless_ngx_database_user }}
-      - PAPERLESS_DBPASS={{ paperless_ngx_database_password }}
-      - PAPERLESS_SECRET_KEY={{ paperless_ngx_secret_key }}
+      - PAPERLESS_DBPASS_FILE=/run/secrets/PAPERLESS_DBPASS
+      - PAPERLESS_SECRET_KEY_FILE=/run/secrets/PAPERLESS_SECRET_KEY
       - PAPERLESS_URL=https://{{ paperless_ngx_domain }}
     volumes:
-      - {{ docker_root }}/paperless/data:/usr/src/paperless/data
-      - {{ docker_root }}/paperless/media:/usr/src/paperless/media
-      - {{ docker_root }}/paperless/export:/usr/src/paperless/export
-      - {{ docker_root }}/paperless/consume:/usr/src/paperless/consume
-    ports:
-      - "{{ paperless_ngx_web_port }}:8000"
+      - {{ docker_dir }}/paperless/data:/usr/src/paperless/data
+      - {{ docker_dir }}/paperless/media:/usr/src/paperless/media
+      - {{ docker_dir }}/paperless/export:/usr/src/paperless/export
+      - {{ docker_dir }}/paperless/consume:/usr/src/paperless/consume
+      - {{ logs_dir }}/paperless-ngx:/usr/src/paperless/logs
+    # Prefer Traefik ingress; disable direct host mapping by default
+    # ports:
+    #   - "{{ paperless_ngx_web_port }}:8000"
     networks:
       - traefik_network
     labels:
@@ -42,11 +44,18 @@ services:
       - "logging=promtail"
       - "promtail-job=paperless"
       - "promtail-service=paperless-ngx"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    volumes:
+      - {{ docker_dir }}/paperless-ngx/secrets:/run/secrets:ro
     depends_on:
       - paperless-db
       - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:8000/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,20 +68,31 @@ services:
     environment:
       - POSTGRES_DB={{ paperless_ngx_database_name }}
       - POSTGRES_USER={{ paperless_ngx_database_user }}
-      - POSTGRES_PASSWORD={{ paperless_ngx_database_password }}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/PAPERLESS_DBPASS
     volumes:
-      - {{ docker_root }}/paperless/database:/var/lib/postgresql/data
+      - {{ docker_dir }}/paperless/database:/var/lib/postgresql/data
+      - {{ docker_dir }}/paperless-ngx/secrets:/run/secrets:ro
     networks:
       - traefik_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   redis:
     image: redis:7
     container_name: paperless-redis
     restart: unless-stopped
     volumes:
-      - {{ docker_root }}/paperless/redis:/data
+      - {{ docker_dir }}/paperless/redis:/data
     networks:
       - traefik_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   traefik_network:

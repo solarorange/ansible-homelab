@@ -83,7 +83,7 @@
         method: GET
         status_code: [401, 403]
         timeout: 10
-        validate_certs: false
+        validate_certs: "{{ validate_certs | default(true) }}"
       register: traefik_api_security
       when: "'traefik' in enabled_services"
 
@@ -105,4 +105,4 @@
         msg: "WARNING: {{ exposed_sensitive_ports.stdout }} sensitive ports exposed"
       when: exposed_sensitive_ports.stdout | int > 0
 
-  tags: [validation, security] 
+  tags: [validation, security]

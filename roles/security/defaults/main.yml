@@ -1,3 +1,4 @@
+---
 # Security Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,34 @@ security_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+security_manage_secret_files: true
+
+security_secret_files:
+  - { name: "SECURITY_API_KEY", value: "{{ security_api_key | default('') }}" }
+  - { name: "SECURITY_SECRET_KEY", value: "{{ security_secret_key | default('') }}" }
+  - { name: "SECURITY_ENCRYPTION_KEY", value: "{{ security_encryption_key | default('') }}" }
+  - { name: "SECURITY_JWT_SECRET", value: "{{ security_jwt_secret | default('') }}" }
+  - { name: "SECURITY_DATABASE_PASSWORD", value: "{{ security_database_password | default('') }}" }
+  - { name: "SECURITY_REDIS_PASSWORD", value: "{{ security_redis_password | default('') }}" }
+  - { name: "SECURITY_SMTP_PASSWORD", value: "{{ security_smtp_password | default('') }}" }
+  # Sub-role secrets consumed by security templates
+  - { name: "AUTHENTIK_SECRET_KEY", value: "{{ vault_authentik_secret_key | default('') }}" }
+  - { name: "POSTGRES_PASSWORD", value: "{{ vault_authentik_postgres_password | default('') }}" }
+  - { name: "WEBPASSWORD", value: "{{ security_pihole.admin_password | default('') }}" }
+
+security_required_secrets:
+  - SECURITY_SECRET_KEY
+  - SECURITY_ENCRYPTION_KEY
+  - SECURITY_JWT_SECRET
+  - SECURITY_DATABASE_PASSWORD
+  - AUTHENTIK_SECRET_KEY
+  - POSTGRES_PASSWORD
+  - WEBPASSWORD
+
+# Authentik sub-role advanced config generation (disabled by default)
+security_authentik_custom_config_enabled: false

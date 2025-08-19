@@ -4,73 +4,94 @@
 
 - name: Include ARR services deployment tasks
   block:
-    - name: Deploy Prowlarr (Indexer Management)
-      community.docker.docker_compose:
+    - name: Deploy Prowlarr (Indexer Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "prowlarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - prowlarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.prowlarr.port ] if (media_arr_services.prowlarr.port is defined) else [] }}"
       when: media_arr_services.prowlarr.enabled | default(true)
       register: prowlarr_deploy
 
-    - name: Deploy Sonarr (TV Show Management)
-      community.docker.docker_compose:
+    - name: Deploy Sonarr (TV Show Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "sonarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - sonarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.sonarr.port ] if (media_arr_services.sonarr.port is defined) else [] }}"
       when: media_arr_services.sonarr.enabled | default(true)
       register: sonarr_deploy
 
-    - name: Deploy Radarr (Movie Management)
-      community.docker.docker_compose:
+    - name: Deploy Radarr (Movie Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "radarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - radarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.radarr.port ] if (media_arr_services.radarr.port is defined) else [] }}"
       when: media_arr_services.radarr.enabled | default(true)
       register: radarr_deploy
 
-    - name: Deploy Lidarr (Music Management)
-      community.docker.docker_compose:
+    - name: Deploy Lidarr (Music Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "lidarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - lidarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.lidarr.port ] if (media_arr_services.lidarr.port is defined) else [] }}"
       when: media_arr_services.lidarr.enabled | default(true)
       register: lidarr_deploy
 
-    - name: Deploy Readarr (Book Management)
-      community.docker.docker_compose:
+    - name: Deploy Readarr (Book Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "readarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - readarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.readarr.port ] if (media_arr_services.readarr.port is defined) else [] }}"
       when: media_arr_services.readarr.enabled | default(true)
       register: readarr_deploy
 
-    - name: Deploy Bazarr (Subtitle Management)
-      community.docker.docker_compose:
+    - name: Deploy Bazarr (Subtitle Management) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "bazarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - bazarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.bazarr.port ] if (media_arr_services.bazarr.port is defined) else [] }}"
       when: media_arr_services.bazarr.enabled | default(true)
       register: bazarr_deploy
 
-    - name: Deploy Pulsarr (ARR Service Status Dashboard)
-      community.docker.docker_compose:
+    - name: Deploy Pulsarr (ARR Service Status Dashboard) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "pulsarr"
         project_src: "{{ docker_dir }}/media"
-        files: docker-compose.yml
+        compose_files:
+          - docker-compose.yml
         services:
           - pulsarr
-        state: present
+        wait_for_ports: "{{ [ media_arr_services.pulsarr.port ] if (media_arr_services.pulsarr.port is defined) else [] }}"
       when: media_arr_services.pulsarr.enabled | default(true)
       register: pulsarr_deploy
 
@@ -167,7 +188,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_arr_services | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_monitoring_enabled | default(true)
 
@@ -189,7 +210,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_arr_services | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_backup_enabled | default(true)
 
@@ -201,7 +222,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_arr_services | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_homepage_enabled | default(true)
 
@@ -213,7 +234,7 @@
         group: "{{ username }}"
         mode: "0644"
       loop: "{{ media_arr_services | dict2items }}"
-      when: 
+      when:
         - item.value.enabled | default(false)
         - media_alerting_enabled | default(true)
 
@@ -235,4 +256,4 @@
       when: item.value.enabled | default(false)
       register: arr_verification
 
-  tags: [media, arr_services, deploy] 
+  tags: [media, arr_services, deploy]

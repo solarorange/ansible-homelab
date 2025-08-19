@@ -193,12 +193,12 @@
   debug:
     msg: |
       Grafana Dashboard Deployment Status:
-      
+
       Health Check: {{ grafana_health.status | default('Unknown') }}
       Dashboard Validation: {{ dashboard_validation.status | default('Unknown') }}
       Alert Rules Validation: {{ alert_validation.status | default('Unknown') }}
       Notification Channels Validation: {{ notification_validation.status | default('Unknown') }}
-      
+
       Dashboards Deployed:
       - Homelab Overview
       - Docker Services
@@ -206,12 +206,12 @@
       - Security Monitoring
       - Network & Infrastructure
       - Backup & Storage
-      
+
       Alert Rules Deployed:
       - Critical Alerts ({{ critical_alerts_count | default(15) }} rules)
       - Warning Alerts ({{ warning_alerts_count | default(20) }} rules)
       - Info Alerts ({{ info_alerts_count | default(10) }} rules)
-      
+
       Notification Channels:
       - Email Alerts
       - Discord Alerts (if configured)
@@ -219,7 +219,7 @@
       - Telegram Alerts (if configured)
       - Webhook Alerts (if configured)
       - Push Notifications (if configured)
-      
+
       Access Grafana at: http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}
   when: grafana_enabled | default(true)
 
@@ -256,7 +256,7 @@
     hour: "2"
     minute: "0"
     job: "{{ grafana_config_dir }}/backup.sh"
-    user: "{{ vault_grafana_user }}"grafana') }}"
+    user: "{{ vault_grafana_user | default('grafana') }}"
   when: grafana_enabled | default(true)
 
 - name: Create Grafana Performance Monitoring
@@ -272,7 +272,7 @@
   debug:
     msg: |
       🎉 Grafana Monitoring System Successfully Deployed!
-      
+
       📊 Dashboards Available:
       • Homelab Overview - System-wide monitoring
       • Docker Services - Container health and performance
@@ -280,33 +280,33 @@
       • Security Monitoring - SSL, firewall, authentication
       • Network & Infrastructure - Bandwidth, latency, DNS
       • Backup & Storage - Backup jobs and storage metrics
-      
+
       🚨 Alert Rules Configured:
       • {{ critical_alerts_count | default(15) }} Critical Alerts
       • {{ warning_alerts_count | default(20) }} Warning Alerts
       • {{ info_alerts_count | default(10) }} Info Alerts
-      
+
       📧 Notification Channels:
       • Email notifications for all alerts
       • Discord/Slack for media and security alerts
       • Telegram for database alerts
       • Webhook for backup alerts
       • Push notifications for container alerts
-      
+
       🔧 Configuration Files:
       • Dashboards: {{ grafana_config_dir }}/dashboards/
       • Alert Rules: {{ grafana_config_dir }}/alerting/
       • Provisioning: {{ grafana_config_dir }}/provisioning/
-      
+
       📖 Documentation: {{ grafana_config_dir }}/dashboards/README.md
-      
+
       🌐 Access: http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}
       👤 Default Login: admin/admin (change immediately!)
-      
+
       Next Steps:
       1. Change default admin password
       2. Configure data sources (Prometheus, Loki)
       3. Set up notification channels
       4. Customize dashboards for your environment
       5. Test alert rules and notifications
-  when: grafana_enabled | default(true) 
+  when: grafana_enabled | default(true)

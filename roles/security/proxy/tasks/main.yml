@@ -31,12 +31,17 @@
     mode: "0644"
   notify: Restart traefik stack
 
-- name: Start traefik stack
-  community.docker.docker_compose:
+- name: Start traefik stack safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "traefik"
     project_src: "{{ docker_dir }}/traefik"
-    build: false
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8080
   register: traefik_result
 
 - name: Display traefik deployment result
   ansible.builtin.debug:
-    var: traefik_result 
+    var: traefik_result

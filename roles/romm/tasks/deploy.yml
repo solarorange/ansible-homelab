@@ -28,16 +28,47 @@
 - name: Deploy Romm Docker Compose
   template:
     src: docker-compose.yml.j2
-    dest: "{{ docker_root }}/romm/docker-compose.yml"
+    dest: "{{ docker_dir }}/romm/docker-compose.yml"
     mode: '0644'
   notify: restart romm
   tags: [romm, deploy]
 
-- name: Start Romm services
-  community.docker.docker_compose:
-    project_src: "{{ docker_root }}/romm"
-    state: present
-  tags: [romm, deploy]
+- name: Prepare Romm secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "romm"
+    secret_dir_root: "{{ docker_dir }}/romm"
+    secret_files: "{{ romm_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ romm_environment | default({}) }}"
+  when: romm_manage_secret_files | default(true) | bool
+  tags: [romm, deploy, setup]
+
+- name: Validate required Romm secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/romm/secrets/{{ item }}"
+  register: romm_secret_stats
+  loop: "{{ romm_required_secrets | default([]) }}"
+  when: romm_manage_secret_files | default(true) | bool and (romm_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Romm secret files are missing
+  ansible.builtin.assert:
+    that: "{{ romm_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/romm/secrets.
+      Missing: {{ (romm_required_secrets | default([])) | reject('in', (romm_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: romm_manage_secret_files | default(true) | bool and (romm_required_secrets | default([]) | length > 0)
+
+- name: Start Romm services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "romm"
+    project_src: "{{ docker_dir }}/romm"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ romm_external_port }}"
+  tags: [romm, deploy, rollback]
 
 - name: Wait for Romm to be ready
   uri:
@@ -48,6 +79,18 @@
   retries: 30
   delay: 10
   tags: [romm, deploy]
+  when: romm_direct_expose_enabled | default(false)
+
+- name: Verify Romm via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ romm_domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [romm, deploy]
+  when: not (romm_direct_expose_enabled | default(false))
 
 - name: Configure Romm authentication
   block:

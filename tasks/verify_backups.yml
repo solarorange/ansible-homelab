@@ -10,7 +10,7 @@
         tar -tf "{{ item }}" > /dev/null && echo "{{ item }} is valid" || exit 1
       fi
     fi
-  loop: "{{ backup_root_dir | default('/var/backups') }}/**/*"
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
   register: integrity_check
   changed_when: false
   tags: [backup, verification]
@@ -18,7 +18,7 @@
 - name: Check backup file permissions
   ansible.builtin.stat:
     path: "{{ item }}"
-  loop: "{{ backup_root_dir | default('/var/backups') }}/**/*"
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
   register: permission_check
   tags: [backup, verification]
 
@@ -31,7 +31,7 @@
         exit 1
       fi
     fi
-  loop: "{{ backup_root_dir | default('/var/backups') }}/**/*"
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
   register: size_check
   changed_when: false
   tags: [backup, verification]
@@ -47,13 +47,14 @@
     integrity_results: "{{ integrity_check.results }}"
     permission_results: "{{ permission_check.results }}"
     size_results: "{{ size_check.results }}"
+    backup_files: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') | map('basename') | list }}"
   tags: [backup, verification, reporting]
 
 - name: Alert on backup verification failures
   ansible.builtin.fail:
     msg: "Backup verification failed. Check the verification report for details."
   when: >
-    integrity_check.failed or
-    size_check.failed or
-    (permission_check.results | selectattr('stat.exists', 'equalto', false) | list | length > 0)
-  tags: [backup, verification, alert] 
+    (integrity_check.failed is defined and integrity_check.failed) or
+    (size_check.failed is defined and size_check.failed) or
+    (permission_check.results is defined and permission_check.results | selectattr('stat.exists', 'equalto', false) | list | length > 0)
+  tags: [backup, verification, alert]

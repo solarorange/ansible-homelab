@@ -199,10 +199,10 @@
           global:
             scrape_interval: 15s
             evaluation_interval: 15s
-          
+
           rule_files:
             - "rules/*.yml"
-          
+
           scrape_configs:
             - job_name: 'prometheus'
               static_configs:
@@ -246,31 +246,31 @@
         dest: "{{ backup_dir }}/databases/verify_backup.sh"
         content: |
           #!/bin/bash
-          
+
           # Database Backup Verification Script
-          
+
           BACKUP_DIR="{{ backup_dir }}/databases"
-          
+
           echo "Verifying database backups..."
-          
+
           # Check PostgreSQL backups
           if [ -d "$BACKUP_DIR/postgresql" ]; then
             PG_BACKUPS=$(find "$BACKUP_DIR/postgresql" -name "*.sql.gz" -mtime -1 | wc -l)
             echo "PostgreSQL backups in last 24h: $PG_BACKUPS"
           fi
-          
+
           # Check MariaDB backups
           if [ -d "$BACKUP_DIR/mariadb" ]; then
             MD_BACKUPS=$(find "$BACKUP_DIR/mariadb" -name "*.sql.gz" -mtime -1 | wc -l)
             echo "MariaDB backups in last 24h: $MD_BACKUPS"
           fi
-          
+
           # Check Redis backups
           if [ -d "$BACKUP_DIR/redis" ]; then
             RD_BACKUPS=$(find "$BACKUP_DIR/redis" -name "*.rdb" -mtime -1 | wc -l)
             echo "Redis backups in last 24h: $RD_BACKUPS"
           fi
-          
+
           # Check Elasticsearch backups
           if [ -d "$BACKUP_DIR/elasticsearch" ]; then
             ES_BACKUPS=$(find "$BACKUP_DIR/elasticsearch" -name "snapshot_*" -mtime -1 | wc -l)
@@ -344,7 +344,7 @@
         dest: "{{ logs_dir }}/databases/audit/audit.conf"
         content: |
           # Database Audit Configuration
-          
+
           # Audit Events
           audit_events:
             - authentication
@@ -353,13 +353,13 @@
             - data_modification
             - configuration_change
             - backup_restore
-          
+
           # Audit Retention
           audit_retention_days: {{ databases_audit_retention }}
-          
+
           # Audit Log Format
           audit_log_format: json
-          
+
           # Audit Log Level
           audit_log_level: info
         owner: "{{ username }}"
@@ -401,22 +401,22 @@
       ansible.builtin.debug:
         msg: |
           Database Stack Prerequisites Verification Completed!
-          
+
           Docker Status:
           - Docker: {{ docker_version.rc == 0 }}
           - Docker Compose: {{ docker_compose_version.rc == 0 }}
-          
+
           Required Tools:
           - curl: {{ curl_version.rc == 0 }}
           - jq: {{ jq_version.rc == 0 }}
           - bc: {{ bc_version.rc == 0 }}
-          
+
           System Resources:
           {{ system_resources.stdout }}
-          
+
           Configuration:
           - Performance Tuning: {{ databases_performance_tuning_enabled | default(true) }}
           - Security: {{ databases_security_enabled | default(true) }}
           - Monitoring: {{ databases_monitoring_enabled | default(true) }}
           - Backup: {{ databases_backup_enabled | default(true) }}
-          - Audit: {{ databases_audit_enabled | default(true) }} 
+          - Audit: {{ databases_audit_enabled | default(true) }}

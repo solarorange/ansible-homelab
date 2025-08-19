@@ -50,7 +50,7 @@
             - "traefik.http.routers.prometheus.middlewares=authentik@docker"
             - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
           healthcheck:
-            test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9090/-/healthy"]
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -122,12 +122,12 @@
               - https://traefik.{{ domain }}
               - https://portainer.{{ domain }}
               - https://authentik.{{ domain }}
-              
+
               # Monitoring services
               - https://grafana.{{ domain }}
               - https://prometheus.{{ domain }}
               - https://alertmanager.{{ domain }}
-              
+
               # Media services
               - https://jellyfin.{{ domain }}
               - https://sonarr.{{ domain }}
@@ -136,24 +136,24 @@
               - https://bazarr.{{ domain }}
               - https://overseerr.{{ domain }}
               - https://tautulli.{{ domain }}
-              
+
               # Development services
               - https://gitlab.{{ domain }}
               - https://harbor.{{ domain }}
               - https://code.{{ domain }}
-              
+
               # Storage services
               - https://nextcloud.{{ domain }}
               - https://minio.{{ domain }}
               - https://paperless.{{ domain }}
-              
+
               # Security services
               - https://vault.{{ domain }}
               - https://vaultwarden.{{ domain }}
-              
+
               # Network services
               - https://pihole.{{ domain }}
-              
+
               # Utility services
               - https://dashdot.{{ domain }}
               - https://heimdall.{{ domain }}
@@ -364,6 +364,16 @@
                 summary: "Service {{ $labels.instance }} is down"
                 description: "Service has been down for more than 1 minute"
 
+            - alert: HealthcheckFailing
+              expr: probe_success == 0
+              for: 5m
+              labels:
+                severity: warning
+                service: 'availability'
+              annotations:
+                summary: "Healthcheck failing for {{ $labels.instance }}"
+                description: "HTTP health probe has been failing for 5 minutes"
+
             - alert: ServiceHighLatency
               expr: probe_duration_seconds > 2
               for: 5m
@@ -373,6 +383,16 @@
               annotations:
                 summary: "Service {{ $labels.instance }} has high latency"
                 description: "Response time is above 2 seconds for 5 minutes"
+
+            - alert: SSLCertExpiringIn14Days
+              expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+              for: 1m
+              labels:
+                severity: warning
+                service: 'ssl'
+              annotations:
+                summary: "SSL certificate for {{ $labels.instance }} expires in <14 days"
+                description: "Certificate expires in less than 14 days"
 
             - alert: SSLCertExpiringSoon
               expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 2
@@ -445,6 +465,16 @@
               annotations:
                 summary: "Container {{ $labels.name }} is restarting"
                 description: "Container has restarted in the last 5 minutes"
+
+            - alert: ContainerFrequentRestarts
+              expr: increase(container_restart_count[10m]) > 3
+              for: 1m
+              labels:
+                severity: critical
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} restarted >3 times in 10m"
+                description: "Frequent restarts detected over the last 10 minutes"
 
         - name: network
           rules:
@@ -540,33 +570,33 @@
     dest: "{{ docker_dir }}/monitoring/prometheus/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Enhanced Prometheus Health Check Script
-      
+
       # Check if Prometheus is responding
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
         echo "Prometheus is not responding"
         exit 1
       fi
-      
+
       # Check if we can query the API
-      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up > /dev/null; then
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up > /dev/null; then
         echo "Prometheus API is not responding"
         exit 1
       fi
-      
+
       # Check if targets are being scraped
-      target_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/targets | jq '.data.activeTargets | length')
+      target_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/targets | jq '.data.activeTargets | length')
       if [ "$target_count" -lt 5 ]; then
         echo "Warning: Only $target_count targets are active"
       fi
-      
+
       # Check if rules are loaded
-      rule_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/rules | jq '.data.groups | length')
+      rule_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/rules | jq '.data.groups | length')
       if [ "$rule_count" -eq 0 ]; then
         echo "Warning: No alerting rules are loaded"
       fi
-      
+
       echo "Prometheus is healthy"
       exit 0
     owner: "{{ username }}"
@@ -603,9 +633,9 @@
     dest: "{{ docker_dir }}/monitoring/prometheus/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Prometheus Management Script
-      
+
       function show_help {
         echo "Prometheus Management Script"
         echo "Usage: $0 [command]"
@@ -619,10 +649,10 @@
         echo "  restore   - Restore from backup"
         echo "  help      - Show this help"
       }
-      
+
       case "$1" in
         status)
-          curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy
+          curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy
           ;;
         logs)
           docker logs prometheus --tail 100 -f
@@ -631,7 +661,7 @@
           docker restart prometheus
           ;;
         reload)
-          curl -X POST http://{{ ansible_default_ipv4.address }}:/-/reload
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/-/reload
           ;;
         backup)
           {{ docker_dir }}/monitoring/prometheus/scripts/backup.sh
@@ -656,36 +686,36 @@
     dest: "{{ docker_dir }}/monitoring/prometheus/scripts/backup.sh"
     content: |
       #!/bin/bash
-      
+
       # Prometheus Backup Script
-      
+
       BACKUP_DIR="{{ docker_dir }}/monitoring/prometheus/backup"
       DATA_DIR="{{ docker_dir }}/monitoring/prometheus/data"
       RETENTION_DAYS=30
-      
+
       # Create backup directory if it doesn't exist
       mkdir -p "$BACKUP_DIR"
-      
+
       # Create timestamp for backup
       TIMESTAMP=$(date +%Y%m%d_%H%M%S)
       BACKUP_FILE="$BACKUP_DIR/prometheus_backup_$TIMESTAMP.tar.gz"
-      
+
       # Stop Prometheus gracefully
       echo "Stopping Prometheus..."
       docker stop prometheus
-      
+
       # Create backup
       echo "Creating backup..."
       tar -czf "$BACKUP_FILE" -C "$DATA_DIR" .
-      
+
       # Start Prometheus
       echo "Starting Prometheus..."
       docker start prometheus
-      
+
       # Remove old backups
       echo "Cleaning up old backups..."
       find "$BACKUP_DIR" -name "prometheus_backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
-      
+
       echo "Backup completed: $BACKUP_FILE"
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -696,46 +726,46 @@
     dest: "{{ docker_dir }}/monitoring/prometheus/scripts/restore.sh"
     content: |
       #!/bin/bash
-      
+
       # Prometheus Restore Script
-      
+
       BACKUP_DIR="{{ docker_dir }}/monitoring/prometheus/backup"
       DATA_DIR="{{ docker_dir }}/monitoring/prometheus/data"
-      
+
       if [ -z "$1" ]; then
         echo "Usage: $0 <backup_file>"
         echo "Available backups:"
         ls -1 "$BACKUP_DIR"/prometheus_backup_*.tar.gz 2>/dev/null
         exit 1
       fi
-      
+
       BACKUP_FILE="$1"
-      
+
       if [ ! -f "$BACKUP_FILE" ]; then
         echo "Backup file not found: $BACKUP_FILE"
         exit 1
       fi
-      
+
       # Stop Prometheus
       echo "Stopping Prometheus..."
       docker stop prometheus
-      
+
       # Clear existing data
       echo "Clearing existing data..."
       rm -rf "$DATA_DIR"/*
-      
+
       # Restore backup
       echo "Restoring backup..."
       tar -xzf "$BACKUP_FILE" -C "$DATA_DIR"
-      
+
       # Fix permissions
       echo "Fixing permissions..."
       chown -R {{ username }}:{{ username }} "$DATA_DIR"
-      
+
       # Start Prometheus
       echo "Starting Prometheus..."
       docker start prometheus
-      
+
       echo "Restore completed successfully"
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -785,7 +815,7 @@
       scrape_configs:
         - job_name: 'prometheus'
           static_configs:
-            - targets: ['{{ ansible_default_ipv4.address }}:']
+            - targets: ['{{ ansible_default_ipv4.address }}:']
 
         - job_name: 'node'
           static_configs:
@@ -829,7 +859,7 @@
 
         - job_name: 'media_services'
           static_configs:
-            - targets: 
+            - targets:
               - 'sonarr:8989'
               - 'radarr:7878'
               - 'lidarr:8686'
@@ -878,4 +908,4 @@
           max-exemplars: 100000
     owner: "{{ username }}"
     group: "{{ username }}"
-    mode: "0640" 
+    mode: "0640"

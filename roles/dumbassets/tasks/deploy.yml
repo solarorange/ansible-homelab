@@ -62,14 +62,16 @@
   register: dumbassets_image_pull
   tags: [dumbassets, deploy, images]
 
-- name: Deploy DumbAssets container
-  community.docker.docker_compose:
+- name: Deploy DumbAssets container safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "dumbassets"
     project_src: "{{ dumbassets_docker_dir }}"
-    state: present
-    pull: true
-    build: false
-  register: dumbassets_container_deployment
-  tags: [dumbassets, deploy, containers]
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ dumbassets_port }}"
+  tags: [dumbassets, deploy, containers, rollback]
 
 - name: Wait for DumbAssets service to start
   ansible.builtin.wait_for:
@@ -90,6 +92,18 @@
   retries: "{{ dumbassets_validation_retries | default(3) }}"
   delay: 10
   tags: [dumbassets, deploy, health]
+  when: dumbassets_direct_expose_enabled | default(false)
+
+- name: Verify DumbAssets via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ dumbassets_subdomain }}.{{ domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [dumbassets, deploy, health]
+  when: not (dumbassets_direct_expose_enabled | default(false))
 
 - name: Display DumbAssets deployment summary
   ansible.builtin.debug:
@@ -102,4 +116,4 @@
       - Service Health: {{ dumbassets_service_start.state }}
       - Access URL: https://{{ dumbassets_subdomain }}.{{ domain }}
       - Local URL: http://{{ ansible_default_ipv4.address }}:{{ dumbassets_port }}
-  tags: [dumbassets, deploy, summary] 
+  tags: [dumbassets, deploy, summary]

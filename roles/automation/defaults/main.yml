@@ -1,3 +1,4 @@
+---
 # Automation Role Configuration
 # Enhanced with comprehensive security, automation, and vault integration
 
@@ -257,3 +258,32 @@ automation_fallback_services:
     url: "{{ grafana_url | default('') }}"
   - name: "prometheus"
     url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+automation_manage_secret_files: true
+automation_home_assistant_custom_config_enabled: false
+automation_zigbee2mqtt_custom_config_enabled: false
+
+automation_secret_files:
+  - { name: "AUTOMATION_API_KEY", value: "{{ automation_api_key | default('') }}" }
+  - { name: "AUTOMATION_SECRET_KEY", value: "{{ automation_secret_key | default('') }}" }
+  - { name: "AUTOMATION_ENCRYPTION_KEY", value: "{{ automation_encryption_key | default('') }}" }
+  - { name: "AUTOMATION_JWT_SECRET", value: "{{ automation_jwt_secret | default('') }}" }
+  - { name: "AUTOMATION_DATABASE_PASSWORD", value: "{{ automation_database_password | default('') }}" }
+  - { name: "AUTOMATION_REDIS_PASSWORD", value: "{{ automation_redis_password | default('') }}" }
+  - { name: "AUTOMATION_SMTP_PASSWORD", value: "{{ automation_smtp_password | default('') }}" }
+  # Optional compatibility names for *_FILE patterns
+  - { name: "MYSQL_ROOT_PASSWORD", value: "{{ mariadb_root_password | default('') }}" }
+  - { name: "redis_password", value: "{{ redis_password | default('') }}" }
+
+automation_required_secrets:
+  - AUTOMATION_SECRET_KEY
+  - AUTOMATION_ENCRYPTION_KEY
+  - AUTOMATION_JWT_SECRET
+  - AUTOMATION_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+automation_direct_expose_enabled: false

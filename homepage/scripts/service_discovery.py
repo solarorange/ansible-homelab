@@ -522,10 +522,12 @@ class ServiceDiscovery:
         }
         
         try:
-            # Scan {{ ansible_default_ipv4.address }} for services
+            # Determine host IP for local probing (fallback to 127.0.0.1)
+            host_ip = os.environ.get("HOMELAB_HOST_IP", "127.0.0.1")
+            # Scan host for services
             for port, possible_services in common_ports.items():
                 try:
-                    response = requests.get(f"http://{{ ansible_default_ipv4.address }}:{port}", timeout=2)
+                    response = requests.get(f"http://{host_ip}:{port}", timeout=2)
                     if response.status_code == 200:
                         # Try to identify the service
                         for service_name in possible_services:
@@ -536,7 +538,7 @@ class ServiceDiscovery:
                                 services[service_name] = {
                                     'name': service_name,
                                     'type': 'network',
-                                    'ip': '{{ ansible_default_ipv4.address }}',
+                                    'ip': host_ip,
                                     'port': port,
                                     'health_path': service_config['health_path'],
                                     'widget_type': service_config['widget_type'],
@@ -559,7 +561,7 @@ class ServiceDiscovery:
         """Check if a service is healthy"""
         try:
             url = f"http://{service['ip']}:{service['port']}{service['health_path']}"
-            response = requests.get(url, timeout=5, verify=False)  # Allow self-signed certs
+            response = requests.get(url, timeout=5)
             return response.status_code == 200
         except requests.exceptions.SSLError:
             # Try HTTP if HTTPS fails

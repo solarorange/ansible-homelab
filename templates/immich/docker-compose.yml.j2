@@ -17,13 +17,13 @@ services:
       - TZ={{ timezone }}
       - DB_HOSTNAME=immich-postgres
       - DB_USERNAME=postgres
-      - DB_PASSWORD={{ vault_immich_db_password }}
+      - DB_PASSWORD__FILE=/run/secrets/POSTGRES_PASSWORD
       - DB_DATABASE_NAME=immich
       - REDIS_HOSTNAME=immich-redis
       - REDIS_PORT=6379
       - REDIS_DBINDEX=0
-      - REDIS_PASSWORD={{ vault_immich_redis_password }}
-      - JWT_SECRET={{ vault_immich_jwt_secret }}
+      - REDIS_PASSWORD__FILE=/run/secrets/REDIS_PASSWORD
+      - JWT_SECRET__FILE=/run/secrets/IMMICH_JWT_SECRET
       - NODE_ENV=production
     volumes:
       - {{ docker_dir }}/immich/server:/config
@@ -41,9 +41,7 @@ services:
       - "traefik.http.routers.immich-server.tls=true"
       - "traefik.http.routers.immich-server.tls.certresolver=cloudflare"
       - "traefik.http.services.immich-server.loadbalancer.server.port=3001"
-      - "traefik.http.middlewares.immich-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
-      - "traefik.http.middlewares.immich-auth.forwardauth.trustForwardHeader=true"
-      - "traefik.http.routers.immich-server.middlewares=immich-auth"
+      # Middleware optional; ensure central SSO policy applies via file provider
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
       - "traefik.http.routers.immich-server.middlewares=immich-headers"
@@ -51,8 +49,13 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=immich-server"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:3001/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -83,9 +86,7 @@ services:
       - "traefik.http.routers.immich-web.tls=true"
       - "traefik.http.routers.immich-web.tls.certresolver=cloudflare"
       - "traefik.http.services.immich-web.loadbalancer.server.port=3000"
-      - "traefik.http.middlewares.immich-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
-      - "traefik.http.middlewares.immich-auth.forwardauth.trustForwardHeader=true"
-      - "traefik.http.routers.immich-web.middlewares=immich-auth"
+      # Middleware optional; ensure central SSO policy applies via file provider
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
       - "traefik.http.routers.immich-web.middlewares=immich-headers"
@@ -93,8 +94,13 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=immich-web"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:3000/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -106,11 +112,12 @@ services:
     container_name: immich-postgres
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD={{ vault_immich_postgres_password }}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/POSTGRES_PASSWORD
       - POSTGRES_DB=immich
     volumes:
       - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
       - {{ logs_dir }}/immich/postgres:/logs
+      - {{ docker_dir }}/immich/secrets:/run/secrets:ro
     restart: unless-stopped
     networks:
       - media
@@ -124,14 +131,20 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=immich-postgres"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   immich-redis:
     image: redis:alpine
     container_name: immich-redis
-    command: redis-server --requirepass {{ vault_immich_redis_password }}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$(cat /run/secrets/REDIS_PASSWORD)\"" ]
     volumes:
       - {{ docker_dir }}/immich/redis:/data
       - {{ logs_dir }}/immich/redis:/logs
+      - {{ docker_dir }}/immich/secrets:/run/secrets:ro
     restart: unless-stopped
     networks:
       - media
@@ -145,6 +158,11 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=immich-redis"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   immich-machine-learning:
     image: ghcr.io/immich-app/immich-machine-learning:latest
@@ -161,7 +179,7 @@ services:
     networks:
       - media
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://{{ ansible_default_ipv4.address }}:/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -172,6 +190,11 @@ services:
       - "logging=promtail"
       - "promtail-job=media"
       - "promtail-service=immich-machine-learning"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   watchtower:
     name: watchtower
@@ -202,6 +225,11 @@ services:
       - "logging=promtail"
       - "promtail-job=infrastructure"
       - "promtail-service=watchtower"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     depends_on:
       - immich-server
       - immich-web

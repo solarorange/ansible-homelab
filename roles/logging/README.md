@@ -190,3 +190,59 @@ docker logs promtail --tail 100
 ---
 
 For detailed variable documentation, see `defaults/main.yml`. 
+
+## Rollback
+
+- Automatic rollback on failed deploys: Safe deploy restores last-known-good Compose and pre-change snapshot automatically if a deployment fails.
+
+- Manual rollback (this role):
+  - Option A — restore last-known-good Compose
+    ```bash
+    SERVICE=<service>  # e.g., logging
+    sudo cp {{ backup_dir }}/${SERVICE}/last_good/docker-compose.yml {{ docker_dir }}/${SERVICE}/docker-compose.yml
+    if [ -f {{ backup_dir }}/${SERVICE}/last_good/.env ]; then sudo cp {{ backup_dir }}/${SERVICE}/last_good/.env {{ docker_dir }}/${SERVICE}/.env; fi
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+  - Option B — restore pre-change snapshot
+    ```bash
+    SERVICE=<service>
+    ls -1 {{ backup_dir }}/${SERVICE}/prechange_*.tar.gz
+    sudo tar -xzf {{ backup_dir }}/${SERVICE}/prechange_<TIMESTAMP>.tar.gz -C /
+    docker compose -f {{ docker_dir }}/${SERVICE}/docker-compose.yml up -d
+    ```
+
+- Rollback to a recorded rollback point (target host):
+  ```bash
+  ls -1 {{ docker_dir }}/rollback/rollback-point-*.json | sed -E 's/.*rollback-point-([0-9]+)\.json/\1/'
+  sudo {{ docker_dir }}/rollback/rollback.sh <ROLLBACK_ID>
+  ```
+
+- Full stack version rollback:
+  ```bash
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh --list
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh tag:vX.Y.Z
+  /Users/rob/Cursor/ansible_homelab/scripts/version_rollback.sh backup:/Users/rob/Cursor/ansible_homelab/backups/versions/<backup_dir>
+  ```
+
+### Secrets & Health Checks
+
+- Secrets directory: `{{ docker_dir }}/logging/secrets`.
+- If any components require secrets, enable file-based secrets:
+  ```yaml
+  logging_manage_secret_files: true
+  logging_secret_files:
+    - name: LOKI_S3_SECRET_KEY
+      from_vault_var: vault_loki_s3_secret_key
+  logging_required_secrets:
+    - LOKI_S3_SECRET_KEY
+  ```
+  Compose templates must map secret-like env keys to `KEY_FILE=/run/secrets/KEY`. See `docs/SECRETS_CONVENTIONS.md`.
+
+- Post-deploy route health check (if exposed via Traefik):
+  ```yaml
+  - ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+    vars:
+      route_health_check_url: "https://{{ loki_subdomain }}.{{ domain }}/ready"
+      route_health_check_status_codes: [200]
+  ```
+  See `docs/POST_DEPLOY_SMOKE_TESTS.md`.

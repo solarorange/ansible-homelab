@@ -16,7 +16,7 @@ services:
     environment:
       - POSTGRES_DB=homelab
       - POSTGRES_USER={{ vault_postgresql_user | default('homelab') }}
-      - POSTGRES_PASSWORD={{ vault_postgresql_password }}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
@@ -24,8 +24,10 @@ services:
       - "{{ config_dir }}/postgresql/init:/docker-entrypoint-initdb.d"
       - "{{ config_dir }}/postgresql/conf:/etc/postgresql/postgresql.conf"
       - "{{ logs_dir }}/postgresql:/var/log/postgresql"
-    ports:
-      - "5432:5432"
+      - "{{ docker_dir }}/postgresql/secrets:/run/secrets:ro"
+    # No host port exposure; internal network access only
+    # ports:
+    #   - "5432:5432"
     networks:
       - homelab
       - monitoring
@@ -51,14 +53,9 @@ services:
       nofile:
         soft: 26677
         hard: 46677
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
+    # Resource controls for Docker Engine
+    mem_limit: 1g
+    cpus: '1.0'
 
   postgresql-exporter:
     image: prometheuscommunity/postgres-exporter:latest
@@ -66,8 +63,9 @@ services:
     restart: unless-stopped
     environment:
       - DATA_SOURCE_NAME=postgresql://{{ vault_postgresql_user | default('homelab') }}:{{ vault_postgresql_password }}@postgresql:5432/homelab?sslmode=disable
-    ports:
-      - "9187:9187"
+    # No host port exposure; metrics scraped internally
+    # ports:
+    #   - "9187:9187"
     networks:
       - monitoring
     labels:
@@ -75,8 +73,11 @@ services:
       - "prometheus.enable=true"
       - "prometheus.job=postgresql_exporter"
       - "prometheus.port=9187"
+    volumes:
+      - "{{ config_dir }}/postgresql:/etc/postgresql"
+      - "{{ docker_dir }}/postgresql/secrets:/run/secrets:ro"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://{{ ansible_default_ipv4.address }}:9187/metrics"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9187/metrics || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -86,11 +87,5 @@ services:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.1'
-        reservations:
-          memory: 64M
-          cpus: '0.05' 
+    mem_limit: 128m
+    cpus: '0.1'

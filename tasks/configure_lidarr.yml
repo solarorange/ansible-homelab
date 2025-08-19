@@ -28,7 +28,7 @@
       configContract: "SabnzbdSettings"
       protocol: "http"
       host: "sabnzbd"
-      port: {{ media_sabnzbd_port | default(8080) }}
+      port: "{{ media_sabnzbd_port | default(8080) }}"
       apiKey: "{{ vault_sabnzbd_api_key }}"
       category: "music"
       recentTvPriority: 0
@@ -46,7 +46,7 @@
       configContract: "QBittorrentSettings"
       protocol: "http"
       host: "qbittorrent"
-      port: {{ media_qbittorrent_port | default(8081) }}
+      port: "{{ media_qbittorrent_port | default(8081) }}"
       username: "{{ media_qbittorrent_username }}"
       password: "{{ vault_service_password }}"
       category: "music"
@@ -74,7 +74,7 @@
       configContract: "NewznabSettings"
       protocol: "http"
       host: "prowlarr"
-      port: {{ media_prowlarr_port | default(9696) }}
+      port: "{{ media_prowlarr_port | default(9696) }}"
       apiKey: "{{ vault_prowlarr_api_key }}"
       categories: [3000, 3010, 3020, 3030, 3040, 3050]
       useSsl: false
@@ -305,9 +305,9 @@
       implementation: "Email"
       configContract: "EmailSettings"
       server: "{{ vault_smtp_server | default('') }}"
-      port: {{ vault_smtp_port | default(587) }}
+      port: "{{ vault_smtp_port | default(587) }}"
       username: "{{ vault_smtp_username | default('') }}"
-      password: "{{ vault_service_password }}"') }}"
+      password: "{{ vault_service_password }}"
       from: "{{ vault_smtp_from | default('lidarr@' + domain) }}"
       to: "{{ vault_smtp_to | default(admin_email) }}"
       useSsl: true
@@ -337,9 +337,9 @@
       implementation: "PlexServer"
       configContract: "PlexServerSettings"
       host: "plex"
-      port: {{ media_plex_port | default(32400) }}
+      port: "{{ media_plex_port | default(32400) }}"
       username: "{{ vault_plex_username | default('') }}"
-      password: "{{ vault_service_password }}"') }}"
+      password: "{{ vault_service_password }}"
       updateLibrary: true
       useSsl: false
       authToken: "{{ vault_plex_token | default('') }}"
@@ -350,9 +350,9 @@
       implementation: "Jellyfin"
       configContract: "JellyfinSettings"
       host: "jellyfin"
-      port: {{ media_jellyfin_port | default(8096) }}
+      port: "{{ media_jellyfin_port | default(8096) }}"
       username: "{{ vault_jellyfin_username | default('') }}"
-      password: "{{ vault_service_password }}"') }}"
+      password: "{{ vault_service_password }}"
       updateLibrary: true
       useSsl: false
       apiKey: "{{ vault_jellyfin_api_key | default('') }}"
@@ -413,10 +413,6 @@
       expandEPByDefault: false
       expandBroadcastByDefault: false
       expandOtherByDefault: false
-      expandSingleByDefault: false
-      expandEPByDefault: false
-      expandBroadcastByDefault: false
-      expandOtherByDefault: false
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr backup settings via API
@@ -462,7 +458,7 @@
       authenticationMethod: "forms"
       authenticationRequired: "enabled"
       username: "{{ vault_lidarr_username }}"
-      password: "{{ vault_service_password }}"') }}"
+      password: "{{ vault_service_password }}"
   when: media_enable_lidarr | default(true)
 
 - name: Configure Lidarr SSL settings via API
@@ -523,7 +519,7 @@
     body:
       name: "Lidarr"
       applicationUrl: "https://lidarr.{{ domain }}"
-      port: {{ media_lidarr_port | default(8686) }}
+      port: "{{ media_lidarr_port | default(8686) }}"
       apiKey: "{{ vault_lidarr_api_key }}"
       branch: "main"
       logLevel: "info"
@@ -541,4 +537,4 @@
 - name: Display Lidarr configuration status
   ansible.builtin.debug:
     msg: "Lidarr configuration completed successfully. Status: {{ lidarr_status.json.status }}"
-  when: media_enable_lidarr | default(true) and lidarr_status.status == 200 
+  when: media_enable_lidarr | default(true) and lidarr_status.status == 200

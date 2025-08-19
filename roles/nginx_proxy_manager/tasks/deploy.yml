@@ -29,6 +29,38 @@
   notify: Restart nginx proxy manager stack
   tags: [nginx_proxy_manager, deploy, config]
 
+- name: Prepare Nginx Proxy Manager secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "nginx_proxy_manager"
+    secret_files: "{{ nginx_proxy_manager_secret_files if nginx_proxy_manager_manage_secret_files else [] }}"
+    secret_env_maps:
+      - "{{ nginx_proxy_manager_db_env | default({}) }}"
+  when: nginx_proxy_manager_manage_secret_files | bool
+  tags: [nginx_proxy_manager, deploy, setup]
+
+- name: Validate Nginx Proxy Manager DB env map uses *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ nginx_proxy_manager_db_env | default({}) }}"
+  when: nginx_proxy_manager_manage_secret_files | bool
+  tags: [nginx_proxy_manager, deploy, validate]
+
+- name: Validate required Nginx Proxy Manager secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/nginx-proxy-manager/secrets/{{ item }}"
+  register: npm_secret_stats
+  loop: "{{ nginx_proxy_manager_required_secrets | default([]) }}"
+  when: nginx_proxy_manager_manage_secret_files | bool and (nginx_proxy_manager_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Nginx Proxy Manager secret files are missing
+  ansible.builtin.assert:
+    that: "{{ npm_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/nginx-proxy-manager/secrets.
+      Missing: {{ (nginx_proxy_manager_required_secrets | default([])) | reject('in', (npm_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: nginx_proxy_manager_manage_secret_files | bool and (nginx_proxy_manager_required_secrets | default([]) | length > 0)
+
 - name: Create Nginx Proxy Manager environment file
   ansible.builtin.template:
     src: .env.j2
@@ -113,13 +145,17 @@
   become: true
   tags: [nginx_proxy_manager, deploy, dependencies]
 
-- name: Deploy Nginx Proxy Manager stack
-  community.docker.docker_compose:
+- name: Deploy Nginx Proxy Manager stack safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "nginx-proxy-manager"
     project_src: "{{ docker_dir }}/nginx-proxy-manager"
-    build: false
-    state: present
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ nginx_proxy_manager_ports.admin }}"
   register: npm_deployment_result
-  tags: [nginx_proxy_manager, deploy, containers]
+  tags: [nginx_proxy_manager, deploy, containers, rollback]
 
 - name: Wait for Nginx Proxy Manager to be ready
   ansible.builtin.uri:
@@ -196,7 +232,7 @@
       domains: ["{{ domain }}", "*.{{ domain }}"]
     timeout: 30
   register: npm_ssl_result
-  when: 
+  when:
     - vault_npm_api_token is defined
     - nginx_proxy_manager_ssl_enabled | default(true)
   tags: [nginx_proxy_manager, deploy, ssl]
@@ -205,24 +241,24 @@
   ansible.builtin.debug:
     msg: |
       Nginx Proxy Manager deployment completed successfully!
-      
+
       Access Information:
       - Admin URL: http://{{ ansible_default_ipv4.address }}:{{ nginx_proxy_manager_ports.admin }}
       - Username: {{ nginx_proxy_manager_api_username }}
       - Password: {{ vault_npm_admin_password }}
-      
+
       API Information:
       - API URL: {{ nginx_proxy_manager_api_url }}
       - API Token: {{ vault_npm_api_token | default('Not available') }}
-      
+
       SSL Configuration:
       - SSL Enabled: {{ nginx_proxy_manager_ssl_enabled }}
       - SSL Provider: {{ nginx_proxy_manager_ssl_provider }}
       - SSL Email: {{ nginx_proxy_manager_ssl_email }}
-      
+
       Automation Features:
       - Service Discovery: {{ nginx_proxy_manager_service_discovery_enabled }}
       - Auto SSL: {{ nginx_proxy_manager_auto_ssl_enabled }}
       - API Automation: {{ nginx_proxy_manager_api_enabled }}
   when: npm_deployment_result is success
-  tags: [nginx_proxy_manager, deploy, info] 
+  tags: [nginx_proxy_manager, deploy, info]

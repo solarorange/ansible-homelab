@@ -12,6 +12,27 @@
     - "{{ docker_data_root }}/nextcloud/custom_apps"
     - "{{ docker_data_root }}/nextcloud/themes"
 
+- name: Create Nextcloud secrets directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/nextcloud/secrets"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0700"
+
+- name: Write Nextcloud database secret files (0600)
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/nextcloud/secrets/{{ item.name }}"
+    content: "{{ item.value }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  loop:
+    - { name: "nextcloud_db_root_password", value: "{{ nextcloud_db_root_password }}" }
+    - { name: "nextcloud_db_password", value: "{{ nextcloud_db_password }}" }
+    - { name: "nextcloud_admin_password", value: "{{ nextcloud_admin_password }}" }
+  no_log: true
+
 - name: Create Nextcloud docker-compose service
   blockinfile:
     path: "{{ docker_compose_file }}"
@@ -30,11 +51,21 @@
           - MYSQL_HOST=nextcloud-db
           - MYSQL_DATABASE=nextcloud
           - MYSQL_USER=nextcloud
-          - MYSQL_PASSWORD={{ nextcloud_db_password }}
           - REDIS_HOST=nextcloud-redis
           - NEXTCLOUD_TRUSTED_DOMAINS=nextcloud.{{ domain }}
           - NEXTCLOUD_ADMIN_USER={{ nextcloud_admin_user }}
-          - NEXTCLOUD_ADMIN_PASSWORD={{ nextcloud_admin_password }}
+        volumes:
+          - {{ docker_data_root }}/nextcloud/html:/var/www/html
+          - {{ docker_data_root }}/nextcloud/data:/var/www/html/data
+          - {{ docker_data_root }}/nextcloud/config:/var/www/html/config
+          - {{ docker_data_root }}/nextcloud/custom_apps:/var/www/html/custom_apps
+          - {{ docker_data_root }}/nextcloud/themes:/var/www/html/themes
+          - {{ docker_dir }}/nextcloud/secrets:/run/secrets:ro
+        entrypoint: ["/bin/sh","-lc"]
+        command: >
+          export MYSQL_PASSWORD="$(cat /run/secrets/nextcloud_db_password)" && \
+          export NEXTCLOUD_ADMIN_PASSWORD="$(cat /run/secrets/nextcloud_admin_password)" && \
+          exec /entrypoint.sh apache2-foreground
         depends_on:
           - nextcloud-db
           - nextcloud-redis
@@ -53,11 +84,12 @@
         container_name: nextcloud-db
         volumes:
           - {{ docker_data_root }}/nextcloud/db:/var/lib/mysql
+          - {{ docker_dir }}/nextcloud/secrets:/run/secrets:ro
         environment:
-          - MYSQL_ROOT_PASSWORD={{ nextcloud_db_root_password }}
+          - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/nextcloud_db_root_password
           - MYSQL_DATABASE=nextcloud
           - MYSQL_USER=nextcloud
-          - MYSQL_PASSWORD={{ nextcloud_db_password }}
+          - MYSQL_PASSWORD_FILE=/run/secrets/nextcloud_db_password
         command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
         restart: unless-stopped
         networks:
@@ -92,12 +124,12 @@
       #!/bin/bash
       BACKUP_DIR="{{ backup_root }}/nextcloud"
       mkdir -p "$BACKUP_DIR"
-      
+
       # Backup Nextcloud data
       tar -czf "$BACKUP_DIR/nextcloud_data_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/nextcloud data config html/custom_apps html/themes
-      
-      # Backup database
-      docker exec nextcloud-db mysqldump -u root -p{{ nextcloud_db_root_password }} nextcloud > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
+
+      # Backup database (read password from Docker secret inside container)
+      docker exec nextcloud-db bash -lc 'mysqldump -u root -p"$(cat /run/secrets/nextcloud_db_root_password)" nextcloud' > "$BACKUP_DIR/nextcloud_db_$(date +%Y%m%d_%H%M%S).sql"
 
 - name: Add Nextcloud backup to crontab
   ansible.builtin.cron:
@@ -119,4 +151,4 @@
           missingok
           notifempty
           create 0640 root root
-      } 
+      }

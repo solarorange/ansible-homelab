@@ -144,31 +144,31 @@
       ========================================
       VAULTWARDEN DEPLOYMENT VALIDATION RESULTS
       ========================================
-      
+
       Container Status:
       - Main Container: {{ 'RUNNING' if vaultwarden_container_status.container.State.Status == 'running' else 'FAILED' }}
       {% if vaultwarden_database_type == 'postgresql' %}
       - PostgreSQL Container: {{ 'RUNNING' if vaultwarden_postgres_status.container.State.Status == 'running' else 'FAILED' }}
       {% endif %}
-      
+
       Service Health:
       - Health Endpoint: {{ 'RESPONDING' if vaultwarden_health_check.status in [200, 302, 401] else 'FAILED' }}
       - Web Interface: {{ 'ACCESSIBLE' if vaultwarden_web_check.status in [200, 302, 401] else 'FAILED' }}
-      
+
       Data & Configuration:
       - Data Directory: {{ 'EXISTS' if vaultwarden_data_check.stat.exists else 'MISSING' }}
       - Config Files: {{ 'VALID' if vaultwarden_config_check.results | selectattr('stat.exists') | list | length == vaultwarden_config_check.results | length else 'INVALID' }}
-      
+
       {% if vaultwarden_database_type == 'postgresql' %}
       Database:
       - Connectivity: {{ 'OK' if vaultwarden_db_check.rc == 0 else 'FAILED' }}
       {% endif %}
-      
+
       Logs & Backup:
       - Logs: {{ 'CLEAN' if 'ERROR' not in vaultwarden_logs_check.stdout and 'FATAL' not in vaultwarden_logs_check.stdout else 'ERRORS' }}
       - Backup Test: {{ 'PASSED' if vaultwarden_backup_test.rc == 0 else 'FAILED' }}
-      
+
       Overall Status: {{ 'SUCCESS' if vaultwarden_container_status.container.State.Status == 'running' and vaultwarden_health_check.status in [200, 302, 401] and vaultwarden_web_check.status in [200, 302, 401] else 'FAILED' }}
-      
+
       ========================================
-  tags: [vaultwarden, vaultwarden-validation, summary] 
+  tags: [vaultwarden, vaultwarden-validation, summary]

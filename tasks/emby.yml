@@ -296,9 +296,9 @@
     dest: "{{ docker_dir }}/emby/scripts/manage.sh"
     content: |
       #!/bin/bash
-      
+
       # Emby Management Script
-      
+
       function show_help {
         echo "Emby Management Script"
         echo "Usage: $0 [command]"
@@ -311,51 +311,51 @@
         echo "  restore   - Restore Emby data"
         echo "  help      - Show this help"
       }
-      
+
       function backup_data {
         local backup_dir="{{ docker_dir }}/emby/backup"
         local timestamp=$(date +%Y%m%d_%H%M%S)
         local backup_file="$backup_dir/emby_backup_$timestamp.tar.gz"
-        
+
         # Create backup directory if it doesn't exist
         mkdir -p "$backup_dir"
-        
+
         # Stop Emby
         docker stop emby
-        
+
         # Create backup
         tar -czf "$backup_file" -C "{{ docker_dir }}/emby" config/ data/ cache/ metadata/
-        
+
         # Start Emby
         docker start emby
-        
+
         echo "Backup created: $backup_file"
       }
-      
+
       function restore_data {
         if [ -z "$1" ]; then
           echo "Please specify backup file"
           exit 1
         fi
-      
+
         local backup_file="$1"
         if [ ! -f "$backup_file" ]; then
           echo "Backup file not found: $backup_file"
           exit 1
         fi
-      
+
         # Stop Emby
         docker stop emby
-      
+
         # Restore backup
         tar -xzf "$backup_file" -C "{{ docker_dir }}/emby"
-      
+
         # Start Emby
         docker start emby
-      
+
         echo "Backup restored from: $backup_file"
       }
-      
+
       case "$1" in
         status)
           docker ps -f name=emby
@@ -386,26 +386,26 @@
     dest: "{{ docker_dir }}/emby/scripts/healthcheck.sh"
     content: |
       #!/bin/bash
-      
+
       # Check if Emby is running
       if ! docker ps -f name=emby -f status=running | grep -q emby; then
         echo "Emby is not running"
         exit 1
       fi
-      
+
       # Check if Emby is responding
       if ! curl -s -f http://{{ ansible_default_ipv4.address }}:8096/System/Info/Public > /dev/null; then
         echo "Emby is not responding"
         exit 1
       fi
-      
+
       # Check Emby status
-      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/System/Info/Public | jq -r .ServerName)
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:/System/Info/Public | jq -r .ServerName)
       if [ -z "$STATUS" ]; then
         echo "Emby status check failed"
         exit 1
       fi
-      
+
       exit 0
     owner: "{{ username }}"
     group: "{{ username }}"
@@ -442,4 +442,4 @@
     job: "{{ docker_dir }}/emby/scripts/manage.sh backup"
     hour: "3"
     minute: "0"
-    user: "{{ vault_emby_user }}" 
+    user: "{{ vault_emby_user }}"
