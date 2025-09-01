@@ -1,0 +1,282 @@
+---
+# Vault Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# VAULT SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+vault_service_name: "vault"
+vault_container_name: "{{ vault_service_name }}"
+vault_image: "vault:latest"
+vault_version: "latest"
+
+# Network Configuration
+vault_port: 8200
+vault_external_port: "{{ vault_port }}"
+vault_protocol: "http"
+vault_host: "{{ ansible_default_ipv4.address }}"
+vault_url: "{{ vault_protocol }}://{{ vault_host }}:{{ vault_port }}"
+
+# Domain Configuration
+vault_subdomain: "vault"
+vault_domain: "{{ vault_subdomain }}.{{ domain }}"
+vault_external_url: "https://{{ vault_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+vault_auth_enabled: true
+vault_auth_method: "authentik"  # Options: basic, authentik, none
+vault_admin_username: "admin"
+vault_admin_password: "{{ vault_vault_admin_password }}"
+
+# API Configuration
+vault_api_key: "{{ vault_vault_api_key }}"
+vault_api_token: "{{ vault_vault_api_token }}"
+
+# Encryption & Security
+vault_secret_key: "{{ vault_vault_secret_key }}"
+vault_encryption_key: "{{ vault_vault_encryption_key }}"
+vault_jwt_secret: "{{ vault_vault_jwt_secret }}"
+
+# SSL/TLS Configuration
+vault_ssl_enabled: true
+vault_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+vault_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+vault_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+vault_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+vault_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+vault_database_port: "{{ databases_postgresql_port | default(5432) }}"
+vault_database_name: "vault"
+vault_database_username: "vault"
+vault_database_password: "{{ vault_vault_database_password }}"
+
+# Redis Configuration (if using)
+vault_redis_enabled: false
+vault_redis_host: "{{ redis_host | default('redis') }}"
+vault_redis_port: "{{ redis_port | default(6379) }}"
+vault_redis_password: "{{ vault_vault_redis_password }}"
+vault_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+vault_data_dir: "{{ homelab_data_dir }}/vault"
+vault_config_dir: "{{ vault_data_dir }}/config"
+vault_backup_dir: "{{ vault_data_dir }}/backups"
+
+# Volume Mappings
+vault_volumes:
+  - "{{ vault_config_dir }}:/config"
+  - "{{ vault_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+vault_health_check_enabled: true
+vault_health_check_path: "/health"
+vault_health_check_interval: 30
+vault_health_check_timeout: 10
+vault_health_check_retries: 3
+
+# Monitoring Integration
+vault_monitoring_enabled: true
+vault_prometheus_enabled: true
+vault_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+vault_backup_enabled: true
+vault_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+vault_backup_retention_days: 30
+vault_backup_encryption_enabled: true
+vault_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+vault_smtp_enabled: false
+vault_smtp_host: "{{ smtp_host | default('') }}"
+vault_smtp_port: "{{ smtp_port | default(587) }}"
+vault_smtp_username: "{{ vault_smtp_username }}"
+vault_smtp_password: "{{ vault_vault_smtp_password }}"
+vault_smtp_from: "{{ vault_admin_email | default('admin@' + domain) }}"
+vault_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+vault_webhook_enabled: false
+vault_webhook_url: "{{ vault_webhook_url | default('') }}"
+vault_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+vault_discovery_enabled: true
+vault_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+vault_cpu_limit: "1.0"
+vault_memory_limit: "1g"
+vault_memory_reservation: "512m"
+
+# Performance Settings
+vault_scan_interval: 10
+vault_parallel_downloads: 3
+vault_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+vault_log_level: "info"  # Options: trace, debug, info, warn, error
+vault_log_rotation_enabled: true
+vault_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+vault_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+vault_rate_limit_enabled: true
+vault_rate_limit_requests: 100
+vault_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+vault_deploy_enabled: true
+vault_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+vault_restart_policy: "unless-stopped"
+vault_auto_update_enabled: true
+
+# Environment Variables
+vault_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  VAULT_API_KEY: "{{ vault_api_key }}"
+  VAULT_SECRET_KEY: "{{ vault_secret_key }}"
+  VAULT_ENCRYPTION_KEY: "{{ vault_encryption_key }}"
+  VAULT_JWT_SECRET: "{{ vault_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+vault_validation_enabled: true
+vault_validation_timeout: 300
+vault_validation_retries: 3
+
+# Testing Configuration
+vault_test_enabled: false
+vault_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+vault_compliance_enabled: true
+vault_audit_logging_enabled: true
+vault_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+vault_automation_enabled: true
+vault_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+vault_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+vault_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+vault_fallback_enabled: true
+vault_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+# Toggle to manage secret files
+vault_manage_secret_files: true
+
+vault_secret_files:
+  - { name: "VAULT_API_KEY", value: "{{ vault_api_key | default('') }}" }
+  - { name: "VAULT_SECRET_KEY", value: "{{ vault_secret_key | default('') }}" }
+  - { name: "VAULT_ENCRYPTION_KEY", value: "{{ vault_encryption_key | default('') }}" }
+  - { name: "VAULT_JWT_SECRET", value: "{{ vault_jwt_secret | default('') }}" }
+  - { name: "VAULT_DATABASE_PASSWORD", value: "{{ vault_database_password | default('') }}" }
+  - { name: "VAULT_REDIS_PASSWORD", value: "{{ vault_redis_password | default('') }}" }
+  - { name: "VAULT_SMTP_PASSWORD", value: "{{ vault_smtp_password | default('') }}" }
+
+vault_required_secrets:
+  - VAULT_SECRET_KEY
+  - VAULT_ENCRYPTION_KEY
+  - VAULT_JWT_SECRET
+  - VAULT_DATABASE_PASSWORD

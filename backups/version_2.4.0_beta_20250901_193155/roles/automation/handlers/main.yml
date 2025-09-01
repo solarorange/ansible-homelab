@@ -1,0 +1,21 @@
+---
+# Handlers for automation role
+
+- name: restart automation services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    daemon_reload: true
+  loop:
+    - homelab-maintenance.service
+    - homelab-performance.service
+    - homeassistant
+    - zigbee2mqtt
+  when: automation_enabled | default(true)
+
+- name: reload systemd
+  ansible.builtin.command: systemctl daemon-reload
+
+- name: notify monitoring
+  ansible.builtin.debug:
+    msg: "Automation stack event: {{ automation_event_message }}"

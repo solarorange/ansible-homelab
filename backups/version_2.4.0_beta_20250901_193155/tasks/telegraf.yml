@@ -1,0 +1,210 @@
+---
+# Telegraf Configuration
+# Production-ready metrics collection agent with comprehensive monitoring
+
+- name: Create Telegraf directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/telegraf/config"
+    - "{{ docker_dir }}/monitoring/telegraf/scripts"
+    - "{{ logs_dir }}/monitoring/telegraf"
+
+- name: Create Telegraf configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/telegraf/telegraf.conf"
+    content: |
+      # Global Agent Configuration
+      [agent]
+        interval = "10s"
+        round_interval = true
+        metric_batch_size = 1000
+        metric_buffer_limit = 10000
+        collection_jitter = "0s"
+        flush_interval = "10s"
+        flush_jitter = "0s"
+        precision = ""
+        hostname = ""
+        omit_hostname = false
+
+      # Output Plugins
+      [[outputs.influxdb_v2]]
+        urls = ["http://influxdb:8086"]
+        token = "${INFLUXDB_TOKEN}"
+        organization = "${INFLUXDB_ORG}"
+        bucket = "${INFLUXDB_BUCKET}"
+        timeout = "5s"
+
+      # Input Plugins
+      [[inputs.cpu]]
+        percpu = true
+        totalcpu = true
+        collect_cpu_time = false
+        report_active = false
+
+      [[inputs.disk]]
+        ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
+
+      [[inputs.diskio]]
+        skip_serial_number = true
+
+      [[inputs.kernel]]
+        no_message = true
+
+      [[inputs.mem]]
+        no_message = true
+
+      [[inputs.processes]]
+        no_message = true
+
+      [[inputs.swap]]
+        no_message = true
+
+      [[inputs.system]]
+        no_message = true
+
+      [[inputs.docker]]
+        endpoint = "unix:///var/run/docker.sock"
+        gather_services = false
+        container_names = []
+        timeout = "5s"
+        perdevice = true
+        total = true
+        container_state_include = ["running"]
+        docker_label_include = []
+        docker_label_exclude = []
+
+      [[inputs.prometheus]]
+        urls = ["http://prometheus:9090/metrics"]
+        response_timeout = "5s"
+
+      [[inputs.http_response]]
+        urls = [
+          "http://grafana:3000/api/health",
+          "http://prometheus:9090/-/healthy",
+          "http://loki:3100/ready",
+          "http://alertmanager:9093/-/healthy",
+          "http://influxdb:8086/health"
+        ]
+        response_timeout = "5s"
+        method = "GET"
+
+      [[inputs.net]]
+        interfaces = ["eth0", "docker0"]
+
+      [[inputs.net_response]]
+        protocol = "tcp"
+        address = ":80"
+        timeout = "1s"
+
+      [[inputs.tail]]
+        files = ["/var/log/syslog", "/var/log/auth.log"]
+        from_beginning = false
+        pipe = false
+        watch_method = "poll"
+        max_undelivered_lines = 1000
+        character_encoding = "utf-8"
+        name_override = "syslog"
+        data_format = "syslog"
+
+      [[inputs.exec]]
+        commands = [
+          "df -h",
+          "free -m",
+          "uptime"
+        ]
+        timeout = "5s"
+        data_format = "influx"
+
+- name: Create Telegraf management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/telegraf/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Telegraf Management Script
+
+      function show_help {
+        echo "Telegraf Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Telegraf status"
+        echo "  logs      - Show Telegraf logs"
+        echo "  restart   - Restart Telegraf"
+        echo "  test      - Test configuration"
+        echo "  help      - Show this help"
+      }
+
+      case "$1" in
+        status)
+          docker exec telegraf telegraf --test
+          ;;
+        logs)
+          docker logs telegraf --tail 100 -f
+          ;;
+        restart)
+          docker restart telegraf
+          ;;
+        test)
+          docker exec telegraf telegraf --test
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Telegraf health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/telegraf/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Check if Telegraf is running
+      if ! docker ps | grep -q telegraf; then
+        echo "Telegraf container is not running"
+        exit 1
+      fi
+
+      # Check if Telegraf can collect metrics
+      if ! docker exec telegraf telegraf --test > /dev/null; then
+        echo "Telegraf is not collecting metrics properly"
+        exit 1
+      fi
+
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Telegraf log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/telegraf/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/telegraf/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Telegraf log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Telegraf logs"
+    job: "logrotate {{ docker_dir }}/monitoring/telegraf/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_telegraf_user }}"

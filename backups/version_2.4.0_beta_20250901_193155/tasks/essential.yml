@@ -1,0 +1,310 @@
+---
+# Enhanced Essential System Setup
+# Production-ready system hardening and package installation
+
+- name: Update package cache (Debian/Ubuntu)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    upgrade: full
+    autoremove: true
+    autoclean: true
+  when: ansible_os_family == "Debian"
+  register: apt_update_result
+  retries: 3
+  delay: 10
+
+- name: Update packages (RedHat/CentOS)
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_only: true
+  when: ansible_os_family == "RedHat"
+  register: dnf_update_result
+  retries: 3
+  delay: 10
+
+- name: Install dnf-utils for RedHat systems
+  ansible.builtin.package:
+    name: dnf-utils
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Check if reboot is required (Debian/Ubuntu)
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: reboot_required_file
+  when: ansible_os_family == "Debian"
+
+- name: Check if reboot is required (RedHat)
+  ansible.builtin.command: needs-restarting -r
+  register: reboot_required_rhel
+  ignore_errors: true
+  changed_when: reboot_required_rhel.rc != 0
+  when: ansible_os_family == "RedHat"
+
+- name: Handle RedHat reboot check errors
+  ansible.builtin.debug:
+    msg: "RedHat reboot check completed with warnings: {{ reboot_required_rhel.stderr | default('None') }}"
+  when: ansible_os_family == "RedHat" and reboot_required_rhel is failed
+
+- name: Reboot system if required
+  ansible.builtin.reboot:
+    msg: "Rebooting due to kernel update"
+    reboot_timeout: 300
+    pre_reboot_delay: 5
+    post_reboot_delay: 30
+  when: >
+    (ansible_os_family == "Debian" and reboot_required_file.stat.exists) or
+    (ansible_os_family == "RedHat" and reboot_required_rhel.rc == 1)
+
+- name: Install essential system packages
+  ansible.builtin.package:
+    name: "{{ essential_packages }}"
+    state: present
+  register: package_install_result
+  retries: 3
+  delay: 5
+
+- name: Install Python packages via pip
+  ansible.builtin.pip:
+    name: "{{ pip_packages }}"
+    state: present
+    extra_args: "--upgrade"
+  register: pip_install_result
+  retries: 3
+  delay: 5
+
+- name: Configure timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  notify: restart system services
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "homelab-{{ inventory_hostname_short }}"
+    use: systemd
+
+- name: Update /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 homelab-{{ inventory_hostname_short }}"
+    backup: true
+
+- name: Create homelab user directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}"
+    - "{{ data_dir }}"
+    - "{{ config_dir }}"
+    - "{{ backup_dir }}"
+    - "{{ logs_dir }}"
+    - "/home/{{ username }}/.config"
+    - "/home/{{ username }}/.cache"
+
+- name: Create media directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop: "{{ media_directories }}"
+
+- name: Create application config directories
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop: "{{ enabled_services }}"
+
+- name: Configure swap file (if not exists)
+  block:
+    - name: Check if swap file exists
+      ansible.builtin.stat:
+        path: /swapfile
+      register: swap_file_check
+
+    - name: Create swap file
+      ansible.builtin.command: |
+        fallocate -l 2G /swapfile
+      when: not swap_file_check.stat.exists
+
+    - name: Set swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+      when: not swap_file_check.stat.exists
+
+    - name: Make swap file
+      ansible.builtin.command: mkswap /swapfile
+      when: not swap_file_check.stat.exists
+
+    - name: Enable swap file
+      ansible.builtin.command: swapon /swapfile
+      when: not swap_file_check.stat.exists
+
+    - name: Add swap to fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        backup: true
+      when: not swap_file_check.stat.exists
+
+- name: Configure system limits
+  ansible.builtin.blockinfile:
+    path: /etc/security/limits.conf
+    block: |
+      # Homelab system limits
+      {{ username }} soft nofile 65536
+      {{ username }} hard nofile 65536
+      {{ username }} soft nproc 32768
+      {{ username }} hard nproc 32768
+      root soft nofile 65536
+      root hard nofile 65536
+    marker: "# {mark} HOMELAB LIMITS"
+    backup: true
+
+- name: Configure sysctl parameters
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { name: "vm.swappiness", value: "10" }
+    - { name: "vm.dirty_ratio", value: "15" }
+    - { name: "vm.dirty_background_ratio", value: "5" }
+    - { name: "net.core.rmem_max", value: "16777216" }
+    - { name: "net.core.wmem_max", value: "16777216" }
+    - { name: "net.ipv4.tcp_rmem", value: "4096 65536 16777216" }
+    - { name: "net.ipv4.tcp_wmem", value: "4096 65536 16777216" }
+    - { name: "net.core.netdev_max_backlog", value: "5000" }
+    - { name: "fs.inotify.max_user_watches", value: "524288" }
+    - { name: "fs.inotify.max_user_instances", value: "512" }
+
+- name: Configure log rotation
+  ansible.builtin.copy:
+    content: |
+      /home/{{ username }}/logs/*.log {
+          daily
+          missingok
+          rotate 30
+          compress
+          delaycompress
+          notifempty
+          create 644 {{ username }} {{ username }}
+          postrotate
+              systemctl reload rsyslog > /dev/null 2>&1 || true
+          endscript
+      }
+
+      {{ docker_dir }}/*/*.log {
+          daily
+          missingok
+          rotate 7
+          compress
+          delaycompress
+          notifempty
+          create 644 {{ username }} {{ username }}
+      }
+    dest: /etc/logrotate.d/homelab
+    mode: "0644"
+
+- name: Configure automatic security updates
+  ansible.builtin.package:
+    name: unattended-upgrades
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Configure unattended upgrades
+  ansible.builtin.copy:
+    content: |
+      Unattended-Upgrade::Allowed-Origins {
+          "${distro_id}:${distro_codename}";
+          "${distro_id}:${distro_codename}-security";
+          "${distro_id}:${distro_codename}-updates";
+      };
+      Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+      Unattended-Upgrade::MinimalSteps "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+
+- name: Suppress login messages
+  ansible.builtin.file:
+    path: "/home/{{ username }}/.hushlogin"
+    state: touch
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Create shell aliases for homelab management
+  ansible.builtin.blockinfile:
+    path: "/home/{{ username }}/.bashrc"
+    block: |
+      # Homelab aliases
+      alias ll='ls -alF'
+      alias la='ls -A'
+      alias l='ls -CF'
+      alias dps='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+      alias dlog='docker logs -f'
+      alias dstats='docker stats --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"'
+      alias dcup='docker-compose up -d'
+      alias dcdown='docker-compose down'
+      alias dclogs='docker-compose logs -f'
+      alias homelab-status='systemctl status docker && docker ps'
+      alias homelab-update='cd {{ docker_dir }} && docker-compose pull && docker-compose up -d'
+      alias homelab-backup='{{ backup_dir }}/backup.sh'
+    marker: "# {mark} HOMELAB ALIASES"
+    backup: true
+
+- name: Configure crontab for system maintenance
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    day: "{{ item.day | default('*') }}"
+    month: "{{ item.month | default('*') }}"
+    weekday: "{{ item.weekday | default('*') }}"
+    job: "{{ item.job }}"
+    user: "{{ vault_service_user }}"
+  loop:
+    - name: "Docker cleanup"
+      minute: "0"
+      hour: "3"
+      job: "docker system prune -f"
+    - name: "Log cleanup"
+      minute: "30"
+      hour: "2"
+      job: "find {{ logs_dir }} -name '*.log' -mtime +30 -delete"
+    - name: "Temp cleanup"
+      minute: "15"
+      hour: "1"
+      job: "find /tmp -type f -mtime +7 -delete"
+
+- name: Display system information
+  ansible.builtin.debug:
+    msg: |
+      System Setup Complete:
+      - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      - Kernel: {{ ansible_kernel }}
+      - Architecture: {{ ansible_architecture }}
+      - Memory: {{ ansible_memtotal_mb }}MB
+      - CPU Cores: {{ ansible_processor_vcpus }}
+      - Docker Directory: {{ docker_dir }}
+      - Data Directory: {{ data_dir }}
+      - Timezone: {{ timezone }}

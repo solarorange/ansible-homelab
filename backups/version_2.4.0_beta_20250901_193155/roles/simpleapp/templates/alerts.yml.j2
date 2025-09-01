@@ -1,0 +1,14 @@
+---
+# Simple App Alerting Rules
+
+groups:
+  - name: Simple App
+    rules:
+      - alert: Simple AppDown
+        expr: up{job="simpleapp"} == 0
+        for: 1m
+        labels:
+          severity: {{ simpleapp_alert_severity | default('warning') }}
+        annotations:
+          summary: "Simple App is down"
+          description: "Simple App has been down for more than 1 minute"

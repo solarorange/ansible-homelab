@@ -1,0 +1,87 @@
+---
+# Advanced Rollback Management
+# Comprehensive rollback procedures for failed deployments
+
+- name: Create rollback directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/rollback"
+    state: directory
+    mode: '0755'
+  tags: [rollback, setup]
+
+- name: Create rollback point before deployment
+  ansible.builtin.template:
+    src: templates/rollback-point.json.j2
+    dest: "{{ docker_dir }}/rollback/rollback-point-{{ ansible_date_time.epoch }}.json"
+    mode: '0644'
+  tags: [rollback, point]
+
+- name: Backup current Docker Compose files
+  ansible.builtin.copy:
+    src: "{{ docker_dir }}/{{ item }}/docker-compose.yml"
+    dest: "{{ docker_dir }}/rollback/{{ item }}-{{ ansible_date_time.epoch }}.yml"
+    remote_src: yes
+    mode: '0644'
+  loop: "{{ enabled_services }}"
+  when:
+    - item in enabled_services
+    - ansible.builtin.stat(path=docker_dir + '/' + item + '/docker-compose.yml').stat.exists
+  tags: [rollback, backup]
+
+- name: Backup current environment files
+  ansible.builtin.copy:
+    src: "{{ docker_dir }}/{{ item }}/.env"
+    dest: "{{ docker_dir }}/rollback/{{ item }}-env-{{ ansible_date_time.epoch }}.env"
+    remote_src: yes
+    mode: '0600'
+  loop: "{{ enabled_services }}"
+  when:
+    - item in enabled_services
+    - ansible.builtin.stat(path=docker_dir + '/' + item + '/.env').stat.exists
+  tags: [rollback, backup]
+
+- name: Create rollback script
+  ansible.builtin.template:
+    src: templates/rollback-execute.sh.j2
+    dest: "{{ docker_dir }}/rollback/rollback.sh"
+    mode: '0755'
+  tags: [rollback, script]
+
+- name: Create rollback configuration
+  ansible.builtin.set_fact:
+    rollback_config:
+      enabled: true
+      max_rollback_points: "{{ lookup('env', 'MAX_ROLLBACK_POINTS') | default('10') | int }}"
+      auto_rollback_on_failure: "{{ lookup('env', 'AUTO_ROLLBACK_ON_FAILURE') | default('true') | bool }}"
+      rollback_timeout: "{{ lookup('env', 'ROLLBACK_TIMEOUT') | default('300') | int }}"
+  tags: [rollback, config]
+
+- name: Cleanup old rollback points
+  ansible.builtin.shell: |
+    cd {{ docker_dir }}/rollback
+    ls -t rollback-point-*.json | tail -n +{{ rollback_config.max_rollback_points + 1 }} | xargs -r rm
+    ls -t *-{{ ansible_date_time.epoch }}.yml | tail -n +{{ rollback_config.max_rollback_points + 1 }} | xargs -r rm
+    ls -t *-env-{{ ansible_date_time.epoch }}.env | tail -n +{{ rollback_config.max_rollback_points + 1 }} | xargs -r rm
+  changed_when: false
+  tags: [rollback, cleanup]
+
+- name: Display rollback status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ROLLBACK POINT CREATED
+      ========================================
+
+      Rollback Point: {{ ansible_date_time.epoch }}
+      Rollback Directory: {{ docker_dir }}/rollback/
+      Rollback Script: {{ docker_dir }}/rollback/rollback.sh
+
+      Configuration:
+      - Max Rollback Points: {{ rollback_config.max_rollback_points }}
+      - Auto Rollback: {{ 'ENABLED' if rollback_config.auto_rollback_on_failure else 'DISABLED' }}
+      - Rollback Timeout: {{ rollback_config.rollback_timeout }}s
+
+      To rollback: {{ docker_dir }}/rollback/rollback.sh {{ ansible_date_time.epoch }}
+
+      ========================================
+  tags: [rollback, summary]

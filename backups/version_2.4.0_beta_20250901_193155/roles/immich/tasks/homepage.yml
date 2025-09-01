@@ -1,0 +1,126 @@
+---
+# Configure Immich Homepage Integration
+# Production-ready homepage integration tasks for Immich
+
+- name: Configure Immich homepage integration
+  block:
+    - name: Generate Immich homepage service configuration
+      ansible.builtin.template:
+        src: homepage-service.yml.j2
+        dest: "{{ immich_config_dir }}/homepage-service.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, homepage]
+
+    - name: Generate Immich homepage widget configuration
+      ansible.builtin.template:
+        src: homepage-widget.yml.j2
+        dest: "{{ immich_config_dir }}/homepage-widget.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_homepage_widget_enabled | default(true)
+      tags: [immich, homepage]
+
+    - name: Create Immich homepage integration script
+      ansible.builtin.template:
+        src: homepage-integration.sh.j2
+        dest: "{{ immich_config_dir }}/homepage-integration.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, homepage]
+
+    - name: Setup Immich homepage integration cron
+      ansible.builtin.cron:
+        name: "Immich Homepage Integration"
+        minute: "*/5"
+        job: "{{ immich_config_dir }}/homepage-integration.sh >> {{ logs_dir }}/immich/homepage/integration.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, homepage]
+
+    - name: Create Immich homepage directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - "{{ logs_dir }}/immich/homepage"
+        - "{{ logs_dir }}/immich/widgets"
+      tags: [immich, homepage]
+
+    - name: Generate Immich homepage bookmark configuration
+      ansible.builtin.template:
+        src: homepage-bookmark.yml.j2
+        dest: "{{ immich_config_dir }}/homepage-bookmark.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, homepage]
+
+    - name: Create Immich homepage status script
+      ansible.builtin.template:
+        src: homepage-status.sh.j2
+        dest: "{{ immich_config_dir }}/homepage-status.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, homepage]
+
+    - name: Setup Immich homepage status cron
+      ansible.builtin.cron:
+        name: "Immich Homepage Status"
+        minute: "*/1"
+        job: "{{ immich_config_dir }}/homepage-status.sh >> {{ logs_dir }}/immich/homepage/status.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, homepage]
+
+    - name: Generate Immich homepage notification configuration
+      ansible.builtin.template:
+        src: homepage-notifications.yml.j2
+        dest: "{{ immich_config_dir }}/homepage-notifications.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, homepage]
+
+    - name: Create Immich homepage systemd service
+      ansible.builtin.template:
+        src: immich-homepage.service.j2
+        dest: /etc/systemd/system/immich-homepage.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, homepage]
+
+    - name: Enable and start Immich homepage service
+      ansible.builtin.systemd:
+        name: immich-homepage
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: [immich, homepage]
+
+    - name: Copy Immich icon to homepage
+      ansible.builtin.copy:
+        src: "{{ immich_config_dir }}/immich.png"
+        dest: "/opt/homepage/public/icons/immich.png"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_homepage_enabled | default(true)
+      tags: [immich, homepage]
+
+    - name: Update homepage services configuration
+      ansible.builtin.lineinfile:
+        path: "{{ homepage_config_dir }}/services.yml"
+        line: "{{ lookup('template', 'homepage-service-entry.yml.j2') }}"
+        insertafter: "^# Immich Service"
+        create: yes
+      when: immich_homepage_enabled | default(true)
+      tags: [immich, homepage]
+
+  tags: [immich, homepage, always]

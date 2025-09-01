@@ -1,0 +1,21 @@
+#!/bin/bash
+# Utilities Stack Backup Cleanup Script
+
+set -e
+
+RETENTION={{ utilities_backup_retention }}
+LOG_FILE="{{ utilities_backup_dir }}/utilities/cleanup_$(date +%Y%m%d_%H%M%S).log"
+
+cleanup_backups() {
+  SERVICE="$1"
+  DIR="$2"
+  PATTERN="$3"
+  echo "[$SERVICE] Cleaning up backups older than $RETENTION days in $DIR..." | tee -a "$LOG_FILE"
+  find "$DIR" -name "$PATTERN" -mtime +$RETENTION -print -delete | tee -a "$LOG_FILE"
+}
+
+cleanup_backups "Portainer" "{{ portainer_data_dir }}/backups" "portainer_data_*.tar.gz"
+cleanup_backups "Tdarr" "{{ tdarr_data_dir }}/backups" "tdarr_backup_*.tar.gz"
+cleanup_backups "Tautulli" "{{ tautulli_data_dir }}/backups" "tautulli_backup_*.tar.gz"
+
+echo "Backup cleanup completed. Log: $LOG_FILE" 

@@ -1,0 +1,161 @@
+# Pezzo Prometheus Alerting Rules
+# Alert rules for monitoring Pezzo services
+
+groups:
+  - name: pezzo.rules
+    rules:
+      # Pezzo Server alerts
+      - alert: PezzoServerDown
+        expr: up{job="pezzo-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pezzo-server
+        annotations:
+          summary: "Pezzo Server is down"
+          description: "Pezzo Server has been down for more than 1 minute"
+
+      - alert: PezzoServerHighResponseTime
+        expr: http_request_duration_seconds{job="pezzo-server"} > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-server
+        annotations:
+          summary: "Pezzo Server high response time"
+          description: "Pezzo Server response time is above 2 seconds"
+
+      - alert: PezzoServerHighErrorRate
+        expr: rate(http_requests_total{job="pezzo-server", status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: pezzo-server
+        annotations:
+          summary: "Pezzo Server high error rate"
+          description: "Pezzo Server is returning 5xx errors at high rate"
+
+      # Pezzo Console alerts
+      - alert: PezzoConsoleDown
+        expr: up{job="pezzo-console"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pezzo-console
+        annotations:
+          summary: "Pezzo Console is down"
+          description: "Pezzo Console has been down for more than 1 minute"
+
+      - alert: PezzoConsoleHighResponseTime
+        expr: http_request_duration_seconds{job="pezzo-console"} > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-console
+        annotations:
+          summary: "Pezzo Console high response time"
+          description: "Pezzo Console response time is above 3 seconds"
+
+      # Database alerts
+      - alert: PezzoPostgreSQLDown
+        expr: up{job="pezzo-postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pezzo-postgres
+        annotations:
+          summary: "Pezzo PostgreSQL is down"
+          description: "Pezzo PostgreSQL database has been down for more than 1 minute"
+
+      - alert: PezzoPostgreSQLHighConnections
+        expr: pg_stat_database_numbackends{job="pezzo-postgres"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-postgres
+        annotations:
+          summary: "Pezzo PostgreSQL high connection count"
+          description: "Pezzo PostgreSQL has more than 80 active connections"
+
+      - alert: PezzoRedisDown
+        expr: up{job="pezzo-redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pezzo-redis
+        annotations:
+          summary: "Pezzo Redis is down"
+          description: "Pezzo Redis has been down for more than 1 minute"
+
+      - alert: PezzoRedisHighMemory
+        expr: redis_memory_used_bytes{job="pezzo-redis"} / redis_memory_max_bytes{job="pezzo-redis"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-redis
+        annotations:
+          summary: "Pezzo Redis high memory usage"
+          description: "Pezzo Redis memory usage is above 80%"
+
+      - alert: PezzoClickHouseDown
+        expr: up{job="pezzo-clickhouse"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pezzo-clickhouse
+        annotations:
+          summary: "Pezzo ClickHouse is down"
+          description: "Pezzo ClickHouse has been down for more than 1 minute"
+
+      # Infrastructure alerts
+      - alert: PezzoHighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-infrastructure
+        annotations:
+          summary: "Pezzo high CPU usage"
+          description: "Pezzo server CPU usage is above 80%"
+
+      - alert: PezzoHighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-infrastructure
+        annotations:
+          summary: "Pezzo high memory usage"
+          description: "Pezzo server memory usage is above 85%"
+
+      - alert: PezzoHighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: pezzo-infrastructure
+        annotations:
+          summary: "Pezzo high disk usage"
+          description: "Pezzo server disk usage is above 85%"
+
+      # Authentication alerts
+      - alert: PezzoAuthFailures
+        expr: rate(http_requests_total{job="pezzo-server", status="401"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: pezzo-auth
+        annotations:
+          summary: "Pezzo authentication failures"
+          description: "High rate of authentication failures detected"
+
+      # Backup alerts
+      - alert: PezzoBackupFailed
+        expr: pezzo_backup_success == 0
+        for: 1h
+        labels:
+          severity: critical
+          service: pezzo-backup
+        annotations:
+          summary: "Pezzo backup failed"
+          description: "Pezzo backup has failed for more than 1 hour" 

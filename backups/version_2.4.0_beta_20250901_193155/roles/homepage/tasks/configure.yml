@@ -1,0 +1,182 @@
+---
+# Homepage Configuration Tasks
+# Handles service configuration via Python script and API integration
+
+- name: Configure Homepage with error handling
+  block:
+    - name: Wait for Homepage API to be ready
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+        method: GET
+        status_code: [200, 302, 401]
+        timeout: 30
+      register: homepage_api_health
+      retries: 30
+      delay: 10
+      until: homepage_api_health.status in [200, 302, 401]
+      tags: [homepage, homepage-config, wait]
+
+    - name: Run Homepage configuration script
+      ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/setup_homepage.py"
+      environment:
+        HOMEPAGE_URL: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}"
+        DOMAIN: "{{ domain }}"
+        WEATHER_LAT: "{{ homepage_weather_lat }}"
+        WEATHER_LON: "{{ homepage_weather_lon }}"
+        WEATHER_API_KEY: "{{ homepage_weather_api_key }}"
+        HOMEPAGE_API_SECRET: "{{ homepage_api_secret }}"
+      register: homepage_setup_result
+      retries: 3
+      delay: 30
+      until: homepage_setup_result.rc == 0
+      tags: [homepage, homepage-config, setup]
+
+    - name: Verify Homepage service configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
+        method: GET
+        status_code: [200, 302]
+        timeout: 30
+      register: homepage_services_verification
+      tags: [homepage, homepage-config, verify]
+
+    - name: Verify Homepage bookmarks configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/bookmarks"
+        method: GET
+        status_code: [200, 302]
+        timeout: 30
+      register: homepage_bookmarks_verification
+      tags: [homepage, homepage-config, verify]
+
+    - name: Test Homepage weather widget
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/weather"
+        method: GET
+        status_code: [200, 302, 404]
+        timeout: 30
+      register: homepage_weather_verification
+      tags: [homepage, homepage-config, verify]
+
+    - name: Create Homepage log rotation configuration
+      ansible.builtin.template:
+        src: logrotate.conf.j2
+        dest: "{{ homepage_docker_dir }}/config/logrotate.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0640"
+      register: homepage_logrotate_creation
+      tags: [homepage, homepage-config, logging]
+
+    - name: Add Homepage log rotation to crontab
+      ansible.builtin.cron:
+        name: "Rotate Homepage logs"
+        job: "logrotate {{ homepage_docker_dir }}/config/logrotate.conf"
+        hour: "0"
+        minute: "0"
+        user: "{{ vault_homepage_user }}"
+      register: homepage_cron_creation
+      tags: [homepage, homepage-config, logging]
+
+    - name: Create Homepage backup cron job
+      ansible.builtin.cron:
+        name: "Backup Homepage configuration"
+        job: "{{ homepage_docker_dir }}/scripts/backup.sh"
+        hour: "2"
+        minute: "0"
+        user: "{{ vault_homepage_user }}"
+      register: homepage_backup_cron_creation
+      tags: [homepage, homepage-config, backup]
+
+    - name: Create Homepage health monitoring
+      ansible.builtin.template:
+        src: health-monitor.yml.j2
+        dest: "{{ homepage_docker_dir }}/config/health-monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      register: homepage_health_monitor_creation
+      tags: [homepage, homepage-config, monitoring]
+
+    - name: Test Homepage configuration
+      ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
+      register: homepage_config_test
+      changed_when: false
+      retries: 3
+      delay: 10
+      until: homepage_config_test.rc == 0
+      tags: [homepage, homepage-config, test]
+
+    - name: Display Homepage configuration status
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          HOMEPAGE CONFIGURATION STATUS
+          ========================================
+
+          Setup Script: {{ 'SUCCESS' if homepage_setup_result.rc == 0 else 'FAILED' }}
+          Services API: {{ 'SUCCESS' if homepage_services_verification.status == 200 else 'FAILED' }}
+          Bookmarks API: {{ 'SUCCESS' if homepage_bookmarks_verification.status == 200 else 'FAILED' }}
+          Weather Widget: {{ 'SUCCESS' if homepage_weather_verification.status == 200 else 'DISABLED' }}
+          Health Check: {{ 'SUCCESS' if homepage_config_test.rc == 0 else 'FAILED' }}
+
+          Configuration:
+          - Service Groups: {{ homepage_service_groups | length }}
+          - Widgets Enabled: {{ homepage_widgets | length }}
+          - Weather Enabled: {{ homepage_weather_enabled }}
+          - API Enabled: {{ homepage_api_enabled }}
+
+          Logging:
+          - Log Rotation: {{ 'ENABLED' if homepage_logrotate_creation.changed else 'EXISTS' }}
+          - Backup Schedule: {{ 'ENABLED' if homepage_backup_cron_creation.changed else 'EXISTS' }}
+          - Health Monitoring: {{ 'ENABLED' if homepage_health_monitor_creation.changed else 'EXISTS' }}
+
+          ========================================
+      tags: [homepage, homepage-config, summary]
+  rescue:
+    - name: Log Homepage configuration failure
+      ansible.builtin.debug:
+        msg: |
+          Homepage configuration failed:
+          - API Health: {{ homepage_api_health | default('N/A') }}
+          - Setup Script: {{ homepage_setup_result | default('N/A') }}
+          - Services Verification: {{ homepage_services_verification | default('N/A') }}
+          - Bookmarks Verification: {{ homepage_bookmarks_verification | default('N/A') }}
+          - Weather Verification: {{ homepage_weather_verification | default('N/A') }}
+          - Config Test: {{ homepage_config_test | default('N/A') }}
+
+    - name: Attempt Homepage configuration recovery
+      ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+      vars:
+        failed_config_files:
+          - "{{ homepage_config_dir }}/config.yml"
+          - "{{ homepage_config_dir }}/services.yml"
+          - "{{ homepage_config_dir }}/bookmarks.yml"
+        config_verification_commands:
+          - "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
+        critical_services:
+          - homepage
+
+    - name: Rollback if recovery failed
+      ansible.builtin.include_tasks: handlers/error_handling/rollback.yml
+      when: recovery_complete | default(false) | bool == false
+      vars:
+        affected_services:
+          - homepage
+        config_files:
+          - "{{ homepage_config_dir }}/config.yml"
+          - "{{ homepage_config_dir }}/services.yml"
+          - "{{ homepage_config_dir }}/bookmarks.yml"
+
+    - name: Fail playbook if recovery and rollback failed
+      ansible.builtin.fail:
+        msg: "Homepage configuration failed and rollback was unsuccessful. Manual intervention required."
+      when: recovery_complete | default(false) | bool == false
+  always:
+    - name: Cleanup temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ temp_dirs | default([]) }}"
+      when: temp_dirs is defined
+      tags: [homepage, homepage-config, cleanup]

@@ -1,0 +1,53 @@
+{
+  "content": "{{ alert.labels.service }} Alert",
+  "username": "Homelab Monitor",
+  "avatar_url": "https://cdn.discordapp.com/emojis/1234567890.png",
+  "embeds": [
+    {
+      "color": {% if alert.labels.severity == 'critical' %}16711680{% elif alert.labels.severity == 'warning' %}16776960{% else %}65280{% endif %},
+      "title": "{% if alert.labels.severity == 'critical' %}🚨 Critical Alert{% elif alert.labels.severity == 'warning' %}⚠️ Warning Alert{% else %}ℹ️ Info Alert{% endif %}: {{ alert.labels.service }}",
+      "description": "{{ alert.annotations.description }}",
+      "fields": [
+        {
+          "name": "Service",
+          "value": "{{ alert.labels.service }}",
+          "inline": true
+        },
+        {
+          "name": "Instance",
+          "value": "{{ alert.labels.instance }}",
+          "inline": true
+        },
+        {
+          "name": "Severity",
+          "value": "{{ alert.labels.severity | upper }}",
+          "inline": true
+        },
+        {
+          "name": "Time",
+          "value": "{{ alert.startsAt }}",
+          "inline": true
+        }
+        {% if alert.annotations.dashboard %},
+        {
+          "name": "Dashboard",
+          "value": "[View Dashboard]({{ alert.annotations.dashboard }})",
+          "inline": false
+        }
+        {% endif %}
+        {% if alert.annotations.runbook %},
+        {
+          "name": "Runbook",
+          "value": "[View Runbook]({{ alert.annotations.runbook }})",
+          "inline": false
+        }
+        {% endif %}
+      ],
+      "footer": {
+        "text": "Homelab Monitor",
+        "icon_url": "https://cdn.discordapp.com/emojis/1234567890.png"
+      },
+      "timestamp": "{{ alert.startsAt }}"
+    }
+  ]
+} 

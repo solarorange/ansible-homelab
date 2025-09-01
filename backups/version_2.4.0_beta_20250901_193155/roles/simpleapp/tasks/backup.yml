@@ -1,0 +1,19 @@
+---
+# Simple App Backup Tasks
+
+- name: Create Simple App backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ backup_scripts_dir }}/simpleapp_backup.sh"
+    mode: '0755'
+  tags: [simpleapp, backup]
+
+- name: Setup Simple App backup cron job
+  cron:
+    name: "Simple App backup"
+    job: "{{ backup_scripts_dir }}/simpleapp_backup.sh"
+    hour: "2"
+    minute: "0"
+    user: "{ vault_service_user }"
+  when: simpleapp_backup_enabled | default(true)
+  tags: [simpleapp, backup]

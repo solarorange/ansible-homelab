@@ -1,0 +1,146 @@
+---
+# Overseerr - Media Request Management
+# Production-ready configuration for media request management
+
+- name: Create Overseerr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ docker_dir }}/overseerr/config"
+    - "{{ docker_dir }}/overseerr/data"
+  tags: [media, overseerr]
+
+- name: Create Overseerr docker-compose configuration
+  ansible.builtin.template:
+    src: templates/overseerr/docker-compose.yml.j2
+    dest: "{{ docker_dir }}/overseerr/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, overseerr]
+
+- name: Create Overseerr environment file
+  ansible.builtin.template:
+    src: templates/overseerr/.env.j2
+    dest: "{{ docker_dir }}/overseerr/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, overseerr]
+
+- name: Create Traefik configuration for Overseerr
+  ansible.builtin.template:
+    src: templates/overseerr/traefik.yml.j2
+    dest: "{{ docker_dir }}/overseerr/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, overseerr]
+
+- name: Start Overseerr container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "overseerr"
+    project_src: "{{ docker_dir }}/overseerr"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 5055
+  tags: [media, overseerr, rollback]
+
+- name: Wait for Overseerr to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:5055/api/v1/status"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: overseerr_status
+  until: overseerr_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [media, overseerr]
+
+- name: Configure Overseerr services
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:5055/api/v1/settings/services"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ overseerr_api_key }}"
+  loop: "{{ overseerr_services }}"
+  when: overseerr_services is defined
+  tags: [media, overseerr]
+
+- name: Configure Overseerr notifications
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/notifications"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ overseerr_api_key }}"
+  loop: "{{ overseerr_notifications }}"
+  when: overseerr_notifications is defined
+  tags: [media, overseerr]
+
+- name: Configure Overseerr users
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/user"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ overseerr_api_key }}"
+  loop: "{{ overseerr_users }}"
+  when: overseerr_users is defined
+  tags: [media, overseerr]
+
+- name: Configure Overseerr permissions
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/permissions"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ overseerr_api_key }}"
+  loop: "{{ overseerr_permissions }}"
+  when: overseerr_permissions is defined
+  tags: [media, overseerr]
+
+- name: Configure Overseerr webhooks
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/settings/webhooks"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ overseerr_api_key }}"
+  loop: "{{ overseerr_webhooks }}"
+  when: overseerr_webhooks is defined
+  tags: [media, overseerr]
+
+- name: Verify Overseerr configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+    method: GET
+    status_code: 200
+    register: overseerr_verify
+  tags: [media, overseerr]
+
+- name: Display Overseerr deployment status
+  ansible.builtin.debug:
+    msg: |
+      Overseerr deployment completed successfully
+      URL: https://overseerr.{{ domain }}
+      Status: {{ overseerr_verify.json.status }}
+  tags: [media, overseerr]

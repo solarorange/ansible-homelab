@@ -1,0 +1,135 @@
+---
+# Automation Infrastructure Setup
+# Sets up core automation components and integrations
+
+- name: Create automation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ config_dir }}/automation"
+    - "{{ config_dir }}/automation/scripts"
+    - "{{ config_dir }}/automation/configs"
+    - "{{ config_dir }}/automation/logs"
+  tags: [automation, setup]
+
+- name: Setup automation user
+  ansible.builtin.user:
+    name: "{{ username }}"
+    shell: /bin/bash
+    create_home: true
+    groups: docker
+    append: true
+  tags: [automation, setup]
+
+- name: Install automation dependencies
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - python3
+    - python3-pip
+    - python3-venv
+    - git
+    - curl
+    - wget
+    - jq
+    - yq
+  tags: [automation, setup]
+
+- name: Create automation virtual environment
+  ansible.builtin.command:
+    cmd: python3 -m venv "{{ config_dir }}/automation/venv"
+    creates: "{{ config_dir }}/automation/venv/bin/activate"
+  tags: [automation, setup]
+
+- name: Install Python automation packages
+  ansible.builtin.pip:
+    name:
+      - ansible
+      - docker
+      - requests
+      - pyyaml
+      - jinja2
+      - passlib
+      - bcrypt
+      - github3.py
+    virtualenv: "{{ config_dir }}/automation/venv"
+    virtualenv_command: python3 -m venv
+  tags: [automation, setup]
+
+- name: Setup automation scripts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - src: "scripts/{{ item }}"
+      dest: "{{ config_dir }}/automation/scripts/{{ item }}"
+  loop_control:
+    loop_var: item
+  with_fileglob: "scripts/*.py"
+  tags: [automation, setup]
+
+- name: Setup automation configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - src: "templates/{{ item }}"
+      dest: "{{ config_dir }}/automation/configs/{{ item }}"
+  loop_control:
+    loop_var: item
+  with_fileglob: "templates/*.yml.j2"
+  tags: [automation, setup]
+
+- name: Setup automation logging
+  ansible.builtin.template:
+    src: "templates/logging/automation-logging.yml.j2"
+    dest: "{{ config_dir }}/automation/configs/logging.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [automation, setup]
+
+- name: Create automation systemd service
+  ansible.builtin.template:
+    src: "templates/automation/automation.service.j2"
+    dest: /etc/systemd/system/automation.service
+    mode: '0644'
+    owner: root
+    group: root
+  tags: [automation, setup]
+
+- name: Enable and start automation service
+  ansible.builtin.systemd:
+    name: automation
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags: [automation, setup]
+
+- name: Verify automation setup
+  ansible.builtin.command:
+    cmd: "{{ config_dir }}/automation/venv/bin/python -c 'import ansible, docker, requests, yaml, jinja2; print(\"Automation setup verified\")'"
+  register: automation_verification
+  changed_when: false
+  tags: [automation, verification]
+
+- name: Display automation setup status
+  ansible.builtin.debug:
+    msg: |
+      Automation Infrastructure Setup Complete:
+      - Virtual Environment: {{ config_dir }}/automation/venv
+      - Scripts Directory: {{ config_dir }}/automation/scripts
+      - Config Directory: {{ config_dir }}/automation/configs
+      - Service Status: {{ 'RUNNING' if automation_verification.rc == 0 else 'FAILED' }}
+  tags: [automation, summary]

@@ -1,0 +1,122 @@
+# Pezzo Telegraf Configuration
+# Metrics collection for Pezzo services
+
+# Global agent configuration
+[agent]
+  interval = "30s"
+  round_interval = true
+  metric_batch_size = 1000
+  metric_buffer_limit = 10000
+  collection_jitter = "0s"
+  flush_interval = "10s"
+  flush_jitter = "0s"
+  precision = ""
+  hostname = ""
+  omit_hostname = false
+
+# Output plugins
+[[outputs.influxdb]]
+  urls = ["http://influxdb:8086"]
+  database = "pezzo_metrics"
+  retention_policy = ""
+  write_consistency = "any"
+  timeout = "5s"
+  username = "{{ telegraf_username | default('telegraf') }}"
+  password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
+
+[[inputs.diskio]]
+
+[[inputs.kernel]]
+
+[[inputs.mem]]
+
+[[inputs.processes]]
+
+[[inputs.swap]]
+
+[[inputs.system]]
+
+# Input plugins - Docker metrics
+[[inputs.docker]]
+  endpoint = "unix:///var/run/docker.sock"
+  gather_services = false
+  container_names = ["pezzo-server", "pezzo-console", "pezzo-postgres", "pezzo-redis", "pezzo-clickhouse", "pezzo-supertokens", "pezzo-local-kms"]
+  timeout = "5s"
+  perdevice = true
+  total = false
+  docker_label_include = ["*"]
+  docker_label_exclude = []
+
+# Input plugins - HTTP metrics
+[[inputs.http_response]]
+  urls = [
+    "https://{{ pezzo_subdomain }}.{{ domain }}/api/healthz",
+    "https://{{ pezzo_subdomain }}.{{ domain }}"
+  ]
+  response_timeout = "5s"
+  method = "GET"
+  follow_redirects = true
+
+# Input plugins - PostgreSQL metrics
+[[inputs.postgresql]]
+  address = "host=pezzo-postgres port=5432 user={{ pezzo_database_user }} password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"{{ pezzo_database_name }}"]
+  interval = "30s"
+
+# Input plugins - Redis metrics
+[[inputs.redis]]
+  servers = ["pezzo-redis:6379"]
+  password: "{{ vault_pezzo_admin_password | password_hash("bcrypt") }}"30s"
+
+# Input plugins - ClickHouse metrics
+[[inputs.http]]
+  urls = ["http://pezzo-clickhouse:8123/ping"]
+  method = "GET"
+  response_timeout = "5s"
+  interval = "30s"
+
+# Input plugins - Log parsing
+[[inputs.tail]]
+  files = [
+    "{{ logs_dir }}/pezzo/server/*.log",
+    "{{ logs_dir }}/pezzo/console/*.log",
+    "{{ logs_dir }}/pezzo/postgres/*.log",
+    "{{ logs_dir }}/pezzo/redis/*.log"
+  ]
+  from_beginning = false
+  pipe = false
+  watch_method = "poll"
+  max_undelivered_lines = 1000
+  data_format = "json"
+
+# Input plugins - Network metrics
+[[inputs.net]]
+  interfaces = ["eth0", "docker0"]
+
+# Input plugins - File system metrics
+[[inputs.filecount]]
+  directories = [
+    "{{ pezzo_config_dir }}",
+    "{{ logs_dir }}/pezzo",
+    "{{ backup_dir }}/pezzo"
+  ]
+  name = "*.log"
+  recursive = true
+  regular_only = true
+  size = false
+  modification_time = false
+
+# Processors
+[[processors.tagoverride]]
+  order = 1
+
+[[processors.rename]]
+  order = 2
+  [[processors.rename.replace]]
+    tag = "host"
+    dest = "server"
+
+# Aggregators
+[[aggregators.basicstats]]
+  period = "5m"
+  drop_original = false
+  stats = ["count", "min", "max", "mean", "sum", "stddev"] 

@@ -1,0 +1,118 @@
+---
+# Database Services Validation
+
+- name: Validate Redis container
+  ansible.builtin.docker_container_info:
+    name: redis
+  register: redis_status
+  failed_when: false
+
+- name: Check Redis status
+  ansible.builtin.debug:
+    msg: "Redis status: {{ 'Running' if redis_status.exists and redis_status.container.State.Running else 'Not running' }}"
+
+- name: Test Redis connection
+  ansible.builtin.shell: docker exec redis redis-cli ping
+  register: redis_test
+  failed_when: false
+  changed_when: false
+
+- name: Check Redis response
+  ansible.builtin.debug:
+    msg: "Redis ping: {{ redis_test.stdout }}"
+
+- name: Validate PostgreSQL container
+  ansible.builtin.docker_container_info:
+    name: postgresql
+  register: postgresql_status
+  failed_when: false
+
+- name: Check PostgreSQL status
+  ansible.builtin.debug:
+    msg: "PostgreSQL status: {{ 'Running' if postgresql_status.exists and postgresql_status.container.State.Running else 'Not running' }}"
+
+- name: Test PostgreSQL connection
+  ansible.builtin.shell: docker exec postgresql pg_isready -U postgres
+  register: postgresql_test
+  failed_when: false
+  changed_when: false
+
+- name: Check PostgreSQL response
+  ansible.builtin.debug:
+    msg: "PostgreSQL connection: {{ postgresql_test.stdout }}"
+
+- name: Validate MariaDB container
+  ansible.builtin.docker_container_info:
+    name: mariadb
+  register: mariadb_status
+  failed_when: false
+
+- name: Check MariaDB status
+  ansible.builtin.debug:
+    msg: "MariaDB status: {{ 'Running' if mariadb_status.exists and mariadb_status.container.State.Running else 'Not running' }}"
+
+- name: Test MariaDB connection
+  ansible.builtin.shell: docker exec mariadb mysqladmin ping -u root -p{{ mariadb_root_password }}
+  register: mariadb_test
+  failed_when: false
+  changed_when: false
+
+- name: Check MariaDB response
+  ansible.builtin.debug:
+    msg: "MariaDB connection: {{ mariadb_test.stdout }}"
+
+- name: Validate Elasticsearch container
+  ansible.builtin.docker_container_info:
+    name: elasticsearch
+  register: elasticsearch_status
+  failed_when: false
+
+- name: Check Elasticsearch status
+  ansible.builtin.debug:
+    msg: "Elasticsearch status: {{ 'Running' if elasticsearch_status.exists and elasticsearch_status.container.State.Running else 'Not running' }}"
+
+- name: Test Elasticsearch API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:9200/_cluster/health"
+    method: GET
+    status_code: [200, 503]
+  register: elasticsearch_api_test
+  failed_when: false
+  changed_when: false
+
+- name: Check Elasticsearch API response
+  ansible.builtin.debug:
+    msg: "Elasticsearch API status: {{ elasticsearch_api_test.status }}"
+
+- name: Validate Kibana container
+  ansible.builtin.docker_container_info:
+    name: kibana
+  register: kibana_status
+  failed_when: false
+
+- name: Check Kibana status
+  ansible.builtin.debug:
+    msg: "Kibana status: {{ 'Running' if kibana_status.exists and kibana_status.container.State.Running else 'Not running' }}"
+
+- name: Test Kibana API
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:5601/api/status"
+    method: GET
+    status_code: [200, 503]
+  register: kibana_api_test
+  failed_when: false
+  changed_when: false
+
+- name: Check Kibana API response
+  ansible.builtin.debug:
+    msg: "Kibana API status: {{ kibana_api_test.status }}"
+
+- name: Check database disk usage
+  ansible.builtin.shell: du -sh /home/{{ username }}/data/*/ 2>/dev/null | head -10
+  register: db_disk_usage
+  failed_when: false
+  changed_when: false
+
+- name: Display database disk usage
+  ansible.builtin.debug:
+    var: db_disk_usage.stdout_lines

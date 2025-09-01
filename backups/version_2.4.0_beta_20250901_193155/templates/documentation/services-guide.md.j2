@@ -1,0 +1,241 @@
+# Homelab Services Guide
+
+## Overview
+This guide documents all services deployed by the Ansible homelab automation system.
+
+## Infrastructure Services
+
+### Traefik
+**Purpose**: Reverse proxy and load balancer
+**URL**: https://traefik.{{ domain }}
+**Port**: 8080 (admin), 80/443 (proxy)
+**Configuration**: `roles/security/templates/traefik.yml.j2`
+
+### Authentik
+**Purpose**: Single Sign-On (SSO) and identity provider
+**URL**: https://auth.{{ domain }}
+**Port**: 9000
+**Configuration**: `roles/security/templates/authentik-docker-compose.yml.j2`
+
+## Database Services
+
+### PostgreSQL
+**Purpose**: Primary relational database
+**Port**: 5432
+**Configuration**: `roles/databases/templates/postgresql.yml.j2`
+**Backup**: Daily automated backups
+
+### Redis
+**Purpose**: Caching and session storage
+**Port**: 6379
+**Configuration**: `roles/databases/templates/redis.yml.j2`
+**Backup**: Daily automated backups
+
+### MariaDB
+**Purpose**: Alternative relational database
+**Port**: 3306
+**Configuration**: `roles/databases/templates/mariadb.yml.j2`
+**Backup**: Daily automated backups
+
+## Monitoring Services
+
+### Prometheus
+**Purpose**: Metrics collection and storage
+**URL**: https://prometheus.{{ domain }}
+**Port**: 9090
+**Configuration**: `roles/logging/templates/prometheus.yml.j2`
+
+### Grafana
+**Purpose**: Metrics visualization and dashboards
+**URL**: https://grafana.{{ domain }}
+**Port**: 3000
+**Configuration**: `roles/logging/templates/grafana.yml.j2`
+
+### AlertManager
+**Purpose**: Alert routing and notification
+**Port**: 9093
+**Configuration**: `roles/logging/templates/alertmanager.yml.j2`
+
+### Loki
+**Purpose**: Log aggregation
+**Port**: 3100
+**Configuration**: `roles/logging/templates/loki.yml.j2`
+
+## Media Services
+
+### Sonarr
+**Purpose**: TV show management
+**URL**: https://sonarr.{{ domain }}
+**Port**: 8989
+**Configuration**: `roles/media/templates/sonarr.yml.j2`
+
+### Radarr
+**Purpose**: Movie management
+**URL**: https://radarr.{{ domain }}
+**Port**: 7878
+**Configuration**: `roles/media/templates/radarr.yml.j2`
+
+### Jellyfin
+**Purpose**: Media server
+**URL**: https://jellyfin.{{ domain }}
+**Port**: 8096
+**Configuration**: `roles/media/templates/jellyfin.yml.j2`
+
+### Plex
+**Purpose**: Media server (alternative)
+**URL**: https://plex.{{ domain }}
+**Port**: 32400
+**Configuration**: `roles/media/templates/plex.yml.j2`
+
+## Storage Services
+
+### Nextcloud
+**Purpose**: File storage and sharing
+**URL**: https://nextcloud.{{ domain }}
+**Port**: 8080
+**Configuration**: `roles/storage/templates/nextcloud.yml.j2`
+
+### Samba
+**Purpose**: Network file sharing
+**Port**: 139/445
+**Configuration**: `roles/storage/templates/samba.yml.j2`
+
+## Security Services
+
+### CrowdSec
+**Purpose**: Intrusion detection and prevention
+**Port**: 6060
+**Configuration**: `roles/security/templates/crowdsec.yml.j2`
+
+### Fail2Ban
+**Purpose**: Brute force protection
+**Configuration**: `roles/security/templates/fail2ban.yml.j2`
+
+## Utility Services
+
+### Portainer
+**Purpose**: Docker container management
+**URL**: https://portainer.{{ domain }}
+**Port**: 9000
+**Configuration**: `roles/utilities/templates/portainer.yml.j2`
+
+### Homepage
+**Purpose**: Service dashboard
+**URL**: https://homepage.{{ domain }}
+**Port**: 3000
+**Configuration**: `roles/utilities/templates/homepage.yml.j2`
+
+## Service Dependencies
+
+### Startup Order
+1. **Infrastructure**: Traefik, Authentik
+2. **Databases**: PostgreSQL, Redis, MariaDB
+3. **Monitoring**: Prometheus, Grafana, AlertManager
+4. **Storage**: Nextcloud, Samba
+5. **Media**: Sonarr, Radarr, Jellyfin
+6. **Utilities**: Portainer, Homepage
+
+### Network Configuration
+- **External**: Services accessible from internet
+- **Internal**: Services only accessible from local network
+- **Admin**: Services only accessible from admin network
+
+## Service Management
+
+### Starting Services
+```bash
+# Start all services
+docker-compose up -d
+
+# Start specific service
+docker-compose up -d <service_name>
+```
+
+### Stopping Services
+```bash
+# Stop all services
+docker-compose down
+
+# Stop specific service
+docker-compose stop <service_name>
+```
+
+### Updating Services
+```bash
+# Update all services
+docker-compose pull
+docker-compose up -d
+
+# Update specific service
+docker-compose pull <service_name>
+docker-compose up -d <service_name>
+```
+
+### Logs
+```bash
+# View all logs
+docker-compose logs
+
+# View specific service logs
+docker-compose logs <service_name>
+
+# Follow logs
+docker-compose logs -f <service_name>
+```
+
+## Backup and Recovery
+
+### Automated Backups
+- **Frequency**: Daily for critical services
+- **Retention**: 7 days for most services, 30 days for configs
+- **Location**: `{{ backup_dir }}`
+
+### Manual Backups
+```bash
+# Backup specific service
+{{ docker_dir }}/backup/backup-<service>.sh
+
+# Restore service
+{{ docker_dir }}/backup/restore-<service>.sh <backup_file>
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **Service won't start**: Check logs and dependencies
+2. **Port conflicts**: Verify no other services using same ports
+3. **Permission errors**: Check file ownership and permissions
+4. **Network issues**: Verify Docker networks and firewall rules
+
+### Health Checks
+```bash
+# Check service health
+curl http://{{ ansible_default_ipv4.address }}:<port>/health
+
+# Check service status
+docker ps | grep <service_name>
+
+# Check service logs
+docker logs <service_name>
+```
+
+## Configuration
+
+### Environment Variables
+Each service uses environment variables for configuration:
+- Database credentials
+- API keys
+- Service URLs
+- Security settings
+
+### Configuration Files
+Service configurations are templated using Jinja2:
+- Docker Compose files
+- Application configs
+- Nginx/Traefik configs
+
+### Customization
+To customize services:
+1. Edit the appropriate template file
+2. Modify variables in `group_vars/all/`
+3. Re-run the Ansible playbook 

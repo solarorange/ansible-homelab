@@ -1,0 +1,295 @@
+---
+# Comprehensive Firewall Rules for Ansible Homelab
+# UFW (Uncomplicated Firewall) configuration
+
+# Default policies
+ufw_default_incoming_policy: deny
+ufw_default_outgoing_policy: allow
+
+# Enable logging
+ufw_logging: on
+
+# Allow SSH (restrict to specific IPs in production)
+ufw_rules:
+  # SSH access
+  - rule: allow
+    port: '22'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "SSH access from local network"
+
+  # HTTP/HTTPS for web services
+  - rule: allow
+    port: '80'
+    proto: tcp
+    comment: "HTTP access"
+  
+  - rule: allow
+    port: '443'
+    proto: tcp
+    comment: "HTTPS access"
+
+  # DNS (Pi-hole)
+  - rule: allow
+    port: '53'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "DNS TCP from local network"
+  
+  - rule: allow
+    port: '53'
+    proto: udp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "DNS UDP from local network"
+
+  # VPN (WireGuard)
+  - rule: allow
+    port: '51820'
+    proto: udp
+    comment: "WireGuard VPN"
+
+  # Docker management
+  - rule: allow
+    port: '2375'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Docker daemon (local network only)"
+
+  # Portainer
+  - rule: allow
+    port: '9000'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Portainer (local network only)"
+
+  # Monitoring ports (restrict to local network)
+  - rule: allow
+    port: '9090'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Prometheus (local network only)"
+  
+  - rule: allow
+    port: '3000'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Grafana (local network only)"
+  
+  - rule: allow
+    port: '3100'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Loki (local network only)"
+
+  # Media services (restrict to local network)
+  - rule: allow
+    port: '32400'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Plex (local network only)"
+  
+  - rule: allow
+    port: '8096'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Jellyfin (local network only)"
+
+  # Database ports (restrict to local network)
+  - rule: allow
+    port: '5432'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "PostgreSQL (local network only)"
+  
+  - rule: allow
+    port: '3306'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "MariaDB (local network only)"
+  
+  - rule: allow
+    port: '6379'
+    proto: tcp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "Redis (local network only)"
+
+  # ICMP (ping) for monitoring
+  - rule: allow
+    proto: icmp
+    from_ip: "{{ ansible_default_ipv4.network }}/24"
+    comment: "ICMP from local network"
+
+# Rate limiting rules
+ufw_rate_limit_rules:
+  - rule: limit
+    port: '22'
+    proto: tcp
+    comment: "Rate limit SSH connections"
+  
+  - rule: limit
+    port: '80'
+    proto: tcp
+    comment: "Rate limit HTTP connections"
+  
+  - rule: limit
+    port: '443'
+    proto: tcp
+    comment: "Rate limit HTTPS connections"
+
+# Application-specific rules
+ufw_application_rules:
+  # Traefik
+  - name: traefik
+    title: "Traefik Reverse Proxy"
+    description: "Traefik reverse proxy and load balancer"
+    ports:
+      - "80/tcp"
+      - "443/tcp"
+      - "8080/tcp"
+  
+  # Authentik
+  - name: authentik
+    title: "Authentik Authentication"
+    description: "Authentik identity provider"
+    ports:
+      - "9000/tcp"
+  
+  # Pi-hole
+  - name: pihole
+    title: "Pi-hole DNS"
+    description: "Pi-hole DNS server"
+    ports:
+      - "53/tcp"
+      - "53/udp"
+      - "80/tcp"
+  
+  # Monitoring
+  - name: monitoring
+    title: "Monitoring Stack"
+    description: "Prometheus, Grafana, Loki monitoring"
+    ports:
+      - "9090/tcp"
+      - "3000/tcp"
+      - "3100/tcp"
+      - "9093/tcp"
+  
+  # Media
+  - name: media
+    title: "Media Services"
+    description: "Plex, Jellyfin, ARR services"
+    ports:
+      - "32400/tcp"
+      - "8096/tcp"
+      - "7878/tcp"
+      - "8989/tcp"
+      - "9696/tcp"
+      - "8080/tcp"
+  
+  # Databases
+  - name: databases
+    title: "Database Services"
+    description: "PostgreSQL, MariaDB, Redis"
+    ports:
+      - "5432/tcp"
+      - "3306/tcp"
+      - "6379/tcp"
+
+# Fail2ban integration
+ufw_fail2ban_integration: true
+ufw_fail2ban_jails:
+  - ssh
+  - http-get-dos
+  - nginx-http-auth
+  - nginx-limit-req
+  - apache-auth
+  - apache-badbots
+  - apache-noscript
+  - apache-overflows
+  - apache-nohome
+  - apache-botsearch
+  - apache-fakegooglebot
+  - apache-modsecurity
+  - apache-shellshock
+  - horde
+  - courier-smtp
+  - courier-auth
+  - postfix
+  - postfix-sasl
+  - dovecot
+  - wordpress
+  - roundcube-auth
+  - openwebmail
+  - plesk
+  - plesk-bots
+  - recidive
+  - 3proxy
+  - pure-ftpd
+  - postfix-rbl
+  - fail2ban-iptables
+  - sasl
+  - asterisk
+  - 3proxy
+  - named-refused-tcp
+  - vsftpd
+  - ufw
+  - tine20
+  - sieve
+  - solid-pop3d
+  - exim
+  - exim-spam
+  - exim-relay
+  - webmin-auth
+  - directadmin
+  - haproxy-http-auth
+  - sogo
+  - postfix-sasl
+  - cyrus-imap
+  - serweb
+  - mongodb-auth
+  - couchdb
+  - postfix-rbl
+  - fail2ban-iptables
+  - sasl
+  - asterisk
+  - 3proxy
+  - named-refused-tcp
+  - vsftpd
+  - ufw
+  - tine20
+  - sieve
+  - solid-pop3d
+  - exim
+  - exim-spam
+  - exim-relay
+  - webmin-auth
+  - directadmin
+  - haproxy-http-auth
+  - sogo
+  - postfix-sasl
+  - cyrus-imap
+  - serweb
+  - mongodb-auth
+  - couchdb
+  - postfix-rbl
+  - fail2ban-iptables
+  - sasl
+  - asterisk
+  - 3proxy
+  - named-refused-tcp
+  - vsftpd
+  - ufw
+  - tine20
+  - sieve
+  - solid-pop3d
+  - exim
+  - exim-spam
+  - exim-relay
+  - webmin-auth
+  - directadmin
+  - haproxy-http-auth
+  - sogo
+  - postfix-sasl
+  - cyrus-imap
+  - serweb
+  - mongodb-auth
+  - couchdb 

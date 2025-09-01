@@ -1,0 +1,345 @@
+#!/bin/bash
+
+# Vaultwarden Management Script
+# Provides easy management commands for Vaultwarden
+
+set -euo pipefail
+
+# Configuration
+CONTAINER_NAME="{{ vaultwarden_app_container_name }}"
+CONFIG_DIR="{{ vaultwarden_config_dir }}"
+DATA_DIR="{{ vaultwarden_data_dir }}"
+BACKUP_DIR="{{ vaultwarden_backup_dir }}"
+LOG_FILE="{{ logs_dir }}/vaultwarden/manage.log"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Print usage
+usage() {
+    cat << EOF
+Vaultwarden Management Script
+
+Usage: $0 [COMMAND] [OPTIONS]
+
+Commands:
+    start       Start Vaultwarden container
+    stop        Stop Vaultwarden container
+    restart     Restart Vaultwarden container
+    status      Show container status
+    logs        Show container logs
+    backup      Create manual backup
+    restore     Restore from backup
+    update      Update Vaultwarden to latest version
+    config      Show configuration
+    health      Check service health
+    clean       Clean up old backups and logs
+    help        Show this help message
+
+Options:
+    -f, --follow    Follow logs (for logs command)
+    -n, --lines     Number of log lines to show (default: 50)
+    -b, --backup    Backup file for restore command
+
+Examples:
+    $0 start
+    $0 logs -f
+    $0 backup
+    $0 restore -b vaultwarden_backup_20231201_120000.tar.gz
+    $0 update
+
+EOF
+}
+
+# Check if container exists
+container_exists() {
+    docker ps -a --format "table {{.Names}}" | grep -q "^${CONTAINER_NAME}$"
+}
+
+# Check if container is running
+container_running() {
+    docker ps --format "table {{.Names}}" | grep -q "^${CONTAINER_NAME}$"
+}
+
+# Start Vaultwarden
+start() {
+    log "Starting Vaultwarden..."
+    if container_running; then
+        echo -e "${YELLOW}Vaultwarden is already running${NC}"
+        return 0
+    fi
+    
+    cd "$CONFIG_DIR"
+    docker-compose up -d
+    log "Vaultwarden started successfully"
+    echo -e "${GREEN}Vaultwarden started successfully${NC}"
+}
+
+# Stop Vaultwarden
+stop() {
+    log "Stopping Vaultwarden..."
+    if ! container_running; then
+        echo -e "${YELLOW}Vaultwarden is not running${NC}"
+        return 0
+    fi
+    
+    cd "$CONFIG_DIR"
+    docker-compose down
+    log "Vaultwarden stopped successfully"
+    echo -e "${GREEN}Vaultwarden stopped successfully${NC}"
+}
+
+# Restart Vaultwarden
+restart() {
+    log "Restarting Vaultwarden..."
+    stop
+    sleep 5
+    start
+    log "Vaultwarden restarted successfully"
+    echo -e "${GREEN}Vaultwarden restarted successfully${NC}"
+}
+
+# Show status
+status() {
+    echo -e "${BLUE}=== Vaultwarden Status ===${NC}"
+    
+    if container_exists; then
+        echo -e "Container: ${GREEN}Exists${NC}"
+        if container_running; then
+            echo -e "Status: ${GREEN}Running${NC}"
+            echo -e "Image: $(docker inspect $CONTAINER_NAME --format='{{.Config.Image}}')"
+            echo -e "Created: $(docker inspect $CONTAINER_NAME --format='{{.Created}}')"
+            echo -e "Ports: $(docker port $CONTAINER_NAME 2>/dev/null || echo 'Not exposed')"
+        else
+            echo -e "Status: ${RED}Stopped${NC}"
+        fi
+    else
+        echo -e "Container: ${RED}Not found${NC}"
+    fi
+    
+    echo -e "\n${BLUE}=== Directories ===${NC}"
+    echo -e "Config: $CONFIG_DIR $(test -d "$CONFIG_DIR" && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}")"
+    echo -e "Data: $DATA_DIR $(test -d "$DATA_DIR" && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}")"
+    echo -e "Backup: $BACKUP_DIR $(test -d "$BACKUP_DIR" && echo -e "${GREEN}✓${NC}" || echo -e "${RED}✗${NC}")"
+}
+
+# Show logs
+logs() {
+    local follow=false
+    local lines=50
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--follow)
+                follow=true
+                shift
+                ;;
+            -n|--lines)
+                lines="$2"
+                shift 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    if ! container_exists; then
+        echo -e "${RED}Container not found${NC}"
+        exit 1
+    fi
+    
+    if [[ "$follow" == "true" ]]; then
+        docker logs -f --tail "$lines" "$CONTAINER_NAME"
+    else
+        docker logs --tail "$lines" "$CONTAINER_NAME"
+    fi
+}
+
+# Create backup
+backup() {
+    log "Creating manual backup..."
+    "$CONFIG_DIR/scripts/backup.sh"
+    echo -e "${GREEN}Backup completed successfully${NC}"
+}
+
+# Restore from backup
+restore() {
+    local backup_file=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -b|--backup)
+                backup_file="$2"
+                shift 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+    
+    if [[ -z "$backup_file" ]]; then
+        echo -e "${RED}Please specify backup file with -b option${NC}"
+        echo -e "Available backups:"
+        ls -la "$BACKUP_DIR"/*.tar.gz 2>/dev/null || echo "No backups found"
+        exit 1
+    fi
+    
+    if [[ ! -f "$backup_file" ]]; then
+        echo -e "${RED}Backup file not found: $backup_file${NC}"
+        exit 1
+    fi
+    
+    log "Restoring from backup: $backup_file"
+    
+    # Stop Vaultwarden
+    stop
+    
+    # Backup current data
+    mv "$DATA_DIR" "${DATA_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # Extract backup
+    tar -xzf "$backup_file" -C /tmp
+    mv /tmp/vaultwarden_backup_*/data "$DATA_DIR"
+    rm -rf /tmp/vaultwarden_backup_*
+    
+    # Start Vaultwarden
+    start
+    
+    echo -e "${GREEN}Restore completed successfully${NC}"
+}
+
+# Update Vaultwarden
+update() {
+    log "Updating Vaultwarden..."
+    
+    # Create backup before update
+    backup
+    
+    # Pull latest image
+    cd "$CONFIG_DIR"
+    docker-compose pull
+    
+    # Restart with new image
+    restart
+    
+    echo -e "${GREEN}Update completed successfully${NC}"
+}
+
+# Show configuration
+config() {
+    echo -e "${BLUE}=== Vaultwarden Configuration ===${NC}"
+    echo -e "Container Name: $CONTAINER_NAME"
+    echo -e "Config Directory: $CONFIG_DIR"
+    echo -e "Data Directory: $DATA_DIR"
+    echo -e "Backup Directory: $BACKUP_DIR"
+    echo -e "Log File: $LOG_FILE"
+    
+    if [[ -f "$CONFIG_DIR/docker-compose.yml" ]]; then
+        echo -e "\n${BLUE}=== Docker Compose Configuration ===${NC}"
+        cat "$CONFIG_DIR/docker-compose.yml"
+    fi
+}
+
+# Check health
+health() {
+    echo -e "${BLUE}=== Vaultwarden Health Check ===${NC}"
+    
+    # Container health
+    if container_running; then
+        echo -e "Container: ${GREEN}Running${NC}"
+        
+        # Health check
+        if docker inspect "$CONTAINER_NAME" --format='{{.State.Health.Status}}' 2>/dev/null | grep -q "healthy"; then
+            echo -e "Health: ${GREEN}Healthy${NC}"
+        else
+            echo -e "Health: ${YELLOW}Unhealthy${NC}"
+        fi
+        
+        # Port check
+        if curl -s -f "http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}/alive" > /dev/null; then
+            echo -e "Web Interface: ${GREEN}Accessible${NC}"
+        else
+            echo -e "Web Interface: ${RED}Not Accessible${NC}"
+        fi
+    else
+        echo -e "Container: ${RED}Not Running${NC}"
+    fi
+}
+
+# Clean up
+clean() {
+    log "Cleaning up old backups and logs..."
+    
+    # Clean old backups
+    find "$BACKUP_DIR" -name "vaultwarden_backup_*" -type f -mtime +{{ vaultwarden_backup_retention_days }} -delete 2>/dev/null || true
+    find "$BACKUP_DIR" -name "vaultwarden_backup_*" -type d -mtime +{{ vaultwarden_backup_retention_days }} -exec rm -rf {} + 2>/dev/null || true
+    
+    # Clean old logs
+    find "{{ logs_dir }}/vaultwarden" -name "*.log" -type f -mtime +7 -delete 2>/dev/null || true
+    
+    # Clean Docker logs
+    docker system prune -f
+    
+    echo -e "${GREEN}Cleanup completed successfully${NC}"
+}
+
+# Main function
+main() {
+    case "${1:-help}" in
+        start)
+            start
+            ;;
+        stop)
+            stop
+            ;;
+        restart)
+            restart
+            ;;
+        status)
+            status
+            ;;
+        logs)
+            logs "$@"
+            ;;
+        backup)
+            backup
+            ;;
+        restore)
+            restore "$@"
+            ;;
+        update)
+            update
+            ;;
+        config)
+            config
+            ;;
+        health)
+            health
+            ;;
+        clean)
+            clean
+            ;;
+        help|--help|-h)
+            usage
+            ;;
+        *)
+            echo -e "${RED}Unknown command: $1${NC}"
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@" 

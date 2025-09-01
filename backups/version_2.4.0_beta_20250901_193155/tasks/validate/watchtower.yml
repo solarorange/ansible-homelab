@@ -1,0 +1,187 @@
+---
+# Watchtower Stack Validation Tasks
+# Validates security, functionality, and configuration of the Watchtower service stack
+
+- name: Validate Watchtower stack security configuration
+  block:
+    - name: Check for privileged containers
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "Up.*privileged" | wc -l
+      register: privileged_containers
+      changed_when: false
+
+    - name: Fail if privileged containers found
+      ansible.builtin.fail:
+        msg: "Security violation: Privileged containers detected in Watchtower stack"
+      when: privileged_containers.stdout | int > 0
+
+    - name: Check for containers running as root
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.User}}" | grep -E "\sroot\s*$" | wc -l
+      register: root_containers
+      changed_when: false
+
+    - name: Fail if containers running as root
+      ansible.builtin.fail:
+        msg: "Security violation: Containers running as root detected in Watchtower stack"
+      when: root_containers.stdout | int > 0
+
+    - name: Check for unauthorized port exposure
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -E "{{ ansible_default_ipv4.address }}:[0-9]+" | grep -v "traefik\|authentik" | wc -l
+      register: unauthorized_ports
+      changed_when: false
+
+    - name: Fail if unauthorized port exposure detected
+      ansible.builtin.fail:
+        msg: "Security violation: Unauthorized port exposure detected in Watchtower stack"
+      when: unauthorized_ports.stdout | int > 0
+
+- name: Validate Watchtower stack service health
+  block:
+    - name: Check critical services status
+      ansible.builtin.shell: |
+        for service in traefik authentik grafana prometheus influxdb vault jellyfin homepage; do
+          if ! docker ps -f name="$service" -f status=running | grep -q "$service"; then
+            echo "Service $service is not running"
+            exit 1
+          fi
+        done
+      register: service_status_check
+      changed_when: false
+
+    - name: Fail if critical services not running
+      ansible.builtin.fail:
+        msg: "Watchtower stack validation failed: Critical services not running"
+      when: service_status_check.rc != 0
+
+    - name: Check service health endpoints
+      ansible.builtin.uri:
+        url: "{{ item }}"
+        method: GET
+        status_code: [200, 201, 202]
+        timeout: 30
+      loop:
+        - "https://homepage.{{ domain }}/health"
+        - "https://traefik.{{ domain }}/ping"
+        - "https://grafana.{{ domain }}/api/health"
+      register: health_checks
+      retries: 3
+      delay: 10
+      until: health_checks is success
+
+    - name: Fail if health checks fail
+      ansible.builtin.fail:
+        msg: "Watchtower stack validation failed: Health checks failed"
+      when: health_checks is failed
+
+- name: Validate Watchtower stack resource usage
+  block:
+    - name: Check container resource limits
+      ansible.builtin.shell: |
+        docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}" | tail -n +2
+      register: resource_usage
+      changed_when: false
+
+    - name: Check for high CPU usage
+      ansible.builtin.shell: |
+        docker stats --no-stream --format "{{.CPUPerc}}" | tr -d '%' | awk '{if($1 > 90) print $1}' | wc -l
+      register: high_cpu_usage
+      changed_when: false
+
+    - name: Warn if high CPU usage detected
+      ansible.builtin.debug:
+        msg: "WARNING: High CPU usage detected in Watchtower stack containers"
+      when: high_cpu_usage.stdout | int > 0
+
+    - name: Check for high memory usage
+      ansible.builtin.shell: |
+        docker stats --no-stream --format "{{.MemPerc}}" | tr -d '%' | awk '{if($1 > 90) print $1}' | wc -l
+      register: high_memory_usage
+      changed_when: false
+
+    - name: Warn if high memory usage detected
+      ansible.builtin.debug:
+        msg: "WARNING: High memory usage detected in Watchtower stack containers"
+      when: high_memory_usage.stdout | int > 0
+
+- name: Validate Watchtower stack network security
+  block:
+    - name: Check network segmentation
+      ansible.builtin.shell: |
+        docker network ls --format "{{.Name}}" | grep -E "(homelab|monitoring|security|media|automation|storage|development)" | wc -l
+      register: network_segments
+      changed_when: false
+
+    - name: Fail if network segmentation not properly configured
+      ansible.builtin.fail:
+        msg: "Security violation: Network segmentation not properly configured in Watchtower stack"
+      when: network_segments.stdout | int < 7
+
+    - name: Check for suspicious network connections
+      ansible.builtin.shell: |
+        netstat -tuln | grep -E ":(22|23|3389|5900)" | wc -l
+      register: suspicious_connections
+      changed_when: false
+
+    - name: Warn if suspicious network connections detected
+      ansible.builtin.debug:
+        msg: "WARNING: Suspicious network connections detected in Watchtower stack"
+      when: suspicious_connections.stdout | int > 5
+
+- name: Validate Watchtower stack configuration files
+  block:
+    - name: Check configuration file permissions
+      ansible.builtin.shell: |
+        find {{ docker_dir }}/watchtower/config -type f -exec stat -c "%a %n" {} \; | grep -v "^600\|^640\|^644" | wc -l
+      register: config_permissions
+      changed_when: false
+
+    - name: Fail if configuration files have insecure permissions
+      ansible.builtin.fail:
+        msg: "Security violation: Configuration files have insecure permissions in Watchtower stack"
+      when: config_permissions.stdout | int > 0
+
+    - name: Check secrets file encryption
+      ansible.builtin.stat:
+        path: "{{ docker_dir }}/watchtower/secrets/secrets.yml"
+      register: secrets_file
+
+    - name: Fail if secrets file not encrypted
+      ansible.builtin.fail:
+        msg: "Security violation: Secrets file not encrypted in Watchtower stack"
+      when: not secrets_file.stat.exists
+
+- name: Validate Watchtower stack logging
+  block:
+    - name: Check log file permissions
+      ansible.builtin.shell: |
+        find {{ logs_dir }}/watchtower -type f -exec stat -c "%a %n" {} \; | grep -v "^600\|^640\|^644" | wc -l
+      register: log_permissions
+      changed_when: false
+
+    - name: Fail if log files have insecure permissions
+      ansible.builtin.fail:
+        msg: "Security violation: Log files have insecure permissions in Watchtower stack"
+      when: log_permissions.stdout | int > 0
+
+    - name: Check for security monitoring logs
+      ansible.builtin.stat:
+        path: "{{ logs_dir }}/watchtower/security-monitor.log"
+      register: security_logs
+
+    - name: Warn if security monitoring logs not found
+      ansible.builtin.debug:
+        msg: "WARNING: Security monitoring logs not found in Watchtower stack"
+      when: not security_logs.stat.exists
+
+- name: Report Watchtower stack validation results
+  ansible.builtin.debug:
+    msg: |
+      Watchtower Stack Validation Results:
+      - Security Configuration: {{ 'PASS' if privileged_containers.stdout | int == 0 and root_containers.stdout | int == 0 and unauthorized_ports.stdout | int == 0 else 'FAIL' }}
+      - Service Health: {{ 'PASS' if service_status_check.rc == 0 and health_checks is success else 'FAIL' }}
+      - Resource Usage: {{ 'PASS' if high_cpu_usage.stdout | int == 0 and high_memory_usage.stdout | int == 0 else 'WARN' }}
+      - Network Security: {{ 'PASS' if network_segments.stdout | int >= 7 else 'FAIL' }}
+      - Configuration Security: {{ 'PASS' if config_permissions.stdout | int == 0 and secrets_file.stat.exists else 'FAIL' }}
+      - Logging Security: {{ 'PASS' if log_permissions.stdout | int == 0 else 'FAIL' }}

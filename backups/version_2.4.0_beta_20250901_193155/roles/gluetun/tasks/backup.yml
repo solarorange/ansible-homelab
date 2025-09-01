@@ -1,0 +1,19 @@
+---
+# Gluetun Backup Tasks
+
+- name: Create Gluetun backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ backup_scripts_dir }}/gluetun_backup.sh"
+    mode: '0755'
+  tags: [gluetun, backup]
+
+- name: Setup Gluetun backup cron job
+  cron:
+    name: "Gluetun backup"
+    job: "{{ backup_scripts_dir }}/gluetun_backup.sh"
+    hour: "2"
+    minute: "0"
+    user: "{ vault_service_user }"
+  when: gluetun_backup_enabled | default(true)
+  tags: [gluetun, backup]

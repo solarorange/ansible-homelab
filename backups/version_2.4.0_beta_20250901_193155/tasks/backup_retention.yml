@@ -1,0 +1,66 @@
+---
+# Backup Retention Policy Tasks
+
+- name: Apply daily backup retention
+  ansible.builtin.find:
+    paths: "{{ backup_root_dir | default('/var/backups') }}"
+    patterns: "*-{{ ansible_date_time.iso8601_basic_short[:8] }}*"
+    age: "{{ backup_retention.daily | default(7) }}d"
+    recurse: yes
+  register: daily_backups
+  tags: [backup, retention]
+
+- name: Apply weekly backup retention
+  ansible.builtin.find:
+    paths: "{{ backup_root_dir | default('/var/backups') }}"
+    patterns: "*-{{ ansible_date_time.iso8601_basic_short[:8] }}*"
+    age: "{{ backup_retention.weekly | default(30) }}d"
+    recurse: yes
+  register: weekly_backups
+  tags: [backup, retention]
+
+- name: Apply monthly backup retention
+  ansible.builtin.find:
+    paths: "{{ backup_root_dir | default('/var/backups') }}"
+    patterns: "*-{{ ansible_date_time.iso8601_basic_short[:8] }}*"
+    age: "{{ backup_retention.monthly | default(365) }}d"
+    recurse: yes
+  register: monthly_backups
+  tags: [backup, retention]
+
+- name: Remove expired daily backups
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ daily_backups.files }}"
+  when: item.mtime < (ansible_date_time.epoch | int - (backup_retention.daily | default(7) * 86400))
+  tags: [backup, retention]
+
+- name: Remove expired weekly backups
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ weekly_backups.files }}"
+  when: item.mtime < (ansible_date_time.epoch | int - (backup_retention.weekly | default(30) * 86400))
+  tags: [backup, retention]
+
+- name: Remove expired monthly backups
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ monthly_backups.files }}"
+  when: item.mtime < (ansible_date_time.epoch | int - (backup_retention.monthly | default(365) * 86400))
+  tags: [backup, retention]
+
+- name: Generate retention report
+  ansible.builtin.template:
+    src: templates/retention_report.j2
+    dest: "{{ backup_root_dir | default('/var/backups') }}/reports/retention-report-{{ ansible_date_time.iso8601_basic_short }}.html"
+    mode: '0640'
+    owner: "{{ backup_user | default(ansible_user) }}"
+    group: "{{ backup_group | default(ansible_user) }}"
+  vars:
+    daily_backups: "{{ daily_backups.files }}"
+    weekly_backups: "{{ weekly_backups.files }}"
+    monthly_backups: "{{ monthly_backups.files }}"
+  tags: [backup, retention, reporting]

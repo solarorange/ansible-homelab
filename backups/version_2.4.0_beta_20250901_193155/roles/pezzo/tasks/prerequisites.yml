@@ -1,0 +1,211 @@
+---
+# Pezzo Prerequisites Tasks
+# Setup required directories, networks, and dependencies for Pezzo deployment
+
+- name: Create Pezzo configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ pezzo_config_dir }}"
+    - "{{ pezzo_server_config_dir }}"
+    - "{{ pezzo_console_config_dir }}"
+    - "{{ pezzo_proxy_config_dir }}"
+    - "{{ pezzo_postgres_config_dir }}"
+    - "{{ pezzo_redis_config_dir }}"
+    - "{{ pezzo_clickhouse_config_dir }}"
+    - "{{ pezzo_supertokens_config_dir }}"
+    - "{{ pezzo_local_kms_config_dir }}"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo log directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ logs_dir }}/pezzo"
+    - "{{ logs_dir }}/pezzo/server"
+    - "{{ logs_dir }}/pezzo/console"
+    - "{{ logs_dir }}/pezzo/proxy"
+    - "{{ logs_dir }}/pezzo/postgres"
+    - "{{ logs_dir }}/pezzo/redis"
+    - "{{ logs_dir }}/pezzo/clickhouse"
+    - "{{ logs_dir }}/pezzo/supertokens"
+    - "{{ logs_dir }}/pezzo/local-kms"
+    - "{{ logs_dir }}/pezzo/backup"
+    - "{{ logs_dir }}/pezzo/health"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo backup directory
+  ansible.builtin.file:
+    path: "{{ pezzo_backup_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo Docker network
+  community.docker.docker_network:
+    name: "{{ pezzo_network_name }}"
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: "{{ pezzo_network_subnet | default('{{ ansible_default_ipv4.address }}/16') }}"
+  tags: [pezzo, setup]
+
+- name: Ensure Pezzo network is connected to Traefik
+  community.docker.docker_network:
+    name: "{{ pezzo_traefik_network }}"
+    state: present
+    driver: bridge
+  tags: [pezzo, setup]
+
+- name: Create Pezzo environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ pezzo_config_dir }}/.env"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ pezzo_config_dir }}/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, setup]
+
+- name: Prepare Pezzo secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "pezzo"
+    secret_dir_root: "{{ pezzo_config_dir }}"
+    secret_files: "{{ pezzo_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ pezzo_components.server.environment | default({}) }}"
+      - "{{ pezzo_components.console.environment | default({}) }}"
+      - "{{ pezzo_components.proxy.environment | default({}) }}"
+      - "{{ pezzo_components.postgres.environment | default({}) }}"
+      - "{{ pezzo_components.redis.environment | default({}) }}"
+      - "{{ pezzo_components.clickhouse.environment | default({}) }}"
+      - "{{ pezzo_components.supertokens.environment | default({}) }}"
+      - "{{ pezzo_components['local-kms'].environment | default({}) }}"
+  when: pezzo_manage_secret_files | default(true) | bool
+  tags: [pezzo, setup, secrets]
+
+- name: Validate required Pezzo secret files exist
+  ansible.builtin.stat:
+    path: "{{ pezzo_config_dir }}/secrets/{{ item }}"
+  register: pezzo_secret_stats
+  loop: "{{ pezzo_required_secrets | default([]) }}"
+  when: pezzo_manage_secret_files | default(true) | bool and (pezzo_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Pezzo secret files are missing
+  ansible.builtin.assert:
+    that: "{{ pezzo_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ pezzo_config_dir }}/secrets.
+      Missing: {{ (pezzo_required_secrets | default([])) | reject('in', (pezzo_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: pezzo_manage_secret_files | default(true) | bool and (pezzo_required_secrets | default([]) | length > 0)
+
+- name: Set proper permissions on Pezzo configuration files
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    recurse: yes
+  tags: [pezzo, setup]
+
+- name: Ensure Docker Compose is available
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - docker-compose
+    - python3-docker
+  tags: [pezzo, setup]
+
+- name: Install required Python packages
+  ansible.builtin.pip:
+    name:
+      - docker
+      - docker-compose
+    state: present
+  tags: [pezzo, setup]
+
+- name: Create Pezzo systemd service file
+  ansible.builtin.template:
+    src: pezzo.service.j2
+    dest: /etc/systemd/system/pezzo.service
+    mode: '0644'
+    owner: root
+    group: root
+  tags: [pezzo, setup]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  tags: [pezzo, setup]
+
+- name: Enable Pezzo systemd service
+  ansible.builtin.systemd:
+    name: pezzo
+    enabled: yes
+    state: stopped
+  tags: [pezzo, setup]
+
+- name: Create Pezzo health check script
+  ansible.builtin.template:
+    src: health_check.sh.j2
+    dest: "{{ pezzo_config_dir }}/health_check.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ pezzo_config_dir }}/backup.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, setup]
+
+- name: Create Pezzo logrotate configuration
+  ansible.builtin.template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.d/pezzo
+    mode: '0644'
+    owner: root
+    group: root
+  tags: [pezzo, setup]
+
+- name: Display Pezzo prerequisites summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Prerequisites Setup Complete:
+      - Configuration Directory: {{ pezzo_config_dir }}
+      - Log Directory: {{ logs_dir }}/pezzo
+      - Backup Directory: {{ pezzo_backup_dir }}
+      - Docker Network: {{ pezzo_network_name }}
+      - Traefik Network: {{ pezzo_traefik_network }}
+      - Environment File: {{ pezzo_config_dir }}/.env
+      - Docker Compose: {{ pezzo_config_dir }}/docker-compose.yml
+      - Systemd Service: /etc/systemd/system/pezzo.service
+      - Health Check Script: {{ pezzo_config_dir }}/health_check.sh
+      - Backup Script: {{ pezzo_config_dir }}/backup.sh
+      - Logrotate Config: /etc/logrotate.d/pezzo
+  tags: [pezzo, setup]

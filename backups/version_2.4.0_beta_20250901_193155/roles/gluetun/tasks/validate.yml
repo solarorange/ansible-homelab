@@ -1,0 +1,23 @@
+---
+# Gluetun Validation Tasks
+
+- name: Validate Gluetun configuration
+  uri:
+    url: "https://{{ gluetun_domain }}/api/health"
+    method: GET
+  register: health_check
+  tags: [gluetun, validate]
+
+- name: Check Gluetun service status
+  uri:
+    url: "https://{{ gluetun_domain }}/api/status"
+    method: GET
+  register: status_check
+  tags: [gluetun, validate]
+
+- name: Validate Gluetun authentication
+  uri:
+    url: "https://{{ gluetun_domain }}/api/auth/status"
+    method: GET
+  register: auth_check
+  tags: [gluetun, validate]

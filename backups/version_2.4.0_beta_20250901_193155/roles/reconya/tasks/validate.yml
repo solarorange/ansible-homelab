@@ -1,0 +1,89 @@
+---
+# Reconya Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Reconya vault variables
+  block:
+    - name: Check required Reconya vault variables
+      assert:
+        that:
+          - vault_reconya_admin_password is defined
+          - vault_reconya_database_password is defined
+          - vault_reconya_api_key is defined
+          - vault_reconya_secret_key is defined
+          - vault_reconya_encryption_key is defined
+          - vault_reconya_jwt_secret is defined
+        fail_msg: "Required Reconya vault variables are not defined"
+        success_msg: "All required Reconya vault variables are defined"
+
+    - name: Validate Reconya password complexity
+      assert:
+        that:
+          - vault_reconya_admin_password | length >= 12
+          - vault_reconya_database_password | length >= 12
+        fail_msg: "Reconya passwords must be at least 12 characters long"
+        success_msg: "Reconya password complexity requirements met"
+
+- name: Validate Reconya network configuration
+  block:
+    - name: Check Reconya port configuration
+      assert:
+        that:
+          - reconya_port is defined
+          - reconya_port | int >= 1024
+          - reconya_port | int <= 65535
+        fail_msg: "Reconya port must be between 1024 and 65535"
+        success_msg: "Reconya port configuration is valid"
+
+    - name: Check Reconya domain configuration
+      assert:
+        that:
+          - domain is defined
+          - reconya_subdomain is defined
+        fail_msg: "Reconya domain configuration is incomplete"
+        success_msg: "Reconya domain configuration is valid"
+
+- name: Validate Reconya security configuration
+  block:
+    - name: Check Reconya SSL configuration
+      assert:
+        that:
+          - reconya_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Reconya SSL configuration is invalid"
+        success_msg: "Reconya SSL configuration is valid"
+
+    - name: Check Reconya authentication configuration
+      assert:
+        that:
+          - reconya_auth_enabled | bool
+          - reconya_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Reconya authentication configuration is invalid"
+        success_msg: "Reconya authentication configuration is valid"
+
+- name: Validate Reconya storage configuration
+  block:
+    - name: Check Reconya data directories
+      assert:
+        that:
+          - reconya_data_dir is defined
+          - reconya_config_dir is defined
+          - reconya_backup_dir is defined
+        fail_msg: "Reconya storage configuration is incomplete"
+        success_msg: "Reconya storage configuration is valid"
+
+    - name: Create Reconya directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ reconya_data_dir }}"
+        - "{{ reconya_config_dir }}"
+        - "{{ reconya_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Reconya validation completed successfully - all configurations are valid and secure"

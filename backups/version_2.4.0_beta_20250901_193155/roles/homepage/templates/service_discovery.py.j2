@@ -1,0 +1,453 @@
+#!/usr/bin/env python3
+"""
+Homepage Service Discovery Script
+Automatically discovers and configures services for Homepage dashboard
+"""
+
+import os
+import sys
+import json
+import yaml
+import docker
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/var/log/homepage/service_discovery.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class ServiceInfo:
+    """Service information structure"""
+    name: str
+    container_name: str
+    image: str
+    status: str
+    ports: List[str]
+    networks: List[str]
+    labels: Dict[str, str]
+    environment: Dict[str, str]
+    url: Optional[str] = None
+    icon: Optional[str] = None
+    group: Optional[str] = None
+    widget: Optional[str] = None
+    health_check: bool = True
+    discovered_at: str = None
+
+class ServiceDiscovery:
+    """Service discovery and configuration for Homepage"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.docker_client = docker.from_env()
+        self.services_file = "{{ homepage_config_dir }}/services.yml"
+        self.bookmarks_file = "{{ homepage_config_dir }}/bookmarks.yml"
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def discover_services(self) -> List[ServiceInfo]:
+        """Discover running Docker services"""
+        services = []
+        
+        try:
+            containers = self.docker_client.containers.list()
+            logger.info(f"Found {len(containers)} running containers")
+            
+            for container in containers:
+                try:
+                    service_info = self.extract_service_info(container)
+                    if service_info:
+                        services.append(service_info)
+                        logger.info(f"Discovered service: {service_info.name}")
+                except Exception as e:
+                    logger.warning(f"Error processing container {container.name}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error discovering services: {e}")
+            
+        return services
+    
+    def extract_service_info(self, container) -> Optional[ServiceInfo]:
+        """Extract service information from Docker container"""
+        try:
+            # Get container attributes
+            attrs = container.attrs
+            
+            # Extract basic information
+            name = container.name
+            image = attrs['Config']['Image']
+            status = container.status
+            
+            # Extract ports
+            ports = []
+            if attrs['NetworkSettings']['Ports']:
+                for port_mapping in attrs['NetworkSettings']['Ports'].values():
+                    if port_mapping:
+                        for mapping in port_mapping:
+                            ports.append(f"{mapping['HostPort']}:{mapping['HostIp']}")
+            
+            # Extract networks
+            networks = list(attrs['NetworkSettings']['Networks'].keys())
+            
+            # Extract labels
+            labels = attrs['Config']['Labels'] or {}
+            
+            # Extract environment variables
+            env_vars = {}
+            if attrs['Config']['Env']:
+                for env_var in attrs['Config']['Env']:
+                    if '=' in env_var:
+                        key, value = env_var.split('=', 1)
+                        env_vars[key] = value
+            
+            # Check if this is a service we want to include
+            if not self.should_include_service(name, labels):
+                return None
+            
+            # Determine service URL
+            url = self.determine_service_url(name, ports, labels, env_vars)
+            
+            # Get service template
+            template = self.get_service_template(name, labels)
+            
+            service_info = ServiceInfo(
+                name=name,
+                container_name=name,
+                image=image,
+                status=status,
+                ports=ports,
+                networks=networks,
+                labels=labels,
+                environment=env_vars,
+                url=url,
+                icon=template.get('icon'),
+                group=template.get('group'),
+                widget=template.get('widget'),
+                health_check=template.get('health_check', True),
+                discovered_at=datetime.now().isoformat()
+            )
+            
+            return service_info
+            
+        except Exception as e:
+            logger.error(f"Error extracting service info from {container.name}: {e}")
+            return None
+    
+    def should_include_service(self, name: str, labels: Dict[str, str]) -> bool:
+        """Determine if a service should be included in Homepage"""
+        # Check exclude patterns
+        exclude_patterns = self.config.get('service_discovery', {}).get('exclude_patterns', [])
+        for pattern in exclude_patterns:
+            if pattern in name:
+                return False
+        
+        # Check for Homepage label
+        if 'homepage.enabled' in labels:
+            return labels['homepage.enabled'].lower() == 'true'
+        
+        # Check for common service patterns
+        service_patterns = [
+            'traefik', 'authentik', 'grafana', 'prometheus', 'loki', 'alertmanager',
+            'portainer', 'jellyfin', 'sonarr', 'radarr', 'lidarr', 'readarr',
+            'prowlarr', 'bazarr', 'tautulli', 'overseerr', 'nextcloud', 'paperless',
+            'vaultwarden', 'gitlab', 'homeassistant', 'zigbee2mqtt', 'nodered', 'n8n'
+        ]
+        
+        return any(pattern in name.lower() for pattern in service_patterns)
+    
+    def determine_service_url(self, name: str, ports: List[str], labels: Dict[str, str], env_vars: Dict[str, str]) -> Optional[str]:
+        """Determine the service URL"""
+        # Check for explicit URL in labels
+        if 'homepage.url' in labels:
+            return labels['homepage.url']
+        
+        # Check for domain in environment variables
+        domain = env_vars.get('DOMAIN') or env_vars.get('VIRTUAL_HOST')
+        if domain:
+            return f"https://{domain}"
+        
+        # Check for subdomain pattern
+        subdomain_patterns = {
+            'traefik': 'traefik',
+            'authentik': 'authentik',
+            'grafana': 'grafana',
+            'prometheus': 'prometheus',
+            'loki': 'loki',
+            'alertmanager': 'alertmanager',
+            'portainer': 'portainer',
+            'jellyfin': 'jellyfin',
+            'sonarr': 'sonarr',
+            'radarr': 'radarr',
+            'lidarr': 'lidarr',
+            'readarr': 'readarr',
+            'prowlarr': 'prowlarr',
+            'bazarr': 'bazarr',
+            'tautulli': 'tautulli',
+            'overseerr': 'overseerr',
+            'nextcloud': 'nextcloud',
+            'paperless': 'paperless',
+            'vaultwarden': 'vaultwarden',
+            'gitlab': 'gitlab',
+            'homeassistant': 'homeassistant',
+            'zigbee2mqtt': 'zigbee2mqtt',
+            'nodered': 'nodered',
+            'n8n': 'n8n'
+        }
+        
+        for pattern, subdomain in subdomain_patterns.items():
+            if pattern in name.lower():
+                return f"https://{subdomain}.{{ domain }}"
+        
+        # Fallback to {{ ansible_default_ipv4.address }} with port
+        if ports:
+            port = ports[0].split(':')[0]
+            return f"http://{{ ansible_default_ipv4.address }}:{port}"
+        
+        return None
+    
+    def get_service_template(self, name: str, labels: Dict[str, str]) -> Dict[str, Any]:
+        """Get service template configuration"""
+        templates = self.config.get('service_discovery', {}).get('service_templates', {})
+        
+        # Check for explicit template in labels
+        if 'homepage.template' in labels:
+            template_name = labels['homepage.template']
+            if template_name in templates:
+                return templates[template_name]
+        
+        # Match by service name
+        for template_name, template in templates.items():
+            if template_name in name.lower():
+                return template
+        
+        # Return default template
+        return {
+            'icon': 'docker',
+            'group': 'Other',
+            'widget': None,
+            'health_check': True
+        }
+    
+    def generate_services_config(self, services: List[ServiceInfo]) -> Dict[str, Any]:
+        """Generate Homepage services configuration"""
+        config = {
+            'services': []
+        }
+        
+        # Group services by category
+        groups = {}
+        for service in services:
+            group = service.group or 'Other'
+            if group not in groups:
+                groups[group] = []
+            groups[group].append(service)
+        
+        # Generate service configurations
+        for group, group_services in groups.items():
+            for service in group_services:
+                service_config = {
+                    'name': service.name,
+                    'icon': service.icon or 'docker',
+                    'url': service.url,
+                    'description': f"Auto-discovered {service.name} service"
+                }
+                
+                # Add widget configuration if available
+                if service.widget:
+                    service_config['widget'] = service.widget
+                
+                # Add health check configuration
+                if service.health_check and service.url:
+                    service_config['health'] = {
+                        'url': service.url,
+                        'interval': 60,
+                        'timeout': 10
+                    }
+                
+                config['services'].append(service_config)
+        
+        return config
+    
+    def generate_bookmarks_config(self, services: List[ServiceInfo]) -> Dict[str, Any]:
+        """Generate Homepage bookmarks configuration"""
+        config = {
+            'bookmarks': []
+        }
+        
+        # Group services by category
+        groups = {}
+        for service in services:
+            group = service.group or 'Other'
+            if group not in groups:
+                groups[group] = []
+            groups[group].append(service)
+        
+        # Generate bookmark configurations
+        for group, group_services in groups.items():
+            group_config = {
+                'name': group,
+                'icon': self.get_group_icon(group),
+                'links': []
+            }
+            
+            for service in group_services:
+                if service.url:
+                    link_config = {
+                        'name': service.name,
+                        'url': service.url,
+                        'icon': service.icon or 'docker'
+                    }
+                    group_config['links'].append(link_config)
+            
+            if group_config['links']:
+                config['bookmarks'].append(group_config)
+        
+        return config
+    
+    def get_group_icon(self, group: str) -> str:
+        """Get icon for service group"""
+        group_icons = {
+            'Infrastructure': 'infrastructure',
+            'Monitoring': 'monitoring',
+            'Media': 'media',
+            'Storage': 'storage',
+            'Security': 'security',
+            'Development': 'development',
+            'Automation': 'automation',
+            'Utilities': 'utilities',
+            'Other': 'docker'
+        }
+        return group_icons.get(group, 'docker')
+    
+    def save_configuration(self, services_config: Dict[str, Any], bookmarks_config: Dict[str, Any]):
+        """Save configuration files"""
+        try:
+            # Save services configuration
+            with open(self.services_file, 'w') as f:
+                yaml.dump(services_config, f, default_flow_style=False, sort_keys=False)
+            logger.info(f"Saved services configuration to {self.services_file}")
+            
+            # Save bookmarks configuration
+            with open(self.bookmarks_file, 'w') as f:
+                yaml.dump(bookmarks_config, f, default_flow_style=False, sort_keys=False)
+            logger.info(f"Saved bookmarks configuration to {self.bookmarks_file}")
+            
+        except Exception as e:
+            logger.error(f"Error saving configuration: {e}")
+            raise
+    
+    def validate_services(self, services: List[ServiceInfo]) -> List[ServiceInfo]:
+        """Validate discovered services"""
+        valid_services = []
+        
+        for service in services:
+            try:
+                if service.url:
+                    # Test service connectivity
+                    response = requests.get(service.url, timeout=10, verify=False)
+                    if response.status_code in [200, 302, 401, 403]:
+                        service.status = 'healthy'
+                        valid_services.append(service)
+                        logger.info(f"Service {service.name} is healthy")
+                    else:
+                        logger.warning(f"Service {service.name} returned status {response.status_code}")
+                else:
+                    # Service without URL, include anyway
+                    valid_services.append(service)
+                    logger.info(f"Service {service.name} has no URL, included anyway")
+                    
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Service {service.name} is not accessible: {e}")
+                # Include service anyway, might be starting up
+                valid_services.append(service)
+        
+        return valid_services
+    
+    def run_discovery(self):
+        """Run the complete service discovery process"""
+        logger.info("Starting Homepage service discovery")
+        
+        try:
+            # Discover services
+            services = self.discover_services()
+            logger.info(f"Discovered {len(services)} services")
+            
+            # Validate services
+            valid_services = self.validate_services(services)
+            logger.info(f"Validated {len(valid_services)} services")
+            
+            # Generate configurations
+            services_config = self.generate_services_config(valid_services)
+            bookmarks_config = self.generate_bookmarks_config(valid_services)
+            
+            # Save configurations
+            self.save_configuration(services_config, bookmarks_config)
+            
+            logger.info("Service discovery completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Service discovery failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Homepage Service Discovery')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing configuration')
+    
+    args = parser.parse_args()
+    
+    # Initialize service discovery
+    discovery = ServiceDiscovery(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        services = discovery.discover_services()
+        print(f"Discovered {len(services)} services:")
+        for service in services:
+            print(f"  - {service.name}: {service.url}")
+        return 0
+    
+    elif args.validate:
+        logger.info("Validating existing configuration")
+        # TODO: Implement validation logic
+        return 0
+    
+    else:
+        # Run full discovery
+        success = discovery.run_discovery()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

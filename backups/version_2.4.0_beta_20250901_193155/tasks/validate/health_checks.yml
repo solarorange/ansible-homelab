@@ -1,0 +1,70 @@
+---
+# Health Check Validation
+# Validates that all services have proper health checks configured
+
+- name: Validate health check configuration for all services
+  block:
+    - name: Check Docker containers for health check configuration
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Health}}" | grep -v "NAMES"
+      register: docker_health_status
+      changed_when: false
+
+    - name: Display health check status
+      ansible.builtin.debug:
+        var: docker_health_status.stdout_lines
+
+    - name: Validate health check endpoints
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}/health"
+        method: GET
+        status_code: [200, 201, 202]
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      loop: "{{ services_with_health_endpoints }}"
+      register: health_endpoint_results
+      retries: 3
+      delay: 5
+      until: health_endpoint_results is success
+      when: services_with_health_endpoints is defined
+
+    - name: Check for services without health checks
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "Health"; then
+            echo "$container"
+          fi
+        done
+      register: services_without_health_checks
+      changed_when: false
+
+    - name: Warn about services without health checks
+      ansible.builtin.debug:
+        msg: "Services without health checks: {{ services_without_health_checks.stdout_lines }}"
+      when: services_without_health_checks.stdout_lines | length > 0
+
+    - name: Validate health check configuration in docker-compose files
+      ansible.builtin.find:
+        paths: "{{ docker_dir }}"
+        patterns: "docker-compose.yml"
+        recurse: yes
+      register: docker_compose_files
+
+    - name: Check health check syntax in docker-compose files
+      ansible.builtin.shell: |
+        for file in {{ docker_compose_files.files | map(attribute='path') | list | join(' ') }}; do
+          if [ -f "$file" ]; then
+            if ! grep -q "healthcheck:" "$file"; then
+              echo "Missing health check in: $file"
+            fi
+          fi
+        done
+      register: missing_health_checks
+      changed_when: false
+
+    - name: Report missing health checks
+      ansible.builtin.debug:
+        var: missing_health_checks.stdout_lines
+      when: missing_health_checks.stdout_lines | length > 0
+
+  tags: [validation, health]

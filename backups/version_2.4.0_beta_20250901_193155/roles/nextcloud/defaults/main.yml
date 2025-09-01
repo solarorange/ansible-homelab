@@ -1,0 +1,260 @@
+---
+# Nextcloud Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# NEXTCLOUD SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+nextcloud_service_name: "nextcloud"
+nextcloud_container_name: "{{ nextcloud_service_name }}"
+nextcloud_image: "nextcloud:latest"
+nextcloud_version: "latest"
+
+# Network Configuration
+nextcloud_port: 8080
+nextcloud_external_port: "{{ nextcloud_port }}"
+nextcloud_protocol: "http"
+nextcloud_host: "{{ ansible_default_ipv4.address }}"
+nextcloud_url: "{{ nextcloud_protocol }}://{{ nextcloud_host }}:{{ nextcloud_port }}"
+
+# Domain Configuration
+nextcloud_subdomain: "nextcloud"
+nextcloud_domain: "{{ nextcloud_subdomain }}.{{ domain }}"
+nextcloud_external_url: "https://{{ nextcloud_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+nextcloud_auth_enabled: true
+nextcloud_auth_method: "authentik"  # Options: basic, authentik, none
+nextcloud_admin_username: "admin"
+nextcloud_admin_password: "{{ vault_nextcloud_admin_password }}"
+
+# API Configuration
+nextcloud_api_key: "{{ vault_nextcloud_api_key }}"
+nextcloud_api_token: "{{ vault_nextcloud_api_token }}"
+
+# Encryption & Security
+nextcloud_secret_key: "{{ vault_nextcloud_secret_key }}"
+nextcloud_encryption_key: "{{ vault_nextcloud_encryption_key }}"
+nextcloud_jwt_secret: "{{ vault_nextcloud_jwt_secret }}"
+
+# SSL/TLS Configuration
+nextcloud_ssl_enabled: true
+nextcloud_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+nextcloud_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+nextcloud_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+nextcloud_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+nextcloud_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+nextcloud_database_port: "{{ databases_postgresql_port | default(5432) }}"
+nextcloud_database_name: "nextcloud"
+nextcloud_database_username: "nextcloud"
+nextcloud_database_password: "{{ vault_nextcloud_database_password }}"
+
+# Redis Configuration (if using)
+nextcloud_redis_enabled: false
+nextcloud_redis_host: "{{ redis_host | default('redis') }}"
+nextcloud_redis_port: "{{ redis_port | default(6379) }}"
+nextcloud_redis_password: "{{ vault_nextcloud_redis_password }}"
+nextcloud_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+nextcloud_data_dir: "{{ homelab_data_dir }}/nextcloud"
+nextcloud_config_dir: "{{ nextcloud_data_dir }}/config"
+nextcloud_backup_dir: "{{ nextcloud_data_dir }}/backups"
+
+# Volume Mappings
+nextcloud_volumes:
+  - "{{ nextcloud_config_dir }}:/config"
+  - "{{ nextcloud_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+nextcloud_health_check_enabled: true
+nextcloud_health_check_path: "/health"
+nextcloud_health_check_interval: 30
+nextcloud_health_check_timeout: 10
+nextcloud_health_check_retries: 3
+
+# Monitoring Integration
+nextcloud_monitoring_enabled: true
+nextcloud_prometheus_enabled: true
+nextcloud_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+nextcloud_backup_enabled: true
+nextcloud_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+nextcloud_backup_retention_days: 30
+nextcloud_backup_encryption_enabled: true
+nextcloud_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+nextcloud_smtp_enabled: false
+nextcloud_smtp_host: "{{ smtp_host | default('') }}"
+nextcloud_smtp_port: "{{ smtp_port | default(587) }}"
+nextcloud_smtp_username: "{{ vault_smtp_username }}"
+nextcloud_smtp_password: "{{ vault_nextcloud_smtp_password }}"
+nextcloud_smtp_from: "{{ nextcloud_admin_email | default('admin@' + domain) }}"
+nextcloud_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+nextcloud_webhook_enabled: false
+nextcloud_webhook_url: "{{ vault_webhook_url | default('') }}"
+nextcloud_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+nextcloud_discovery_enabled: true
+nextcloud_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+nextcloud_cpu_limit: "1.0"
+nextcloud_memory_limit: "1g"
+nextcloud_memory_reservation: "512m"
+
+# Performance Settings
+nextcloud_scan_interval: 10
+nextcloud_parallel_downloads: 3
+nextcloud_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+nextcloud_log_level: "info"  # Options: trace, debug, info, warn, error
+nextcloud_log_rotation_enabled: true
+nextcloud_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+nextcloud_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+nextcloud_rate_limit_enabled: true
+nextcloud_rate_limit_requests: 100
+nextcloud_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+nextcloud_deploy_enabled: true
+nextcloud_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+nextcloud_restart_policy: "unless-stopped"
+nextcloud_auto_update_enabled: true
+
+# Environment Variables
+nextcloud_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  NEXTCLOUD_API_KEY: "{{ nextcloud_api_key }}"
+  NEXTCLOUD_SECRET_KEY: "{{ nextcloud_secret_key }}"
+  NEXTCLOUD_ENCRYPTION_KEY: "{{ nextcloud_encryption_key }}"
+  NEXTCLOUD_JWT_SECRET: "{{ nextcloud_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+nextcloud_validation_enabled: true
+nextcloud_validation_timeout: 300
+nextcloud_validation_retries: 3
+
+# Testing Configuration
+nextcloud_test_enabled: false
+nextcloud_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+nextcloud_compliance_enabled: true
+nextcloud_audit_logging_enabled: true
+nextcloud_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+nextcloud_automation_enabled: true
+nextcloud_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+nextcloud_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+nextcloud_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+nextcloud_fallback_enabled: true
+nextcloud_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

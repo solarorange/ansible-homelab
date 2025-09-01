@@ -1,0 +1,239 @@
+version: '3.8'
+
+networks:
+  media:
+    name: media
+    external: true
+  watchtower:
+    name: watchtower
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:latest
+    container_name: immich-server
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - DB_HOSTNAME=immich-postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD__FILE=/run/secrets/POSTGRES_PASSWORD
+      - DB_DATABASE_NAME=immich
+      - REDIS_HOSTNAME=immich-redis
+      - REDIS_PORT=6379
+      - REDIS_DBINDEX=0
+      - REDIS_PASSWORD__FILE=/run/secrets/REDIS_PASSWORD
+      - JWT_SECRET__FILE=/run/secrets/IMMICH_JWT_SECRET
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/server:/config
+      - {{ data_dir }}/media/photos:/photos
+      - {{ logs_dir }}/immich/server:/logs
+    restart: unless-stopped
+    networks:
+      - media
+      - watchtower
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=watchtower"
+      - "traefik.http.routers.immich-server.rule=Host(`immich.{{ domain }}`)"
+      - "traefik.http.routers.immich-server.entrypoints=websecure"
+      - "traefik.http.routers.immich-server.tls=true"
+      - "traefik.http.routers.immich-server.tls.certresolver=cloudflare"
+      - "traefik.http.services.immich-server.loadbalancer.server.port=3001"
+      # Middleware optional; ensure central SSO policy applies via file provider
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
+      - "traefik.http.routers.immich-server.middlewares=immich-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-server"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-postgres
+      - immich-redis
+
+  immich-web:
+    image: ghcr.io/immich-app/immich-web:latest
+    container_name: immich-web
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/web:/config
+      - {{ logs_dir }}/immich/web:/logs
+    restart: unless-stopped
+    networks:
+      - media
+      - watchtower
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=watchtower"
+      - "traefik.http.routers.immich-web.rule=Host(`immich.{{ domain }}`)"
+      - "traefik.http.routers.immich-web.entrypoints=websecure"
+      - "traefik.http.routers.immich-web.tls=true"
+      - "traefik.http.routers.immich-web.tls.certresolver=cloudflare"
+      - "traefik.http.services.immich-web.loadbalancer.server.port=3000"
+      # Middleware optional; ensure central SSO policy applies via file provider
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.immich-headers.headers.customrequestheaders.X-Forwarded-Host=immich.{{ domain }}"
+      - "traefik.http.routers.immich-web.middlewares=immich-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-web"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-server
+
+  immich-postgres:
+    image: postgres:14-alpine
+    container_name: immich-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD_FILE=/run/secrets/POSTGRES_PASSWORD
+      - POSTGRES_DB=immich
+    volumes:
+      - {{ docker_dir }}/immich/postgres:/var/lib/postgresql/data
+      - {{ logs_dir }}/immich/postgres:/logs
+      - {{ docker_dir }}/immich/secrets:/run/secrets:ro
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-postgres"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  immich-redis:
+    image: redis:alpine
+    container_name: immich-redis
+    command: ["sh", "-c", "exec redis-server --requirepass \"$(cat /run/secrets/REDIS_PASSWORD)\"" ]
+    volumes:
+      - {{ docker_dir }}/immich/redis:/data
+      - {{ logs_dir }}/immich/redis:/logs
+      - {{ docker_dir }}/immich/secrets:/run/secrets:ro
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-redis"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:latest
+    container_name: immich-machine-learning
+    environment:
+      - PUID={{ user_id }}
+      - PGID={{ group_id }}
+      - TZ={{ timezone }}
+      - NODE_ENV=production
+    volumes:
+      - {{ docker_dir }}/immich/ml:/config
+      - {{ logs_dir }}/immich/ml:/logs
+    restart: unless-stopped
+    networks:
+      - media
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - immich-server
+    labels:
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=immich-machine-learning"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  watchtower:
+    name: watchtower
+    image: containrrr/watchtower
+    container_name: watchtower
+    environment:
+      - WATCHTOWER_SCHEDULE={{ watchtower_schedule }}
+    volumes:
+      - {{ docker_dir }}/watchtower:/config
+    restart: unless-stopped
+    networks:
+      - watchtower
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=watchtower"
+      - "traefik.http.routers.watchtower.rule=Host(`watchtower.{{ domain }}`)"
+      - "traefik.http.routers.watchtower.entrypoints=websecure"
+      - "traefik.http.routers.watchtower.tls=true"
+      - "traefik.http.routers.watchtower.tls.certresolver=cloudflare"
+      - "traefik.http.services.watchtower.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.watchtower-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.watchtower-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.watchtower.middlewares=watchtower-auth"
+      - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.watchtower-headers.headers.customrequestheaders.X-Forwarded-Host=watchtower.{{ domain }}"
+      - "traefik.http.routers.watchtower.middlewares=watchtower-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=infrastructure"
+      - "promtail-service=watchtower"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    depends_on:
+      - immich-server
+      - immich-web
+      - immich-postgres
+      - immich-redis
+      - immich-machine-learning
+      - watchtower 

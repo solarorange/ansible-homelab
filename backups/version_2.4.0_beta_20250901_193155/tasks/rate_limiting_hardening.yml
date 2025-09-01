@@ -1,0 +1,26 @@
+---
+# Rate Limiting Hardening
+# Configures rate limiting for web and API services
+
+- name: Configure Traefik rate limiting middleware
+  ansible.builtin.template:
+    src: templates/traefik-rate-limit.yml.j2
+    dest: "{{ config_dir }}/traefik/traefik-rate-limit.yml"
+    mode: '0644'
+  tags: [security, rate_limiting, traefik]
+
+- name: Ensure rate limiting is enabled in Traefik
+  ansible.builtin.lineinfile:
+    path: "{{ config_dir }}/traefik/traefik-rate-limit.yml"
+    regexp: '^\s*average:'
+    line: '  average: 100'
+    state: present
+  tags: [security, rate_limiting, traefik]
+
+- name: Ensure rate limiting burst is set
+  ansible.builtin.lineinfile:
+    path: "{{ config_dir }}/traefik/traefik-rate-limit.yml"
+    regexp: '^\s*burst:'
+    line: '  burst: 50'
+    state: present
+  tags: [security, rate_limiting, traefik]

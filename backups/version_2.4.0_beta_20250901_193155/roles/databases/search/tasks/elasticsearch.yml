@@ -1,0 +1,103 @@
+---
+# Elasticsearch deployment, configuration, backup, validation, homepage integration
+
+- name: Ensure Elasticsearch directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/elasticsearch/data"
+    - "{{ docker_dir }}/elasticsearch/config"
+    - "{{ docker_dir }}/elasticsearch/scripts"
+    - "{{ docker_dir }}/elasticsearch/backup"
+    - "{{ logs_dir }}/elasticsearch"
+
+- name: Deploy elasticsearch.yml
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: "{{ docker_dir }}/elasticsearch/config/elasticsearch.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy Elasticsearch backup script
+  ansible.builtin.template:
+    src: backup-elasticsearch.sh.j2
+    dest: "{{ docker_dir }}/elasticsearch/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Elasticsearch restore script
+  ansible.builtin.template:
+    src: restore-elasticsearch.sh.j2
+    dest: "{{ docker_dir }}/elasticsearch/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Elasticsearch management script
+  ansible.builtin.template:
+    src: manage-elasticsearch.sh.j2
+    dest: "{{ docker_dir }}/elasticsearch/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Start Elasticsearch container
+  community.docker.docker_container:
+    name: "{{ elasticsearch_container_name }}"
+    image: "{{ elasticsearch_image }}"
+    restart_policy: "{{ elasticsearch_restart_policy }}"
+    network_mode: "{{ elasticsearch_network_mode }}"
+    published_ports:
+      - "{{ elasticsearch_web_port }}:9200"
+      - "{{ elasticsearch_transport_port }}:9300"
+    env:
+      discovery.type: "{{ elasticsearch_discovery_type }}"
+      ES_JAVA_OPTS: "-Xms{{ elasticsearch_heap_size }} -Xmx{{ elasticsearch_heap_size }}"
+      ELASTIC_PASSWORD: "{{ vault_databases_database_password }}"
+      xpack.security.enabled: "{{ elasticsearch_xpack_security_enabled | lower }}"
+      xpack.security.transport.ssl.enabled: "{{ elasticsearch_xpack_security_transport_ssl_enabled | lower }}"
+      xpack.security.http.ssl.enabled: "{{ elasticsearch_xpack_security_http_ssl_enabled | lower }}"
+    volumes:
+      - "{{ docker_dir }}/elasticsearch/data:/usr/share/elasticsearch/data"
+      - "{{ docker_dir }}/elasticsearch/config:/usr/share/elasticsearch/config"
+      - "{{ docker_dir }}/elasticsearch/scripts:/docker-entrypoint-initdb.d"
+      - "{{ docker_dir }}/elasticsearch/backup:/usr/share/elasticsearch/backup"
+      - "{{ logs_dir }}/elasticsearch:/usr/share/elasticsearch/logs"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:{{ elasticsearch_web_port }}/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    state: started
+    restart: true
+  register: elasticsearch_container
+
+- name: Validate Elasticsearch is running
+  ansible.builtin.command: docker exec {{ elasticsearch_container_name }} curl -s -k https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_cluster/health
+  register: elasticsearch_health_result
+  changed_when: false
+  failed_when: elasticsearch_health_result.rc != 0
+
+- name: Schedule Elasticsearch backup cron job
+  ansible.builtin.cron:
+    name: "Elasticsearch Backup"
+    job: "{{ docker_dir }}/elasticsearch/scripts/backup.sh >> {{ logs_dir }}/elasticsearch/backup.log 2>&1"
+    minute: "0"
+    hour: "4"
+    user: "{{ vault_databases_user }}"
+    state: present
+
+- name: Integrate Elasticsearch with homepage
+  ansible.builtin.template:
+    src: homepage-elasticsearch.yml.j2
+    dest: "{{ homepage_config_dir }}/services/elasticsearch.yml"
+    mode: "0644"
+  when: elasticsearch_homepage_enabled | default(true)
+
+# Security and SSL tasks can be added here as needed

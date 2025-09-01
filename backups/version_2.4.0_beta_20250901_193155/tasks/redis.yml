@@ -1,0 +1,254 @@
+---
+# Redis Configuration
+# Production-ready caching and message broker
+
+- name: Create Redis directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/redis/data"
+    - "{{ docker_dir }}/redis/config"
+    - "{{ docker_dir }}/redis/scripts"
+    - "{{ docker_dir }}/redis/backup"
+    - "{{ logs_dir }}/redis"
+
+- name: Create Redis configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/config/redis.conf"
+    content: |
+      # Network
+      bind {{ ansible_default_ipv4.address }}
+      port 6379
+      protected-mode yes
+
+      # General
+      daemonize no
+      supervised no
+      pidfile /var/run/redis/redis-server.pid
+      loglevel notice
+      logfile /var/log/redis/redis.log
+
+      # Snapshotting
+      dir /data
+      dbfilename dump.rdb
+      save 900 1
+      save 300 10
+      save 60 10000
+      stop-writes-on-bgsave-error yes
+      rdbcompression yes
+      rdbchecksum yes
+
+      # Memory Management
+      maxmemory 1gb
+      maxmemory-policy allkeys-lru
+      maxmemory-samples 5
+
+      # Append Only Mode
+      appendonly yes
+      appendfilename "appendonly.aof"
+      appendfsync everysec
+      no-appendfsync-on-rewrite no
+      auto-aof-rewrite-percentage 100
+      auto-aof-rewrite-min-size 64mb
+
+      # Slow Log
+      slowlog-log-slower-than 10000
+      slowlog-max-len 128
+
+      # Latency Monitor
+      latency-monitor-threshold 0
+
+      # Event Notification
+      notify-keyspace-events ""
+
+      # Advanced Config
+      hash-max-ziplist-entries 512
+      hash-max-ziplist-value 64
+      list-max-ziplist-entries 512
+      list-max-ziplist-value 64
+      set-max-intset-entries 512
+      zset-max-ziplist-entries 128
+      zset-max-ziplist-value 64
+      activerehashing yes
+      client-output-buffer-limit normal 0 0 0
+      client-output-buffer-limit slave 256mb 64mb 60
+      client-output-buffer-limit pubsub 32mb 8mb 60
+      hz 10
+      aof-rewrite-incremental-fsync yes
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Redis backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+
+      # Redis Backup Script
+
+      BACKUP_DIR="{{ docker_dir }}/redis/backup"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="$BACKUP_DIR/redis_backup_$TIMESTAMP.rdb"
+
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+
+      # Perform backup
+      docker exec redis redis-cli SAVE
+      docker cp redis:/data/dump.rdb "$BACKUP_FILE"
+
+      # Remove backups older than 7 days
+      find "$BACKUP_DIR" -name "redis_backup_*.rdb" -mtime +7 -delete
+
+      echo "Backup created: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Redis restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+
+      # Redis Restore Script
+
+      if [ -z "$1" ]; then
+        echo "Please specify backup file"
+        exit 1
+      fi
+
+      BACKUP_FILE="$1"
+      if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Backup file not found: $BACKUP_FILE"
+        exit 1
+      fi
+
+      # Stop Redis
+      docker stop redis
+
+      # Copy backup file
+      docker cp "$BACKUP_FILE" redis:/data/dump.rdb
+
+      # Start Redis
+      docker start redis
+
+      echo "Backup restored from: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Redis management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Redis Management Script
+
+      function show_help {
+        echo "Redis Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Redis status"
+        echo "  logs      - Show Redis logs"
+        echo "  restart   - Restart Redis"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  info      - Show Redis info"
+        echo "  monitor   - Monitor Redis commands"
+        echo "  help      - Show this help"
+      }
+
+      case "$1" in
+        status)
+          docker ps -f name=redis
+          docker exec redis redis-cli ping
+          ;;
+        logs)
+          docker logs redis --tail 100 -f
+          ;;
+        restart)
+          docker restart redis
+          ;;
+        backup)
+          {{ docker_dir }}/redis/scripts/backup.sh
+          ;;
+        restore)
+          {{ docker_dir }}/redis/scripts/restore.sh "$2"
+          ;;
+        info)
+          docker exec redis redis-cli info
+          ;;
+        monitor)
+          docker exec redis redis-cli monitor
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Redis health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Check if Redis is running
+      if ! docker ps -f name=redis -f status=running | grep -q redis; then
+        echo "Redis is not running"
+        exit 1
+      fi
+
+      # Check if Redis is responding
+      if ! docker exec redis redis-cli ping > /dev/null; then
+        echo "Redis is not responding"
+        exit 1
+      fi
+
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Redis log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/redis/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/redis/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Redis log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Redis logs"
+    job: "logrotate {{ docker_dir }}/redis/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_service_user }}"
+
+- name: Add Redis backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Redis database"
+    job: "{{ docker_dir }}/redis/scripts/backup.sh"
+    hour: "3"
+    minute: "0"
+    user: "{{ vault_service_user }}"

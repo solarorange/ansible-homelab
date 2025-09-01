@@ -1,0 +1,260 @@
+---
+# Storage Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# STORAGE SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+storage_service_name: "storage"
+storage_container_name: "{{ storage_service_name }}"
+storage_image: "minio/minio:latest"
+storage_version: "latest"
+
+# Network Configuration
+storage_port: 9000
+storage_external_port: "{{ storage_port }}"
+storage_protocol: "http"
+storage_host: "{{ ansible_default_ipv4.address }}"
+storage_url: "{{ storage_protocol }}://{{ storage_host }}:{{ storage_port }}"
+
+# Domain Configuration
+storage_subdomain: "storage"
+storage_domain: "{{ storage_subdomain }}.{{ domain }}"
+storage_external_url: "https://{{ storage_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+storage_auth_enabled: true
+storage_auth_method: "authentik"  # Options: basic, authentik, none
+storage_admin_username: "admin"
+storage_admin_password: "{{ vault_storage_admin_password }}"
+
+# API Configuration
+storage_api_key: "{{ vault_storage_api_key }}"
+storage_api_token: "{{ vault_storage_api_token }}"
+
+# Encryption & Security
+storage_secret_key: "{{ vault_storage_secret_key }}"
+storage_encryption_key: "{{ vault_storage_encryption_key }}"
+storage_jwt_secret: "{{ vault_storage_jwt_secret }}"
+
+# SSL/TLS Configuration
+storage_ssl_enabled: true
+storage_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+storage_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+storage_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+storage_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+storage_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+storage_database_port: "{{ databases_postgresql_port | default(5432) }}"
+storage_database_name: "storage"
+storage_database_username: "storage"
+storage_database_password: "{{ vault_storage_database_password }}"
+
+# Redis Configuration (if using)
+storage_redis_enabled: false
+storage_redis_host: "{{ redis_host | default('redis') }}"
+storage_redis_port: "{{ redis_port | default(6379) }}"
+storage_redis_password: "{{ vault_storage_redis_password }}"
+storage_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+storage_data_dir: "{{ homelab_data_dir }}/storage"
+storage_config_dir: "{{ storage_data_dir }}/config"
+storage_backup_dir: "{{ storage_data_dir }}/backups"
+
+# Volume Mappings
+storage_volumes:
+  - "{{ storage_config_dir }}:/config"
+  - "{{ storage_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+storage_health_check_enabled: true
+storage_health_check_path: "/health"
+storage_health_check_interval: 30
+storage_health_check_timeout: 10
+storage_health_check_retries: 3
+
+# Monitoring Integration
+storage_monitoring_enabled: true
+storage_prometheus_enabled: true
+storage_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+storage_backup_enabled: true
+storage_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+storage_backup_retention_days: 30
+storage_backup_encryption_enabled: true
+storage_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+storage_smtp_enabled: false
+storage_smtp_host: "{{ smtp_host | default('') }}"
+storage_smtp_port: "{{ smtp_port | default(587) }}"
+storage_smtp_username: "{{ vault_smtp_username }}"
+storage_smtp_password: "{{ vault_storage_smtp_password }}"
+storage_smtp_from: "{{ storage_admin_email | default('admin@' + domain) }}"
+storage_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+storage_webhook_enabled: false
+storage_webhook_url: "{{ vault_webhook_url | default('') }}"
+storage_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+storage_discovery_enabled: true
+storage_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+storage_cpu_limit: "1.0"
+storage_memory_limit: "1g"
+storage_memory_reservation: "512m"
+
+# Performance Settings
+storage_scan_interval: 10
+storage_parallel_downloads: 3
+storage_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+storage_log_level: "info"  # Options: trace, debug, info, warn, error
+storage_log_rotation_enabled: true
+storage_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+storage_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+storage_rate_limit_enabled: true
+storage_rate_limit_requests: 100
+storage_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+storage_deploy_enabled: true
+storage_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+storage_restart_policy: "unless-stopped"
+storage_auto_update_enabled: true
+
+# Environment Variables
+storage_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  STORAGE_API_KEY: "{{ storage_api_key }}"
+  STORAGE_SECRET_KEY: "{{ storage_secret_key }}"
+  STORAGE_ENCRYPTION_KEY: "{{ storage_encryption_key }}"
+  STORAGE_JWT_SECRET: "{{ storage_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+storage_validation_enabled: true
+storage_validation_timeout: 300
+storage_validation_retries: 3
+
+# Testing Configuration
+storage_test_enabled: false
+storage_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+storage_compliance_enabled: true
+storage_audit_logging_enabled: true
+storage_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+storage_automation_enabled: true
+storage_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+storage_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+storage_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+storage_fallback_enabled: true
+storage_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

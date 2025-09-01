@@ -1,0 +1,74 @@
+---
+# Advanced Health Monitoring
+# Comprehensive health monitoring and self-healing capabilities
+
+- name: Create health monitoring directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/monitoring/health"
+    state: directory
+    mode: '0755'
+  tags: [health, monitoring, setup]
+
+- name: Configure health check endpoints
+  ansible.builtin.template:
+    src: templates/monitoring/health-endpoints.yml.j2
+    dest: "{{ docker_dir }}/monitoring/health/endpoints.yml"
+    mode: '0644'
+  tags: [health, monitoring, endpoints]
+
+- name: Setup health monitoring dashboard
+  ansible.builtin.template:
+    src: templates/monitoring/health-dashboard.json.j2
+    dest: "{{ docker_dir }}/monitoring/health/dashboard.json"
+    mode: '0644'
+  tags: [health, monitoring, dashboard]
+
+- name: Configure self-healing rules
+  ansible.builtin.template:
+    src: templates/monitoring/self-healing-rules.yml.j2
+    dest: "{{ docker_dir }}/monitoring/health/healing-rules.yml"
+    mode: '0644'
+  tags: [health, monitoring, healing]
+
+- name: Create health monitoring script
+  ansible.builtin.template:
+    src: templates/monitoring/health-monitor.sh.j2
+    dest: "{{ docker_dir }}/monitoring/health/health-monitor.sh"
+    mode: '0755'
+  tags: [health, monitoring, script]
+
+- name: Setup health monitoring cron job
+  ansible.builtin.cron:
+    name: "Health Monitoring"
+    minute: "*/2"
+    job: "{{ docker_dir }}/monitoring/health/health-monitor.sh"
+    user: root
+  tags: [health, monitoring, cron]
+
+- name: Configure health alerting
+  ansible.builtin.template:
+    src: templates/monitoring/health-alerts.yml.j2
+    dest: "{{ docker_dir }}/monitoring/health/alerts.yml"
+    mode: '0644'
+  tags: [health, monitoring, alerts]
+
+- name: Display health monitoring status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ADVANCED HEALTH MONITORING CONFIGURED
+      ========================================
+
+      Health Monitoring Directory: {{ docker_dir }}/monitoring/health
+      Endpoints Configuration: {{ docker_dir }}/monitoring/health/endpoints.yml
+      Health Dashboard: {{ docker_dir }}/monitoring/health/dashboard.json
+      Self-Healing Rules: {{ docker_dir }}/monitoring/health/healing-rules.yml
+      Health Monitor Script: {{ docker_dir }}/monitoring/health/health-monitor.sh
+      Alert Rules: {{ docker_dir }}/monitoring/health/alerts.yml
+
+      Monitoring Schedule: Every 2 minutes
+      Self-Healing: Enabled
+      Dashboard URL: https://grafana.{{ domain }}
+
+      ========================================
+  tags: [health, monitoring, summary]

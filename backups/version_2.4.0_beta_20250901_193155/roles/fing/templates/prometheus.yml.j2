@@ -1,0 +1,55 @@
+# Fing Prometheus Scraping Configuration
+- job_name: 'fing'
+  static_configs:
+    - targets:
+        - 'fing:{{ fing_metrics_port }}'
+      labels:
+        job: 'fing'
+        service: 'network-monitoring'
+        instance: '{{ inventory_hostname }}'
+        environment: '{{ environment | default("production") }}'
+        domain: '{{ domain }}'
+  scrape_interval: {{ fing_prometheus_scrape_interval | default(30) }}s
+  scrape_timeout: 10s
+  metrics_path: /metrics
+  scheme: http
+  honor_labels: true
+  params:
+    format: ['prometheus']
+
+# Fing API Health Check
+- job_name: 'fing-api-health'
+  static_configs:
+    - targets:
+        - 'fing:{{ fing_web_port }}'
+      labels:
+        job: 'fing-api-health'
+        service: 'network-monitoring'
+        instance: '{{ inventory_hostname }}'
+        environment: '{{ environment | default("production") }}'
+        domain: '{{ domain }}'
+  scrape_interval: 60s
+  scrape_timeout: 10s
+  metrics_path: {{ fing_health_check_url }}
+  scheme: http
+  honor_labels: true
+
+# Fing Network Discovery Metrics
+- job_name: 'fing-discovery'
+  static_configs:
+    - targets:
+        - 'fing:{{ fing_api_port }}'
+      labels:
+        job: 'fing-discovery'
+        service: 'network-monitoring'
+        instance: '{{ inventory_hostname }}'
+        environment: '{{ environment | default("production") }}'
+        domain: '{{ domain }}'
+  scrape_interval: 120s
+  scrape_timeout: 15s
+  metrics_path: /api/{{ fing_api_version }}/metrics/discovery
+  scheme: http
+  honor_labels: true
+  authorization:
+    type: Bearer
+    credentials: '{{ fing_api_key }}' 

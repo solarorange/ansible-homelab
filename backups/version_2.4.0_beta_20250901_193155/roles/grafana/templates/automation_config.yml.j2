@@ -1,0 +1,649 @@
+# Grafana Automation Configuration
+# Comprehensive configuration for automated Grafana setup and integration
+
+# =============================================================================
+# CORE AUTOMATION SETTINGS
+# =============================================================================
+
+automation:
+  enabled: true
+  mode: "auto"  # auto, manual, validate
+  log_level: "info"
+  backup_before_changes: true
+  validate_after_changes: true
+  retry_failed_operations: true
+  max_retries: 3
+  retry_delay: 30
+
+# =============================================================================
+# GRAFANA API CONFIGURATION
+# =============================================================================
+
+grafana_api:
+  base_url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}"
+  admin_user: "{{ grafana_admin_user }}"
+  admin_password: "{{ grafana_admin_password }}"
+  api_key: "{{ grafana_api_key | default('') }}"
+  timeout: 30
+  verify_ssl: false
+
+# =============================================================================
+# DATA SOURCE CONFIGURATION
+# =============================================================================
+
+datasources:
+  enabled: true
+  auto_configure: true
+  backup_existing: true
+  
+  sources:
+    prometheus:
+      enabled: true
+      name: "Prometheus"
+      type: "prometheus"
+      url: "http://prometheus:9090"
+      access: "proxy"
+      is_default: true
+      editable: true
+      json_data:
+        timeInterval: "15s"
+        queryTimeout: "60s"
+        httpMethod: "POST"
+        manageAlerts: true
+        disableRecordingRules: false
+        incrementalQueryOverlapWindow: "10m"
+      secure_json_data: {}
+      
+    loki:
+      enabled: true
+      name: "Loki"
+      type: "loki"
+      url: "http://loki:3100"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        maxLines: 1000
+        derivedFields:
+          - datasourceUid: "prometheus"
+            matcherRegex: "traceID=(\\w+)"
+            name: "TraceID"
+            url: "$${__value.raw}"
+      secure_json_data: {}
+      
+    postgresql:
+      enabled: true
+      name: "PostgreSQL"
+      type: "postgres"
+      url: "postgresql:5432"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        database: "{{ grafana_database_name }}"
+        sslmode: "disable"
+        maxOpenConns: 100
+        maxIdleConns: 100
+        connMaxLifetime: 14400
+        postgresVersion: 1200
+        timescaledb: false
+      secure_json_data:
+        password: "{{ grafana_database_password }}"
+        
+    redis:
+      enabled: true
+      name: "Redis"
+      type: "redis-datasource"
+      url: "http://redis:6379"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        client: "standalone"
+        poolSize: 5
+        timeout: 5
+        pingInterval: 0
+        pipelineWindow: 0
+      secure_json_data: {}
+      
+    node_exporter:
+      enabled: true
+      name: "Node Exporter"
+      type: "prometheus"
+      url: "http://node-exporter:9100"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        timeInterval: "15s"
+        queryTimeout: "60s"
+      secure_json_data: {}
+      
+    cadvisor:
+      enabled: true
+      name: "cAdvisor"
+      type: "prometheus"
+      url: "http://cadvisor:8080"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        timeInterval: "15s"
+        queryTimeout: "60s"
+      secure_json_data: {}
+      
+    traefik:
+      enabled: true
+      name: "Traefik"
+      type: "prometheus"
+      url: "http://traefik:8080"
+      access: "proxy"
+      is_default: false
+      editable: true
+      json_data:
+        timeInterval: "15s"
+        queryTimeout: "60s"
+      secure_json_data: {}
+
+# =============================================================================
+# DASHBOARD CONFIGURATION
+# =============================================================================
+
+dashboards:
+  enabled: true
+  auto_import: true
+  backup_existing: true
+  overwrite: false
+  folder_organization: true
+  
+  folders:
+    - name: "System Overview"
+      description: "System-level monitoring dashboards"
+      uid: "system-overview"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Services"
+      description: "Service-specific dashboards"
+      uid: "services"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Security"
+      description: "Security monitoring dashboards"
+      uid: "security"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Media"
+      description: "Media service dashboards"
+      uid: "media"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Network"
+      description: "Network and infrastructure dashboards"
+      uid: "network"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Databases"
+      description: "Database monitoring dashboards"
+      uid: "databases"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+          
+    - name: "Storage"
+      description: "Storage and backup dashboards"
+      uid: "storage"
+      permissions:
+        - role: "Viewer"
+          permission: "View"
+        - role: "Editor"
+          permission: "Edit"
+        - role: "Admin"
+          permission: "Admin"
+  
+  dashboard_templates:
+    system_overview:
+      enabled: true
+      folder: "System Overview"
+      title: "System Overview"
+      uid: "system-overview"
+      refresh: "30s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/system-overview.json.j2"
+      
+    docker_services:
+      enabled: true
+      folder: "Services"
+      title: "Docker Services"
+      uid: "docker-services"
+      refresh: "30s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/docker-services.json.j2"
+      
+    security_monitoring:
+      enabled: true
+      folder: "Security"
+      title: "Security Monitoring"
+      uid: "security-monitoring"
+      refresh: "15s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/security-monitoring.json.j2"
+      
+    media_services:
+      enabled: true
+      folder: "Media"
+      title: "Media Services"
+      uid: "media-services"
+      refresh: "30s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/media-services.json.j2"
+      
+    network_monitoring:
+      enabled: true
+      folder: "Network"
+      title: "Network Monitoring"
+      uid: "network-monitoring"
+      refresh: "30s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/network-monitoring.json.j2"
+      
+    database_monitoring:
+      enabled: true
+      folder: "Databases"
+      title: "Database Monitoring"
+      uid: "database-monitoring"
+      refresh: "30s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/database-monitoring.json.j2"
+      
+    storage_monitoring:
+      enabled: true
+      folder: "Storage"
+      title: "Storage Monitoring"
+      uid: "storage-monitoring"
+      refresh: "60s"
+      timezone: "{{ timezone | default('UTC') }}"
+      template_path: "dashboards/storage-monitoring.json.j2"
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+alerting:
+  enabled: true
+  auto_configure: true
+  backup_existing: true
+  
+  notification_channels:
+    - name: "Email"
+      type: "email"
+      enabled: false
+      settings:
+        addresses: "{{ alert_email | default('admin@' + domain) }}"
+        
+    - name: "Discord"
+      type: "discord"
+      enabled: false
+      settings:
+        url: "{{ discord_webhook_url | default('') }}"
+        
+    - name: "Slack"
+      type: "slack"
+      enabled: false
+      settings:
+        url: "{{ slack_webhook_url | default('') }}"
+        channel: "{{ slack_channel | default('#alerts') }}"
+        
+    - name: "Telegram"
+      type: "telegram"
+      enabled: false
+      settings:
+        bottoken: "{{ telegram_bot_token | default('') }}"
+        chatid: "{{ telegram_chat_id | default('') }}"
+  
+  alert_rules:
+    system_alerts:
+      enabled: true
+      folder: "System Alerts"
+      rules:
+        - name: "High CPU Usage"
+          condition: "avg(rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) > 0.8"
+          for: "5m"
+          labels:
+            severity: "warning"
+            category: "system"
+          annotations:
+            summary: "High CPU usage detected"
+            description: "CPU usage is above 80% for 5 minutes"
+            
+        - name: "High Memory Usage"
+          condition: "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9"
+          for: "5m"
+          labels:
+            severity: "warning"
+            category: "system"
+          annotations:
+            summary: "High memory usage detected"
+            description: "Memory usage is above 90% for 5 minutes"
+            
+        - name: "High Disk Usage"
+          condition: "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.9"
+          for: "5m"
+          labels:
+            severity: "warning"
+            category: "system"
+          annotations:
+            summary: "High disk usage detected"
+            description: "Disk usage is above 90% for 5 minutes"
+            
+        - name: "Service Down"
+          condition: "up == 0"
+          for: "1m"
+          labels:
+            severity: "critical"
+            category: "service"
+          annotations:
+            summary: "Service is down"
+            description: "Service {{ $labels.instance }} is not responding"
+            
+    security_alerts:
+      enabled: true
+      folder: "Security Alerts"
+      rules:
+        - name: "Failed Login Attempts"
+          condition: "rate(auth_failures_total[5m]) > 0.1"
+          for: "1m"
+          labels:
+            severity: "warning"
+            category: "security"
+          annotations:
+            summary: "High number of failed login attempts"
+            description: "More than 0.1 failed login attempts per second"
+            
+        - name: "Suspicious Network Activity"
+          condition: "rate(network_connections_total[5m]) > 100"
+          for: "5m"
+          labels:
+            severity: "warning"
+            category: "security"
+          annotations:
+            summary: "Suspicious network activity detected"
+            description: "High number of network connections"
+
+# =============================================================================
+# USER MANAGEMENT
+# =============================================================================
+
+user_management:
+  enabled: true
+  auto_create_users: true
+  
+  default_users:
+    - username: "{{ grafana_admin_user }}"
+      email: "{{ grafana_admin_user }}@{{ domain }}"
+      password: "{{ grafana_admin_password }}"
+      role: "Admin"
+      enabled: true
+      
+    - username: "viewer"
+      email: "viewer@{{ domain }}"
+      password: "{{ vault_grafana_viewer_password | default('viewer') }}"
+      role: "Viewer"
+      enabled: true
+      
+    - username: "editor"
+      email: "editor@{{ domain }}"
+      password: "{{ vault_grafana_editor_password | default('editor') }}"
+      role: "Editor"
+      enabled: true
+  
+  teams:
+    - name: "Administrators"
+      description: "System administrators"
+      members:
+        - "{{ grafana_admin_user }}@{{ domain }}"
+        
+    - name: "Viewers"
+      description: "Read-only users"
+      members:
+        - "viewer@{{ domain }}"
+        
+    - name: "Editors"
+      description: "Dashboard editors"
+      members:
+        - "editor@{{ domain }}"
+
+# =============================================================================
+# MONITORING INTEGRATION
+# =============================================================================
+
+monitoring_integration:
+  enabled: true
+  
+  prometheus_integration:
+    enabled: true
+    metrics_path: "/metrics"
+    scrape_interval: 30
+    retention_days: 15
+    
+  loki_integration:
+    enabled: true
+    query_timeout: 30
+    max_lines: 1000
+    
+  alertmanager_integration:
+    enabled: true
+    api_version: "v2"
+    timeout: 30
+    
+  health_checks:
+    enabled: true
+    interval: 60
+    timeout: 10
+    retries: 3
+    
+  performance_monitoring:
+    enabled: true
+    collect_metrics: true
+    collect_logs: true
+    collect_traces: false
+
+# =============================================================================
+# AUTHENTICATION INTEGRATION
+# =============================================================================
+
+authentication_integration:
+  enabled: true
+  
+  authentik:
+    enabled: true
+    url: "https://{{ authentik_subdomain }}.{{ domain }}"
+    client_id: "{{ authentik_grafana_client_id | default('grafana') }}"
+    client_secret: "{{ authentik_grafana_client_secret | default('') }}"
+    redirect_uri: "https://{{ grafana_subdomain }}.{{ domain }}/login/generic_oauth"
+    scope: "openid profile email"
+    
+  oauth_providers:
+    - name: "authentik"
+      type: "oidc"
+      enabled: true
+      config:
+        issuer: "https://{{ authentik_subdomain }}.{{ domain }}"
+        client_id: "{{ authentik_grafana_client_id | default('grafana') }}"
+        client_secret: "{{ authentik_grafana_client_secret | default('') }}"
+        redirect_uri: "https://{{ grafana_subdomain }}.{{ domain }}/login/generic_oauth"
+        scopes: "openid profile email"
+        
+  user_management:
+    enabled: true
+    auto_create_users: true
+    default_role: "Viewer"
+    admin_users:
+      - "admin@{{ domain }}"
+    allowed_domains:
+      - "{{ domain }}"
+
+# =============================================================================
+# TRAEFIK INTEGRATION
+# =============================================================================
+
+traefik_integration:
+  enabled: true
+  
+  reverse_proxy:
+    enabled: true
+    domain: "{{ grafana_subdomain }}.{{ domain }}"
+    port: "{{ grafana_port }}"
+    ssl_enabled: true
+    ssl_cert_resolver: "letsencrypt"
+    
+  middleware:
+    auth_forward:
+      enabled: true
+      address: "https://{{ authentik_subdomain }}.{{ domain }}"
+      trust_forward_header: true
+      auth_response_headers:
+        - "X-User"
+        - "X-Email"
+        - "X-Groups"
+        
+    security_headers:
+      enabled: true
+      headers:
+        X-Frame-Options: "DENY"
+        X-Content-Type-Options: "nosniff"
+        X-XSS-Protection: "1; mode=block"
+        Referrer-Policy: "strict-origin-when-cross-origin"
+        Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+        
+  health_check:
+    enabled: true
+    path: "/api/health"
+    interval: "30s"
+    timeout: "5s"
+    retries: 3
+
+# =============================================================================
+# BACKUP AND RECOVERY
+# =============================================================================
+
+backup_and_recovery:
+  enabled: true
+  
+  backup:
+    enabled: true
+    schedule: "{{ grafana_backup_schedule | default('0 2 * * *') }}"
+    retention_days: "{{ grafana_backup_retention_days | default(30) }}"
+    include_dashboards: true
+    include_datasources: true
+    include_users: true
+    include_alerting: true
+    compression: true
+    
+  recovery:
+    enabled: true
+    auto_restore: false
+    validate_backup: true
+    test_restore: false
+    
+  monitoring:
+    enabled: true
+    check_backup_status: true
+    alert_on_backup_failure: true
+    alert_on_restore_failure: true
+
+# =============================================================================
+# LOGGING AND DEBUGGING
+# =============================================================================
+
+logging:
+  level: "{{ grafana_log_level | default('info') }}"
+  file: "{{ grafana_logs_dir }}/automation.log"
+  max_size: "10MB"
+  max_files: 5
+  format: "json"
+  
+  debug:
+    enabled: false
+    log_requests: false
+    log_responses: false
+    log_configuration: true
+    
+  performance:
+    enabled: true
+    log_slow_operations: true
+    slow_operation_threshold: 5.0
+    log_memory_usage: true
+    log_cpu_usage: true
+
+# =============================================================================
+# NOTIFICATIONS
+# =============================================================================
+
+notifications:
+  enabled: true
+  
+  channels:
+    discord:
+      enabled: false
+      webhook_url: "{{ discord_webhook_url | default('') }}"
+      username: "Grafana Automation"
+      avatar_url: ""
+      
+    email:
+      enabled: false
+      smtp_host: "{{ smtp_host | default('') }}"
+      smtp_port: "{{ smtp_port | default(587) }}"
+      smtp_user: "{{ smtp_user | default('') }}"
+      smtp_password: "{{ smtp_password | default('') }}"
+      from_email: "{{ from_email | default('grafana@' + domain) }}"
+      to_email: "{{ to_email | default('admin@' + domain) }}"
+      
+    slack:
+      enabled: false
+      webhook_url: "{{ slack_webhook_url | default('') }}"
+      channel: "{{ slack_channel | default('#grafana') }}"
+      username: "Grafana Automation"
+      
+  events:
+    datasource_configured: true
+    dashboard_imported: true
+    alert_rule_created: true
+    user_created: true
+    backup_completed: true
+    backup_failed: true
+    health_check_failed: true
+    configuration_changed: true 

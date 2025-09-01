@@ -1,0 +1,269 @@
+#!/bin/bash
+# Pezzo Monitoring Health Check Script
+# Monitors the health of monitoring systems for Pezzo
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/monitoring"
+HEALTH_LOG="$LOGS_DIR/health_check.log"
+STATUS_FILE="$LOGS_DIR/monitoring_status.json"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$HEALTH_LOG"
+}
+
+# Function to check service endpoint
+check_endpoint() {
+    local url="$1"
+    local service_name="$2"
+    local timeout="${3:-10}"
+    
+    if curl -f -s --max-time "$timeout" "$url" > /dev/null 2>&1; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check Prometheus health
+check_prometheus() {
+    local status=$(check_endpoint "http://prometheus:9090/-/healthy" "Prometheus")
+    echo "$status"
+}
+
+# Function to check Grafana health
+check_grafana() {
+    local status=$(check_endpoint "http://grafana:3000/api/health" "Grafana")
+    echo "$status"
+}
+
+# Function to check Loki health
+check_loki() {
+    local status=$(check_endpoint "http://loki:3100/ready" "Loki")
+    echo "$status"
+}
+
+# Function to check AlertManager health
+check_alertmanager() {
+    local status=$(check_endpoint "http://alertmanager:9093/-/healthy" "AlertManager")
+    echo "$status"
+}
+
+# Function to check InfluxDB health
+check_influxdb() {
+    local status=$(check_endpoint "http://influxdb:8086/ping" "InfluxDB")
+    echo "$status"
+}
+
+# Function to check Telegraf health
+check_telegraf() {
+    # Check if Telegraf container is running
+    if docker ps --format "table {{.Names}}" | grep -q "^telegraf$"; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check CrowdSec health
+check_crowdsec() {
+    # Check if CrowdSec container is running
+    if docker ps --format "table {{.Names}}" | grep -q "^crowdsec$"; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check Fail2ban health
+check_fail2ban() {
+    # Check if Fail2ban service is running
+    if systemctl is-active --quiet fail2ban; then
+        echo "healthy"
+    else
+        echo "unhealthy"
+    fi
+}
+
+# Function to check metrics collection
+check_metrics_collection() {
+    local metrics_file="$LOGS_DIR/current_metrics.json"
+    
+    if [ -f "$metrics_file" ]; then
+        local file_age=$(($(date +%s) - $(stat -c %Y "$metrics_file")))
+        local max_age=300  # 5 minutes
+        
+        if [ "$file_age" -lt "$max_age" ]; then
+            echo "healthy"
+        else
+            echo "stale"
+        fi
+    else
+        echo "missing"
+    fi
+}
+
+# Function to check log aggregation
+check_log_aggregation() {
+    local log_file="$LOGS_DIR/aggregated/aggregated.log"
+    
+    if [ -f "$log_file" ]; then
+        local file_age=$(($(date +%s) - $(stat -c %Y "$log_file")))
+        local max_age=600  # 10 minutes
+        
+        if [ "$file_age" -lt "$max_age" ]; then
+            echo "healthy"
+        else
+            echo "stale"
+        fi
+    else
+        echo "missing"
+    fi
+}
+
+# Function to check backup status
+check_backup_status() {
+    local backup_dir="{{ pezzo_backup_dir }}"
+    
+    if [ -d "$backup_dir" ]; then
+        local latest_backup=$(find "$backup_dir" -name "pezzo_*" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
+        
+        if [ -n "$latest_backup" ]; then
+            local backup_age=$(($(date +%s) - $(stat -c %Y "$latest_backup")))
+            local max_age=86400  # 24 hours
+            
+            if [ "$backup_age" -lt "$max_age" ]; then
+                echo "healthy"
+            else
+                echo "stale"
+            fi
+        else
+            echo "missing"
+        fi
+    else
+        echo "missing"
+    fi
+}
+
+# Function to generate monitoring status
+generate_status() {
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Check all monitoring components
+    local prometheus_status=$(check_prometheus)
+    local grafana_status=$(check_grafana)
+    local loki_status=$(check_loki)
+    local alertmanager_status=$(check_alertmanager)
+    local influxdb_status=$(check_influxdb)
+    local telegraf_status=$(check_telegraf)
+    local crowdsec_status=$(check_crowdsec)
+    local fail2ban_status=$(check_fail2ban)
+    local metrics_status=$(check_metrics_collection)
+    local logs_status=$(check_log_aggregation)
+    local backup_status=$(check_backup_status)
+    
+    # Build status JSON
+    local status_json=$(cat << EOF
+{
+  "timestamp": "$timestamp",
+  "service": "pezzo-monitoring",
+  "components": {
+    "prometheus": "$prometheus_status",
+    "grafana": "$grafana_status",
+    "loki": "$loki_status",
+    "alertmanager": "$alertmanager_status",
+    "influxdb": "$influxdb_status",
+    "telegraf": "$telegraf_status",
+    "crowdsec": "$crowdsec_status",
+    "fail2ban": "$fail2ban_status",
+    "metrics_collection": "$metrics_status",
+    "log_aggregation": "$logs_status",
+    "backup": "$backup_status"
+  },
+  "overall": "$(if [ "$prometheus_status" = "healthy" ] && [ "$grafana_status" = "healthy" ] && [ "$loki_status" = "healthy" ] && [ "$alertmanager_status" = "healthy" ]; then echo "healthy"; else echo "unhealthy"; fi)"
+}
+EOF
+)
+    
+    # Save status to file
+    echo "$status_json" > "$STATUS_FILE"
+    log "Monitoring status updated: $STATUS_FILE"
+}
+
+# Function to send alerts if needed
+send_alerts() {
+    if [ -f "$STATUS_FILE" ]; then
+        local overall_status=$(jq -r '.overall' "$STATUS_FILE" 2>/dev/null || echo "unknown")
+        
+        if [ "$overall_status" != "healthy" ]; then
+            log "WARNING: Monitoring system is unhealthy"
+            
+            # Send alert via webhook if configured
+            if [ -n "{{ pezzo_alerting_webhook | default('') }}" ]; then
+                curl -f -s -X POST -H "Content-Type: application/json" \
+                    -d "{\"text\":\"🚨 Pezzo monitoring system is unhealthy\",\"status\":\"$overall_status\"}" \
+                    "{{ pezzo_alerting_webhook }}" > /dev/null 2>&1 || log "Warning: Failed to send alert"
+            fi
+        fi
+    fi
+}
+
+# Function to generate report
+generate_report() {
+    log "Generating monitoring health report"
+    
+    if [ -f "$STATUS_FILE" ]; then
+        local report_file="$LOGS_DIR/health_report_$(date +%Y%m%d_%H%M%S).txt"
+        
+        cat > "$report_file" << EOF
+Pezzo Monitoring Health Report
+Generated: $(date)
+========================================
+
+Overall Status: $(jq -r '.overall' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+
+Component Status:
+- Prometheus: $(jq -r '.components.prometheus' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Grafana: $(jq -r '.components.grafana' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Loki: $(jq -r '.components.loki' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- AlertManager: $(jq -r '.components.alertmanager' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- InfluxDB: $(jq -r '.components.influxdb' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Telegraf: $(jq -r '.components.telegraf' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- CrowdSec: $(jq -r '.components.crowdsec' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Fail2ban: $(jq -r '.components.fail2ban' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Metrics Collection: $(jq -r '.components.metrics_collection' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Log Aggregation: $(jq -r '.components.log_aggregation' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+- Backup: $(jq -r '.components.backup' "$STATUS_FILE" 2>/dev/null || echo "Unknown")
+
+Container Status:
+$(docker ps --filter "name=prometheus|grafana|loki|alertmanager|influxdb|telegraf|crowdsec" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}")
+EOF
+        
+        log "Health report generated: $report_file"
+    fi
+}
+
+# Main health check function
+main_health_check() {
+    log "Starting Pezzo monitoring health check"
+    
+    # Generate status
+    generate_status
+    
+    # Send alerts if needed
+    send_alerts
+    
+    # Generate report
+    generate_report
+    
+    log "Pezzo monitoring health check completed"
+}
+
+# Execute main health check function
+main_health_check "$@" 

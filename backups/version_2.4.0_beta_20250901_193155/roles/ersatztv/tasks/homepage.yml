@@ -1,0 +1,55 @@
+---
+# ErsatzTV Homepage Integration
+# Configure Homepage integration for ErsatzTV
+
+- name: Create ErsatzTV Homepage service configuration
+  ansible.builtin.template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/ersatztv.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, homepage]
+
+- name: Create ErsatzTV Homepage widget configuration
+  ansible.builtin.template:
+    src: homepage-widget.yml.j2
+    dest: "{{ homepage_config_dir }}/widgets/ersatztv.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, homepage]
+
+- name: Create ErsatzTV Homepage bookmark configuration
+  ansible.builtin.template:
+    src: homepage-bookmark.yml.j2
+    dest: "{{ homepage_config_dir }}/bookmarks/ersatztv.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, homepage]
+
+- name: Create ErsatzTV Homepage icon
+  ansible.builtin.copy:
+    src: ersatztv-icon.png
+    dest: "{{ homepage_config_dir }}/icons/ersatztv.png"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, homepage]
+
+- name: Display ErsatzTV Homepage configuration
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Homepage Integration:
+      - Homepage Enabled: {{ ersatztv_homepage_enabled }}
+      - Homepage Group: {{ ersatztv_homepage_group }}
+      - Homepage Icon: {{ ersatztv_homepage_icon }}
+      - Homepage Description: {{ ersatztv_homepage_description }}
+      - Homepage Widget: {{ ersatztv_homepage_widget }}
+      - Service URL: https://{{ ersatztv_domain }}
+  tags: [ersatztv, homepage]

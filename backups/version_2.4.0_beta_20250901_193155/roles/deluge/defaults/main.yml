@@ -1,0 +1,260 @@
+---
+# Deluge Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# DELUGE SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+deluge_service_name: "deluge"
+deluge_container_name: "{{ deluge_service_name }}"
+deluge_image: "linuxserver/deluge:latest"
+deluge_version: "latest"
+
+# Network Configuration
+deluge_port: 8112
+deluge_external_port: "{{ deluge_port }}"
+deluge_protocol: "http"
+deluge_host: "{{ ansible_default_ipv4.address }}"
+deluge_url: "{{ deluge_protocol }}://{{ deluge_host }}:{{ deluge_port }}"
+
+# Domain Configuration
+deluge_subdomain: "deluge"
+deluge_domain: "{{ deluge_subdomain }}.{{ domain }}"
+deluge_external_url: "https://{{ deluge_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+deluge_auth_enabled: true
+deluge_auth_method: "authentik"  # Options: basic, authentik, none
+deluge_admin_username: "admin"
+deluge_admin_password: "{{ vault_deluge_admin_password }}"
+
+# API Configuration
+deluge_api_key: "{{ vault_deluge_api_key }}"
+deluge_api_token: "{{ vault_deluge_api_token }}"
+
+# Encryption & Security
+deluge_secret_key: "{{ vault_deluge_secret_key }}"
+deluge_encryption_key: "{{ vault_deluge_encryption_key }}"
+deluge_jwt_secret: "{{ vault_deluge_jwt_secret }}"
+
+# SSL/TLS Configuration
+deluge_ssl_enabled: true
+deluge_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+deluge_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+deluge_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+deluge_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+deluge_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+deluge_database_port: "{{ databases_postgresql_port | default(5432) }}"
+deluge_database_name: "deluge"
+deluge_database_username: "deluge"
+deluge_database_password: "{{ vault_deluge_database_password }}"
+
+# Redis Configuration (if using)
+deluge_redis_enabled: false
+deluge_redis_host: "{{ redis_host | default('redis') }}"
+deluge_redis_port: "{{ redis_port | default(6379) }}"
+deluge_redis_password: "{{ vault_deluge_redis_password }}"
+deluge_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+deluge_data_dir: "{{ homelab_data_dir }}/deluge"
+deluge_config_dir: "{{ deluge_data_dir }}/config"
+deluge_backup_dir: "{{ deluge_data_dir }}/backups"
+
+# Volume Mappings
+deluge_volumes:
+  - "{{ deluge_config_dir }}:/config"
+  - "{{ deluge_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+deluge_health_check_enabled: true
+deluge_health_check_path: "/health"
+deluge_health_check_interval: 30
+deluge_health_check_timeout: 10
+deluge_health_check_retries: 3
+
+# Monitoring Integration
+deluge_monitoring_enabled: true
+deluge_prometheus_enabled: true
+deluge_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+deluge_backup_enabled: true
+deluge_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+deluge_backup_retention_days: 30
+deluge_backup_encryption_enabled: true
+deluge_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+deluge_smtp_enabled: false
+deluge_smtp_host: "{{ smtp_host | default('') }}"
+deluge_smtp_port: "{{ smtp_port | default(587) }}"
+deluge_smtp_username: "{{ vault_smtp_username }}"
+deluge_smtp_password: "{{ vault_deluge_smtp_password }}"
+deluge_smtp_from: "{{ deluge_admin_email | default('admin@' + domain) }}"
+deluge_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+deluge_webhook_enabled: false
+deluge_webhook_url: "{{ vault_webhook_url | default('') }}"
+deluge_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+deluge_discovery_enabled: true
+deluge_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+deluge_cpu_limit: "1.0"
+deluge_memory_limit: "1g"
+deluge_memory_reservation: "512m"
+
+# Performance Settings
+deluge_scan_interval: 10
+deluge_parallel_downloads: 3
+deluge_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+deluge_log_level: "info"  # Options: trace, debug, info, warn, error
+deluge_log_rotation_enabled: true
+deluge_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+deluge_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+deluge_rate_limit_enabled: true
+deluge_rate_limit_requests: 100
+deluge_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+deluge_deploy_enabled: true
+deluge_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+deluge_restart_policy: "unless-stopped"
+deluge_auto_update_enabled: true
+
+# Environment Variables
+deluge_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  DELUGE_API_KEY: "{{ deluge_api_key }}"
+  DELUGE_SECRET_KEY: "{{ deluge_secret_key }}"
+  DELUGE_ENCRYPTION_KEY: "{{ deluge_encryption_key }}"
+  DELUGE_JWT_SECRET: "{{ deluge_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+deluge_validation_enabled: true
+deluge_validation_timeout: 300
+deluge_validation_retries: 3
+
+# Testing Configuration
+deluge_test_enabled: false
+deluge_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+deluge_compliance_enabled: true
+deluge_audit_logging_enabled: true
+deluge_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+deluge_automation_enabled: true
+deluge_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+deluge_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+deluge_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+deluge_fallback_enabled: true
+deluge_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

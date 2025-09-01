@@ -1,0 +1,16 @@
+#!/bin/bash
+# Media stack monitoring script
+declare -A services=(
+{% for service in media_services %}
+  [{{ service.name }}]="{{ service.health_url }}"
+{% endfor %}
+)
+for name in "${!services[@]}"; do
+  url="${services[$name]}"
+  status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+  if [[ "$status" != "200" ]]; then
+    echo "[ERROR] $name health check failed (status: $status)"
+  else
+    echo "[OK] $name is healthy"
+  fi
+done 

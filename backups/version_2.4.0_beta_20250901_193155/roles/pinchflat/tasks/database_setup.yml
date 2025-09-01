@@ -1,0 +1,43 @@
+---
+# Pinchflat Database Setup
+
+- name: Check Pinchflat database connection
+  ansible.builtin.uri:
+    url: "https://{{ pinchflat_domain }}/api/health/database"
+    method: GET
+  register: db_check
+  ignore_errors: yes
+  tags: [pinchflat, database]
+
+- name: Initialize Pinchflat database
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/admin/database/init"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_pinchflat_api_key | default('') }}"
+    body_format: json
+    body:
+      database_type: "{{ pinchflat_database_type }}"
+      host: "{{ pinchflat_database_host if pinchflat_database_type == 'postgresql' else '' }}"
+      port: "{{ pinchflat_database_port if pinchflat_database_type == 'postgresql' else '' }}"
+      name: "{{ pinchflat_database_name if pinchflat_database_type == 'postgresql' else '' }}"
+      user: "{{ vault_service_user if pinchflat_database_type == 'postgresql' else '' }}"
+      password: "{{ vault_service_password if pinchflat_database_type == 'postgresql' else '' }}"
+  when: db_check.status is not defined or db_check.status != 200
+  tags: [pinchflat, database]
+
+- name: Pre-change snapshot (config and data)
+  ansible.builtin.include_tasks: "{{ role_path }}/../automation/tasks/prechange_snapshot.yml"
+  vars:
+    service_name: pinchflat
+  tags: [backup, prechange]
+
+- name: Run Pinchflat database migrations
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/admin/database/migrate"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_pinchflat_api_key | default('') }}"
+  tags: [pinchflat, database]

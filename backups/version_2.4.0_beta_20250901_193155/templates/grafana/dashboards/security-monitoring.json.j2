@@ -1,0 +1,515 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Security Monitoring",
+    "tags": ["security", "authentication", "firewall", "ssl", "threats", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "security_service",
+          "type": "query",
+          "query": "label_values(up, job=~\"crowdsec|fail2ban|authentik|traefik\")",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Security Service"
+        },
+        {
+          "name": "threat_level",
+          "type": "custom",
+          "query": "low,medium,high,critical",
+          "includeAll": true,
+          "multi": true,
+          "label": "Threat Level"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Security Services Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"crowdsec|fail2ban|authentik|traefik\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Threats",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "crowdsec_active_threats_total",
+            "legendFormat": "CrowdSec Threats"
+          },
+          {
+            "expr": "fail2ban_banned_ips_total",
+            "legendFormat": "Fail2Ban Banned IPs"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "SSL Certificate Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "probe_ssl_earliest_cert_expiry - time()",
+            "legendFormat": "Days Until Expiry"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 30},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "d",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Authentication Events",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "authentik_successful_logins_total",
+            "legendFormat": "Successful Logins"
+          },
+          {
+            "expr": "authentik_failed_logins_total",
+            "legendFormat": "Failed Logins"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Security Events Timeline",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(security_events_total[5m])",
+            "legendFormat": "Security Events/sec"
+          },
+          {
+            "expr": "rate(failed_login_attempts_total[5m])",
+            "legendFormat": "Failed Logins/sec"
+          },
+          {
+            "expr": "rate(crowdsec_threats_detected_total[5m])",
+            "legendFormat": "Threats/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Network Traffic Analysis",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(network_connections_total[5m])",
+            "legendFormat": "Connections/sec"
+          },
+          {
+            "expr": "rate(network_bytes_total[5m])",
+            "legendFormat": "Bytes/sec"
+          },
+          {
+            "expr": "rate(suspicious_connections_total[5m])",
+            "legendFormat": "Suspicious Connections/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Firewall Rules Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "firewall_rules_active",
+            "legendFormat": "{{rule_name}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "custom": {
+              "displayMode": "color-background"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Rule"
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "Blocked IP Addresses",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "fail2ban_banned_ips",
+            "legendFormat": "{{ip_address}} - {{reason}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Time"
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "title": "SSL Certificate Expiry Timeline",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "probe_ssl_earliest_cert_expiry - time()",
+            "legendFormat": "{{instance}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 30},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "d",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Authentication Success Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(authentik_successful_logins_total[5m]) / (rate(authentik_successful_logins_total[5m]) + rate(authentik_failed_logins_total[5m])) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "System Vulnerabilities",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "system_vulnerabilities_total",
+            "legendFormat": "Total Vulnerabilities"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 32},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 12,
+        "title": "VPN Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "vpn_active_connections_total",
+            "legendFormat": "Active VPN Connections"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 32},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 13,
+        "title": "Security Logs",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{container_name=~\"crowdsec|fail2ban|authentik\"}",
+            "legendFormat": "{{container_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "sortOrder": "Descending",
+          "dedupStrategy": "none"
+        }
+      }
+    ],
+    "schemaVersion": 30,
+    "version": 1
+  },
+  "folderTitle": "{{ grafana_dashboard_categories.security_monitoring.folder | default('Security Monitoring') }}",
+  "overwrite": true
+} 

@@ -1,0 +1,142 @@
+---
+# n8n Service Deployment
+# Deploy n8n workflow automation platform
+
+- name: Copy n8n Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ n8n_config_dir }}/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [n8n, deploy]
+
+- name: Prepare n8n secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "n8n"
+    secret_dir_root: "{{ docker_dir }}/n8n"
+    secret_files: "{{ n8n_secret_files if n8n_manage_secret_files else [] }}"
+    secret_env_maps:
+      - "{{ n8n_components.app.environment | default({}) }}"
+      - "{{ n8n_components.postgres.environment | default({}) }}"
+  when: n8n_manage_secret_files | bool
+  tags: [n8n, deploy, setup]
+
+- name: Validate n8n environment maps use *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ n8n_environment | default({}) }}"
+  when: n8n_manage_secret_files | bool
+  tags: [n8n, deploy, validate]
+
+- name: Validate required n8n secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/n8n/secrets/{{ item }}"
+  register: n8n_secret_stats
+  loop: "{{ n8n_required_secrets | default([]) }}"
+  when: n8n_manage_secret_files | bool and (n8n_required_secrets | default([]) | length > 0)
+
+- name: Fail if required n8n secret files are missing
+  ansible.builtin.assert:
+    that: "{{ n8n_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/n8n/secrets.
+      Missing: {{ (n8n_required_secrets | default([])) | reject('in', (n8n_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: n8n_manage_secret_files | bool and (n8n_required_secrets | default([]) | length > 0)
+
+- name: Stop existing n8n containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ n8n_config_dir }}"
+    state: absent
+  ignore_errors: true
+  tags: [n8n, deploy]
+
+- name: Remove existing n8n containers
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+    force_kill: true
+  loop:
+    - "{{ n8n_app_container_name }}"
+    - "{{ n8n_postgres_container_name }}"
+  ignore_errors: true
+  tags: [n8n, deploy]
+
+- name: Pull n8n Docker images
+  community.docker.docker_image:
+    name: "{{ item }}"
+    source: pull
+    force_source: true
+  loop:
+    - "{{ n8n_components.app.image }}"
+    - "{{ n8n_components.postgres.image }}"
+  tags: [n8n, deploy]
+
+- name: Deploy n8n services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "n8n"
+    project_src: "{{ n8n_config_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ n8n_port }}"
+  tags: [n8n, deploy, rollback]
+
+- name: Wait for n8n services to be ready
+  ansible.builtin.wait_for:
+    port: "{{ n8n_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    delay: 10
+    timeout: 300
+  tags: [n8n, deploy]
+
+- name: Verify n8n app container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_app_container_name }}"
+  register: n8n_app_info
+  tags: [n8n, deploy]
+
+- name: Verify n8n postgres container is running
+  community.docker.docker_container_info:
+    name: "{{ n8n_postgres_container_name }}"
+  register: n8n_postgres_info
+  tags: [n8n, deploy]
+
+- name: Check n8n app health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: n8n_health_check
+  retries: 10
+  delay: 30
+  until: n8n_health_check.status == 200
+  tags: [n8n, deploy]
+  when: n8n_direct_expose_enabled | default(false)
+
+- name: Verify n8n via Traefik route
+  ansible.builtin.uri:
+    url: "https://{{ n8n_subdomain }}.{{ domain }}/healthz"
+    method: GET
+    status_code: 200
+    timeout: 30
+    validate_certs: true
+  register: n8n_route_health
+  retries: 10
+  delay: 10
+  until: n8n_route_health.status == 200
+  tags: [n8n, deploy]
+  when: not (n8n_direct_expose_enabled | default(false))
+
+- name: Display n8n deployment status
+  ansible.builtin.debug:
+    msg: |
+      n8n Deployment Status:
+      - App Container: {{ n8n_app_info.exists }}
+      - Postgres Container: {{ n8n_postgres_info.exists }}
+      - Health Check: {{ n8n_health_check.status }}
+      - URL: https://{{ n8n_subdomain }}.{{ domain }}
+  tags: [n8n, deploy]

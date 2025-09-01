@@ -1,0 +1,162 @@
+#!/bin/bash
+# Linkwarden Health Check Script
+# Production-ready health check script for Linkwarden
+
+set -euo pipefail
+
+# Configuration
+APP_CONTAINER="{{ linkwarden_app_container_name }}"
+DB_CONTAINER="{{ linkwarden_postgres_container_name }}"
+APP_PORT="{{ linkwarden_port }}"
+DB_PORT="5432"
+HEALTH_URL="http://{{ ansible_default_ipv4.address }}:$APP_PORT/api/health"
+LOG_FILE="{{ linkwarden_health_check_log_file }}"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+trap 'log "ERROR: Health check failed with exit code $?"; exit 1' ERR
+
+# Function to check if container is running
+check_container() {
+    local container_name="$1"
+    local container_type="$2"
+    
+    if docker ps --format "table {{.Names}}" | grep -q "^${container_name}$"; then
+        log "✓ $container_type container ($container_name) is running"
+        return 0
+    else
+        log "✗ $container_type container ($container_name) is not running"
+        return 1
+    fi
+}
+
+# Function to check if port is listening
+check_port() {
+    local port="$1"
+    local service="$2"
+    
+    if netstat -tuln | grep -q ":$port "; then
+        log "✓ $service is listening on port $port"
+        return 0
+    else
+        log "✗ $service is not listening on port $port"
+        return 1
+    fi
+}
+
+# Function to check HTTP health endpoint
+check_health_endpoint() {
+    local url="$1"
+    local timeout="${2:-10}"
+    
+    if curl -f -s --max-time "$timeout" "$url" > /dev/null 2>&1; then
+        log "✓ Health endpoint is responding"
+        return 0
+    else
+        log "✗ Health endpoint is not responding"
+        return 1
+    fi
+}
+
+# Function to check database connection
+check_database() {
+    local container="$1"
+    local user="$2"
+    local db="$3"
+    
+    if docker exec "$container" pg_isready -U "$user" -d "$db" > /dev/null 2>&1; then
+        log "✓ Database connection is healthy"
+        return 0
+    else
+        log "✗ Database connection is unhealthy"
+        return 1
+    fi
+}
+
+# Function to check disk space
+check_disk_space() {
+    local threshold="${1:-90}"
+    local usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+    
+    if [ "$usage" -lt "$threshold" ]; then
+        log "✓ Disk space is sufficient ($usage% used)"
+        return 0
+    else
+        log "✗ Disk space is low ($usage% used)"
+        return 1
+    fi
+}
+
+# Function to check memory usage
+check_memory() {
+    local threshold="${1:-90}"
+    local usage=$(free | grep Mem | awk '{printf("%.0f", $3/$2 * 100.0)}')
+    
+    if [ "$usage" -lt "$threshold" ]; then
+        log "✓ Memory usage is normal ($usage% used)"
+        return 0
+    else
+        log "✗ Memory usage is high ($usage% used)"
+        return 1
+    fi
+}
+
+# Main health check
+main() {
+    log "Starting Linkwarden health check..."
+    
+    local exit_code=0
+    
+    # Check containers
+    if ! check_container "$APP_CONTAINER" "Application"; then
+        exit_code=1
+    fi
+    
+    if ! check_container "$DB_CONTAINER" "Database"; then
+        exit_code=1
+    fi
+    
+    # Check ports
+    if ! check_port "$APP_PORT" "Linkwarden"; then
+        exit_code=1
+    fi
+    
+    if ! check_port "$DB_PORT" "PostgreSQL"; then
+        exit_code=1
+    fi
+    
+    # Check health endpoint
+    if ! check_health_endpoint "$HEALTH_URL"; then
+        exit_code=1
+    fi
+    
+    # Check database connection
+    if ! check_database "$DB_CONTAINER" "{{ linkwarden_database_user }}" "{{ linkwarden_database_name }}"; then
+        exit_code=1
+    fi
+    
+    # Check system resources
+    if ! check_disk_space; then
+        exit_code=1
+    fi
+    
+    if ! check_memory; then
+        exit_code=1
+    fi
+    
+    # Summary
+    if [ $exit_code -eq 0 ]; then
+        log "✓ All health checks passed"
+    else
+        log "✗ Some health checks failed"
+    fi
+    
+    exit $exit_code
+}
+
+# Run main function
+main "$@" 

@@ -1,0 +1,33 @@
+[Unit]
+Description=Homelab Service Orchestration
+Documentation=https://github.com/your-repo/ansible_homelab
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+WorkingDirectory={{ docker_dir }}/orchestration
+ExecStart={{ docker_dir }}/orchestration/startup.sh
+ExecStop={{ docker_dir }}/orchestration/shutdown.sh
+ExecReload={{ docker_dir }}/orchestration/health-check.sh
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
+TimeoutStopSec=300
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ docker_dir }} {{ data_dir }} {{ config_dir }} {{ logs_dir }}
+
+# Restart policy
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target 

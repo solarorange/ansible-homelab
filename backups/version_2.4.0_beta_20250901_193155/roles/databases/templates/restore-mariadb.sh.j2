@@ -1,0 +1,13 @@
+#!/bin/bash
+# MariaDB Restore Script
+if [ -z "$1" ]; then
+  echo "Please specify backup file"
+  exit 1
+fi
+BACKUP_FILE="$1"
+if [ ! -f "$BACKUP_FILE" ]; then
+  echo "Backup file not found: $BACKUP_FILE"
+  exit 1
+fi
+gunzip -c "$BACKUP_FILE" | docker exec -i {{ mariadb_container_name }} mysql -u root -p"{{ mariadb_root_password }}"
+echo "Backup restored from: $BACKUP_FILE" 

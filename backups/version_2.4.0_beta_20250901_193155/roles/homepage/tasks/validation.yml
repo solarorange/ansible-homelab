@@ -1,0 +1,171 @@
+---
+# Homepage Automation Integration Validation Tasks
+# Validates configuration, connectivity, and integration status
+
+- name: Validate Homepage service status
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: homepage_health_validation
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: homepage_config_validation
+  loop:
+    - "{{ homepage_config_dir }}/config.yml"
+    - "{{ homepage_config_dir }}/groups.yml"
+    - "{{ homepage_config_dir }}/monitoring.yml"
+    - "{{ homepage_config_dir }}/auth.yml"
+    - "{{ homepage_config_dir }}/traefik.yml"
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage automation scripts
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: homepage_scripts_validation
+  loop:
+    - "{{ homepage_docker_dir }}/scripts/service_discovery.py"
+    - "{{ homepage_docker_dir }}/scripts/homepage_automation.py"
+    - "{{ homepage_docker_dir }}/scripts/automation_config.yml"
+  tags: [homepage, automation, validate]
+
+- name: Test Homepage service discovery script
+  ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/service_discovery.py --test"
+  args:
+    chdir: "{{ homepage_docker_dir }}/scripts"
+  register: homepage_service_discovery_test
+  environment:
+    PYTHONPATH: "{{ homepage_docker_dir }}/scripts"
+  tags: [homepage, automation, validate]
+
+- name: Test Homepage automation script
+  ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/homepage_automation.py --validate"
+  args:
+    chdir: "{{ homepage_docker_dir }}/scripts"
+  register: homepage_automation_test
+  environment:
+    PYTHONPATH: "{{ homepage_docker_dir }}/scripts"
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage API endpoints
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: homepage_api_validation
+  loop:
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/bookmarks"
+    - "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/widgets"
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage monitoring integration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/metrics"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: homepage_monitoring_validation
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage authentication integration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/auth/status"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: homepage_auth_validation
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage Traefik integration
+  ansible.builtin.uri:
+    url: "https://{{ homepage_subdomain }}.{{ domain }}/api/health"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+    validate_certs: "{{ validate_certs | default(true) }}"
+  register: homepage_traefik_validation
+  tags: [homepage, automation, validate]
+
+- name: Check Homepage container logs for errors
+  community.docker.docker_container_info:
+    name: homepage
+  register: homepage_container_info
+  tags: [homepage, automation, validate]
+
+- name: Validate Homepage container health
+  ansible.builtin.assert:
+    that:
+      - homepage_container_info.exists
+      - homepage_container_info.container.State.Status == "running"
+      - homepage_container_info.container.State.Health.Status in ["healthy", "none"]
+    fail_msg: "Homepage container is not healthy"
+  tags: [homepage, automation, validate]
+
+- name: Display Homepage validation summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      HOMEPAGE VALIDATION SUMMARY
+      ========================================
+
+      Service Health:
+      - API Health: {{ homepage_health_validation.status | default('Unknown') }}
+      - Container Status: {{ homepage_container_info.container.State.Status | default('Unknown') }}
+      - Container Health: {{ homepage_container_info.container.State.Health.Status | default('Unknown') }}
+
+      Configuration Files:
+      - Main Config: {{ homepage_config_validation.results[0].stat.exists | default(false) }}
+      - Groups Config: {{ homepage_config_validation.results[1].stat.exists | default(false) }}
+      - Monitoring Config: {{ homepage_config_validation.results[2].stat.exists | default(false) }}
+      - Auth Config: {{ homepage_config_validation.results[3].stat.exists | default(false) }}
+      - Traefik Config: {{ homepage_config_validation.results[4].stat.exists | default(false) }}
+
+      Automation Scripts:
+      - Service Discovery: {{ homepage_scripts_validation.results[0].stat.exists | default(false) }}
+      - Automation Script: {{ homepage_scripts_validation.results[1].stat.exists | default(false) }}
+      - Config File: {{ homepage_scripts_validation.results[2].stat.exists | default(false) }}
+
+      Script Tests:
+      - Service Discovery Test: {{ homepage_service_discovery_test.rc == 0 if homepage_service_discovery_test.rc is defined else 'Not Run' }}
+      - Automation Test: {{ homepage_automation_test.rc == 0 if homepage_automation_test.rc is defined else 'Not Run' }}
+
+      API Endpoints:
+      - Services API: {{ homepage_api_validation.results[0].status | default('Unknown') }}
+      - Bookmarks API: {{ homepage_api_validation.results[1].status | default('Unknown') }}
+      - Widgets API: {{ homepage_api_validation.results[2].status | default('Unknown') }}
+
+      Integration Status:
+      - Monitoring Integration: {{ homepage_monitoring_validation.status | default('Unknown') }}
+      - Authentication Integration: {{ homepage_auth_validation.status | default('Unknown') }}
+      - Traefik Integration: {{ homepage_traefik_validation.status | default('Unknown') }}
+
+      Validation Results:
+      - All Config Files Present: {{ homepage_config_validation.results | map(attribute='stat.exists') | list | all }}
+      - All Scripts Present: {{ homepage_scripts_validation.results | map(attribute='stat.exists') | list | all }}
+      - Service Healthy: {{ homepage_health_validation.status in [200, 302, 401] if homepage_health_validation.status is defined else false }}
+      - Container Healthy: {{ homepage_container_info.container.State.Health.Status in ['healthy', 'none'] if homepage_container_info.container.State.Health.Status is defined else false }}
+
+      ========================================
+  tags: [homepage, automation, validate, summary]
+
+- name: Set Homepage validation result
+  ansible.builtin.set_fact:
+    homepage_validation_success: "{{
+      homepage_health_validation.status in [200, 302, 401] and
+      homepage_config_validation.results | map(attribute='stat.exists') | list | all and
+      homepage_scripts_validation.results | map(attribute='stat.exists') | list | all and
+      homepage_container_info.container.State.Status == 'running'
+    }}"
+  tags: [homepage, automation, validate]
+
+- name: Fail if Homepage validation fails
+  ansible.builtin.fail:
+    msg: "Homepage validation failed. Check the validation summary above for details."
+  when: not homepage_validation_success
+  tags: [homepage, automation, validate]

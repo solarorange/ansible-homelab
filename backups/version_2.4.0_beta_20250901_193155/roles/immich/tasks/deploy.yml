@@ -1,0 +1,169 @@
+---
+# Deploy Immich Services
+# Production-ready deployment tasks for Immich
+
+- name: Deploy Immich services
+  block:
+    - name: Generate Immich Docker Compose configuration
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ immich_config_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, deploy]
+
+    - name: Generate Immich environment file
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ immich_config_dir }}/.env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [immich, deploy]
+
+    - name: Prepare Immich secret files
+      ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+      vars:
+        service_name: "immich"
+        secret_dir_root: "{{ docker_dir }}/immich"
+        secret_files: "{{ immich_secret_files | default([]) }}"
+        secret_env_maps:
+          - "{{ immich_components.server.environment | default({}) }}"
+          - "{{ immich_components.web.environment | default({}) }}"
+          - "{{ immich_components.postgres.environment | default({}) }}"
+          - "{{ immich_components.redis.environment | default({}) }}"
+          - "{{ immich_components.machine_learning.environment | default({}) }}"
+      when: immich_manage_secret_files | default(true) | bool
+      tags: [immich, deploy, setup]
+
+    - name: Validate Immich environment maps use *_FILE for secrets
+      ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+      vars:
+        env_map_input: "{{ immich_components.server.environment | default({}) }}"
+      when: immich_manage_secret_files | default(true) | bool
+      tags: [immich, deploy, validate]
+
+    - name: Validate required Immich secret files exist
+      ansible.builtin.stat:
+        path: "{{ docker_dir }}/immich/secrets/{{ item }}"
+      register: immich_secret_stats
+      loop: "{{ immich_required_secrets | default([]) }}"
+      when: immich_manage_secret_files | default(true) | bool and (immich_required_secrets | default([]) | length > 0)
+
+    - name: Fail if required Immich secret files are missing
+      ansible.builtin.assert:
+        that: "{{ immich_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+        fail_msg: >-
+          One or more required secret files are missing under {{ docker_dir }}/immich/secrets.
+          Missing: {{ (immich_required_secrets | default([])) | reject('in', (immich_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+      when: immich_manage_secret_files | default(true) | bool and (immich_required_secrets | default([]) | length > 0)
+
+    - name: Generate Immich Traefik configuration
+      ansible.builtin.template:
+        src: traefik.yml.j2
+        dest: "{{ immich_config_dir }}/traefik.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_traefik_enabled | default(true)
+      tags: [immich, deploy]
+
+    - name: Pull Immich Docker images
+      community.docker.docker_image:
+        name: "{{ item.image }}"
+        source: pull
+        force_source: yes
+      loop:
+        - "{{ immich_components.server }}"
+        - "{{ immich_components.web }}"
+        - "{{ immich_components.postgres }}"
+        - "{{ immich_components.redis }}"
+        - "{{ immich_components.machine_learning }}"
+      tags: [immich, deploy]
+
+    - name: Stop existing Immich containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ immich_config_dir }}"
+        state: absent
+      tags: [immich, deploy]
+
+    - name: Deploy Immich services safely with rollback
+      ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "immich"
+        project_src: "{{ immich_config_dir }}"
+        compose_files:
+          - docker-compose.yml
+        wait_for_ports:
+          - "{{ immich_ports.server }}"
+      tags: [immich, deploy, rollback]
+
+    - name: Wait for Immich services to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ immich_ports.server }}"
+        delay: 10
+        timeout: 300
+      tags: [immich, deploy]
+
+    - name: Check Immich service health
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.server }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: health_check
+      retries: 5
+      delay: 10
+      until: health_check.status == 200
+      when: immich_direct_expose_enabled | default(false)
+      tags: [immich, deploy]
+
+    - name: Verify Immich via Traefik route
+      ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+      vars:
+        route_health_check_url: "https://{{ immich_subdomain }}.{{ domain }}/api/health"
+        route_health_check_status_codes: [200, 302, 401]
+        route_health_check_timeout: 30
+        route_health_check_retries: 10
+        route_health_check_delay: 10
+      when: not (immich_direct_expose_enabled | default(false))
+      tags: [immich, deploy]
+
+    - name: Create Immich admin user
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ immich_ports.server }}/api/auth/admin-sign-up"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          email: "{{ immich_admin_email }}"
+          password: "{{ vault_immich_password }}"
+          firstName: "Admin"
+          lastName: "User"
+        status_code: [200, 201, 409]  # 409 if user already exists
+        timeout: 30
+      register: admin_creation
+      tags: [immich, deploy]
+
+    - name: Display Immich deployment status
+      ansible.builtin.debug:
+        msg: |
+          Immich deployment completed successfully!
+
+          Access URLs:
+          - Web Interface: https://{{ immich_subdomain }}.{{ domain }}
+          - API: https://{{ immich_subdomain }}.{{ domain }}/api
+
+          Admin credentials:
+          - Email: {{ immich_admin_email }}
+          - Password: (check vault or use default)
+
+          Service status:
+          - Server: {{ health_check.status }}
+          - Admin user: {{ 'Created' if admin_creation.status in [200, 201] else 'Already exists' }}
+      tags: [immich, deploy]
+
+  tags: [immich, deploy, always]

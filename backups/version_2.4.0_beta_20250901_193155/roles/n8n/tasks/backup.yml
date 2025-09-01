@@ -1,0 +1,108 @@
+---
+# n8n Backup Configuration
+# Configure automated backup and recovery for n8n
+
+- name: Create n8n backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ n8n_config_dir }}/backup.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Create n8n restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ n8n_config_dir }}/restore.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Setup n8n backup cron job
+  ansible.builtin.cron:
+    name: "n8n backup"
+    hour: "{{ n8n_backup_schedule.split()[1] | default('3') }}"
+    minute: "{{ n8n_backup_schedule.split()[0] | default('0') }}"
+    day: "{{ n8n_backup_schedule.split()[2] | default('*') }}"
+    month: "{{ n8n_backup_schedule.split()[3] | default('*') }}"
+    weekday: "{{ n8n_backup_schedule.split()[4] | default('*') }}"
+    job: "{{ n8n_config_dir }}/backup.sh >> {{ n8n_backup_log_file }} 2>&1"
+    user: "{{ vault_n8n_user }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Create n8n backup retention cleanup script
+  ansible.builtin.template:
+    src: cleanup-backups.sh.j2
+    dest: "{{ n8n_config_dir }}/cleanup-backups.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Setup n8n backup cleanup cron job
+  ansible.builtin.cron:
+    name: "n8n backup cleanup"
+    hour: "4"
+    minute: "0"
+    job: "{{ n8n_config_dir }}/cleanup-backups.sh >> {{ n8n_backup_log_file }} 2>&1"
+    user: "{{ vault_n8n_user }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Create n8n backup verification script
+  ansible.builtin.template:
+    src: verify-backup.sh.j2
+    dest: "{{ n8n_config_dir }}/verify-backup.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Create n8n backup configuration
+  ansible.builtin.template:
+    src: backup-config.yml.j2
+    dest: "{{ n8n_config_dir }}/backup-config.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Test n8n backup script
+  ansible.builtin.command: "{{ n8n_config_dir }}/backup.sh test"
+  register: n8n_backup_test
+  changed_when: false
+  failed_when: n8n_backup_test.rc != 0
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Create initial n8n backup
+  ansible.builtin.command: "{{ n8n_config_dir }}/backup.sh"
+  register: n8n_initial_backup
+  when: n8n_backup_enabled | default(true)
+  tags: [n8n, backup]
+
+- name: Verify n8n backup files exist
+  ansible.builtin.stat:
+    path: "{{ n8n_backup_dir }}"
+  register: n8n_backup_dir_stat
+  tags: [n8n, backup]
+
+- name: Display n8n backup status
+  ansible.builtin.debug:
+    msg: |
+      n8n Backup Status:
+      - Backup Enabled: {{ n8n_backup_enabled | default(true) }}
+      - Backup Schedule: {{ n8n_backup_schedule | default('0 3 * * *') }}
+      - Backup Retention: {{ n8n_backup_retention_days | default(7) }} days
+      - Backup Directory: {{ n8n_backup_dir }}
+      - Backup Directory Exists: {{ n8n_backup_dir_stat.stat.exists }}
+      - Initial Backup: {{ n8n_initial_backup.changed | default(false) }}
+  tags: [n8n, backup]

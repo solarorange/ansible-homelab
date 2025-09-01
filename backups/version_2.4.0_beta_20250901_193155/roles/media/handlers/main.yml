@@ -1,0 +1,113 @@
+---
+# Media Stack Handlers
+# Handlers for media stack role
+
+- name: restart media stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    files: docker-compose.yml
+    state: present
+  listen: "restart media stack"
+
+- name: restart downloaders
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    files: docker-compose.yml
+    services:
+      - sabnzbd
+      - qbittorrent
+    state: present
+  listen: "restart downloaders"
+
+- name: restart arr services
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    files: docker-compose.yml
+    services:
+      - prowlarr
+      - sonarr
+      - radarr
+      - lidarr
+      - readarr
+      - bazarr
+      - pulsarr
+    state: present
+  listen: "restart arr services"
+
+- name: restart media players
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    files: docker-compose.yml
+    services:
+      - jellyfin
+      - immich-server
+      - immich-web
+      - immich-machine-learning
+    state: present
+  listen: "restart media players"
+
+- name: restart monitoring
+  ansible.builtin.systemd:
+    name: media-monitoring
+    state: restarted
+  listen: "restart media monitoring"
+
+- name: restart security
+  ansible.builtin.systemd:
+    name: media-security
+    state: restarted
+  listen: "restart media security"
+
+- name: restart backup
+  ansible.builtin.systemd:
+    name: media-backup
+    state: restarted
+  listen: "restart media backup"
+
+- name: restart alerts
+  ansible.builtin.systemd:
+    name: media-alerts
+    state: restarted
+  listen: "restart media alerts"
+
+- name: reload traefik
+  ansible.builtin.systemd:
+    name: traefik
+    state: reloaded
+  listen: "reload traefik"
+
+- name: reload prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: reloaded
+  listen: "reload prometheus"
+
+- name: reload alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: reloaded
+  listen: "reload alertmanager"
+
+- name: reload loki
+  ansible.builtin.systemd:
+    name: loki
+    state: reloaded
+  listen: "reload loki"
+
+- name: reload telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: reloaded
+  listen: "reload telegraf"
+
+- name: reload fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: reloaded
+  listen: "reload fail2ban"
+
+- name: reload crowdsec
+  ansible.builtin.systemd:
+    name: crowdsec
+    state: reloaded
+  listen: "reload crowdsec"

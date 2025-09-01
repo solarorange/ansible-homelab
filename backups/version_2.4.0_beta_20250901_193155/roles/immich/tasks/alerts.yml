@@ -1,0 +1,152 @@
+---
+# Configure Immich Alerts
+# Production-ready alerting tasks for Immich
+
+- name: Configure Immich alerts
+  block:
+    - name: Generate Immich alerting configuration
+      ansible.builtin.template:
+        src: alerts.yml.j2
+        dest: "{{ immich_config_dir }}/alerts.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Generate Immich AlertManager configuration
+      ansible.builtin.template:
+        src: alertmanager.yml.j2
+        dest: "{{ immich_config_dir }}/alertmanager.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_alerting_enabled | default(true)
+      tags: [immich, alerts]
+
+    - name: Create Immich alert monitoring script
+      ansible.builtin.template:
+        src: alert-monitor.sh.j2
+        dest: "{{ immich_config_dir }}/alert-monitor.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, alerts]
+
+    - name: Setup Immich alert monitoring cron
+      ansible.builtin.cron:
+        name: "Immich Alert Monitoring"
+        minute: "*/2"
+        job: "{{ immich_config_dir }}/alert-monitor.sh >> {{ logs_dir }}/immich/alerts/monitor.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, alerts]
+
+    - name: Create Immich alert directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - "{{ logs_dir }}/immich/alerts"
+        - "{{ logs_dir }}/immich/notifications"
+      tags: [immich, alerts]
+
+    - name: Generate Immich notification templates
+      ansible.builtin.template:
+        src: notification-templates.yml.j2
+        dest: "{{ immich_config_dir }}/notification-templates.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Create Immich alert escalation script
+      ansible.builtin.template:
+        src: alert-escalation.sh.j2
+        dest: "{{ immich_config_dir }}/alert-escalation.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, alerts]
+
+    - name: Setup Immich alert escalation cron
+      ansible.builtin.cron:
+        name: "Immich Alert Escalation"
+        minute: "*/5"
+        job: "{{ immich_config_dir }}/alert-escalation.sh >> {{ logs_dir }}/immich/alerts/escalation.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, alerts]
+
+    - name: Generate Immich alert rules
+      ansible.builtin.template:
+        src: alert-rules.yml.j2
+        dest: "{{ immich_config_dir }}/alert-rules.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Create Immich alert notification script
+      ansible.builtin.template:
+        src: alert-notify.sh.j2
+        dest: "{{ immich_config_dir }}/alert-notify.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, alerts]
+
+    - name: Generate Immich alert thresholds
+      ansible.builtin.template:
+        src: alert-thresholds.yml.j2
+        dest: "{{ immich_config_dir }}/alert-thresholds.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Create Immich alert systemd service
+      ansible.builtin.template:
+        src: immich-alerts.service.j2
+        dest: /etc/systemd/system/immich-alerts.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Enable and start Immich alerts service
+      ansible.builtin.systemd:
+        name: immich-alerts
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: [immich, alerts]
+
+    - name: Generate Immich alert dashboard
+      ansible.builtin.template:
+        src: alert-dashboard.json.j2
+        dest: "{{ immich_config_dir }}/alert-dashboard.json"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, alerts]
+
+    - name: Create Immich alert history script
+      ansible.builtin.template:
+        src: alert-history.sh.j2
+        dest: "{{ immich_config_dir }}/alert-history.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, alerts]
+
+    - name: Setup Immich alert history cron
+      ansible.builtin.cron:
+        name: "Immich Alert History"
+        hour: "1"
+        minute: "0"
+        job: "{{ immich_config_dir }}/alert-history.sh >> {{ logs_dir }}/immich/alerts/history.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, alerts]
+
+  tags: [immich, alerts, always]

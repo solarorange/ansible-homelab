@@ -1,0 +1,37 @@
+# Utilities Stack Security Monitoring Configuration
+
+security_monitoring:
+  enabled: true
+  alert_email: "{{ admin_email | default('admin@' + domain) }}"
+  
+  # Security monitoring settings
+  monitoring_interval: "5m"
+  alert_threshold: 3
+  
+  # Security checks
+  checks:
+    - unauthorized_access
+    - privilege_escalation
+    - suspicious_activity
+    - failed_authentication
+    - resource_abuse
+    
+  # Notification channels
+  notifications:
+    email: true
+    slack: "{{ slack_webhook_url | default('') }}"
+    discord: "{{ discord_webhook_url | default('') }}"
+    
+  # Log monitoring
+  log_monitoring:
+    enabled: true
+    log_paths:
+      - "{{ logs_dir }}/utilities/*.log"
+      - "/var/log/auth.log"
+      - "/var/log/syslog"
+      
+  # Response actions
+  actions:
+    block_ip: true
+    restart_service: false
+    notify_admin: true 

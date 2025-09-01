@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Verification Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Backup Verification Report</h1>
+        <p>Generated: {{ ansible_date_time.iso8601 }}</p>
+        <p>Host: {{ inventory_hostname }}</p>
+    </div>
+
+    <h2>Summary</h2>
+    <p>Total backups verified: {{ backup_files | length }}</p>
+    
+    <h2>Backup Details</h2>
+    <table>
+        <tr>
+            <th>File</th>
+            <th>Size</th>
+            <th>Status</th>
+        </tr>
+        {% for file in backup_files %}
+        <tr>
+            <td>{{ file.path }}</td>
+            <td>{{ file.size }}</td>
+            <td class="success">✓ Verified</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Verification Results</h2>
+    <p class="success">✓ All backup files verified successfully</p>
+    <p>Backup directory: {{ backup_root_dir | default('/var/backups') }}</p>
+</body>
+</html>

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  pihole:
+    image: pihole/pihole:latest
+    container_name: pihole
+    environment:
+      TZ: '{{ timezone | default("UTC") }}'
+      WEBPASSWORD_FILE: '/run/secrets/WEBPASSWORD'
+      VIRTUAL_HOST: '{{ pihole_domain | default("pihole." + domain) }}'
+      PROXY_LOCATION: pihole
+      ServerIP: '{{ ansible_default_ipv4.address }}'
+      DNS1: '{{ pihole_upstream_dns[0] | default("1.1.1.1") }}'
+      DNS2: '{{ pihole_upstream_dns[1] | default("1.0.0.1") }}'
+      DNSMASQ_LISTENING: all
+      REV_SERVER: '{{ pihole_rev_server | default(false) }}'
+      REV_SERVER_DOMAIN: '{{ pihole_rev_server_domain | default("") }}'
+      REV_SERVER_TARGET: '{{ pihole_rev_server_target | default("") }}'
+      REV_SERVER_CIDR: '{{ pihole_rev_server_cidr | default("") }}'
+    volumes:
+      - '{{ docker_data_root }}/pihole/etc-pihole:/etc/pihole'
+      - '{{ docker_data_root }}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
+      - '{{ logs_dir }}/pihole:/var/log'
+      - '{{ docker_dir }}/pihole/secrets:/run/secrets:ro'
+    ports:
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:53:53/tcp"
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:53:53/udp"
+      - "{{ lan_bind_ip | default(ansible_default_ipv4.address) }}:67:67/udp"
+    restart: unless-stopped
+    networks:
+      - traefik_network
+      - pihole_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole.rule=Host(`{{ pihole_domain | default('pihole.' + domain) }}`)"
+      - "traefik.http.routers.pihole.entrypoints=websecure"
+      - "traefik.http.routers.pihole.tls=true"
+      - "traefik.http.routers.pihole.tls.certresolver=letsencrypt"
+      - "traefik.http.services.pihole.loadbalancer.server.port=80"
+      - "traefik.http.routers.pihole.middlewares=authelia@file"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=security"
+      - "promtail-service=pihole"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Secrets directory mounted above
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/admin/api.php?status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  traefik_network:
+    external: true
+  pihole_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

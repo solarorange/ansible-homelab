@@ -1,0 +1,143 @@
+---
+# Paperless-ngx Homepage Integration
+# Configure homepage dashboard integration and bookmarks
+
+- name: Configure Paperless-ngx homepage integration
+  block:
+    - name: Add Paperless-ngx to homepage bookmarks
+      ansible.builtin.template:
+        src: homepage-bookmarks.yml.j2
+        dest: "{{ config_dir }}/homepage/bookmarks/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+
+    - name: Add Paperless-ngx to homepage services
+      ansible.builtin.template:
+        src: homepage-services.yml.j2
+        dest: "{{ config_dir }}/homepage/services/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+
+    - name: Add Paperless-ngx to homepage widgets
+      ansible.builtin.template:
+        src: homepage-widgets.yml.j2
+        dest: "{{ config_dir }}/homepage/widgets/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, homepage]
+
+- name: Configure Paperless-ngx homepage icon
+  block:
+    - name: Download Paperless-ngx icon
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/master/paperless_ngx/static/img/logo.png"
+        dest: "{{ config_dir }}/homepage/icons/{{ paperless_ngx_homepage_icon }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+        force: false
+      register: icon_download
+
+    - name: Create Paperless-ngx icon if download fails
+      ansible.builtin.copy:
+        src: "{{ config_dir }}/homepage/icons/default.png"
+        dest: "{{ config_dir }}/homepage/icons/{{ paperless_ngx_homepage_icon }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: icon_download is failed
+      notify: restart homepage
+
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, homepage]
+
+- name: Configure Paperless-ngx homepage health check
+  block:
+    - name: Create Paperless-ngx health check configuration
+      ansible.builtin.template:
+        src: homepage-health.yml.j2
+        dest: "{{ config_dir }}/homepage/health/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+
+  when: paperless_ngx_homepage_widget_enabled | default(true)
+  tags: [paperless-ngx, homepage]
+
+- name: Configure Paperless-ngx homepage notifications
+  block:
+    - name: Create Paperless-ngx notification configuration
+      ansible.builtin.template:
+        src: homepage-notifications.yml.j2
+        dest: "{{ config_dir }}/homepage/notifications/paperless-ngx.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, homepage]
+
+- name: Create Paperless-ngx homepage directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ config_dir }}/homepage/bookmarks"
+    - "{{ config_dir }}/homepage/services"
+    - "{{ config_dir }}/homepage/widgets"
+    - "{{ config_dir }}/homepage/health"
+    - "{{ config_dir }}/homepage/notifications"
+    - "{{ config_dir }}/homepage/icons"
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, homepage]
+
+- name: Verify Paperless-ngx homepage integration
+  block:
+    - name: Test Paperless-ngx homepage configuration
+      ansible.builtin.uri:
+        url: "https://{{ homepage_subdomain }}.{{ domain }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 10
+      register: homepage_test
+
+    - name: Display homepage integration status
+      ansible.builtin.debug:
+        msg: |
+          Paperless-ngx homepage integration completed!
+
+          Homepage Components:
+          - Bookmarks: {{ paperless_ngx_homepage_enabled | default(true) }}
+          - Services: {{ paperless_ngx_homepage_enabled | default(true) }}
+          - Widgets: {{ paperless_ngx_homepage_widget_enabled | default(true) }}
+          - Health Check: {{ paperless_ngx_homepage_widget_enabled | default(true) }}
+          - Notifications: {{ paperless_ngx_homepage_enabled | default(true) }}
+
+          Homepage Configuration:
+          - Category: {{ paperless_ngx_homepage_category }}
+          - Description: {{ paperless_ngx_homepage_description }}
+          - Icon: {{ paperless_ngx_homepage_icon }}
+          - URL: https://{{ paperless_ngx_domain }}
+
+          Homepage Test Results:
+          - Homepage Access: {{ homepage_test.status }}
+
+          Access URLs:
+          - Homepage: https://{{ homepage_subdomain }}.{{ domain }}
+          - Paperless-ngx: https://{{ paperless_ngx_domain }}
+
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, homepage]

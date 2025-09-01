@@ -1,0 +1,119 @@
+---
+# DumbAssets Deployment Tasks
+# Handles Docker deployment, directory creation, and basic configuration
+
+- name: Backup existing DumbAssets configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir | default('/tmp/ansible_backup') }}/dumbassets/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ dumbassets_docker_dir }}/docker-compose.yml"
+    - "{{ dumbassets_docker_dir }}/.env"
+  when: item is file
+  register: dumbassets_config_backup
+  tags: [dumbassets, deploy, backup]
+
+- name: Create DumbAssets Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ dumbassets_docker_dir }}/docker-compose.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  register: dumbassets_docker_compose_creation
+  tags: [dumbassets, deploy, config]
+
+- name: Create DumbAssets Traefik configuration
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ dumbassets_config_dir }}/traefik.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  register: dumbassets_traefik_creation
+  tags: [dumbassets, deploy, config]
+
+- name: Create DumbAssets management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/manage.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0755"
+  register: dumbassets_script_creation
+  tags: [dumbassets, deploy, scripts]
+
+- name: Create DumbAssets health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/healthcheck.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0755"
+  register: dumbassets_healthcheck_creation
+  tags: [dumbassets, deploy, scripts]
+
+- name: Pull DumbAssets Docker image
+  community.docker.docker_image:
+    name: "{{ dumbassets_image }}"
+    source: pull
+    force_source: true
+  register: dumbassets_image_pull
+  tags: [dumbassets, deploy, images]
+
+- name: Deploy DumbAssets container safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "dumbassets"
+    project_src: "{{ dumbassets_docker_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ dumbassets_port }}"
+  tags: [dumbassets, deploy, containers, rollback]
+
+- name: Wait for DumbAssets service to start
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ dumbassets_port }}"
+    state: started
+    timeout: "{{ dumbassets_validation_timeout | default(300) }}"
+    delay: 10
+  register: dumbassets_service_start
+  tags: [dumbassets, deploy, health]
+
+- name: Verify DumbAssets service health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ dumbassets_port }}"
+    status_code: [200, 302, 401, 403]
+  register: result
+  until: result.status in [200, 302, 401, 403]
+  retries: "{{ dumbassets_validation_retries | default(3) }}"
+  delay: 10
+  tags: [dumbassets, deploy, health]
+  when: dumbassets_direct_expose_enabled | default(false)
+
+- name: Verify DumbAssets via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ dumbassets_subdomain }}.{{ domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [dumbassets, deploy, health]
+  when: not (dumbassets_direct_expose_enabled | default(false))
+
+- name: Display DumbAssets deployment summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Deployment Summary:
+      - Docker Compose: {{ dumbassets_docker_compose_creation.changed }}
+      - Traefik Config: {{ dumbassets_traefik_creation.changed }}
+      - Image Pull: {{ dumbassets_image_pull.changed }}
+      - Container Deployment: {{ dumbassets_container_deployment.changed }}
+      - Service Health: {{ dumbassets_service_start.state }}
+      - Access URL: https://{{ dumbassets_subdomain }}.{{ domain }}
+      - Local URL: http://{{ ansible_default_ipv4.address }}:{{ dumbassets_port }}
+  tags: [dumbassets, deploy, summary]

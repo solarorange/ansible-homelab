@@ -1,0 +1,89 @@
+---
+- name: Pre-flight Validation
+  hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Check system requirements
+      block:
+        - name: Verify minimum memory requirements
+          ansible.builtin.assert:
+            that: ansible_memtotal_mb >= 4096
+            fail_msg: "System must have at least 4GB of RAM"
+
+        - name: Verify minimum disk space
+          ansible.builtin.assert:
+            that: ansible_facts['devices']['sda']['size'] | int >= 20
+            fail_msg: "System must have at least 20GB of disk space"
+
+        - name: Verify CPU architecture
+          ansible.builtin.assert:
+            that: ansible_architecture in ['x86_64', 'aarch64']
+            fail_msg: "Unsupported CPU architecture"
+
+    - name: Check network connectivity
+      block:
+        - name: Verify DNS resolution
+          ansible.builtin.command: nslookup {{ domain }}
+          register: dns_check
+          changed_when: false
+          failed_when: false
+
+        - name: Assert DNS resolution
+          ansible.builtin.assert:
+            that: dns_check.rc == 0
+            fail_msg: "DNS resolution failed for {{ domain }}"
+
+        - name: Verify internet connectivity
+          ansible.builtin.uri:
+            url: https://www.google.com
+            method: GET
+            status_code: 200
+          register: internet_check
+          failed_when: false
+
+        - name: Assert internet connectivity
+          ansible.builtin.assert:
+            that: internet_check.status == 200
+            fail_msg: "No internet connectivity"
+
+    - name: Validate required variables
+      block:
+        - name: Check required variables
+          ansible.builtin.assert:
+            that:
+              - username is defined
+              - domain is defined
+              - cloudflare_email is defined
+              - cloudflare_api_key is defined
+              - enabled_services is defined
+            fail_msg: "Required variables are not defined"
+
+        - name: Validate service configurations
+          ansible.builtin.assert:
+            that: >
+              enabled_services is sequence
+            fail_msg: "enabled_services must be a list"
+
+    - name: Check system services
+      block:
+        - name: Verify Docker is installed
+          ansible.builtin.command: docker --version
+          register: docker_check
+          changed_when: false
+          failed_when: false
+
+        - name: Assert Docker installation
+          ansible.builtin.assert:
+            that: docker_check.rc == 0
+            fail_msg: "Docker is not installed"
+
+        - name: Verify Docker daemon is running
+          ansible.builtin.service_facts:
+          register: service_facts
+
+        - name: Assert Docker daemon status
+          ansible.builtin.assert:
+            that: service_facts.ansible_facts.services['docker.service'].status == 'running'
+            fail_msg: "Docker daemon is not running"

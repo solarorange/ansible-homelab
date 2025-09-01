@@ -1,0 +1,63 @@
+---
+# Backup verification configuration
+verification:
+  schedule: "0 2 * * *"  # Run at 2 AM daily
+  retention: 30  # Keep verification results for 30 days
+
+backups:
+  - name: "system_backup"
+    type: "kopia"
+    path: "{{ backup_path }}/system"
+    verification_script: "verify_kopia_backup.sh"
+    expected_size: "{{ system_backup_size | default('10G') }}"
+    max_age: 24h
+
+  - name: "docker_volumes"
+    type: "kopia"
+    path: "{{ backup_path }}/docker"
+    verification_script: "verify_docker_backup.sh"
+    expected_size: "{{ docker_backup_size | default('20G') }}"
+    max_age: 24h
+
+  - name: "config_backup"
+    type: "kopia"
+    path: "{{ backup_path }}/config"
+    verification_script: "verify_config_backup.sh"
+    expected_size: "{{ config_backup_size | default('5G') }}"
+    max_age: 24h
+
+  - name: "media_backup"
+    type: "kopia"
+    path: "{{ backup_path }}/media"
+    verification_script: "verify_media_backup.sh"
+    expected_size: "{{ media_backup_size | default('100G') }}"
+    max_age: 24h
+
+notifications:
+  email:
+    smtp_host: "{{ smtp_host | default('smtp.gmail.com') }}"
+    smtp_port: "{{ smtp_port | default(587) }}"
+    smtp_username: "{{ smtp_username }}"
+    smtp_password: "{{ smtp_password }}"
+    from_address: "{{ monitoring_email }}"
+    to_address: "{{ admin_email }}"
+
+  slack:
+    webhook_url: "{{ slack_webhook_url }}"
+    channel: "{{ slack_channel | default('#backups') }}"
+
+alerts:
+  - name: "backup_failed"
+    condition: "backup_status == 'failed'"
+    severity: "critical"
+    notification_channels: ["email", "slack"]
+
+  - name: "backup_size_mismatch"
+    condition: "actual_size < expected_size * 0.9"
+    severity: "warning"
+    notification_channels: ["email", "slack"]
+
+  - name: "backup_too_old"
+    condition: "age > max_age"
+    severity: "critical"
+    notification_channels: ["email", "slack"] 

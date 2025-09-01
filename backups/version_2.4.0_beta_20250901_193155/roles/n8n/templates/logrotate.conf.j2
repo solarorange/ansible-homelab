@@ -1,0 +1,35 @@
+# n8n Log Rotation Configuration
+# Log rotation configuration for n8n logs
+
+{{ logs_dir }}/n8n/*.log {
+    daily
+    missingok
+    rotate {{ n8n_log_retention | default(30) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ username }} {{ username }}
+    postrotate
+        systemctl reload n8n > /dev/null 2>&1 || true
+    endscript
+}
+
+{{ logs_dir }}/n8n/backup/*.log {
+    daily
+    missingok
+    rotate {{ n8n_backup_retention_days | default(7) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ username }} {{ username }}
+}
+
+{{ logs_dir }}/n8n/health/*.log {
+    daily
+    missingok
+    rotate {{ n8n_health_check_retention_days | default(7) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ username }} {{ username }}
+} 

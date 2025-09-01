@@ -1,0 +1,274 @@
+---
+# Health check endpoints configuration
+endpoints:
+  - name: "{{ inventory_hostname }}_system"
+    url: "http://{{ ansible_default_ipv4.address }}:9100/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_docker"
+    url: "http://{{ ansible_default_ipv4.address }}:9323/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_traefik"
+    url: "http://{{ ansible_default_ipv4.address }}:/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_prometheus"
+    url: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_grafana"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_influxdb"
+    url: "http://{{ ansible_default_ipv4.address }}:/health"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_alertmanager"
+    url: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_loki"
+    url: "http://{{ loki_host | default('localhost') }}:{{ loki_port | default(3100) }}/ready"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+  - name: "{{ inventory_hostname }}_blackbox"
+    url: "http://{{ ansible_default_ipv4.address }}:/metrics"
+    interval: 30s
+    timeout: 5s
+    expected_status: 200
+
+notifications:
+  email:
+    smtp_host: "{{ smtp_host | default('smtp.gmail.com') }}"
+    smtp_port: "{{ smtp_port | default(587) }}"
+    smtp_username: "{{ smtp_username }}"
+    smtp_password: "{{ smtp_password }}"
+    from_address: "{{ monitoring_email }}"
+    to_address: "{{ admin_email }}"
+
+# Enhanced Health Check Configuration Template
+# Production-ready health checks with explicit exit codes and robust error handling
+
+# HTTP health check with explicit exit codes
+http_health_check:
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/health || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+  disable: false
+
+# API health check with explicit exit codes
+api_health_check:
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/api/v3/health || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+  disable: false
+
+# Database health check with explicit exit codes
+database_health_check:
+  test: ["CMD-SHELL", "pg_isready -U {{ vault_postgresql_user | default('homelab') }} -d {{ database_name | default('homelab') }} || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+  disable: false
+
+# Redis health check with explicit exit codes
+redis_health_check:
+  test: ["CMD-SHELL", "redis-cli --raw incr ping || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+  disable: false
+
+# Prometheus metrics health check with explicit exit codes
+prometheus_health_check:
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port }}/metrics || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+  disable: false
+
+# Docker container health check with explicit exit codes
+docker_health_check:
+  test: ["CMD-SHELL", "docker ps -f name={{ container_name }} -f status=running | grep -q {{ container_name }} || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 10s
+  disable: false
+
+# Service-specific health checks with enhanced configuration
+service_health_checks:
+  traefik:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ping || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+    disable: false
+  
+  authentik:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/if/user/ || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  grafana:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+    disable: false
+  
+  prometheus:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+    disable: false
+  
+  sonarr:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8989/api/v3/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  radarr:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7878/api/v3/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  prowlarr:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9696/api/v1/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  bazarr:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6767/api/v1/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  jellyfin:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8096/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  nextcloud:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/status.php || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+    disable: false
+  
+  portainer:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/api/status || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+    disable: false
+
+# Enhanced health check script template with better error handling
+health_check_script: |
+  #!/bin/bash
+  
+  # Enhanced Service Health Check Script
+  # Usage: ./health_check.sh <service_name> <port> <endpoint>
+  
+  set -euo pipefail
+  
+  SERVICE_NAME="$1"
+  PORT="$2"
+  ENDPOINT="$3"
+  TIMEOUT="${4:-10}"
+  RETRIES="${5:-3}"
+  
+  if [ -z "$SERVICE_NAME" ] || [ -z "$PORT" ]; then
+    echo "Usage: $0 <service_name> <port> [endpoint] [timeout] [retries]"
+    exit 1
+  fi
+  
+  # Default endpoint if not provided
+  if [ -z "$ENDPOINT" ]; then
+    ENDPOINT="/health"
+  fi
+  
+  # Function to check if service is running
+  check_container() {
+    if ! docker ps -f name="$SERVICE_NAME" -f status=running | grep -q "$SERVICE_NAME"; then
+      echo "Service $SERVICE_NAME is not running"
+      return 1
+    fi
+    return 0
+  }
+  
+  # Function to check if service is responding
+  check_response() {
+    local attempt=1
+    while [ $attempt -le $RETRIES ]; do
+      if wget -qO- --timeout="$TIMEOUT" "http://127.0.0.1:$PORT$ENDPOINT" > /dev/null 2>&1; then
+        return 0
+      fi
+      
+      if [ $attempt -lt $RETRIES ]; then
+        echo "Health check attempt $attempt failed, retrying in 5 seconds..."
+        sleep 5
+      fi
+      ((attempt++))
+    done
+    
+    echo "Service $SERVICE_NAME is not responding on port $PORT after $RETRIES attempts"
+    return 1
+  }
+  
+  # Main health check
+  if check_container && check_response; then
+    echo "Service $SERVICE_NAME is healthy"
+    exit 0
+  else
+    echo "Service $SERVICE_NAME health check failed"
+    exit 1
+  fi 

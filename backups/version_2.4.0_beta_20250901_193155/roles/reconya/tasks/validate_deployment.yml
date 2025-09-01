@@ -1,0 +1,118 @@
+---
+# Reconya Deployment Validation
+# Validate Reconya deployment and functionality
+
+- name: Validate Reconya deployment
+  block:
+    - name: Check Reconya container status
+      community.docker.docker_container_info:
+        name: "{{ reconya_backend_container_name }}"
+      register: reconya_container_status
+
+    - name: Verify Reconya container is running
+      ansible.builtin.assert:
+        that:
+          - reconya_container_status.exists
+          - reconya_container_status.container.State.Status == "running"
+        fail_msg: "Reconya container is not running"
+        success_msg: "Reconya container is running"
+
+    - name: Check Reconya service health
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}/api/health"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: reconya_health_check
+      retries: 3
+      delay: 10
+
+    - name: Verify Reconya health endpoint
+      ansible.builtin.assert:
+        that:
+          - reconya_health_check.status == 200
+        fail_msg: "Reconya health endpoint is not responding"
+        success_msg: "Reconya health endpoint is responding"
+
+  tags: [reconya, validation]
+
+- name: Validate Reconya functionality
+  block:
+    - name: Test Reconya API connectivity
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}/api/devices"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 30
+      register: reconya_api_test
+
+    - name: Verify Reconya API is accessible
+      ansible.builtin.assert:
+        that:
+          - reconya_api_test.status in [200, 401, 403]
+        fail_msg: "Reconya API is not accessible"
+        success_msg: "Reconya API is accessible"
+
+    - name: Check Reconya database connectivity
+      ansible.builtin.shell: |
+        docker exec {{ reconya_backend_container_name }} ls -la {{ reconya_database_path }}
+      register: reconya_db_check
+      changed_when: false
+
+    - name: Verify Reconya database exists
+      ansible.builtin.assert:
+        that:
+          - reconya_db_check.rc == 0
+        fail_msg: "Reconya database is not accessible"
+        success_msg: "Reconya database is accessible"
+
+  tags: [reconya, validation]
+
+- name: Validate Reconya integration
+  block:
+    - name: Check Reconya Traefik integration
+      ansible.builtin.uri:
+        url: "https://{{ reconya_subdomain }}.{{ domain }}"
+        method: GET
+        status_code: [200, 401, 403, 404]
+        timeout: 30
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: reconya_traefik_test
+      ignore_errors: true
+
+    - name: Verify Reconya Traefik integration
+      ansible.builtin.assert:
+        that:
+          - reconya_traefik_test.status in [200, 401, 403, 404]
+        fail_msg: "Reconya Traefik integration is not working"
+        success_msg: "Reconya Traefik integration is working"
+
+    - name: Check Reconya monitoring integration
+      ansible.builtin.file:
+        path: "{{ prometheus_config_dir }}/reconya_targets.yml"
+        state: file
+      register: reconya_monitoring_check
+
+    - name: Verify Reconya monitoring configuration
+      ansible.builtin.assert:
+        that:
+          - reconya_monitoring_check.exists
+        fail_msg: "Reconya monitoring configuration is missing"
+        success_msg: "Reconya monitoring configuration exists"
+
+  tags: [reconya, validation]
+
+- name: Display Reconya deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "Reconya deployment validation completed successfully"
+      - "Container: {{ reconya_container_status.container.State.Status }}"
+      - "Health: {{ reconya_health_check.status }}"
+      - "API: {{ reconya_api_test.status }}"
+      - "Database: Accessible"
+      - "Traefik: {{ reconya_traefik_test.status | default('Not tested') }}"
+      - "Monitoring: Configured"
+      - "URL: https://{{ reconya_subdomain }}.{{ domain }}"
+      - "Local: http://{{ ansible_default_ipv4.address }}:{{ reconya_port }}"
+
+  tags: [reconya, validation]

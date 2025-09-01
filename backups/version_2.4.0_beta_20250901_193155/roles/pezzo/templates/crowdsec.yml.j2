@@ -1,0 +1,73 @@
+# Pezzo CrowdSec Configuration
+# Threat intelligence and security monitoring for Pezzo services
+
+api:
+  server:
+    listen_uri: {{ ansible_default_ipv4.address }}:8080
+    profiles_path: /etc/crowdsec/profiles.yaml
+    use_forwarded_for_headers: true
+    forwarded_for_headers_trusted_proxies:
+      - "{{ ansible_default_ipv4.address }}"
+      - "::1"
+
+common:
+  daemonize: false
+  pid_dir: /var/run/
+  log_media: stdout
+  log_level: info
+  working_dir: /etc/crowdsec/
+
+config_paths:
+  config_dir: /etc/crowdsec/
+  data_dir: /var/lib/crowdsec/data/
+  simulation_path: /etc/crowdsec/simulation.yaml
+  hub_dir: /etc/crowdsec/hub/
+  index_path: /etc/crowdsec/hub/.index
+
+db_config:
+  type: sqlite
+  db_path: /var/lib/crowdsec/crowdsec.db
+  max_open_conns: 100
+
+plugin_config:
+  user: "{{ crowdsec_user | default('65534:65534') }}"
+  group: "{{ crowdsec_group | default('65534:65534') }}"
+
+# Pezzo-specific collections
+collections:
+  - crowdsecurity/nginx
+  - crowdsecurity/http-cve
+  - crowdsecurity/wordpress
+  - crowdsecurity/php
+  - crowdsecurity/apache2
+
+# Pezzo service monitoring
+services:
+  - name: pezzo-server
+    type: http
+    port: 3000
+    path: /api/healthz
+    interval: 30s
+    
+  - name: pezzo-console
+    type: http
+    port: 8080
+    path: /health
+    interval: 30s
+
+# Security rules for Pezzo
+rules:
+  - name: pezzo-api-rate-limit
+    description: "Rate limiting for Pezzo API endpoints"
+    expression: "evt.Meta.service == 'pezzo-server' && evt.Meta.http_status_code >= 400"
+    group: pezzo-security
+    
+  - name: pezzo-auth-failures
+    description: "Authentication failures for Pezzo services"
+    expression: "evt.Meta.service == 'pezzo-server' && evt.Meta.http_status_code == 401"
+    group: pezzo-security
+    
+  - name: pezzo-sql-injection
+    description: "Potential SQL injection attempts"
+    expression: "evt.Meta.service == 'pezzo-server' && evt.Parsed.query contains 'UNION' || evt.Parsed.query contains 'SELECT'"
+    group: pezzo-security 

@@ -1,0 +1,25 @@
+name: CodeRabbit Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, develop]
+
+jobs:
+  coderabbit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: CodeRabbit
+        uses: coderabbitai/coderabbit-action@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODERABBIT_AI_API_KEY: ${{ secrets.CODERABBIT_AI_API_KEY }}
+        with:
+          config: .coderabbit.yaml

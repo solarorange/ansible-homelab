@@ -1,0 +1,748 @@
+# Media Services Logging Configuration
+# Comprehensive logging setup for all media-related services
+# This file should be included in the main Promtail configuration
+
+scrape_configs:
+  # =============================================================================
+  # ARR SERVICES (SONARR, RADARR, LIDARR, READARR, BAZARR)
+  # =============================================================================
+  
+  # Sonarr - TV Show Management
+  - job_name: media_sonarr
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: media_services
+          service: sonarr
+          component: tv_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/sonarr/logs/*.log
+          - {{ logs_dir }}/media/sonarr/application/*.log
+          - {{ logs_dir }}/media/sonarr/api/*.log
+          - {{ logs_dir }}/media/sonarr/downloads/*.log
+          - {{ logs_dir }}/media/sonarr/imports/*.log
+          - {{ logs_dir }}/media/sonarr/notifications/*.log
+          - {{ logs_dir }}/media/sonarr/backup/*.log
+          - {{ logs_dir }}/media/sonarr/errors/*.log
+          - {{ logs_dir }}/media/sonarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_sonarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Radarr - Movie Management
+  - job_name: media_radarr
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: media_services
+          service: radarr
+          component: movie_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/radarr/logs/*.log
+          - {{ logs_dir }}/media/radarr/application/*.log
+          - {{ logs_dir }}/media/radarr/api/*.log
+          - {{ logs_dir }}/media/radarr/downloads/*.log
+          - {{ logs_dir }}/media/radarr/imports/*.log
+          - {{ logs_dir }}/media/radarr/notifications/*.log
+          - {{ logs_dir }}/media/radarr/backup/*.log
+          - {{ logs_dir }}/media/radarr/errors/*.log
+          - {{ logs_dir }}/media/radarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_radarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Lidarr - Music Management
+  - job_name: media_lidarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: lidarr
+          component: music_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/lidarr/logs/*.log
+          - {{ logs_dir }}/media/lidarr/application/*.log
+          - {{ logs_dir }}/media/lidarr/api/*.log
+          - {{ logs_dir }}/media/lidarr/downloads/*.log
+          - {{ logs_dir }}/media/lidarr/imports/*.log
+          - {{ logs_dir }}/media/lidarr/notifications/*.log
+          - {{ logs_dir }}/media/lidarr/backup/*.log
+          - {{ logs_dir }}/media/lidarr/errors/*.log
+          - {{ logs_dir }}/media/lidarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_lidarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Readarr - Book Management
+  - job_name: media_readarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: readarr
+          component: book_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/readarr/logs/*.log
+          - {{ logs_dir }}/media/readarr/application/*.log
+          - {{ logs_dir }}/media/readarr/api/*.log
+          - {{ logs_dir }}/media/readarr/downloads/*.log
+          - {{ logs_dir }}/media/readarr/imports/*.log
+          - {{ logs_dir }}/media/readarr/notifications/*.log
+          - {{ logs_dir }}/media/readarr/backup/*.log
+          - {{ logs_dir }}/media/readarr/errors/*.log
+          - {{ logs_dir }}/media/readarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_readarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Bazarr - Subtitle Management
+  - job_name: media_bazarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: bazarr
+          component: subtitle_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/bazarr/logs/*.log
+          - {{ logs_dir }}/media/bazarr/application/*.log
+          - {{ logs_dir }}/media/bazarr/api/*.log
+          - {{ logs_dir }}/media/bazarr/downloads/*.log
+          - {{ logs_dir }}/media/bazarr/processing/*.log
+          - {{ logs_dir }}/media/bazarr/notifications/*.log
+          - {{ logs_dir }}/media/bazarr/backup/*.log
+          - {{ logs_dir }}/media/bazarr/errors/*.log
+          - {{ logs_dir }}/media/bazarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_bazarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Prowlarr - Indexer Management
+  - job_name: media_prowlarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: prowlarr
+          component: indexer_management
+          category: arr_services
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/prowlarr/logs/*.log
+          - {{ logs_dir }}/media/prowlarr/application/*.log
+          - {{ logs_dir }}/media/prowlarr/api/*.log
+          - {{ logs_dir }}/media/prowlarr/indexers/*.log
+          - {{ logs_dir }}/media/prowlarr/searches/*.log
+          - {{ logs_dir }}/media/prowlarr/notifications/*.log
+          - {{ logs_dir }}/media/prowlarr/backup/*.log
+          - {{ logs_dir }}/media/prowlarr/errors/*.log
+          - {{ logs_dir }}/media/prowlarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_prowlarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # DOWNLOADERS
+  # =============================================================================
+  
+  # SABnzbd - Usenet Downloader
+  - job_name: media_sabnzbd
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: sabnzbd
+          component: usenet_downloader
+          category: downloaders
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/sabnzbd/logs/*.log
+          - {{ logs_dir }}/media/sabnzbd/application/*.log
+          - {{ logs_dir }}/media/sabnzbd/api/*.log
+          - {{ logs_dir }}/media/sabnzbd/downloads/*.log
+          - {{ logs_dir }}/media/sabnzbd/repair/*.log
+          - {{ logs_dir }}/media/sabnzbd/unpack/*.log
+          - {{ logs_dir }}/media/sabnzbd/notifications/*.log
+          - {{ logs_dir }}/media/sabnzbd/backup/*.log
+          - {{ logs_dir }}/media/sabnzbd/errors/*.log
+          - {{ logs_dir }}/media/sabnzbd/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_sabnzbd"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # qBittorrent - Torrent Downloader
+  - job_name: media_qbittorrent
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: qbittorrent
+          component: torrent_downloader
+          category: downloaders
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/qbittorrent/logs/*.log
+          - {{ logs_dir }}/media/qbittorrent/application/*.log
+          - {{ logs_dir }}/media/qbittorrent/api/*.log
+          - {{ logs_dir }}/media/qbittorrent/downloads/*.log
+          - {{ logs_dir }}/media/qbittorrent/trackers/*.log
+          - {{ logs_dir }}/media/qbittorrent/notifications/*.log
+          - {{ logs_dir }}/media/qbittorrent/backup/*.log
+          - {{ logs_dir }}/media/qbittorrent/errors/*.log
+          - {{ logs_dir }}/media/qbittorrent/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_qbittorrent"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Transmission - Torrent Downloader
+  - job_name: media_transmission
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: transmission
+          component: torrent_downloader
+          category: downloaders
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/transmission/logs/*.log
+          - {{ logs_dir }}/media/transmission/application/*.log
+          - {{ logs_dir }}/media/transmission/api/*.log
+          - {{ logs_dir }}/media/transmission/downloads/*.log
+          - {{ logs_dir }}/media/transmission/trackers/*.log
+          - {{ logs_dir }}/media/transmission/notifications/*.log
+          - {{ logs_dir }}/media/transmission/backup/*.log
+          - {{ logs_dir }}/media/transmission/errors/*.log
+          - {{ logs_dir }}/media/transmission/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_transmission"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # MEDIA PLAYERS
+  # =============================================================================
+  
+  # Jellyfin - Media Server
+  - job_name: media_jellyfin
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: jellyfin
+          component: media_server
+          category: players
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/jellyfin/logs/*.log
+          - {{ logs_dir }}/media/jellyfin/application/*.log
+          - {{ logs_dir }}/media/jellyfin/api/*.log
+          - {{ logs_dir }}/media/jellyfin/playback/*.log
+          - {{ logs_dir }}/media/jellyfin/transcoding/*.log
+          - {{ logs_dir }}/media/jellyfin/notifications/*.log
+          - {{ logs_dir }}/media/jellyfin/backup/*.log
+          - {{ logs_dir }}/media/jellyfin/errors/*.log
+          - {{ logs_dir }}/media/jellyfin/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_jellyfin"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Emby - Media Server
+  - job_name: media_emby
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: emby
+          component: media_server
+          category: players
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/emby/logs/*.log
+          - {{ logs_dir }}/media/emby/application/*.log
+          - {{ logs_dir }}/media/emby/api/*.log
+          - {{ logs_dir }}/media/emby/playback/*.log
+          - {{ logs_dir }}/media/emby/transcoding/*.log
+          - {{ logs_dir }}/media/emby/notifications/*.log
+          - {{ logs_dir }}/media/emby/backup/*.log
+          - {{ logs_dir }}/media/emby/errors/*.log
+          - {{ logs_dir }}/media/emby/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_emby"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Plex - Media Server
+  - job_name: media_plex
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: plex
+          component: media_server
+          category: players
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/plex/logs/*.log
+          - {{ logs_dir }}/media/plex/application/*.log
+          - {{ logs_dir }}/media/plex/api/*.log
+          - {{ logs_dir }}/media/plex/playback/*.log
+          - {{ logs_dir }}/media/plex/transcoding/*.log
+          - {{ logs_dir }}/media/plex/notifications/*.log
+          - {{ logs_dir }}/media/plex/backup/*.log
+          - {{ logs_dir }}/media/plex/errors/*.log
+          - {{ logs_dir }}/media/plex/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_plex"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # MEDIA PROCESSING
+  # =============================================================================
+  
+  # Tdarr - Media Processing
+  - job_name: media_tdarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: tdarr
+          component: media_processing
+          category: processing
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/tdarr/logs/*.log
+          - {{ logs_dir }}/media/tdarr/application/*.log
+          - {{ logs_dir }}/media/tdarr/api/*.log
+          - {{ logs_dir }}/media/tdarr/processing/*.log
+          - {{ logs_dir }}/media/tdarr/plugins/*.log
+          - {{ logs_dir }}/media/tdarr/notifications/*.log
+          - {{ logs_dir }}/media/tdarr/backup/*.log
+          - {{ logs_dir }}/media/tdarr/errors/*.log
+          - {{ logs_dir }}/media/tdarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_tdarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # HandBrake - Video Transcoding
+  - job_name: media_handbrake
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: handbrake
+          component: video_transcoding
+          category: processing
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/handbrake/logs/*.log
+          - {{ logs_dir }}/media/handbrake/application/*.log
+          - {{ logs_dir }}/media/handbrake/processing/*.log
+          - {{ logs_dir }}/media/handbrake/notifications/*.log
+          - {{ logs_dir }}/media/handbrake/backup/*.log
+          - {{ logs_dir }}/media/handbrake/errors/*.log
+          - {{ logs_dir }}/media/handbrake/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_handbrake"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # MEDIA MANAGEMENT
+  # =============================================================================
+  
+  # Overseerr - Media Request Management
+  - job_name: media_overseerr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: overseerr
+          component: request_management
+          category: management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/overseerr/logs/*.log
+          - {{ logs_dir }}/media/overseerr/application/*.log
+          - {{ logs_dir }}/media/overseerr/api/*.log
+          - {{ logs_dir }}/media/overseerr/requests/*.log
+          - {{ logs_dir }}/media/overseerr/notifications/*.log
+          - {{ logs_dir }}/media/overseerr/backup/*.log
+          - {{ logs_dir }}/media/overseerr/errors/*.log
+          - {{ logs_dir }}/media/overseerr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_overseerr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Tautulli - Plex Analytics
+  - job_name: media_tautulli
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: tautulli
+          component: analytics
+          category: management
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/tautulli/logs/*.log
+          - {{ logs_dir }}/media/tautulli/application/*.log
+          - {{ logs_dir }}/media/tautulli/api/*.log
+          - {{ logs_dir }}/media/tautulli/analytics/*.log
+          - {{ logs_dir }}/media/tautulli/notifications/*.log
+          - {{ logs_dir }}/media/tautulli/backup/*.log
+          - {{ logs_dir }}/media/tautulli/errors/*.log
+          - {{ logs_dir }}/media/tautulli/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_tautulli"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # PHOTO MANAGEMENT
+  # =============================================================================
+  
+  # Immich - Photo Management
+  - job_name: media_immich
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: immich
+          component: photo_management
+          category: photos
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/immich/logs/*.log
+          - {{ logs_dir }}/media/immich/application/*.log
+          - {{ logs_dir }}/media/immich/api/*.log
+          - {{ logs_dir }}/media/immich/upload/*.log
+          - {{ logs_dir }}/media/immich/processing/*.log
+          - {{ logs_dir }}/media/immich/notifications/*.log
+          - {{ logs_dir }}/media/immich/backup/*.log
+          - {{ logs_dir }}/media/immich/errors/*.log
+          - {{ logs_dir }}/media/immich/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_immich"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # MEDIA UTILITIES
+  # =============================================================================
+  
+  # Pulsarr - Plex Integration
+  - job_name: media_pulsarr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: media_services
+          service: pulsarr
+          component: plex_integration
+          category: utilities
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/pulsarr/logs/*.log
+          - {{ logs_dir }}/media/pulsarr/application/*.log
+          - {{ logs_dir }}/media/pulsarr/api/*.log
+          - {{ logs_dir }}/media/pulsarr/integration/*.log
+          - {{ logs_dir }}/media/pulsarr/notifications/*.log
+          - {{ logs_dir }}/media/pulsarr/backup/*.log
+          - {{ logs_dir }}/media/pulsarr/errors/*.log
+          - {{ logs_dir }}/media/pulsarr/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="media_pulsarr"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category: 

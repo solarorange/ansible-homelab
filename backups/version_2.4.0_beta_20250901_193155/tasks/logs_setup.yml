@@ -1,0 +1,48 @@
+---
+# Ensure homelab log directories exist so mounts and promtail scraping never fail
+- name: Ensure base logs directory exists
+  ansible.builtin.file:
+    path: "{{ logs_dir }}"
+    state: directory
+    mode: "0755"
+  tags: [logging, prerequisites, directories]
+- name: Build list of service names to provision log directories for
+  ansible.builtin.set_fact:
+    _logs_services_combined: "{{ (
+        (enabled_services | default([]))
+        + (media_services | default([]))
+        + (automation_services | default([]))
+        + (file_services | default([]))
+        + (development_services | default([]))
+        + (utility_services | default([]))
+      ) | unique }}"
+  tags: [logging, prerequisites]
+- name: Ensure per-service logs directories exist
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ _logs_services_combined }}"
+  loop_control:
+    label: "{{ logs_dir }}/{{ item }}"
+  tags: [logging, prerequisites, directories]
+# Special components that mount subfolders under the service
+- name: Ensure component subdirectories for logs exist (multi-component services)
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/{{ item.service }}/{{ item.component }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - { service: "linkwarden", component: "app" }
+    - { service: "linkwarden", component: "postgres" }
+    - { service: "n8n", component: "app" }
+    - { service: "n8n", component: "postgres" }
+    - { service: "nginx-proxy-manager", component: "app" }
+    - { service: "nginx-proxy-manager", component: "db" }
+    - { service: "reconya", component: "backend" }
+    - { service: "vaultwarden", component: "postgres" }
+    - { service: "fing", component: "app" }
+  when: "item.service in _logs_services_combined"
+  loop_control:
+    label: "{{ logs_dir }}/{{ item.service }}/{{ item.component }}"
+  tags: [logging, prerequisites, directories]

@@ -1,0 +1,186 @@
+---
+# Media Stack Monitoring
+# Configure monitoring integration for media stack
+
+- name: Configure Media Stack monitoring
+  block:
+    - name: Create media stack monitoring dashboard
+      ansible.builtin.template:
+        src: media-dashboard.json.j2
+        dest: "{{ grafana_dashboards_dir }}/media-stack-dashboard.json"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_grafana_enabled | default(true)
+
+    - name: Configure media stack Prometheus targets
+      ansible.builtin.template:
+        src: media-prometheus.yml.j2
+        dest: "{{ prometheus_config_dir }}/media-stack.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_prometheus_enabled | default(true)
+
+    - name: Configure media stack Promtail for log collection
+      ansible.builtin.template:
+        src: promtail-config.yml.j2
+        dest: "{{ promtail_config_dir }}/promtail-media-stack.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_loki_enabled | default(true)
+
+    - name: Configure media stack Telegraf configuration
+      ansible.builtin.template:
+        src: media-telegraf.conf.j2
+        dest: "{{ telegraf_config_dir }}/media-stack.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_telegraf_enabled | default(true)
+
+    - name: Create media stack monitoring alerts
+      ansible.builtin.template:
+        src: media-alerts.yml.j2
+        dest: "{{ alertmanager_config_dir }}/media-stack-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_alerting_enabled | default(true)
+
+    - name: Configure media stack health check monitoring
+      ansible.builtin.template:
+        src: media-health-monitor.yml.j2
+        dest: "{{ config_dir }}/media/media-health-monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack performance monitoring
+      ansible.builtin.template:
+        src: media-performance-monitor.yml.j2
+        dest: "{{ config_dir }}/media/media-performance-monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Configure media stack resource monitoring
+      ansible.builtin.template:
+        src: media-resource-monitor.yml.j2
+        dest: "{{ config_dir }}/media/media-resource-monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack monitoring scripts
+      ansible.builtin.template:
+        src: media-monitor.sh.j2
+        dest: "{{ config_dir }}/media-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create media stack metrics collection script
+      ansible.builtin.template:
+        src: media-metrics.sh.j2
+        dest: "{{ config_dir }}/media-metrics.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule media stack monitoring tasks
+      ansible.builtin.cron:
+        name: "Media stack monitoring"
+        minute: "*/5"
+        job: "{{ config_dir }}/media-monitor.sh"
+        user: "{{ vault_media_user }}"
+
+    - name: Schedule media stack metrics collection
+      ansible.builtin.cron:
+        name: "Media stack metrics collection"
+        minute: "*/1"
+        job: "{{ config_dir }}/media-metrics.sh"
+        user: "{{ vault_media_user }}"
+
+    - name: Configure media stack log aggregation
+      ansible.builtin.template:
+        src: media-log-aggregation.yml.j2
+        dest: "{{ config_dir }}/media/media-log-aggregation.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack monitoring service
+      ansible.builtin.template:
+        src: media-monitoring.service.j2
+        dest: "/etc/systemd/system/media-monitoring.service"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable media stack monitoring service
+      ansible.builtin.systemd:
+        name: media-monitoring
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Configure media stack monitoring rules
+      ansible.builtin.template:
+        src: media-monitoring-rules.yml.j2
+        dest: "{{ prometheus_rules_dir }}/media-stack-rules.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_prometheus_enabled | default(true)
+
+    - name: Create media stack monitoring documentation
+      ansible.builtin.template:
+        src: media-monitoring-docs.md.j2
+        dest: "{{ docs_dir }}/media-monitoring.md"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Configure media stack monitoring API endpoints
+      ansible.builtin.template:
+        src: media-monitoring-api.yml.j2
+        dest: "{{ config_dir }}/media/media-monitoring-api.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack monitoring webhook configuration
+      ansible.builtin.template:
+        src: media-monitoring-webhooks.yml.j2
+        dest: "{{ config_dir }}/media/media-monitoring-webhooks.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Configure media stack monitoring notification channels
+      ansible.builtin.template:
+        src: media-monitoring-notifications.yml.j2
+        dest: "{{ config_dir }}/media/media-monitoring-notifications.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack monitoring maintenance script
+      ansible.builtin.template:
+        src: media-monitoring-maintenance.sh.j2
+        dest: "{{ config_dir }}/media-monitoring-maintenance.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule media stack monitoring maintenance
+      ansible.builtin.cron:
+        name: "Media stack monitoring maintenance"
+        hour: "4"
+        minute: "0"
+        job: "{{ config_dir }}/media-monitoring-maintenance.sh"
+        user: "{{ vault_media_user }}"
+
+  tags: [media, monitoring]

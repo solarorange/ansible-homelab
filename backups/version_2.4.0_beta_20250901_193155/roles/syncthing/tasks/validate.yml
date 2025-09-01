@@ -1,0 +1,89 @@
+---
+# Syncthing Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Syncthing vault variables
+  block:
+    - name: Check required Syncthing vault variables
+      assert:
+        that:
+          - vault_syncthing_admin_password is defined
+          - vault_syncthing_database_password is defined
+          - vault_syncthing_api_key is defined
+          - vault_syncthing_secret_key is defined
+          - vault_syncthing_encryption_key is defined
+          - vault_syncthing_jwt_secret is defined
+        fail_msg: "Required Syncthing vault variables are not defined"
+        success_msg: "All required Syncthing vault variables are defined"
+
+    - name: Validate Syncthing password complexity
+      assert:
+        that:
+          - vault_syncthing_admin_password | length >= 12
+          - vault_syncthing_database_password | length >= 12
+        fail_msg: "Syncthing passwords must be at least 12 characters long"
+        success_msg: "Syncthing password complexity requirements met"
+
+- name: Validate Syncthing network configuration
+  block:
+    - name: Check Syncthing port configuration
+      assert:
+        that:
+          - syncthing_port is defined
+          - syncthing_port | int >= 1024
+          - syncthing_port | int <= 65535
+        fail_msg: "Syncthing port must be between 1024 and 65535"
+        success_msg: "Syncthing port configuration is valid"
+
+    - name: Check Syncthing domain configuration
+      assert:
+        that:
+          - domain is defined
+          - syncthing_subdomain is defined
+        fail_msg: "Syncthing domain configuration is incomplete"
+        success_msg: "Syncthing domain configuration is valid"
+
+- name: Validate Syncthing security configuration
+  block:
+    - name: Check Syncthing SSL configuration
+      assert:
+        that:
+          - syncthing_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Syncthing SSL configuration is invalid"
+        success_msg: "Syncthing SSL configuration is valid"
+
+    - name: Check Syncthing authentication configuration
+      assert:
+        that:
+          - syncthing_auth_enabled | bool
+          - syncthing_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Syncthing authentication configuration is invalid"
+        success_msg: "Syncthing authentication configuration is valid"
+
+- name: Validate Syncthing storage configuration
+  block:
+    - name: Check Syncthing data directories
+      assert:
+        that:
+          - syncthing_data_dir is defined
+          - syncthing_config_dir is defined
+          - syncthing_backup_dir is defined
+        fail_msg: "Syncthing storage configuration is incomplete"
+        success_msg: "Syncthing storage configuration is valid"
+
+    - name: Create Syncthing directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ syncthing_data_dir }}"
+        - "{{ syncthing_config_dir }}"
+        - "{{ syncthing_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Syncthing validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,89 @@
+---
+# Rtorrent Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Rtorrent vault variables
+  block:
+    - name: Check required Rtorrent vault variables
+      assert:
+        that:
+          - vault_rtorrent_admin_password is defined
+          - vault_rtorrent_database_password is defined
+          - vault_rtorrent_api_key is defined
+          - vault_rtorrent_secret_key is defined
+          - vault_rtorrent_encryption_key is defined
+          - vault_rtorrent_jwt_secret is defined
+        fail_msg: "Required Rtorrent vault variables are not defined"
+        success_msg: "All required Rtorrent vault variables are defined"
+
+    - name: Validate Rtorrent password complexity
+      assert:
+        that:
+          - vault_rtorrent_admin_password | length >= 12
+          - vault_rtorrent_database_password | length >= 12
+        fail_msg: "Rtorrent passwords must be at least 12 characters long"
+        success_msg: "Rtorrent password complexity requirements met"
+
+- name: Validate Rtorrent network configuration
+  block:
+    - name: Check Rtorrent port configuration
+      assert:
+        that:
+          - rtorrent_port is defined
+          - rtorrent_port | int >= 1024
+          - rtorrent_port | int <= 65535
+        fail_msg: "Rtorrent port must be between 1024 and 65535"
+        success_msg: "Rtorrent port configuration is valid"
+
+    - name: Check Rtorrent domain configuration
+      assert:
+        that:
+          - domain is defined
+          - rtorrent_subdomain is defined
+        fail_msg: "Rtorrent domain configuration is incomplete"
+        success_msg: "Rtorrent domain configuration is valid"
+
+- name: Validate Rtorrent security configuration
+  block:
+    - name: Check Rtorrent SSL configuration
+      assert:
+        that:
+          - rtorrent_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Rtorrent SSL configuration is invalid"
+        success_msg: "Rtorrent SSL configuration is valid"
+
+    - name: Check Rtorrent authentication configuration
+      assert:
+        that:
+          - rtorrent_auth_enabled | bool
+          - rtorrent_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Rtorrent authentication configuration is invalid"
+        success_msg: "Rtorrent authentication configuration is valid"
+
+- name: Validate Rtorrent storage configuration
+  block:
+    - name: Check Rtorrent data directories
+      assert:
+        that:
+          - rtorrent_data_dir is defined
+          - rtorrent_config_dir is defined
+          - rtorrent_backup_dir is defined
+        fail_msg: "Rtorrent storage configuration is incomplete"
+        success_msg: "Rtorrent storage configuration is valid"
+
+    - name: Create Rtorrent directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ rtorrent_data_dir }}"
+        - "{{ rtorrent_config_dir }}"
+        - "{{ rtorrent_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Rtorrent validation completed successfully - all configurations are valid and secure"

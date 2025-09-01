@@ -1,0 +1,33 @@
+---
+# Media Stack Security
+# Configure security hardening for media stack
+
+- name: Configure Fail2ban for media stack
+  ansible.builtin.template:
+    src: fail2ban-jail.local.j2
+    dest: "/etc/fail2ban/jail.d/media-stack.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: media_fail2ban_enabled | default(true)
+  notify: restart fail2ban
+
+- name: Configure CrowdSec for media stack
+  ansible.builtin.template:
+    src: crowdsec-config.yml.j2
+    dest: "{{ crowdsec_config_dir }}/media-stack.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: media_crowdsec_enabled | default(true)
+  notify: restart crowdsec
+
+- name: Configure media stack security headers
+  ansible.builtin.template:
+    src: security.yml.j2
+    dest: "{{ config_dir }}/media/security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: media_security_headers | default(true)
+  notify: restart media stack

@@ -1,0 +1,80 @@
+---
+# Reconya Homepage Integration
+# Configure Homepage integration for Reconya
+
+- name: Configure Reconya Homepage integration
+  block:
+    - name: Create Reconya Homepage configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}/homepage"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create Reconya Homepage service configuration
+      ansible.builtin.template:
+        src: homepage_service.yml.j2
+        dest: "{{ homepage_config_dir }}/services/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create Reconya Homepage widget configuration
+      ansible.builtin.template:
+        src: homepage_widget.yml.j2
+        dest: "{{ homepage_config_dir }}/widgets/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_homepage_widget_enabled | default(true)
+
+    - name: Create Reconya Homepage bookmark configuration
+      ansible.builtin.template:
+        src: homepage_bookmark.yml.j2
+        dest: "{{ homepage_config_dir }}/bookmarks/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  tags: [reconya, homepage]
+
+- name: Configure Reconya Homepage theme integration
+  block:
+    - name: Create Reconya Homepage theme configuration
+      ansible.builtin.template:
+        src: homepage_theme.yml.j2
+        dest: "{{ homepage_config_dir }}/theme/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create Reconya Homepage custom CSS
+      ansible.builtin.template:
+        src: homepage_custom.css.j2
+        dest: "{{ homepage_config_dir }}/custom/reconya.css"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  tags: [reconya, homepage]
+
+- name: Configure Reconya Homepage API integration
+  block:
+    - name: Create Reconya Homepage API configuration
+      ansible.builtin.template:
+        src: homepage_api.yml.j2
+        dest: "{{ homepage_config_dir }}/api/reconya.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create Reconya Homepage API script
+      ansible.builtin.template:
+        src: homepage_api_script.sh.j2
+        dest: "{{ homepage_config_dir }}/scripts/reconya_api.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+  tags: [reconya, homepage]

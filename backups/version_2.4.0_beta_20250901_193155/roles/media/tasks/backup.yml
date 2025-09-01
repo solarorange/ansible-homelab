@@ -1,0 +1,34 @@
+---
+# Media Stack Backup
+# Configure backup procedures for media stack
+
+- name: Create media stack backup directory
+  ansible.builtin.file:
+    path: "{{ media_backup_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: media_backup_enabled | default(true)
+
+- name: Create media stack backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ config_dir }}/media-backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: media_backup_enabled | default(true)
+  notify: restart media backup
+
+- name: Schedule media stack backup
+  ansible.builtin.cron:
+    name: "Media stack backup"
+    hour: "{{ media_backup_schedule.split(' ')[1] }}"
+    minute: "{{ media_backup_schedule.split(' ')[0] }}"
+    day: "{{ media_backup_schedule.split(' ')[2] }}"
+    month: "{{ media_backup_schedule.split(' ')[3] }}"
+    weekday: "{{ media_backup_schedule.split(' ')[4] }}"
+    job: "{{ config_dir }}/media-backup.sh"
+    user: "{{ vault_media_user }}"
+  when: media_backup_enabled | default(true)

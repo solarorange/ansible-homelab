@@ -1,0 +1,114 @@
+---
+# Tautulli - Plex Statistics and Monitoring
+# Production-ready configuration for Plex statistics and monitoring
+
+- name: Create Tautulli directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ docker_dir }}/tautulli/config"
+    - "{{ docker_dir }}/tautulli/logs"
+  tags: [media, tautulli]
+
+- name: Create Tautulli docker-compose configuration
+  ansible.builtin.template:
+    src: templates/tautulli/docker-compose.yml.j2
+    dest: "{{ docker_dir }}/tautulli/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Create Tautulli environment file
+  ansible.builtin.template:
+    src: templates/tautulli/.env.j2
+    dest: "{{ docker_dir }}/tautulli/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Create Traefik configuration for Tautulli
+  ansible.builtin.template:
+    src: templates/tautulli/traefik.yml.j2
+    dest: "{{ docker_dir }}/tautulli/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, tautulli]
+
+- name: Start Tautulli container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "tautulli"
+    project_src: "{{ docker_dir }}/tautulli"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8181
+  tags: [media, tautulli, rollback]
+
+- name: Wait for Tautulli to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: tautulli_status
+  until: tautulli_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [media, tautulli]
+
+- name: Configure Tautulli Plex server
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=update_plex_server"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_plex_servers }}"
+  when: tautulli_plex_servers is defined
+  tags: [media, tautulli]
+
+- name: Configure Tautulli notifications
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=update_notification_config"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_notifications }}"
+  when: tautulli_notifications is defined
+  tags: [media, tautulli]
+
+- name: Configure Tautulli backup
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=backup_config"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+  loop: "{{ tautulli_backups }}"
+  when: tautulli_backups is defined
+  tags: [media, tautulli]
+
+- name: Verify Tautulli configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    method: GET
+    status_code: 200
+    register: tautulli_verify
+  tags: [media, tautulli]
+
+- name: Display Tautulli deployment status
+  ansible.builtin.debug:
+    msg: |
+      Tautulli deployment completed successfully
+      URL: https://tautulli.{{ domain }}
+      Status: {{ tautulli_verify.json.response.data }}
+  tags: [media, tautulli]

@@ -1,0 +1,39 @@
+#!/bin/bash
+# PostgreSQL Management Script
+function show_help {
+  echo "PostgreSQL Management Script"
+  echo "Usage: $0 [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status    - Show PostgreSQL status"
+  echo "  logs      - Show PostgreSQL logs"
+  echo "  restart   - Restart PostgreSQL"
+  echo "  backup    - Create backup"
+  echo "  restore   - Restore from backup"
+  echo "  vacuum    - Run VACUUM ANALYZE"
+  echo "  help      - Show this help"
+}
+case "$1" in
+  status)
+    docker ps -f name={{ postgresql_container_name }}
+    docker exec {{ postgresql_container_name }} pg_isready
+    ;;
+  logs)
+    docker logs {{ postgresql_container_name }} --tail 100 -f
+    ;;
+  restart)
+    docker restart {{ postgresql_container_name }}
+    ;;
+  backup)
+    {{ docker_dir }}/postgresql/scripts/backup.sh
+    ;;
+  restore)
+    {{ docker_dir }}/postgresql/scripts/restore.sh "$2"
+    ;;
+  vacuum)
+    docker exec {{ postgresql_container_name }} psql -U {{ postgresql_admin_user }} -c "VACUUM ANALYZE;"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

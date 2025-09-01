@@ -1,0 +1,312 @@
+---
+# Deploy Grafana Dashboards and Alert Rules
+# Comprehensive deployment of monitoring dashboards and alerting
+
+- name: Create Grafana configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  loop:
+    - "{{ grafana_config_dir }}/provisioning/dashboards"
+    - "{{ grafana_config_dir }}/provisioning/alerting"
+    - "{{ grafana_config_dir }}/provisioning/notifiers"
+    - "{{ grafana_config_dir }}/dashboards"
+    - "{{ grafana_config_dir }}/alerting"
+  when: grafana_enabled | default(true)
+
+- name: Deploy Grafana dashboard provisioning configuration
+  template:
+    src: dashboard-provisioning.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/dashboards/dashboard-provisioning.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Grafana alerting provisioning configuration
+  template:
+    src: alerting-provisioning.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/alerting/alerting-provisioning.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Grafana notifier provisioning configuration
+  template:
+    src: notifier-provisioning.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/notifiers/notifier-provisioning.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Homelab Overview Dashboard
+  template:
+    src: dashboards/homelab-overview.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/homelab-overview.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Docker Services Dashboard
+  template:
+    src: dashboards/docker-services.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/docker-services.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Media Stack Dashboard
+  template:
+    src: dashboards/media-stack.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/media-stack.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Security Monitoring Dashboard
+  template:
+    src: dashboards/security-monitoring.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/security-monitoring.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Network & Infrastructure Dashboard
+  template:
+    src: dashboards/network-infrastructure.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/network-infrastructure.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Backup & Storage Dashboard
+  template:
+    src: dashboards/backup-storage.json.j2
+    dest: "{{ grafana_config_dir }}/dashboards/backup-storage.json"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Alert Rules Configuration
+  template:
+    src: alert-rules.yml.j2
+    dest: "{{ grafana_config_dir }}/alerting/alert-rules.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Notification Channels Configuration
+  template:
+    src: notification-channels.yml.j2
+    dest: "{{ grafana_config_dir }}/alerting/notification-channels.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Deploy Data Sources Configuration
+  template:
+    src: datasources.yml.j2
+    dest: "{{ grafana_config_dir }}/provisioning/datasources/datasources.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+  notify: restart grafana
+
+- name: Create Dashboard Documentation
+  template:
+    src: dashboard-documentation.md.j2
+    dest: "{{ grafana_config_dir }}/dashboards/README.md"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+
+- name: Wait for Grafana to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/health"
+    method: GET
+    status_code: 200
+  register: grafana_health
+  retries: 30
+  delay: 10
+  when: grafana_enabled | default(true)
+
+- name: Validate Dashboard Deployment
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/dashboards/db/homelab-overview"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: yes
+    status_code: 200
+  register: dashboard_validation
+  when: grafana_enabled | default(true)
+
+- name: Validate Alert Rules Deployment
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/v1/provisioning/alert-rules"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: yes
+    status_code: 200
+  register: alert_validation
+  when: grafana_enabled | default(true)
+
+- name: Validate Notification Channels Deployment
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}/api/v1/provisioning/notification-policies"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: yes
+    status_code: 200
+  register: notification_validation
+  when: grafana_enabled | default(true)
+
+- name: Display Deployment Status
+  debug:
+    msg: |
+      Grafana Dashboard Deployment Status:
+
+      Health Check: {{ grafana_health.status | default('Unknown') }}
+      Dashboard Validation: {{ dashboard_validation.status | default('Unknown') }}
+      Alert Rules Validation: {{ alert_validation.status | default('Unknown') }}
+      Notification Channels Validation: {{ notification_validation.status | default('Unknown') }}
+
+      Dashboards Deployed:
+      - Homelab Overview
+      - Docker Services
+      - Media Stack
+      - Security Monitoring
+      - Network & Infrastructure
+      - Backup & Storage
+
+      Alert Rules Deployed:
+      - Critical Alerts ({{ critical_alerts_count | default(15) }} rules)
+      - Warning Alerts ({{ warning_alerts_count | default(20) }} rules)
+      - Info Alerts ({{ info_alerts_count | default(10) }} rules)
+
+      Notification Channels:
+      - Email Alerts
+      - Discord Alerts (if configured)
+      - Slack Alerts (if configured)
+      - Telegram Alerts (if configured)
+      - Webhook Alerts (if configured)
+      - Push Notifications (if configured)
+
+      Access Grafana at: http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}
+  when: grafana_enabled | default(true)
+
+- name: Create Grafana Service Health Check
+  template:
+    src: healthcheck.sh.j2
+    dest: "{{ grafana_config_dir }}/healthcheck.sh"
+    mode: '0755'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+
+- name: Set up Grafana Log Rotation
+  template:
+    src: logrotate.conf.j2
+    dest: /etc/logrotate.d/grafana
+    mode: '0644'
+    owner: root
+    group: root
+  when: grafana_enabled | default(true)
+
+- name: Create Grafana Backup Script
+  template:
+    src: backup.sh.j2
+    dest: "{{ grafana_config_dir }}/backup.sh"
+    mode: '0755'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+
+- name: Set up Grafana Backup Cron Job
+  cron:
+    name: "Grafana Dashboard Backup"
+    hour: "2"
+    minute: "0"
+    job: "{{ grafana_config_dir }}/backup.sh"
+    user: "{{ vault_grafana_user | default('grafana') }}"
+  when: grafana_enabled | default(true)
+
+- name: Create Grafana Performance Monitoring
+  template:
+    src: performance-monitoring.yml.j2
+    dest: "{{ grafana_config_dir }}/performance-monitoring.yml"
+    mode: '0644'
+    owner: "{{ grafana_user | default('grafana') }}"
+    group: "{{ grafana_group | default('grafana') }}"
+  when: grafana_enabled | default(true)
+
+- name: Display Final Configuration Summary
+  debug:
+    msg: |
+      🎉 Grafana Monitoring System Successfully Deployed!
+
+      📊 Dashboards Available:
+      • Homelab Overview - System-wide monitoring
+      • Docker Services - Container health and performance
+      • Media Stack - Sonarr, Radarr, Jellyfin monitoring
+      • Security Monitoring - SSL, firewall, authentication
+      • Network & Infrastructure - Bandwidth, latency, DNS
+      • Backup & Storage - Backup jobs and storage metrics
+
+      🚨 Alert Rules Configured:
+      • {{ critical_alerts_count | default(15) }} Critical Alerts
+      • {{ warning_alerts_count | default(20) }} Warning Alerts
+      • {{ info_alerts_count | default(10) }} Info Alerts
+
+      📧 Notification Channels:
+      • Email notifications for all alerts
+      • Discord/Slack for media and security alerts
+      • Telegram for database alerts
+      • Webhook for backup alerts
+      • Push notifications for container alerts
+
+      🔧 Configuration Files:
+      • Dashboards: {{ grafana_config_dir }}/dashboards/
+      • Alert Rules: {{ grafana_config_dir }}/alerting/
+      • Provisioning: {{ grafana_config_dir }}/provisioning/
+
+      📖 Documentation: {{ grafana_config_dir }}/dashboards/README.md
+
+      🌐 Access: http://{{ ansible_default_ipv4.address }}:{{ grafana_port | default(3000) }}
+      👤 Default Login: admin/admin (change immediately!)
+
+      Next Steps:
+      1. Change default admin password
+      2. Configure data sources (Prometheus, Loki)
+      3. Set up notification channels
+      4. Customize dashboards for your environment
+      5. Test alert rules and notifications
+  when: grafana_enabled | default(true)

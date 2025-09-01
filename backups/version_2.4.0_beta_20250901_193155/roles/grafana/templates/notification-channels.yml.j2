@@ -1,0 +1,518 @@
+# Grafana Notification Channels Configuration
+# Comprehensive notification setup for homelab monitoring
+
+apiVersion: 1
+
+notifiers:
+  # Email Notifications
+  - name: Email Alerts
+    type: email
+    uid: email_alerts
+    org_id: 1
+    is_default: true
+    settings:
+      addresses: "{{ grafana_email_addresses | default('admin@' + domain) }}"
+      singleEmail: true
+    secure_settings: {}
+    send_reminder: true
+    frequency: "1m"
+    disable_resolve_message: false
+
+  # Discord Notifications
+  {% if grafana_discord_webhook_url %}
+  - name: Discord Alerts
+    type: discord
+    uid: discord_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_discord_webhook_url }}"
+      use_discord_username: true
+      username: "Homelab Monitor"
+      icon_emoji: "🏠"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Slack Notifications
+  {% if grafana_slack_webhook_url %}
+  - name: Slack Alerts
+    type: slack
+    uid: slack_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_slack_webhook_url }}"
+      username: "Homelab Monitor"
+      icon_emoji: ":house:"
+      channel: "{{ grafana_slack_channel | default('#homelab') }}"
+      mentionChannel: "here"
+      mentionUsers: "{{ grafana_slack_mention_users | default('') }}"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Telegram Notifications
+  {% if grafana_telegram_bot_token and grafana_telegram_chat_id %}
+  - name: Telegram Alerts
+    type: telegram
+    uid: telegram_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      bottoken: "{{ grafana_telegram_bot_token }}"
+      chatid: "{{ grafana_telegram_chat_id }}"
+      message: "🏠 *Homelab Alert*\n\n**{{ .AlertName }}**\n{{ .Message }}\n\n**Severity:** {{ .Labels.severity }}\n**Service:** {{ .Labels.service }}\n**Instance:** {{ .Labels.instance }}\n\n**Dashboard:** {{ .DashboardURL }}"
+      parseMode: "Markdown"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Webhook Notifications
+  {% if grafana_webhook_url %}
+  - name: Webhook Alerts
+    type: webhook
+    uid: webhook_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_webhook_url }}"
+      httpMethod: "POST"
+      maxAlerts: 0
+      title: "Homelab Alert: {{ .AlertName }}"
+      message: "{{ .Message }}\n\nSeverity: {{ .Labels.severity }}\nService: {{ .Labels.service }}\nInstance: {{ .Labels.instance }}\n\nDashboard: {{ .DashboardURL }}"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Push Notifications (via webhook to push service)
+  {% if grafana_push_url %}
+  - name: Push Notifications
+    type: webhook
+    uid: push_notifications
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_push_url }}"
+      httpMethod: "POST"
+      maxAlerts: 0
+      title: "🏠 {{ .AlertName }}"
+      message: "{{ .Message }}\n\nSeverity: {{ .Labels.severity }}\nService: {{ .Labels.service }}"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Critical Alerts Channel
+  - name: Critical Alerts
+    type: email
+    uid: critical_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      addresses: "{{ grafana_critical_email_addresses | default('admin@' + domain) }}"
+      singleEmail: true
+    secure_settings: {}
+    send_reminder: true
+    frequency: "1m"
+    disable_resolve_message: false
+
+  # Warning Alerts Channel
+  - name: Warning Alerts
+    type: email
+    uid: warning_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      addresses: "{{ grafana_warning_email_addresses | default('admin@' + domain) }}"
+      singleEmail: true
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+
+  # Info Alerts Channel
+  - name: Info Alerts
+    type: email
+    uid: info_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      addresses: "{{ grafana_info_email_addresses | default('admin@' + domain) }}"
+      singleEmail: true
+    secure_settings: {}
+    send_reminder: false
+    frequency: "15m"
+    disable_resolve_message: true
+
+# Alert Notification Policies
+policies:
+  # Critical Alerts Policy
+  - orgId: 1
+    receiver: critical_alerts
+    group_by: ['alertname', 'severity', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      - receiver: critical_alerts
+        group_by: ['alertname']
+        matchers:
+          - severity = critical
+
+  # Warning Alerts Policy
+  - orgId: 1
+    receiver: warning_alerts
+    group_by: ['alertname', 'severity', 'service']
+    group_wait: 1m
+    group_interval: 10m
+    repeat_interval: 6h
+    routes:
+      - receiver: warning_alerts
+        group_by: ['alertname']
+        matchers:
+          - severity = warning
+
+  # Info Alerts Policy
+  - orgId: 1
+    receiver: info_alerts
+    group_by: ['alertname', 'severity', 'service']
+    group_wait: 2m
+    group_interval: 15m
+    repeat_interval: 12h
+    routes:
+      - receiver: info_alerts
+        group_by: ['alertname']
+        matchers:
+          - severity = info
+
+  # Service-Specific Policies
+  - orgId: 1
+    receiver: discord_alerts
+    group_by: ['alertname', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 2h
+    routes:
+      - receiver: discord_alerts
+        group_by: ['alertname']
+        matchers:
+          - service = media
+          - service = security
+
+  # Database Alerts Policy
+  - orgId: 1
+    receiver: telegram_alerts
+    group_by: ['alertname', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 1h
+    routes:
+      - receiver: telegram_alerts
+        group_by: ['alertname']
+        matchers:
+          - service = database
+
+  # Network Alerts Policy
+  - orgId: 1
+    receiver: slack_alerts
+    group_by: ['alertname', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 2h
+    routes:
+      - receiver: slack_alerts
+        group_by: ['alertname']
+        matchers:
+          - service = network
+
+  # Backup Alerts Policy
+  - orgId: 1
+    receiver: webhook_alerts
+    group_by: ['alertname', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 1h
+    routes:
+      - receiver: webhook_alerts
+        group_by: ['alertname']
+        matchers:
+          - service = backup
+
+  # Container Alerts Policy
+  - orgId: 1
+    receiver: push_notifications
+    group_by: ['alertname', 'service']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 2h
+    routes:
+      - receiver: push_notifications
+        group_by: ['alertname']
+        matchers:
+          - service = container
+
+# Notification Templates
+templates:
+  # Email Templates
+  email:
+    critical:
+      subject: "🚨 CRITICAL: {{ $labels.service }} Alert"
+      body: |
+        Critical alert triggered on {{ $labels.instance }}
+        
+        Service: {{ $labels.service }}
+        Severity: {{ $labels.severity }}
+        Description: {{ $annotations.description }}
+        
+        Dashboard: {{ $annotations.dashboard }}
+        Runbook: {{ $annotations.runbook | default('N/A') }}
+        
+        Time: {{ $startsAt }}
+    
+    warning:
+      subject: "⚠️ WARNING: {{ $labels.service }} Alert"
+      body: |
+        Warning alert triggered on {{ $labels.instance }}
+        
+        Service: {{ $labels.service }}
+        Severity: {{ $labels.severity }}
+        Description: {{ $annotations.description }}
+        
+        Dashboard: {{ $annotations.dashboard }}
+        
+        Time: {{ $startsAt }}
+    
+    info:
+      subject: "ℹ️ INFO: {{ $labels.service }} Notification"
+      body: |
+        Information notification from {{ $labels.instance }}
+        
+        Service: {{ $labels.service }}
+        Description: {{ $annotations.description }}
+        
+        Dashboard: {{ $annotations.dashboard }}
+        
+        Time: {{ $startsAt }}
+
+  # Discord Templates
+  discord:
+    critical:
+      color: 16711680  # Red
+      title: "🚨 Critical Alert: {{ $labels.service }}"
+      description: "{{ $annotations.description }}"
+      fields:
+        - name: "Service"
+          value: "{{ $labels.service }}"
+          inline: true
+        - name: "Instance"
+          value: "{{ $labels.instance }}"
+          inline: true
+        - name: "Dashboard"
+          value: "[View Dashboard]({{ $annotations.dashboard }})"
+          inline: false
+    
+    warning:
+      color: 16776960  # Yellow
+      title: "⚠️ Warning Alert: {{ $labels.service }}"
+      description: "{{ $annotations.description }}"
+      fields:
+        - name: "Service"
+          value: "{{ $labels.service }}"
+          inline: true
+        - name: "Instance"
+          value: "{{ $labels.instance }}"
+          inline: true
+    
+    info:
+      color: 65280  # Green
+      title: "ℹ️ Info: {{ $labels.service }}"
+      description: "{{ $annotations.description }}"
+
+  # Slack Templates
+  slack:
+    critical:
+      color: "danger"
+      title: "🚨 Critical Alert: {{ $labels.service }}"
+      text: "{{ $annotations.description }}"
+      fields:
+        - title: "Service"
+          value: "{{ $labels.service }}"
+          short: true
+        - title: "Instance"
+          value: "{{ $labels.instance }}"
+          short: true
+        - title: "Dashboard"
+          value: "{{ $annotations.dashboard }}"
+          short: false
+    
+    warning:
+      color: "warning"
+      title: "⚠️ Warning Alert: {{ $labels.service }}"
+      text: "{{ $annotations.description }}"
+      fields:
+        - title: "Service"
+          value: "{{ $labels.service }}"
+          short: true
+        - title: "Instance"
+          value: "{{ $labels.instance }}"
+          short: true
+    
+    info:
+      color: "good"
+      title: "ℹ️ Info: {{ $labels.service }}"
+      text: "{{ $annotations.description }}"
+
+  # Telegram Templates
+  telegram:
+    critical:
+      text: |
+        🚨 <b>Critical Alert</b>
+        
+        <b>Service:</b> {{ $labels.service }}
+        <b>Instance:</b> {{ $labels.instance }}
+        <b>Description:</b> {{ $annotations.description }}
+        
+        <a href="{{ $annotations.dashboard }}">View Dashboard</a>
+    
+    warning:
+      text: |
+        ⚠️ <b>Warning Alert</b>
+        
+        <b>Service:</b> {{ $labels.service }}
+        <b>Instance:</b> {{ $labels.instance }}
+        <b>Description:</b> {{ $annotations.description }}
+    
+    info:
+      text: |
+        ℹ️ <b>Info</b>
+        
+        <b>Service:</b> {{ $labels.service }}
+        <b>Description:</b> {{ $annotations.description }}
+
+  # Webhook Templates
+  webhook:
+    critical:
+      payload: |
+        {
+          "alert": "{{ $labels.alertname }}",
+          "severity": "critical",
+          "service": "{{ $labels.service }}",
+          "instance": "{{ $labels.instance }}",
+          "description": "{{ $annotations.description }}",
+          "dashboard": "{{ $annotations.dashboard }}",
+          "time": "{{ $startsAt }}"
+        }
+    
+    warning:
+      payload: |
+        {
+          "alert": "{{ $labels.alertname }}",
+          "severity": "warning",
+          "service": "{{ $labels.service }}",
+          "instance": "{{ $labels.instance }}",
+          "description": "{{ $annotations.description }}",
+          "dashboard": "{{ $annotations.dashboard }}",
+          "time": "{{ $startsAt }}"
+        }
+    
+    info:
+      payload: |
+        {
+          "alert": "{{ $labels.alertname }}",
+          "severity": "info",
+          "service": "{{ $labels.service }}",
+          "description": "{{ $annotations.description }}",
+          "dashboard": "{{ $annotations.dashboard }}",
+          "time": "{{ $startsAt }}"
+        }
+
+# Notification Channel Settings
+settings:
+  # Global Settings
+  global:
+    smtp_host: "{{ grafana_smtp_host | default('smtp.gmail.com') }}"
+    smtp_port: "{{ grafana_smtp_port | default(587) }}"
+    smtp_username: "{{ grafana_smtp_username | default('') }}"
+    smtp_password: "{{ grafana_smtp_password | default('') }}"
+    smtp_use_tls: true
+    smtp_use_ssl: false
+    from_address: "{{ grafana_from_address | default('grafana@' + domain) }}"
+    from_name: "Homelab Monitor"
+
+  # Rate Limiting
+  rate_limiting:
+    critical_alerts: "1m"
+    warning_alerts: "5m"
+    info_alerts: "15m"
+
+  # Escalation Settings
+  escalation:
+    critical_timeout: "30m"
+    warning_timeout: "2h"
+    info_timeout: "6h"
+
+  # Grouping Settings
+  grouping:
+    group_by: ['alertname', 'severity', 'service']
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+
+# Time-based Routing
+time_intervals:
+  # Business Hours (9 AM - 5 PM, Monday-Friday)
+  - name: business_hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 09:00
+            end_time: 17:00
+
+  # Off Hours (5 PM - 9 AM, Monday-Friday + Weekends)
+  - name: off_hours
+    time_intervals:
+      - weekdays: ['monday:friday']
+        times:
+          - start_time: 17:00
+            end_time: 09:00
+      - weekdays: ['saturday', 'sunday']
+
+# Inhibition Rules
+inhibit_rules:
+  # Inhibit critical alerts when system is down
+  - source_match:
+      alertname: 'SystemDown'
+    target_match:
+      severity: critical
+    equal: ['instance']
+  
+  # Inhibit container alerts when Docker is down
+  - source_match:
+      alertname: 'DockerServiceDown'
+    target_match:
+      service: 'container'
+    equal: ['instance']
+  
+  # Inhibit service alerts when network is down
+  - source_match:
+      alertname: 'NetworkConnectivityLost'
+    target_match:
+      service: 'web'
+    equal: ['instance']
+  
+  # Inhibit SSL alerts when the service is down
+  - source_match:
+      service: 'availability'
+    target_match:
+      service: 'ssl'
+    equal: ['instance'] 

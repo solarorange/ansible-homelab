@@ -1,0 +1,33 @@
+---
+# Promtail Deployment Tasks
+
+- name: Render Promtail docker-compose
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/monitoring/promtail-docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/promtail/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Deploy Promtail with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "promtail"
+    project_src: "{{ docker_dir }}/monitoring/promtail"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports: []
+  tags: [promtail, deploy, rollback]
+
+- name: Wait for Promtail to be ready (local HTTP server)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ promtail_port | default(9080) }}/ready"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: promtail_health
+  retries: 5
+  delay: 10
+  until: promtail_health.status == 200
+  tags: [promtail, deploy, health]
+

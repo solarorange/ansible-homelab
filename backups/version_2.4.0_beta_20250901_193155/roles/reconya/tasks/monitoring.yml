@@ -1,0 +1,85 @@
+---
+# Reconya Monitoring Configuration
+# Configure monitoring integration for Reconya
+
+- name: Configure Reconya monitoring
+  block:
+    - name: Create Reconya monitoring configuration directory
+      ansible.builtin.file:
+        path: "{{ reconya_config_dir }}/monitoring"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Configure Reconya Prometheus metrics
+      ansible.builtin.template:
+        src: prometheus_targets.yml.j2
+        dest: "{{ prometheus_config_dir }}/reconya_targets.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_prometheus_enabled | default(true)
+
+    - name: Configure Reconya Telegraf monitoring
+      ansible.builtin.template:
+        src: telegraf.conf.j2
+        dest: "{{ telegraf_config_dir }}/reconya.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_telegraf_enabled | default(true)
+
+    - name: Configure Reconya Loki logging
+      ansible.builtin.template:
+        src: promtail.yml.j2
+        dest: "{{ loki_config_dir }}/reconya_promtail.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_loki_enabled | default(true)
+
+  tags: [reconya, monitoring]
+
+- name: Configure Reconya health monitoring
+  block:
+    - name: Create Reconya health check configuration
+      ansible.builtin.template:
+        src: health_monitor.yml.j2
+        dest: "{{ reconya_config_dir }}/health_monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_health_check_enabled | default(true)
+
+    - name: Set up Reconya health check cron job
+      ansible.builtin.cron:
+        name: "Reconya Health Check"
+        minute: "*/{{ reconya_health_check_interval | default(30) }}"
+        job: "{{ reconya_config_dir }}/health_check.sh >> {{ reconya_health_check_log_file }} 2>&1"
+        user: "{{ vault_reconya_user }}"
+        state: present
+      when: reconya_health_check_enabled | default(true)
+
+  tags: [reconya, monitoring]
+
+- name: Configure Reconya metrics collection
+  block:
+    - name: Create Reconya metrics configuration
+      ansible.builtin.template:
+        src: metrics.yml.j2
+        dest: "{{ reconya_config_dir }}/metrics.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: reconya_metrics_enabled | default(true)
+
+    - name: Configure Reconya performance monitoring
+      ansible.builtin.template:
+        src: performance_monitor.yml.j2
+        dest: "{{ reconya_config_dir }}/performance_monitor.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+  tags: [reconya, monitoring]

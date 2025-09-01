@@ -1,0 +1,160 @@
+---
+# Pezzo Security Tasks
+# Configure security features for Pezzo services
+
+- name: Create Pezzo security configuration directory
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}/security"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Create Pezzo CrowdSec configuration
+  ansible.builtin.template:
+    src: crowdsec.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/crowdsec.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_crowdsec_enabled | default(true)
+  tags: [pezzo, security]
+
+- name: Create Pezzo Fail2ban configuration
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "{{ pezzo_config_dir }}/security/fail2ban.conf"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_fail2ban_enabled | default(true)
+  tags: [pezzo, security]
+
+- name: Create Pezzo rate limiting configuration
+  ansible.builtin.template:
+    src: rate_limit.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/rate_limit.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_rate_limiting | default(true)
+  tags: [pezzo, security]
+
+- name: Create Pezzo CORS configuration
+  ansible.builtin.template:
+    src: cors.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/cors.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_cors_enabled | default(false)
+  tags: [pezzo, security]
+
+- name: Create Pezzo security headers configuration
+  ansible.builtin.template:
+    src: security_headers.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/security_headers.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_security_headers | default(true)
+  tags: [pezzo, security]
+
+- name: Create Pezzo security monitoring script
+  ansible.builtin.template:
+    src: security_monitoring.sh.j2
+    dest: "{{ pezzo_config_dir }}/security_monitoring.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Create Pezzo security audit script
+  ansible.builtin.template:
+    src: security_audit.sh.j2
+    dest: "{{ pezzo_config_dir }}/security_audit.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Setup Pezzo security monitoring cron job
+  ansible.builtin.cron:
+    name: "Pezzo Security Monitoring"
+    minute: "*/10"
+    job: "{{ pezzo_config_dir }}/security_monitoring.sh >> {{ logs_dir }}/pezzo/security/monitoring.log 2>&1"
+    user: "{{ vault_pezzo_user }}"
+  when: pezzo_security_enabled | default(true)
+  tags: [pezzo, security]
+
+- name: Setup Pezzo security audit cron job
+  ansible.builtin.cron:
+    name: "Pezzo Security Audit"
+    hour: "2"
+    minute: "0"
+    job: "{{ pezzo_config_dir }}/security_audit.sh >> {{ logs_dir }}/pezzo/security/audit.log 2>&1"
+    user: "{{ vault_pezzo_user }}"
+  when: pezzo_security_enabled | default(true)
+  tags: [pezzo, security]
+
+- name: Create Pezzo security log directory
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/pezzo/security"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Configure Pezzo firewall rules
+  ansible.builtin.template:
+    src: firewall_rules.conf.j2
+    dest: "{{ pezzo_config_dir }}/security/firewall_rules.conf"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Create Pezzo SSL/TLS configuration
+  ansible.builtin.template:
+    src: ssl_config.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/ssl_config.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Create Pezzo access control configuration
+  ansible.builtin.template:
+    src: access_control.yml.j2
+    dest: "{{ pezzo_config_dir }}/security/access_control.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Create Pezzo security incident response script
+  ansible.builtin.template:
+    src: incident_response.sh.j2
+    dest: "{{ pezzo_config_dir }}/incident_response.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, security]
+
+- name: Display Pezzo security configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Security Configuration Complete:
+      - CrowdSec Enabled: {{ pezzo_crowdsec_enabled | default(true) }}
+      - Fail2ban Enabled: {{ pezzo_fail2ban_enabled | default(true) }}
+      - Rate Limiting: {{ pezzo_rate_limiting | default(true) }}
+      - CORS Enabled: {{ pezzo_cors_enabled | default(false) }}
+      - Security Headers: {{ pezzo_security_headers | default(true) }}
+      - Security Monitoring: {{ pezzo_config_dir }}/security_monitoring.sh
+      - Security Audit: {{ pezzo_config_dir }}/security_audit.sh
+      - Incident Response: {{ pezzo_config_dir }}/incident_response.sh
+      - Configuration: {{ pezzo_config_dir }}/security/
+      - Logs: {{ logs_dir }}/pezzo/security/
+  tags: [pezzo, security]

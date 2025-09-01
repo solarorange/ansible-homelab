@@ -1,0 +1,52 @@
+http:
+  routers:
+    overseerr:
+      rule: "Host(`overseerr.{{ domain }}`)"
+      service: overseerr
+      entryPoints:
+        - websecure
+      middlewares:
+        - overseerr-auth
+        - overseerr-headers
+      tls:
+        certResolver: cloudflare
+
+  services:
+    overseerr:
+      loadBalancer:
+        servers:
+          - url: "http://overseerr:5055"
+
+  middlewares:
+    overseerr-auth:
+      forwardAuth:
+        address: "http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-authentik-username
+          - X-authentik-groups
+          - X-authentik-email
+          - X-authentik-name
+          - X-authentik-uid
+          - X-authentik-jwt
+          - X-authentik-meta-jwks
+          - X-authentik-meta-outpost
+          - X-authentik-meta-provider
+          - X-authentik-meta-app
+          - X-authentik-meta-app-jwks
+
+    overseerr-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Host: "overseerr.{{ domain }}"
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()" 

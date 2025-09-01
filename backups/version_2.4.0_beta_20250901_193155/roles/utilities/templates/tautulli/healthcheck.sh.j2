@@ -1,0 +1,16 @@
+#!/bin/bash
+# Tautulli Health Check Script
+
+TAUTULLI_CONTAINER="tautulli"
+TAUTULLI_PORT={{ tautulli_port }}
+TAUTULLI_api_key: "{{ vault_utilities_api_token | default("") }}"Tautulli container is not running"
+  exit 1
+fi
+
+# Check if Tautulli API is responsive
+if ! curl -s -f "http://{{ ansible_default_ipv4.address }}:$TAUTULLI_PORT/api/v2?apikey=$TAUTULLI_api_key: "{{ vault_utilities_api_token | default("") }}"Tautulli API is not responding on port $TAUTULLI_PORT"
+  exit 1
+fi
+
+echo "Tautulli is healthy."
+exit 0 

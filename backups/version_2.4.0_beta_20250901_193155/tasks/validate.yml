@@ -1,0 +1,63 @@
+---
+# Comprehensive Service Validation
+# Validates all deployed services with health checks and resource monitoring
+
+- name: Validate service health and functionality
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    validation_timeout: 30
+    health_check_retries: 3
+    health_check_delay: 10
+    resource_thresholds:
+      cpu_warning: 80
+      memory_warning: 85
+      disk_warning: 90
+
+  tasks:
+    # ✅ CRITICAL FIX: Validate all services have health checks
+    - name: Validate health check configuration
+      ansible.builtin.include_tasks: validate/health_checks.yml
+      tags: [validation, health]
+
+    # ✅ CRITICAL FIX: Validate resource limits are set
+    - name: Validate resource limits
+      ansible.builtin.include_tasks: validate/resource_limits.yml
+      tags: [validation, resources]
+
+    # ✅ CRITICAL FIX: Validate network segmentation
+    - name: Validate network segmentation
+      ansible.builtin.include_tasks: validate/network_segmentation.yml
+      tags: [validation, network]
+
+    # ✅ CRITICAL FIX: Validate security configuration
+    - name: Validate security configuration
+      ansible.builtin.include_tasks: validate/security.yml
+      tags: [validation, security]
+
+    # ✅ CRITICAL FIX: Validate service connectivity
+    - name: Validate service connectivity
+      ansible.builtin.include_tasks: validate/connectivity.yml
+      tags: [validation, connectivity]
+
+    # ✅ CRITICAL FIX: Validate monitoring integration
+    - name: Validate monitoring integration
+      ansible.builtin.include_tasks: validate/monitoring.yml
+      tags: [validation, monitoring]
+
+  handlers:
+    - name: restart unhealthy service
+      ansible.builtin.docker_container:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ unhealthy_services }}"
+      when: unhealthy_services is defined and unhealthy_services | length > 0
+
+    - name: scale up service
+      ansible.builtin.docker_container:
+        name: "{{ item.name }}"
+        scale: "{{ item.scale }}"
+      loop: "{{ services_to_scale }}"
+      when: services_to_scale is defined and services_to_scale | length > 0

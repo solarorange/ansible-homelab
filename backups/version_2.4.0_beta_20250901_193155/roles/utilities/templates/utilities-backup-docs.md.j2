@@ -1,0 +1,56 @@
+# Utilities Stack Backup Documentation
+
+This document describes the backup procedures, retention, and recovery for the utilities stack.
+
+## Backup Configuration
+
+- **Backup Location:** `{{ utilities_backup_dir | default('/opt/backups/utilities') }}/utilities`
+- **Retention Period:** `{{ utilities_backup_retention | default(30) }}` days
+- **Compression:** {{ 'Enabled' if utilities_backup_compression | default(true) else 'Disabled' }}
+- **Encryption:** {{ 'Enabled' if utilities_backup_encryption | default(false) else 'Disabled' }}
+
+## Services Included
+
+- **Portainer:** Container management and orchestration
+- **Tdarr:** Media transcoding and processing
+- **Tautulli:** Plex statistics and monitoring
+- **Homepage:** Service dashboard and navigation
+
+## Backup Schedule
+
+- **Frequency:** {{ utilities_backup_schedule | default('0 2 * * *') }} (Daily at 2 AM)
+- **Type:** Incremental with full backup weekly
+- **Verification:** Automatic integrity checks
+
+## Recovery Procedures
+
+### Full System Recovery
+1. Stop all utilities services
+2. Restore from latest backup
+3. Verify service configurations
+4. Restart services in dependency order
+
+### Individual Service Recovery
+1. Stop the specific service
+2. Restore service data from backup
+3. Update service configuration if needed
+4. Restart the service
+
+## Monitoring and Alerts
+
+- Backup success/failure notifications via {{ utilities_alerting_provider | default('alertmanager') }}
+- Daily backup status reports
+- Storage usage monitoring
+- Retention policy enforcement
+
+## Troubleshooting
+
+### Common Issues
+- **Backup failures:** Check disk space and permissions
+- **Restore errors:** Verify backup integrity and service dependencies
+- **Performance issues:** Monitor backup window and resource usage
+
+### Log Locations
+- Backup logs: `{{ utilities_logs_dir | default('/var/log/utilities') }}/backup.log`
+- Service logs: `{{ utilities_logs_dir | default('/var/log/utilities') }}/services/`
+- Error logs: `{{ utilities_logs_dir | default('/var/log/utilities') }}/errors/` 

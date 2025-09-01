@@ -1,0 +1,156 @@
+#!/bin/bash
+
+# Service Recovery Script
+# This script implements automatic recovery procedures for failed services
+
+LOG_FILE="/var/log/service_recovery.log"
+MAX_RECOVERY_ATTEMPTS=3
+RECOVERY_DELAY=10
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+recover_docker_service() {
+    local service=$1
+    local container_id=$(docker ps -qf "name=$service")
+    
+    log "Attempting to recover Docker service: $service"
+    
+    # Stop and remove the container if it exists
+    if [ ! -z "$container_id" ]; then
+        docker stop "$container_id" > /dev/null 2>&1
+        docker rm "$container_id" > /dev/null 2>&1
+    fi
+    
+    # Pull latest image
+    docker pull "$(docker inspect --format='{{.Config.Image}}' "$container_id" 2>/dev/null)" > /dev/null 2>&1
+    
+    # Restart the service using docker-compose
+    cd /etc/ansible/service_management/docker-compose
+    docker-compose up -d "$service"
+    
+    # Wait for service to start
+    sleep $RECOVERY_DELAY
+    
+    # Verify recovery
+    if docker ps -qf "name=$service" | grep -q .; then
+        log "Successfully recovered Docker service: $service"
+        return 0
+    else
+        log "Failed to recover Docker service: $service"
+        return 1
+    fi
+}
+
+recover_system_service() {
+    local service=$1
+    
+    log "Attempting to recover system service: $service"
+    
+    # Stop the service
+    systemctl stop "$service"
+    
+    # Clear any failed state
+    systemctl reset-failed "$service"
+    
+    # Start the service
+    systemctl start "$service"
+    
+    # Wait for service to start
+    sleep $RECOVERY_DELAY
+    
+    # Verify recovery
+    if systemctl is-active --quiet "$service"; then
+        log "Successfully recovered system service: $service"
+        return 0
+    else
+        log "Failed to recover system service: $service"
+        return 1
+    fi
+}
+
+perform_service_recovery() {
+    local service=$1
+    local attempt=1
+    
+    while [ $attempt -le $MAX_RECOVERY_ATTEMPTS ]; do
+        log "Recovery attempt $attempt/$MAX_RECOVERY_ATTEMPTS for service: $service"
+        
+        if [[ "$service" == *"docker"* ]]; then
+            recover_docker_service "$service"
+        else
+            recover_system_service "$service"
+        fi
+        
+        if [ $? -eq 0 ]; then
+            return 0
+        fi
+        
+        attempt=$((attempt + 1))
+        if [ $attempt -le $MAX_RECOVERY_ATTEMPTS ]; then
+            log "Waiting before next recovery attempt..."
+            sleep $RECOVERY_DELAY
+        fi
+    done
+    
+    log "Failed to recover service $service after $MAX_RECOVERY_ATTEMPTS attempts"
+    return 1
+}
+
+handle_dependency_recovery() {
+    local service=$1
+    local dependencies_file="/etc/ansible/service_management/dependencies.json"
+    
+    if [ -f "$dependencies_file" ]; then
+        # Get dependencies for the service
+        local dependencies=$(jq -r ".$service.depends_on[]" "$dependencies_file" 2>/dev/null)
+        
+        for dep in $dependencies; do
+            if [ ! -z "$dep" ]; then
+                log "Recovering dependency: $dep for service: $service"
+                perform_service_recovery "$dep"
+            fi
+        done
+    fi
+}
+
+main() {
+    # Create log file if it doesn't exist
+    touch "$LOG_FILE"
+    
+    # Get failed services from health check
+    local failed_services=($(grep "ERROR: Health check failed for" /var/log/service_health.log | awk '{print $NF}' | sort -u))
+    
+    if [ ${#failed_services[@]} -eq 0 ]; then
+        log "No failed services detected"
+        exit 0
+    fi
+    
+    local recovery_failed=()
+    
+    for service in "${failed_services[@]}"; do
+        # Handle dependencies first
+        handle_dependency_recovery "$service"
+        
+        # Attempt to recover the service
+        perform_service_recovery "$service"
+        if [ $? -ne 0 ]; then
+            recovery_failed+=("$service")
+        fi
+    done
+    
+    if [ ${#recovery_failed[@]} -gt 0 ]; then
+        log "Failed to recover the following services: ${recovery_failed[*]}"
+        # Notify administrator
+        if [ -f /usr/local/bin/notify_admin.sh ]; then
+            /usr/local/bin/notify_admin.sh "Service Recovery Failed" "Failed to recover: ${recovery_failed[*]}"
+        fi
+        exit 1
+    fi
+    
+    log "All services successfully recovered"
+    exit 0
+}
+
+main 

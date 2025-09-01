@@ -1,0 +1,110 @@
+---
+# DumbAssets Security Tasks
+# Apply security hardening and access controls
+
+- name: Create DumbAssets security configuration
+  ansible.builtin.template:
+    src: security.yml.j2
+    dest: "{{ docker_config_root }}/security/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_security_config
+  tags: [dumbassets, security, config]
+
+- name: Configure DumbAssets firewall rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ dumbassets_port }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ server_ips | default([ansible_default_ipv4.address]) }}"
+  register: dumbassets_firewall_rules
+  tags: [dumbassets, security, firewall]
+  when: not (firewall.centralized | default(false))
+
+- name: Set DumbAssets container security options
+  ansible.builtin.lineinfile:
+    path: "{{ dumbassets_docker_dir }}/docker-compose.yml"
+    regexp: '^(\s+)security_opt:'
+    line: '      security_opt:'
+    insertafter: '^(\s+)restart:'
+  register: dumbassets_security_opts
+  tags: [dumbassets, security, container]
+
+- name: Configure DumbAssets container read-only root filesystem
+  ansible.builtin.lineinfile:
+    path: "{{ dumbassets_docker_dir }}/docker-compose.yml"
+    regexp: '^(\s+)read_only:'
+    line: '      read_only: true'
+    insertafter: '^(\s+)security_opt:'
+  register: dumbassets_readonly_fs
+  tags: [dumbassets, security, container]
+
+- name: Configure DumbAssets container no-new-privileges
+  ansible.builtin.lineinfile:
+    path: "{{ dumbassets_docker_dir }}/docker-compose.yml"
+    regexp: '^(\s+)no_new_privileges:'
+    line: '      no_new_privileges: true'
+    insertafter: '^(\s+)read_only:'
+  register: dumbassets_no_new_privileges
+  tags: [dumbassets, security, container]
+
+- name: Set DumbAssets directory permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+    recurse: true
+  loop:
+    - "{{ dumbassets_data_dir }}"
+    - "{{ dumbassets_config_dir }}"
+  register: dumbassets_directory_permissions
+  tags: [dumbassets, security, permissions]
+
+- name: Configure DumbAssets SSL/TLS settings
+  ansible.builtin.template:
+    src: ssl.yml.j2
+    dest: "{{ dumbassets_config_dir }}/ssl.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_ssl_config
+  tags: [dumbassets, security, ssl]
+
+- name: Create DumbAssets access control list
+  ansible.builtin.template:
+    src: acl.yml.j2
+    dest: "{{ dumbassets_config_dir }}/acl.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_acl_config
+  tags: [dumbassets, security, acl]
+
+- name: Configure DumbAssets fail2ban rules
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "/etc/fail2ban/jail.d/dumbassets.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart fail2ban
+  register: dumbassets_fail2ban_config
+  tags: [dumbassets, security, fail2ban]
+
+- name: Display DumbAssets security configuration summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Security Configuration Summary:
+      - Security Config: {{ dumbassets_security_config.changed }}
+      - Firewall Rules: {{ dumbassets_firewall_rules.results | length }}
+      - Security Options: {{ dumbassets_security_opts.changed }}
+      - Read-only FS: {{ dumbassets_readonly_fs.changed }}
+      - No New Privileges: {{ dumbassets_no_new_privileges.changed }}
+      - Directory Permissions: {{ dumbassets_directory_permissions.results | length }}
+      - SSL Config: {{ dumbassets_ssl_config.changed }}
+      - ACL Config: {{ dumbassets_acl_config.changed }}
+      - Fail2Ban Config: {{ dumbassets_fail2ban_config.changed }}
+  tags: [dumbassets, security, summary]

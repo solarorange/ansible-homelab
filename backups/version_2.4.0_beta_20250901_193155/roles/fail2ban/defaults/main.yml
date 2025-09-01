@@ -1,0 +1,260 @@
+---
+# Fail2Ban Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# FAIL2BAN SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+fail2ban_service_name: "fail2ban"
+fail2ban_container_name: "{{ fail2ban_service_name }}"
+fail2ban_image: "crazymax/fail2ban:latest"
+fail2ban_version: "latest"
+
+# Network Configuration
+fail2ban_port: 7001
+fail2ban_external_port: "{{ fail2ban_port }}"
+fail2ban_protocol: "http"
+fail2ban_host: "{{ ansible_default_ipv4.address }}"
+fail2ban_url: "{{ fail2ban_protocol }}://{{ fail2ban_host }}:{{ fail2ban_port }}"
+
+# Domain Configuration
+fail2ban_subdomain: "fail2ban"
+fail2ban_domain: "{{ fail2ban_subdomain }}.{{ domain }}"
+fail2ban_external_url: "https://{{ fail2ban_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+fail2ban_auth_enabled: true
+fail2ban_auth_method: "authentik"  # Options: basic, authentik, none
+fail2ban_admin_username: "admin"
+fail2ban_admin_password: "{{ vault_fail2ban_admin_password }}"
+
+# API Configuration
+fail2ban_api_key: "{{ vault_fail2ban_api_key }}"
+fail2ban_api_token: "{{ vault_fail2ban_api_token }}"
+
+# Encryption & Security
+fail2ban_secret_key: "{{ vault_fail2ban_secret_key }}"
+fail2ban_encryption_key: "{{ vault_fail2ban_encryption_key }}"
+fail2ban_jwt_secret: "{{ vault_fail2ban_jwt_secret }}"
+
+# SSL/TLS Configuration
+fail2ban_ssl_enabled: true
+fail2ban_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+fail2ban_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+fail2ban_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+fail2ban_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+fail2ban_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+fail2ban_database_port: "{{ databases_postgresql_port | default(5432) }}"
+fail2ban_database_name: "fail2ban"
+fail2ban_database_username: "fail2ban"
+fail2ban_database_password: "{{ vault_fail2ban_database_password }}"
+
+# Redis Configuration (if using)
+fail2ban_redis_enabled: false
+fail2ban_redis_host: "{{ redis_host | default('redis') }}"
+fail2ban_redis_port: "{{ redis_port | default(6379) }}"
+fail2ban_redis_password: "{{ vault_fail2ban_redis_password }}"
+fail2ban_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+fail2ban_data_dir: "{{ homelab_data_dir }}/fail2ban"
+fail2ban_config_dir: "{{ fail2ban_data_dir }}/config"
+fail2ban_backup_dir: "{{ fail2ban_data_dir }}/backups"
+
+# Volume Mappings
+fail2ban_volumes:
+  - "{{ fail2ban_config_dir }}:/config"
+  - "{{ fail2ban_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+fail2ban_health_check_enabled: true
+fail2ban_health_check_path: "/health"
+fail2ban_health_check_interval: 30
+fail2ban_health_check_timeout: 10
+fail2ban_health_check_retries: 3
+
+# Monitoring Integration
+fail2ban_monitoring_enabled: true
+fail2ban_prometheus_enabled: true
+fail2ban_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+fail2ban_backup_enabled: true
+fail2ban_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+fail2ban_backup_retention_days: 30
+fail2ban_backup_encryption_enabled: true
+fail2ban_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+fail2ban_smtp_enabled: false
+fail2ban_smtp_host: "{{ smtp_host | default('') }}"
+fail2ban_smtp_port: "{{ smtp_port | default(587) }}"
+fail2ban_smtp_username: "{{ vault_smtp_username }}"
+fail2ban_smtp_password: "{{ vault_fail2ban_smtp_password }}"
+fail2ban_smtp_from: "{{ fail2ban_admin_email | default('admin@' + domain) }}"
+fail2ban_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+fail2ban_webhook_enabled: false
+fail2ban_webhook_url: "{{ vault_webhook_url | default('') }}"
+fail2ban_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+fail2ban_discovery_enabled: true
+fail2ban_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+fail2ban_cpu_limit: "1.0"
+fail2ban_memory_limit: "1g"
+fail2ban_memory_reservation: "512m"
+
+# Performance Settings
+fail2ban_scan_interval: 10
+fail2ban_parallel_downloads: 3
+fail2ban_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+fail2ban_log_level: "info"  # Options: trace, debug, info, warn, error
+fail2ban_log_rotation_enabled: true
+fail2ban_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+fail2ban_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+fail2ban_rate_limit_enabled: true
+fail2ban_rate_limit_requests: 100
+fail2ban_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+fail2ban_deploy_enabled: true
+fail2ban_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+fail2ban_restart_policy: "unless-stopped"
+fail2ban_auto_update_enabled: true
+
+# Environment Variables
+fail2ban_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  FAIL2BAN_API_KEY: "{{ fail2ban_api_key }}"
+  FAIL2BAN_SECRET_KEY: "{{ fail2ban_secret_key }}"
+  FAIL2BAN_ENCRYPTION_KEY: "{{ fail2ban_encryption_key }}"
+  FAIL2BAN_JWT_SECRET: "{{ fail2ban_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+fail2ban_validation_enabled: true
+fail2ban_validation_timeout: 300
+fail2ban_validation_retries: 3
+
+# Testing Configuration
+fail2ban_test_enabled: false
+fail2ban_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+fail2ban_compliance_enabled: true
+fail2ban_audit_logging_enabled: true
+fail2ban_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+fail2ban_automation_enabled: true
+fail2ban_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+fail2ban_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+fail2ban_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+fail2ban_fallback_enabled: true
+fail2ban_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

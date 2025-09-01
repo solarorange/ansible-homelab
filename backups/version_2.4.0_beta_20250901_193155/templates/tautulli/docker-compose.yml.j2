@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  tautulli:
+    image: linuxserver/tautulli:latest
+    container_name: tautulli
+    environment:
+      - PUID={{ ansible_user_id }}
+      - PGID={{ ansible_user_gid }}
+      - TZ={{ timezone | default('UTC') }}
+      - DOCKER_MODS=linuxserver/mods:universal-cron
+    volumes:
+      - {{ docker_dir }}/tautulli/config:/config
+      - {{ logs_dir }}/tautulli:/logs
+    ports:
+      - "8181:8181"
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tautulli.rule=Host(`tautulli.{{ domain }}`)"
+      - "traefik.http.routers.tautulli.entrypoints=websecure"
+      - "traefik.http.routers.tautulli.tls=true"
+      - "traefik.http.routers.tautulli.tls.certresolver=cloudflare"
+      - "traefik.http.services.tautulli.loadbalancer.server.port=8181"
+      - "traefik.http.middlewares.tautulli-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.tautulli-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.tautulli.middlewares=tautulli-auth"
+      - "traefik.http.middlewares.tautulli-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.tautulli-headers.headers.customrequestheaders.X-Forwarded-Host=tautulli.{{ domain }}"
+      - "traefik.http.routers.tautulli.middlewares=tautulli-headers"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=media"
+      - "promtail-service=tautulli"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  traefik_network:
+    external: true 

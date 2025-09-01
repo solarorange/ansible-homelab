@@ -1,0 +1,72 @@
+---
+# n8n Service Handlers
+# Handlers for n8n service management
+
+- name: restart n8n
+  community.docker.docker_compose_v2:
+    project_src: "{{ n8n_config_dir }}"
+    state: present
+    restarted: true
+  listen: "restart n8n"
+
+- name: reload n8n
+  community.docker.docker_compose_v2:
+    project_src: "{{ n8n_config_dir }}"
+    state: present
+    pull: true
+  listen: "reload n8n"
+
+- name: restart n8n app
+  community.docker.docker_container:
+    name: "{{ n8n_app_container_name }}"
+    state: started
+    restart: true
+  listen: "restart n8n app"
+
+- name: restart n8n postgres
+  community.docker.docker_container:
+    name: "{{ n8n_postgres_container_name }}"
+    state: started
+    restart: true
+  listen: "restart n8n postgres"
+
+- name: restart traefik
+  ansible.builtin.systemd:
+    name: traefik
+    state: restarted
+  listen: "restart traefik"
+
+- name: restart monitoring
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - prometheus
+    - grafana
+    - loki
+    - telegraf
+  listen: "restart monitoring"
+
+- name: restart security
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - crowdsec
+    - fail2ban
+  listen: "restart security"
+
+- name: restart alerting
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - alertmanager
+    - prometheus
+  listen: "restart alerting"
+
+- name: restart homepage
+  ansible.builtin.systemd:
+    name: homepage
+    state: restarted
+  listen: "restart homepage"

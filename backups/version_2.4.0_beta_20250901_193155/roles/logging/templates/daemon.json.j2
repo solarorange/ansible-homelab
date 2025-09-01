@@ -1,0 +1,25 @@
+{
+  "log-driver": "loki",
+  "log-opts": {
+    "loki-url": "http://loki:3100/loki/api/v1/push",
+    "loki-pipeline-stages": "[{\"json\": {\"expressions\": {\"timestamp\": \"time\", \"level\": \"level\", \"message\": \"message\", \"container_name\": \"container_name\", \"container_id\": \"container_id\", \"image\": \"image\"}}}, {\"timestamp\": {\"source\": \"timestamp\", \"format\": \"RFC3339Nano\"}}, {\"labels\": {\"level\": \"level\", \"container_name\": \"container_name\", \"image\": \"image\"}}]",
+    "loki-retries": "5",
+    "loki-batch-size": "400",
+    "loki-batch-wait": "1s",
+    "loki-timeout": "10s",
+    "loki-external-labels": "host={{ inventory_hostname }},environment={{ environment | default('production') }},service=docker",
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.size=10G"
+  ],
+  "live-restore": true,
+  "max-concurrent-downloads": 10,
+  "max-concurrent-uploads": 5,
+  "experimental": false,
+  "features": {
+    "buildkit": true
+  }
+} 

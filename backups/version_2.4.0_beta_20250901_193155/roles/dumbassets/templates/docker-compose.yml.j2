@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  dumbassets:
+    container_name: {{ dumbassets_container_name }}
+    image: {{ dumbassets_image }}
+    restart: {{ dumbassets_restart_policy }}
+    {% if dumbassets_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ dumbassets_external_port }}:3000"
+    {% endif %}
+    volumes:
+      - {{ dumbassets_data_dir }}:/app/data
+      - {{ dumbassets_logs_dir }}:/app/logs
+    environment:
+      - NODE_ENV={{ dumbassets_node_env }}
+      - DEBUG={{ dumbassets_debug | lower }}
+      - SITE_TITLE={{ dumbassets_site_title }}
+      - BASE_URL={{ dumbassets_base_url }}
+      - DUMBASSETS_PIN={{ dumbassets_pin }}
+      - ALLOWED_ORIGINS={{ dumbassets_allowed_origins }}
+      - DEMO_MODE={{ dumbassets_demo_mode | lower }}
+      - APPRISE_URL={{ dumbassets_apprise_url }}
+      - CURRENCY_CODE={{ dumbassets_currency_code }}
+      - CURRENCY_LOCALE={{ dumbassets_currency_locale }}
+      - TZ={{ dumbassets_timezone }}
+    networks:
+      - {{ dumbassets_network }}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dumbassets.rule=Host(`{{ dumbassets_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.dumbassets.entrypoints=websecure"
+      - "traefik.http.routers.dumbassets.tls.certresolver=cloudflare"
+      - "traefik.http.services.dumbassets.loadbalancer.server.port=3000"
+      - "traefik.docker.network={{ dumbassets_network }}"
+      - "traefik.http.middlewares.dumbassets-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.dumbassets-headers.headers.customrequestheaders.X-Forwarded-Host={{ dumbassets_subdomain }}.{{ domain }}"
+      - "traefik.http.routers.dumbassets.middlewares=dumbassets-headers"
+      - "com.docker.compose.project=dumbassets"
+      - "com.docker.compose.service=dumbassets"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    mem_limit: {{ dumbassets_memory_limit }}
+    cpus: '{{ dumbassets_cpus }}'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  {{ dumbassets_network }}:
+    external: true 

@@ -1,0 +1,105 @@
+---
+# Security Stack Prerequisites
+# Setup required packages and configurations for security services
+
+- name: Install required packages for security stack
+  ansible.builtin.apt:
+    name:
+      - ufw
+      - fail2ban
+      - iptables-persistent
+      - python3-pip
+      - curl
+      - wget
+      - gnupg
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+    state: present
+    update_cache: yes
+  tags: [security, prerequisites, packages]
+
+- name: Install Docker Compose if not present
+  ansible.builtin.pip:
+    name: docker-compose
+    state: present
+  tags: [security, prerequisites, docker]
+
+- name: Create security directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_dir }}/security"
+    - "{{ docker_dir }}/security/authentik"
+    - "{{ docker_dir }}/security/traefik"
+    - "{{ docker_dir }}/security/pihole"
+    - "{{ docker_dir }}/security/crowdsec"
+    - "{{ docker_dir }}/security/wireguard"
+    - "{{ docker_dir }}/security/fail2ban"
+    - "{{ logs_dir }}/security"
+  tags: [security, prerequisites, directories]
+
+- name: Configure firewall (UFW)
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: not (firewall.centralized | default(false))
+  tags: [security, prerequisites, firewall]
+
+- name: Allow SSH through firewall
+  community.general.ufw:
+    rule: allow
+    port: ssh
+    proto: tcp
+  when: not (firewall.centralized | default(false))
+  tags: [security, prerequisites, firewall]
+
+- name: Allow HTTP and HTTPS through firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 80
+    - 443
+  when: not (firewall.centralized | default(false))
+  tags: [security, prerequisites, firewall]
+
+- name: Configure SSH security
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?AllowUsers', line: 'AllowUsers {{ username }}' }
+  notify: restart ssh
+  tags: [security, prerequisites, ssh]
+
+- name: Create security network
+  community.docker.docker_network:
+    name: security
+    state: present
+  tags: [security, prerequisites, network]
+
+- name: Verify prerequisites installation
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      SECURITY PREREQUISITES COMPLETED
+      ========================================
+
+      Packages installed: ufw, fail2ban, iptables-persistent, docker-compose
+      Directories created: {{ docker_dir }}/security/*
+      Firewall configured: {{ firewall.centralized | default(false) | ternary('Centralized via group_vars', 'Local UFW enabled with SSH/HTTP/HTTPS') }}
+      SSH secured: Root login disabled, password auth disabled
+      Docker network: security network created
+
+      ========================================
+  tags: [security, prerequisites, summary]

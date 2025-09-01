@@ -1,0 +1,911 @@
+---
+# Enhanced Prometheus Configuration
+# Production-ready monitoring with external service monitoring and certificate validation
+
+- name: Create Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/prometheus/config"
+    - "{{ docker_dir }}/monitoring/prometheus/rules"
+    - "{{ docker_dir }}/monitoring/prometheus/scripts"
+    - "{{ logs_dir }}/monitoring/prometheus"
+
+- name: Create Prometheus docker-compose service
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/docker-compose.yml"
+    content: |
+      version: '3.8'
+      services:
+        prometheus:
+          image: prom/prometheus:latest
+          container_name: prometheus
+          volumes:
+            - {{ docker_dir }}/monitoring/prometheus/config:/etc/prometheus
+            - {{ docker_dir }}/monitoring/prometheus/data:/prometheus
+            - {{ docker_dir }}/monitoring/prometheus/rules:/etc/prometheus/rules
+            - {{ logs_dir }}/monitoring/prometheus:/var/log/prometheus
+          command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+            - '--web.console.templates=/usr/share/prometheus/consoles'
+            - '--web.enable-lifecycle'
+          ports:
+            - "9090:9090"
+          restart: unless-stopped
+          networks:
+            - monitoring
+            - homelab
+          labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=homelab"
+            - "traefik.http.routers.prometheus.rule=Host(`prometheus.{{ domain }}`)"
+            - "traefik.http.routers.prometheus.entrypoints=https"
+            - "traefik.http.routers.prometheus.tls=true"
+            - "traefik.http.routers.prometheus.middlewares=authentik@docker"
+            - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+          healthcheck:
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+      networks:
+        monitoring:
+          external: true
+        homelab:
+          external: true
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Enhanced Prometheus configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/config/prometheus.yml"
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+        scrape_timeout: 10s
+        external_labels:
+          monitor: 'homelab'
+          environment: 'production'
+
+      rule_files:
+        - "/etc/prometheus/rules/*.yml"
+
+      scrape_configs:
+        # Self-monitoring
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['{{ ansible_default_ipv4.address }}:9090']
+              labels:
+                service: 'prometheus'
+                instance: '{{ inventory_hostname }}'
+
+        # System metrics
+        - job_name: 'node'
+          static_configs:
+            - targets: ['node-exporter:9100']
+              labels:
+                service: 'node-exporter'
+                instance: '{{ inventory_hostname }}'
+
+        # Container metrics
+        - job_name: 'cadvisor'
+          static_configs:
+            - targets: ['cadvisor:8080']
+              labels:
+                service: 'cadvisor'
+                instance: '{{ inventory_hostname }}'
+
+        # Blackbox Exporter
+        - job_name: 'blackbox'
+          static_configs:
+            - targets: ['blackbox:9115']
+              labels:
+                service: 'blackbox-exporter'
+                instance: '{{ inventory_hostname }}'
+
+        # External service monitoring via Blackbox
+        - job_name: 'external_services_http'
+          metrics_path: /probe
+          params:
+            module: [http_2xx]
+          static_configs:
+            - targets:
+              # Infrastructure services
+              - https://traefik.{{ domain }}
+              - https://portainer.{{ domain }}
+              - https://authentik.{{ domain }}
+
+              # Monitoring services
+              - https://grafana.{{ domain }}
+              - https://prometheus.{{ domain }}
+              - https://alertmanager.{{ domain }}
+
+              # Media services
+              - https://jellyfin.{{ domain }}
+              - https://sonarr.{{ domain }}
+              - https://radarr.{{ domain }}
+              - https://prowlarr.{{ domain }}
+              - https://bazarr.{{ domain }}
+              - https://overseerr.{{ domain }}
+              - https://tautulli.{{ domain }}
+
+              # Development services
+              - https://gitlab.{{ domain }}
+              - https://harbor.{{ domain }}
+              - https://code.{{ domain }}
+
+              # Storage services
+              - https://nextcloud.{{ domain }}
+              - https://minio.{{ domain }}
+              - https://paperless.{{ domain }}
+
+              # Security services
+              - https://vault.{{ domain }}
+              - https://vaultwarden.{{ domain }}
+
+              # Network services
+              - https://pihole.{{ domain }}
+
+              # Utility services
+              - https://dashdot.{{ domain }}
+              - https://heimdall.{{ domain }}
+              - https://homarr.{{ domain }}
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: blackbox:9115
+            - source_labels: [__param_target]
+              regex: 'https://([^/]+)'
+              target_label: domain
+            - source_labels: [__param_target]
+              regex: 'https://([^.]+)\.'
+              target_label: service
+
+        # External service monitoring with SSL certificate validation
+        - job_name: 'external_services_https'
+          metrics_path: /probe
+          params:
+            module: [https_2xx]
+          static_configs:
+            - targets:
+              # Critical services that require SSL validation
+              - https://traefik.{{ domain }}
+              - https://authentik.{{ domain }}
+              - https://grafana.{{ domain }}
+              - https://prometheus.{{ domain }}
+              - https://vault.{{ domain }}
+              - https://nextcloud.{{ domain }}
+              - https://gitlab.{{ domain }}
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: blackbox:9115
+            - source_labels: [__param_target]
+              regex: 'https://([^/]+)'
+              target_label: domain
+            - source_labels: [__param_target]
+              regex: 'https://([^.]+)\.'
+              target_label: service
+
+        # DNS monitoring
+        - job_name: 'dns_monitoring'
+          metrics_path: /probe
+          params:
+            module: [dns_udp_53]
+          static_configs:
+            - targets:
+              - {{ domain }}
+              - www.{{ domain }}
+              - api.{{ domain }}
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: blackbox:9115
+
+        # Network connectivity monitoring
+        - job_name: 'network_ping'
+          metrics_path: /probe
+          params:
+            module: [icmp]
+          static_configs:
+            - targets:
+              - {{ ip_address }}
+              - 8.8.8.8  # Google DNS
+              - 1.1.1.1  # Cloudflare DNS
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: blackbox:9115
+
+        # Internal service monitoring
+        - job_name: 'internal_services'
+          static_configs:
+            - targets:
+              - 'traefik:8080'
+              - 'alertmanager:9093'
+              - 'influxdb:8086'
+              - 'loki:3100'
+              - 'telegraf:9273'
+            labels:
+              environment: 'internal'
+              instance: '{{ inventory_hostname }}'
+
+        # Media services monitoring
+        - job_name: 'media_services'
+          static_configs:
+            - targets:
+              - 'sonarr:8989'
+              - 'radarr:7878'
+              - 'lidarr:8686'
+              - 'readarr:8787'
+              - 'bazarr:6767'
+              - 'prowlarr:9696'
+              - 'sabnzbd:8080'
+              - 'qbittorrent:8080'
+              - 'tdarr:8265'
+              - 'calibre-web:8083'
+              - 'audiobookshelf:13378'
+              - 'komga:8080'
+              - 'emby:8096'
+              - 'jellyfin:8096'
+            labels:
+              service_group: 'media'
+              instance: '{{ inventory_hostname }}'
+
+        # Security services monitoring
+        - job_name: 'security_services'
+          static_configs:
+            - targets:
+              - 'authentik:9000'
+              - 'crowdsec:8080'
+              - 'vault:8200'
+              - 'fail2ban:8080'
+            labels:
+              service_group: 'security'
+              instance: '{{ inventory_hostname }}'
+
+        # Infrastructure services monitoring
+        - job_name: 'infrastructure_services'
+          static_configs:
+            - targets:
+              - 'portainer:9000'
+              - 'wireguard:51820'
+              - 'nginx:80'
+              - 'postgresql:5432'
+              - 'mariadb:3306'
+              - 'redis:6379'
+              - 'elasticsearch:9200'
+              - 'kibana:5601'
+            labels:
+              service_group: 'infrastructure'
+              instance: '{{ inventory_hostname }}'
+
+      storage:
+        tsdb:
+          path: /prometheus
+          retention:
+            time: 15d
+            size: 512MB
+          wal:
+            retention-period: 12h
+          out-of-order-time-window: 10m
+        exemplars:
+          max-exemplars: 100000
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Enhanced Prometheus alert rules
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/rules/alerts.yml"
+    content: |
+      groups:
+        - name: system
+          rules:
+            - alert: HighCPUUsage
+              expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+              for: 5m
+              labels:
+                severity: warning
+                service: 'system'
+              annotations:
+                summary: "High CPU usage detected on {{ $labels.instance }}"
+                description: "CPU usage is above 80% for 5 minutes"
+
+            - alert: HighMemoryUsage
+              expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+              for: 5m
+              labels:
+                severity: warning
+                service: 'system'
+              annotations:
+                summary: "High memory usage detected on {{ $labels.instance }}"
+                description: "Memory usage is above 85% for 5 minutes"
+
+            - alert: HighDiskUsage
+              expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 85
+              for: 5m
+              labels:
+                severity: warning
+                service: 'system'
+              annotations:
+                summary: "High disk usage detected on {{ $labels.instance }}"
+                description: "Disk usage is above 85% for 5 minutes"
+
+        - name: service_availability
+          rules:
+            - alert: ServiceDown
+              expr: probe_success == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'availability'
+              annotations:
+                summary: "Service {{ $labels.instance }} is down"
+                description: "Service has been down for more than 1 minute"
+
+            - alert: HealthcheckFailing
+              expr: probe_success == 0
+              for: 5m
+              labels:
+                severity: warning
+                service: 'availability'
+              annotations:
+                summary: "Healthcheck failing for {{ $labels.instance }}"
+                description: "HTTP health probe has been failing for 5 minutes"
+
+            - alert: ServiceHighLatency
+              expr: probe_duration_seconds > 2
+              for: 5m
+              labels:
+                severity: warning
+                service: 'availability'
+              annotations:
+                summary: "Service {{ $labels.instance }} has high latency"
+                description: "Response time is above 2 seconds for 5 minutes"
+
+            - alert: SSLCertExpiringIn14Days
+              expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+              for: 1m
+              labels:
+                severity: warning
+                service: 'ssl'
+              annotations:
+                summary: "SSL certificate for {{ $labels.instance }} expires in <14 days"
+                description: "Certificate expires in less than 14 days"
+
+            - alert: SSLCertExpiringSoon
+              expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 2
+              for: 1m
+              labels:
+                severity: critical
+                service: 'ssl'
+              annotations:
+                summary: "SSL certificate for {{ $labels.instance }} expires soon"
+                description: "Certificate expires in less than 48 hours"
+
+            - alert: SSLCertExpiringWarning
+              expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+              for: 1m
+              labels:
+                severity: warning
+                service: 'ssl'
+              annotations:
+                summary: "SSL certificate for {{ $labels.instance }} expires soon"
+                description: "Certificate expires in less than 7 days"
+
+            - alert: SSLValidationFailed
+              expr: probe_ssl_validation_success == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'ssl'
+              annotations:
+                summary: "SSL validation failed for {{ $labels.instance }}"
+                description: "SSL certificate validation is failing"
+
+        - name: docker
+          rules:
+            - alert: ContainerDown
+              expr: up{job="docker"} == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} is down"
+                description: "Container has been down for more than 1 minute"
+
+            - alert: ContainerHighCPU
+              expr: rate(container_cpu_usage_seconds_total{container!=""}[5m]) * 100 > 80
+              for: 5m
+              labels:
+                severity: warning
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} has high CPU usage"
+                description: "Container CPU usage is above 80% for 5 minutes"
+
+            - alert: ContainerHighMemory
+              expr: container_memory_usage_bytes{container!=""} / container_spec_memory_limit_bytes{container!=""} * 100 > 85
+              for: 5m
+              labels:
+                severity: warning
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} has high memory usage"
+                description: "Container memory usage is above 85% for 5 minutes"
+
+            - alert: ContainerRestarting
+              expr: increase(container_restart_count[5m]) > 0
+              for: 1m
+              labels:
+                severity: warning
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} is restarting"
+                description: "Container has restarted in the last 5 minutes"
+
+            - alert: ContainerFrequentRestarts
+              expr: increase(container_restart_count[10m]) > 3
+              for: 1m
+              labels:
+                severity: critical
+                service: 'docker'
+              annotations:
+                summary: "Container {{ $labels.name }} restarted >3 times in 10m"
+                description: "Frequent restarts detected over the last 10 minutes"
+
+        - name: network
+          rules:
+            - alert: DNSResolutionFailed
+              expr: probe_success{job="dns_monitoring"} == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'network'
+              annotations:
+                summary: "DNS resolution failed for {{ $labels.instance }}"
+                description: "DNS resolution is failing"
+
+            - alert: NetworkPingFailed
+              expr: probe_success{job="network_ping"} == 0
+              for: 1m
+              labels:
+                severity: warning
+                service: 'network'
+              annotations:
+                summary: "Network ping failed to {{ $labels.instance }}"
+                description: "ICMP ping is failing"
+
+            - alert: HighNetworkErrors
+              expr: rate(node_network_transmit_errs_total[5m]) > 0
+              for: 5m
+              labels:
+                severity: warning
+                service: 'network'
+              annotations:
+                summary: "High network errors on {{ $labels.instance }}"
+                description: "Network interface {{ $labels.device }} is experiencing errors"
+
+        - name: backup
+          rules:
+            - alert: BackupFailed
+              expr: backup_status == 0
+              for: 1h
+              labels:
+                severity: critical
+                service: 'backup'
+              annotations:
+                summary: "Backup failed on {{ $labels.instance }}"
+                description: "Backup job {{ $labels.job }} has failed"
+
+            - alert: BackupTooOld
+              expr: time() - backup_last_success_timestamp > 86400
+              for: 1h
+              labels:
+                severity: critical
+                service: 'backup'
+              annotations:
+                summary: "Backup too old on {{ $labels.instance }}"
+                description: "No successful backup in the last 24 hours"
+
+        - name: monitoring
+          rules:
+            - alert: PrometheusDown
+              expr: up{job="prometheus"} == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'monitoring'
+              annotations:
+                summary: "Prometheus is down"
+                description: "Prometheus monitoring system is not responding"
+
+            - alert: GrafanaDown
+              expr: up{job="grafana"} == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'monitoring'
+              annotations:
+                summary: "Grafana is down"
+                description: "Grafana dashboard is not responding"
+
+            - alert: AlertmanagerDown
+              expr: up{job="alertmanager"} == 0
+              for: 1m
+              labels:
+                severity: critical
+                service: 'monitoring'
+              annotations:
+                summary: "Alertmanager is down"
+                description: "Alertmanager is not responding"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Prometheus health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Enhanced Prometheus Health Check Script
+
+      # Check if Prometheus is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy > /dev/null; then
+        echo "Prometheus is not responding"
+        exit 1
+      fi
+
+      # Check if we can query the API
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up > /dev/null; then
+        echo "Prometheus API is not responding"
+        exit 1
+      fi
+
+      # Check if targets are being scraped
+      target_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/targets | jq '.data.activeTargets | length')
+      if [ "$target_count" -lt 5 ]; then
+        echo "Warning: Only $target_count targets are active"
+      fi
+
+      # Check if rules are loaded
+      rule_count=$(curl -s http://{{ ansible_default_ipv4.address }}:/api/v1/rules | jq '.data.groups | length')
+      if [ "$rule_count" -eq 0 ]; then
+        echo "Warning: No alerting rules are loaded"
+      fi
+
+      echo "Prometheus is healthy"
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Prometheus log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/prometheus/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Prometheus log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Prometheus logs"
+    job: "logrotate {{ docker_dir }}/monitoring/prometheus/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_prometheus_user }}"
+
+- name: Create Prometheus management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Prometheus Management Script
+
+      function show_help {
+        echo "Prometheus Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Prometheus status"
+        echo "  logs      - Show Prometheus logs"
+        echo "  restart   - Restart Prometheus"
+        echo "  reload    - Reload configuration"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  help      - Show this help"
+      }
+
+      case "$1" in
+        status)
+          curl -s http://{{ ansible_default_ipv4.address }}:/-/healthy
+          ;;
+        logs)
+          docker logs prometheus --tail 100 -f
+          ;;
+        restart)
+          docker restart prometheus
+          ;;
+        reload)
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/-/reload
+          ;;
+        backup)
+          {{ docker_dir }}/monitoring/prometheus/scripts/backup.sh
+          ;;
+        restore)
+          if [ -z "$2" ]; then
+            echo "Please specify backup file"
+            exit 1
+          fi
+          {{ docker_dir }}/monitoring/prometheus/scripts/restore.sh "$2"
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Prometheus backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+
+      # Prometheus Backup Script
+
+      BACKUP_DIR="{{ docker_dir }}/monitoring/prometheus/backup"
+      DATA_DIR="{{ docker_dir }}/monitoring/prometheus/data"
+      RETENTION_DAYS=30
+
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+
+      # Create timestamp for backup
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="$BACKUP_DIR/prometheus_backup_$TIMESTAMP.tar.gz"
+
+      # Stop Prometheus gracefully
+      echo "Stopping Prometheus..."
+      docker stop prometheus
+
+      # Create backup
+      echo "Creating backup..."
+      tar -czf "$BACKUP_FILE" -C "$DATA_DIR" .
+
+      # Start Prometheus
+      echo "Starting Prometheus..."
+      docker start prometheus
+
+      # Remove old backups
+      echo "Cleaning up old backups..."
+      find "$BACKUP_DIR" -name "prometheus_backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+
+      echo "Backup completed: $BACKUP_FILE"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Prometheus restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+
+      # Prometheus Restore Script
+
+      BACKUP_DIR="{{ docker_dir }}/monitoring/prometheus/backup"
+      DATA_DIR="{{ docker_dir }}/monitoring/prometheus/data"
+
+      if [ -z "$1" ]; then
+        echo "Usage: $0 <backup_file>"
+        echo "Available backups:"
+        ls -1 "$BACKUP_DIR"/prometheus_backup_*.tar.gz 2>/dev/null
+        exit 1
+      fi
+
+      BACKUP_FILE="$1"
+
+      if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Backup file not found: $BACKUP_FILE"
+        exit 1
+      fi
+
+      # Stop Prometheus
+      echo "Stopping Prometheus..."
+      docker stop prometheus
+
+      # Clear existing data
+      echo "Clearing existing data..."
+      rm -rf "$DATA_DIR"/*
+
+      # Restore backup
+      echo "Restoring backup..."
+      tar -xzf "$BACKUP_FILE" -C "$DATA_DIR"
+
+      # Fix permissions
+      echo "Fixing permissions..."
+      chown -R {{ username }}:{{ username }} "$DATA_DIR"
+
+      # Start Prometheus
+      echo "Starting Prometheus..."
+      docker start prometheus
+
+      echo "Restore completed successfully"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Add Prometheus backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Prometheus data"
+    job: "{{ docker_dir }}/monitoring/prometheus/scripts/backup.sh"
+    hour: "1"
+    minute: "0"
+    user: "{{ vault_prometheus_user }}"
+
+- name: Create Prometheus storage configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/config/storage.yml"
+    content: |
+      storage:
+        tsdb:
+          path: /prometheus
+          retention:
+            time: 15d
+            size: 512MB
+          wal:
+            retention-period: 12h
+          out-of-order-time-window: 10m
+        exemplars:
+          max-exemplars: 100000
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Update Prometheus configuration with storage settings
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/prometheus/config/prometheus.yml"
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+        scrape_timeout: 10s
+        external_labels:
+          monitor: 'homelab'
+
+      rule_files:
+        - "/etc/prometheus/rules/*.yml"
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['{{ ansible_default_ipv4.address }}:']
+
+        - job_name: 'node'
+          static_configs:
+            - targets: ['node-exporter:9100']
+
+        - job_name: 'cadvisor'
+          static_configs:
+            - targets: ['cadvisor:8080']
+
+        - job_name: 'blackbox'
+          static_configs:
+            - targets: ['blackbox-exporter:9115']
+
+        - job_name: 'docker'
+          static_configs:
+            - targets: ['cadvisor:8080']
+
+        - job_name: 'traefik'
+          static_configs:
+            - targets: ['traefik:8080']
+
+        - job_name: 'alertmanager'
+          static_configs:
+            - targets: ['alertmanager:9093']
+
+        - job_name: 'influxdb'
+          static_configs:
+            - targets: ['influxdb:8086']
+
+        - job_name: 'grafana'
+          static_configs:
+            - targets: ['grafana:3000']
+
+        - job_name: 'loki'
+          static_configs:
+            - targets: ['loki:3100']
+
+        - job_name: 'telegraf'
+          static_configs:
+            - targets: ['telegraf:9273']
+
+        - job_name: 'media_services'
+          static_configs:
+            - targets:
+              - 'sonarr:8989'
+              - 'radarr:7878'
+              - 'lidarr:8686'
+              - 'readarr:8787'
+              - 'bazarr:6767'
+              - 'prowlarr:9696'
+              - 'sabnzbd:8080'
+              - 'qbittorrent:8080'
+              - 'tdarr:8265'
+              - 'calibre-web:8083'
+              - 'audiobookshelf:13378'
+              - 'komga:8080'
+              - 'emby:8096'
+              - 'jellyfin:8096'
+
+        - job_name: 'security_services'
+          static_configs:
+            - targets:
+              - 'authentik:9000'
+              - 'crowdsec:8080'
+              - 'vault:8200'
+              - 'fail2ban:8080'
+
+        - job_name: 'infrastructure_services'
+          static_configs:
+            - targets:
+              - 'portainer:9000'
+              - 'wireguard:51820'
+              - 'nginx:80'
+              - 'postgresql:5432'
+              - 'mariadb:3306'
+              - 'redis:6379'
+              - 'elasticsearch:9200'
+              - 'kibana:5601'
+
+      storage:
+        tsdb:
+          path: /prometheus
+          retention:
+            time: 15d
+            size: 512MB
+          wal:
+            retention-period: 12h
+          out-of-order-time-window: 10m
+        exemplars:
+          max-exemplars: 100000
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"

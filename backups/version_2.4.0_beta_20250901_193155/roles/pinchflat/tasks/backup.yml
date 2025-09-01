@@ -1,0 +1,19 @@
+---
+# Pinchflat Backup Tasks
+
+- name: Create Pinchflat backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ backup_scripts_dir }}/pinchflat_backup.sh"
+    mode: '0755'
+  tags: [pinchflat, backup]
+
+- name: Setup Pinchflat backup cron job
+  cron:
+    name: "Pinchflat backup"
+    job: "{{ backup_scripts_dir }}/pinchflat_backup.sh"
+    hour: "2"
+    minute: "0"
+    user: "{ vault_service_user }"
+  when: pinchflat_backup_enabled | default(true)
+  tags: [pinchflat, backup]

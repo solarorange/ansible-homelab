@@ -1,0 +1,306 @@
+---
+# Elasticsearch Configuration
+# Production-ready search and analytics engine
+
+- name: Create Elasticsearch directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/elasticsearch/data"
+    - "{{ docker_dir }}/elasticsearch/config"
+    - "{{ docker_dir }}/elasticsearch/scripts"
+    - "{{ docker_dir }}/elasticsearch/backup"
+    - "{{ logs_dir }}/elasticsearch"
+
+- name: Create Elasticsearch configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/config/elasticsearch.yml"
+    content: |
+      # Cluster
+      cluster.name: homelab
+      node.name: ${HOSTNAME}
+      node.master: true
+      node.data: true
+      node.ingest: true
+
+      # Network
+      network.host: {{ ansible_default_ipv4.address }}
+      http.port: 9200
+      transport.port: 9300
+
+      # Discovery
+      discovery.type: single-node
+
+      # Paths
+      path.data: /usr/share/elasticsearch/data
+      path.logs: /usr/share/elasticsearch/logs
+
+      # Memory
+      bootstrap.memory_lock: true
+
+      # JVM
+      xpack.security.enabled: true
+      xpack.security.transport.ssl.enabled: true
+      xpack.security.transport.ssl.verification_mode: certificate
+      xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
+      xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+
+      # Cross-cluster search
+      search.remote.connect: false
+
+      # Snapshot and Restore
+      path.repo: ["/usr/share/elasticsearch/backup"]
+
+      # Monitoring
+      xpack.monitoring.enabled: true
+      xpack.monitoring.collection.enabled: true
+
+      # Machine Learning
+      xpack.ml.enabled: true
+
+      # Watcher
+      xpack.watcher.enabled: true
+
+      # Security
+      xpack.security.audit.enabled: true
+      xpack.security.audit.outputs: [logfile]
+      xpack.security.audit.logfile.events.include: authentication_granted,authentication_failed,access_granted,access_denied,anonymous_access_denied,connection_granted,connection_denied,tampered_request,run_as_granted,run_as_denied
+
+      # Logging
+      logger.level: INFO
+      logger.name: org.elasticsearch
+      logger.name: org.elasticsearch.transport
+      logger.name: org.elasticsearch.http
+      logger.name: org.elasticsearch.discovery
+      logger.name: org.elasticsearch.cluster.service
+      logger.name: org.elasticsearch.indices
+      logger.name: org.elasticsearch.search
+      logger.name: org.elasticsearch.mapping
+      logger.name: org.elasticsearch.action
+      logger.name: org.elasticsearch.security
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Elasticsearch JVM options
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/config/jvm.options"
+    content: |
+      # JVM Configuration
+
+      # Memory
+      -Xms1g
+      -Xmx1g
+
+      # GC Settings
+      -XX:+UseG1GC
+      -XX:G1ReservePercent=25
+      -XX:InitiatingHeapOccupancyPercent=75
+
+      # Logging
+      -XX:+HeapDumpOnOutOfMemoryError
+      -XX:HeapDumpPath=data
+      -XX:ErrorFile=logs/hs_err_pid%p.log
+
+      # System Properties
+      -Djava.awt.headless=true
+      -Dfile.encoding=UTF-8
+      -Djna.nosys=true
+
+      # Security
+      -Djava.security.manager=allow
+      -Djava.security.policy=file:config/security.policy
+
+      # Performance
+      -XX:+AlwaysPreTouch
+      -XX:+DisableExplicitGC
+      -XX:+UseStringDeduplication
+      -XX:+UseCompressedOops
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Elasticsearch backup script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/scripts/backup.sh"
+    content: |
+      #!/bin/bash
+
+      # Elasticsearch Backup Script
+
+      BACKUP_DIR="{{ docker_dir }}/elasticsearch/backup"
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      SNAPSHOT_NAME="snapshot_$TIMESTAMP"
+
+      # Create backup directory if it doesn't exist
+      mkdir -p "$BACKUP_DIR"
+
+      # Register snapshot repository
+      curl -X PUT "{{ ansible_default_ipv4.address }}:9200/_snapshot/backup" -H 'Content-Type: application/json' -d'
+      {
+        "type": "fs",
+        "settings": {
+          "location": "/usr/share/elasticsearch/backup"
+        }
+      }'
+
+      # Create snapshot
+      curl -X PUT "{{ ansible_default_ipv4.address }}:9200/_snapshot/backup/$SNAPSHOT_NAME?wait_for_completion=true"
+
+      # Remove snapshots older than 7 days
+      find "$BACKUP_DIR" -name "snapshot_*" -mtime +7 -delete
+
+      echo "Backup created: $SNAPSHOT_NAME"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Elasticsearch restore script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/scripts/restore.sh"
+    content: |
+      #!/bin/bash
+
+      # Elasticsearch Restore Script
+
+      if [ -z "$1" ]; then
+        echo "Please specify snapshot name"
+        exit 1
+      fi
+
+      SNAPSHOT_NAME="$1"
+
+      # Check if snapshot exists
+      if ! curl -s -f "{{ ansible_default_ipv4.address }}:/_snapshot/backup/$SNAPSHOT_NAME" > /dev/null; then
+        echo "Snapshot not found: $SNAPSHOT_NAME"
+        exit 1
+      fi
+
+      # Restore snapshot
+      curl -X POST "{{ ansible_default_ipv4.address }}:/_snapshot/backup/$SNAPSHOT_NAME/_restore?wait_for_completion=true"
+
+      echo "Snapshot restored: $SNAPSHOT_NAME"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Elasticsearch management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Elasticsearch Management Script
+
+      function show_help {
+        echo "Elasticsearch Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show Elasticsearch status"
+        echo "  logs      - Show Elasticsearch logs"
+        echo "  restart   - Restart Elasticsearch"
+        echo "  backup    - Create backup"
+        echo "  restore   - Restore from backup"
+        echo "  health    - Show cluster health"
+        echo "  indices   - List indices"
+        echo "  help      - Show this help"
+      }
+
+      case "$1" in
+        status)
+          docker ps -f name=elasticsearch
+          curl -s {{ ansible_default_ipv4.address }}:/_cluster/health | jq .
+          ;;
+        logs)
+          docker logs elasticsearch --tail 100 -f
+          ;;
+        restart)
+          docker restart elasticsearch
+          ;;
+        backup)
+          {{ docker_dir }}/elasticsearch/scripts/backup.sh
+          ;;
+        restore)
+          {{ docker_dir }}/elasticsearch/scripts/restore.sh "$2"
+          ;;
+        health)
+          curl -s {{ ansible_default_ipv4.address }}:/_cluster/health | jq .
+          ;;
+        indices)
+          curl -s {{ ansible_default_ipv4.address }}:/_cat/indices?v
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Elasticsearch health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Check if Elasticsearch is running
+      if ! docker ps -f name=elasticsearch -f status=running | grep -q elasticsearch; then
+        echo "Elasticsearch is not running"
+        exit 1
+      fi
+
+      # Check if Elasticsearch is responding
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:/_cluster/health > /dev/null; then
+        echo "Elasticsearch is not responding"
+        exit 1
+      fi
+
+      # Check cluster health
+      HEALTH=$(curl -s http://{{ ansible_default_ipv4.address }}:/_cluster/health | jq -r .status)
+      if [ "$HEALTH" != "green" ] && [ "$HEALTH" != "yellow" ]; then
+        echo "Elasticsearch cluster health is $HEALTH"
+        exit 1
+      fi
+
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Elasticsearch log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/elasticsearch/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/elasticsearch/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Elasticsearch log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Elasticsearch logs"
+    job: "logrotate {{ docker_dir }}/elasticsearch/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_service_user }}"
+
+- name: Add Elasticsearch backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Elasticsearch indices"
+    job: "{{ docker_dir }}/elasticsearch/scripts/backup.sh"
+    hour: "3"
+    minute: "0"
+    user: "{{ vault_service_user }}"

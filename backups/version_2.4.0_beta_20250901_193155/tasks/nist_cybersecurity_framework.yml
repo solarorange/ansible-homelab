@@ -1,0 +1,29 @@
+---
+# NIST Cybersecurity Framework Compliance
+# Maps and reports on NIST CSF controls for the homelab
+
+- name: Ensure NIST CSF mapping file exists
+  ansible.builtin.template:
+    src: templates/nist-csf-mapping.yml.j2
+    dest: "{{ config_dir }}/security/nist-csf-mapping.yml"
+    mode: '0644'
+  tags: [compliance, nist, security]
+
+- name: Check NIST CSF control implementation status
+  ansible.builtin.shell: |
+    grep 'status:' {{ config_dir }}/security/nist-csf-mapping.yml
+  register: nist_csf_status
+  changed_when: false
+  tags: [compliance, nist, security]
+
+- name: Save NIST CSF compliance report
+  ansible.builtin.copy:
+    content: "{{ nist_csf_status.stdout }}"
+    dest: "{{ logs_dir }}/nist-csf-compliance.log"
+    mode: '0644'
+  tags: [compliance, nist, security]
+
+- name: Notify on NIST CSF compliance gaps
+  ansible.builtin.debug:
+    msg: "NIST CSF compliance check completed. Review {{ logs_dir }}/nist-csf-compliance.log for gaps."
+  tags: [compliance, nist, security]

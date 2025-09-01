@@ -1,0 +1,89 @@
+---
+# Wireguard Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Wireguard vault variables
+  block:
+    - name: Check required Wireguard vault variables
+      assert:
+        that:
+          - vault_wireguard_admin_password is defined
+          - vault_wireguard_database_password is defined
+          - vault_wireguard_api_key is defined
+          - vault_wireguard_secret_key is defined
+          - vault_wireguard_encryption_key is defined
+          - vault_wireguard_jwt_secret is defined
+        fail_msg: "Required Wireguard vault variables are not defined"
+        success_msg: "All required Wireguard vault variables are defined"
+
+    - name: Validate Wireguard password complexity
+      assert:
+        that:
+          - vault_wireguard_admin_password | length >= 12
+          - vault_wireguard_database_password | length >= 12
+        fail_msg: "Wireguard passwords must be at least 12 characters long"
+        success_msg: "Wireguard password complexity requirements met"
+
+- name: Validate Wireguard network configuration
+  block:
+    - name: Check Wireguard port configuration
+      assert:
+        that:
+          - wireguard_port is defined
+          - wireguard_port | int >= 1024
+          - wireguard_port | int <= 65535
+        fail_msg: "Wireguard port must be between 1024 and 65535"
+        success_msg: "Wireguard port configuration is valid"
+
+    - name: Check Wireguard domain configuration
+      assert:
+        that:
+          - domain is defined
+          - wireguard_subdomain is defined
+        fail_msg: "Wireguard domain configuration is incomplete"
+        success_msg: "Wireguard domain configuration is valid"
+
+- name: Validate Wireguard security configuration
+  block:
+    - name: Check Wireguard SSL configuration
+      assert:
+        that:
+          - wireguard_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Wireguard SSL configuration is invalid"
+        success_msg: "Wireguard SSL configuration is valid"
+
+    - name: Check Wireguard authentication configuration
+      assert:
+        that:
+          - wireguard_auth_enabled | bool
+          - wireguard_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Wireguard authentication configuration is invalid"
+        success_msg: "Wireguard authentication configuration is valid"
+
+- name: Validate Wireguard storage configuration
+  block:
+    - name: Check Wireguard data directories
+      assert:
+        that:
+          - wireguard_data_dir is defined
+          - wireguard_config_dir is defined
+          - wireguard_backup_dir is defined
+        fail_msg: "Wireguard storage configuration is incomplete"
+        success_msg: "Wireguard storage configuration is valid"
+
+    - name: Create Wireguard directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ wireguard_data_dir }}"
+        - "{{ wireguard_config_dir }}"
+        - "{{ wireguard_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Wireguard validation completed successfully - all configurations are valid and secure"

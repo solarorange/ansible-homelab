@@ -1,0 +1,116 @@
+---
+# Database Stack Homepage Integration
+# Configure homepage dashboard integration for database services
+
+- name: Configure database services homepage integration
+  block:
+    - name: Add databases to homepage services
+      ansible.builtin.template:
+        src: homepage-services.yml.j2
+        dest: "{{ config_dir }}/homepage/services/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+      vars:
+        services:
+          - name: postgresql
+            enabled: "{{ postgresql_enabled | default(true) }}"
+            domain: "{{ postgresql_domain }}"
+            port: "{{ postgresql_port }}"
+            description: "PostgreSQL Relational Database"
+            icon: "postgresql.png"
+          - name: mariadb
+            enabled: "{{ mariadb_enabled | default(true) }}"
+            domain: "{{ mariadb_domain }}"
+            port: "{{ mariadb_port }}"
+            description: "MariaDB Relational Database"
+            icon: "mariadb.png"
+          - name: redis
+            enabled: "{{ redis_enabled | default(true) }}"
+            domain: "{{ redis_domain }}"
+            port: "{{ redis_port }}"
+            description: "Redis In-memory Cache"
+            icon: "redis.png"
+          - name: elasticsearch
+            enabled: "{{ elasticsearch_enabled | default(true) }}"
+            domain: "{{ elasticsearch_domain }}"
+            port: "{{ elasticsearch_port }}"
+            description: "Elasticsearch Search Engine"
+            icon: "elasticsearch.png"
+          - name: kibana
+            enabled: "{{ kibana_enabled | default(true) }}"
+            domain: "{{ kibana_domain }}"
+            port: "{{ kibana_port }}"
+            description: "Kibana Data Visualization"
+            icon: "kibana.png"
+
+    - name: Add databases to homepage widgets
+      ansible.builtin.template:
+        src: homepage-widgets.yml.j2
+        dest: "{{ config_dir }}/homepage/widgets/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart homepage
+      when: databases_homepage_widget_enabled | default(true)
+
+    - name: Download database icons
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ config_dir }}/homepage/icons/{{ item.name }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+        force: false
+      loop:
+        - name: postgresql.png
+          url: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/postgresql.png"
+        - name: mariadb.png
+          url: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/mariadb.png"
+        - name: redis.png
+          url: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/redis.png"
+        - name: elasticsearch.png
+          url: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/elasticsearch.png"
+        - name: kibana.png
+          url: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/kibana.png"
+
+  when: databases_homepage_enabled | default(true)
+  tags: [databases, homepage]
+
+- name: Validate database homepage integration
+  block:
+    - name: Check homepage configuration files
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: homepage_files
+      loop:
+        - "{{ config_dir }}/homepage/services/databases.yml"
+        - "{{ config_dir }}/homepage/widgets/databases.yml"
+
+    - name: Verify homepage configuration files exist
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Homepage configuration file {{ item.item }} not found."
+        success_msg: "Homepage configuration file {{ item.item }} exists."
+      loop: "{{ homepage_files.results }}"
+
+    - name: Display homepage integration status
+      ansible.builtin.debug:
+        msg: |
+          Database Homepage Integration Completed!
+
+          Homepage Components:
+          - Services: Configured
+          - Widgets: {{ 'Configured' if databases_homepage_widget_enabled else 'Disabled' }}
+
+          Access URLs:
+          - PostgreSQL: https://{{ postgresql_domain }}
+          - MariaDB: https://{{ mariadb_domain }}
+          - Redis: https://{{ redis_domain }}
+          - Elasticsearch: https://{{ elasticsearch_domain }}
+          - Kibana: https://{{ kibana_domain }}
+
+  when: databases_homepage_enabled | default(true)
+  tags: [databases, homepage, validation]

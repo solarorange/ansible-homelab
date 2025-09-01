@@ -1,0 +1,276 @@
+---
+# Pihole Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# PIHOLE SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+pihole_service_name: "pihole"
+pihole_container_name: "{{ pihole_service_name }}"
+pihole_image: "pihole/pihole:latest"
+pihole_version: "latest"
+
+# Network Configuration
+pihole_port: 8083
+pihole_external_port: "{{ pihole_port }}"
+pihole_protocol: "http"
+pihole_host: "{{ ansible_default_ipv4.address }}"
+pihole_url: "{{ pihole_protocol }}://{{ pihole_host }}:{{ pihole_port }}"
+
+# Domain Configuration
+pihole_subdomain: "pihole"
+pihole_domain: "{{ pihole_subdomain }}.{{ domain }}"
+pihole_external_url: "https://{{ pihole_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+pihole_auth_enabled: true
+pihole_auth_method: "authentik"  # Options: basic, authentik, none
+pihole_admin_username: "admin"
+pihole_admin_password: "{{ vault_pihole_admin_password }}"
+
+# API Configuration
+pihole_api_key: "{{ vault_pihole_api_key }}"
+pihole_api_token: "{{ vault_pihole_api_token }}"
+
+# Encryption & Security
+pihole_secret_key: "{{ vault_pihole_secret_key }}"
+pihole_encryption_key: "{{ vault_pihole_encryption_key }}"
+pihole_jwt_secret: "{{ vault_pihole_jwt_secret }}"
+
+# SSL/TLS Configuration
+pihole_ssl_enabled: true
+pihole_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+pihole_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+pihole_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+pihole_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+pihole_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+pihole_database_port: "{{ databases_postgresql_port | default(5432) }}"
+pihole_database_name: "pihole"
+pihole_database_username: "pihole"
+pihole_database_password: "{{ vault_pihole_database_password }}"
+
+# Redis Configuration (if using)
+pihole_redis_enabled: false
+pihole_redis_host: "{{ redis_host | default('redis') }}"
+pihole_redis_port: "{{ redis_port | default(6379) }}"
+pihole_redis_password: "{{ vault_pihole_redis_password }}"
+pihole_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+pihole_data_dir: "{{ homelab_data_dir }}/pihole"
+pihole_config_dir: "{{ pihole_data_dir }}/config"
+pihole_backup_dir: "{{ pihole_data_dir }}/backups"
+
+# Volume Mappings
+pihole_volumes:
+  - "{{ pihole_config_dir }}:/config"
+  - "{{ pihole_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+pihole_health_check_enabled: true
+pihole_health_check_path: "/health"
+pihole_health_check_interval: 30
+pihole_health_check_timeout: 10
+pihole_health_check_retries: 3
+
+# Monitoring Integration
+pihole_monitoring_enabled: true
+pihole_prometheus_enabled: true
+pihole_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+pihole_backup_enabled: true
+pihole_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+pihole_backup_retention_days: 30
+pihole_backup_encryption_enabled: true
+pihole_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+pihole_smtp_enabled: false
+pihole_smtp_host: "{{ smtp_host | default('') }}"
+pihole_smtp_port: "{{ smtp_port | default(587) }}"
+pihole_smtp_username: "{{ vault_smtp_username }}"
+pihole_smtp_password: "{{ vault_pihole_smtp_password }}"
+pihole_smtp_from: "{{ pihole_admin_email | default('admin@' + domain) }}"
+pihole_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+pihole_webhook_enabled: false
+pihole_webhook_url: "{{ vault_webhook_url | default('') }}"
+pihole_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+pihole_discovery_enabled: true
+pihole_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+pihole_cpu_limit: "1.0"
+pihole_memory_limit: "1g"
+pihole_memory_reservation: "512m"
+
+# Performance Settings
+pihole_scan_interval: 10
+pihole_parallel_downloads: 3
+pihole_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+pihole_log_level: "info"  # Options: trace, debug, info, warn, error
+pihole_log_rotation_enabled: true
+pihole_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+pihole_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+pihole_rate_limit_enabled: true
+pihole_rate_limit_requests: 100
+pihole_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+pihole_deploy_enabled: true
+pihole_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+pihole_restart_policy: "unless-stopped"
+pihole_auto_update_enabled: true
+
+# Environment Variables
+pihole_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  PIHOLE_API_KEY: "{{ pihole_api_key }}"
+  PIHOLE_SECRET_KEY: "{{ pihole_secret_key }}"
+  PIHOLE_ENCRYPTION_KEY: "{{ pihole_encryption_key }}"
+  PIHOLE_JWT_SECRET: "{{ pihole_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+pihole_validation_enabled: true
+pihole_validation_timeout: 300
+pihole_validation_retries: 3
+
+# Testing Configuration
+pihole_test_enabled: false
+pihole_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+pihole_compliance_enabled: true
+pihole_audit_logging_enabled: true
+pihole_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+pihole_automation_enabled: true
+pihole_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+pihole_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+pihole_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+pihole_fallback_enabled: true
+pihole_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+# Toggle to manage secret files (kept backward compatible with existing envs)
+pihole_manage_secret_files: true
+
+# Secret files written to {{ docker_dir }}/pihole/secrets (0600)
+pihole_secret_files:
+  - name: "WEBPASSWORD"
+    value: "{{ pihole_admin_password }}"
+
+# Optional list of required secrets for validation in role tasks
+pihole_required_secrets:
+  - WEBPASSWORD

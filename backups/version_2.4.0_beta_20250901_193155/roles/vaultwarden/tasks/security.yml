@@ -1,0 +1,134 @@
+---
+# Vaultwarden Security Configuration
+# Configures security settings for Vaultwarden
+
+- name: Configure Vaultwarden security headers
+  ansible.builtin.template:
+    src: security-headers.yml.j2
+    dest: "{{ traefik_config_dir }}/vaultwarden-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_security_headers | default(true)
+  tags: [vaultwarden, vaultwarden-security, headers]
+
+- name: Configure Vaultwarden rate limiting
+  ansible.builtin.template:
+    src: rate-limiting.yml.j2
+    dest: "{{ traefik_config_dir }}/vaultwarden-rate-limit.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_rate_limiting | default(true)
+  tags: [vaultwarden, vaultwarden-security, rate-limit]
+
+- name: Configure Vaultwarden CORS settings
+  ansible.builtin.template:
+    src: cors.yml.j2
+    dest: "{{ traefik_config_dir }}/vaultwarden-cors.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_cors_enabled | default(false)
+  tags: [vaultwarden, vaultwarden-security, cors]
+
+- name: Configure Vaultwarden CrowdSec integration
+  ansible.builtin.template:
+    src: crowdsec.yml.j2
+    dest: "{{ crowdsec_config_dir }}/vaultwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_crowdsec_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-security, crowdsec]
+
+- name: Configure Vaultwarden Fail2ban integration
+  ansible.builtin.template:
+    src: fail2ban.conf.j2
+    dest: "{{ fail2ban_config_dir }}/jail.d/vaultwarden.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_fail2ban_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-security, fail2ban]
+
+- name: Configure Vaultwarden firewall rules
+  ansible.builtin.template:
+    src: firewall.yml.j2
+    dest: "{{ firewall_config_dir }}/vaultwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [vaultwarden, vaultwarden-security, firewall]
+
+- name: Set Vaultwarden file permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  loop:
+    - "{{ vaultwarden_data_dir }}/config.json"
+    - "{{ vaultwarden_data_dir }}/rsa_key.der"
+    - "{{ vaultwarden_data_dir }}/rsa_key.pem"
+    - "{{ vaultwarden_data_dir }}/rsa_key.pub.der"
+  when: item is file
+  tags: [vaultwarden, vaultwarden-security, permissions]
+
+- name: Configure Vaultwarden SSL/TLS settings
+  ansible.builtin.template:
+    src: ssl.yml.j2
+    dest: "{{ traefik_config_dir }}/vaultwarden-ssl.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_ssl_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-security, ssl]
+
+- name: Restart security services for Vaultwarden
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - traefik
+    - crowdsec
+    - fail2ban
+  when: vaultwarden_security_headers | default(true) or vaultwarden_crowdsec_enabled | default(true) or vaultwarden_fail2ban_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-security, restart]
+
+- name: Verify Vaultwarden security configuration
+  ansible.builtin.uri:
+    url: "https://{{ vaultwarden_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 10
+  register: vaultwarden_security_verification
+  tags: [vaultwarden, vaultwarden-security, verify]
+
+- name: Display Vaultwarden security status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN SECURITY STATUS
+      ========================================
+
+      Security Features:
+      - Security Headers: {{ 'ENABLED' if vaultwarden_security_headers else 'DISABLED' }}
+      - Rate Limiting: {{ 'ENABLED' if vaultwarden_rate_limiting else 'DISABLED' }}
+      - CORS: {{ 'ENABLED' if vaultwarden_cors_enabled else 'DISABLED' }}
+      - SSL/TLS: {{ 'ENABLED' if vaultwarden_ssl_enabled else 'DISABLED' }}
+
+      Security Integrations:
+      - CrowdSec: {{ 'ENABLED' if vaultwarden_crowdsec_enabled else 'DISABLED' }}
+      - Fail2ban: {{ 'ENABLED' if vaultwarden_fail2ban_enabled else 'DISABLED' }}
+
+      Rate Limiting:
+      - Requests: {{ vaultwarden_rate_limit_requests }}
+      - Window: {{ vaultwarden_rate_limit_window }}s
+
+      Fail2ban:
+      - Max Retry: {{ vaultwarden_fail2ban_max_retry }}
+      - Ban Time: {{ vaultwarden_fail2ban_bantime }}s
+
+      ========================================
+  tags: [vaultwarden, vaultwarden-security, summary]

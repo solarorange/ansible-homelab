@@ -1,0 +1,103 @@
+version: '3.8'
+
+networks:
+  homelab:
+    external: true
+
+services:
+{% if home_assistant_enabled %}
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    volumes:
+      - "{{ home_assistant_config_dir }}:/config"
+      - "{{ home_assistant_ssl_dir }}:/ssl"
+      - "{{ logs_dir }}/homeassistant:/logs"
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    # Harden security: drop privileged/host network; use explicit devices/caps if needed
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+    cap_drop:
+      - ALL
+    # cap_add may be added selectively via vars if strictly required
+    # cap_add:
+    #   - NET_ADMIN
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ={{ automation_timezone }}
+{% endif %}
+
+{% if zigbee2mqtt_enabled %}
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    container_name: zigbee2mqtt
+    volumes:
+      - "{{ zigbee2mqtt_data_dir }}:/app/data"
+      - /dev:/dev
+      - "{{ logs_dir }}/zigbee2mqtt:/logs"
+    {% if automation_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ zigbee2mqtt_port }}:8080"
+    {% endif %}
+    environment:
+      - TZ={{ automation_timezone }}
+    restart: unless-stopped
+    # Harden security: remove privileged, keep specific device mapping
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+    networks:
+      - homelab
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    depends_on:
+      - mosquitto
+{% endif %}
+
+{% if node_red_enabled %}
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered
+    {% if automation_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ node_red_port }}:1880"
+    {% endif %}
+    volumes:
+      - "{{ docker_data_root }}/nodered:/data"
+      - "{{ logs_dir }}/nodered:/logs"
+    restart: unless-stopped
+    networks:
+      - homelab
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+{% endif %}
+
+{% if n8n_enabled %}
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    {% if automation_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ n8n_port }}:5678"
+    {% endif %}
+    volumes:
+      - "{{ docker_data_root }}/n8n:/home/node/.n8n"
+      - "{{ logs_dir }}/n8n:/logs"
+    restart: unless-stopped
+    networks:
+      - homelab
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+{% endif %} 

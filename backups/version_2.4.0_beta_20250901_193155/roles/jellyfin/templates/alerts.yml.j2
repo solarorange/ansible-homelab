@@ -1,0 +1,14 @@
+---
+# Jellyfin Alerting Rules
+
+groups:
+  - name: Jellyfin
+    rules:
+      - alert: JellyfinDown
+        expr: up{job="jellyfin"} == 0
+        for: 1m
+        labels:
+          severity: {{ jellyfin_alert_severity | default('warning') }}
+        annotations:
+          summary: "Jellyfin is down"
+          description: "Jellyfin has been down for more than 1 minute"

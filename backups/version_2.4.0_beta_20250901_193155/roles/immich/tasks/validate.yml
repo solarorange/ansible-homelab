@@ -1,0 +1,89 @@
+---
+# Immich Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Immich vault variables
+  block:
+    - name: Check required Immich vault variables
+      assert:
+        that:
+          - vault_immich_admin_password is defined
+          - vault_immich_database_password is defined
+          - vault_immich_api_key is defined
+          - vault_immich_secret_key is defined
+          - vault_immich_encryption_key is defined
+          - vault_immich_jwt_secret is defined
+        fail_msg: "Required Immich vault variables are not defined"
+        success_msg: "All required Immich vault variables are defined"
+
+    - name: Validate Immich password complexity
+      assert:
+        that:
+          - vault_immich_admin_password | length >= 12
+          - vault_immich_database_password | length >= 12
+        fail_msg: "Immich passwords must be at least 12 characters long"
+        success_msg: "Immich password complexity requirements met"
+
+- name: Validate Immich network configuration
+  block:
+    - name: Check Immich port configuration
+      assert:
+        that:
+          - immich_port is defined
+          - immich_port | int >= 1024
+          - immich_port | int <= 65535
+        fail_msg: "Immich port must be between 1024 and 65535"
+        success_msg: "Immich port configuration is valid"
+
+    - name: Check Immich domain configuration
+      assert:
+        that:
+          - domain is defined
+          - immich_subdomain is defined
+        fail_msg: "Immich domain configuration is incomplete"
+        success_msg: "Immich domain configuration is valid"
+
+- name: Validate Immich security configuration
+  block:
+    - name: Check Immich SSL configuration
+      assert:
+        that:
+          - immich_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Immich SSL configuration is invalid"
+        success_msg: "Immich SSL configuration is valid"
+
+    - name: Check Immich authentication configuration
+      assert:
+        that:
+          - immich_auth_enabled | bool
+          - immich_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Immich authentication configuration is invalid"
+        success_msg: "Immich authentication configuration is valid"
+
+- name: Validate Immich storage configuration
+  block:
+    - name: Check Immich data directories
+      assert:
+        that:
+          - immich_data_dir is defined
+          - immich_config_dir is defined
+          - immich_backup_dir is defined
+        fail_msg: "Immich storage configuration is incomplete"
+        success_msg: "Immich storage configuration is valid"
+
+    - name: Create Immich directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ immich_data_dir }}"
+        - "{{ immich_config_dir }}"
+        - "{{ immich_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Immich validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,89 @@
+---
+# Vaultwarden Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Vaultwarden vault variables
+  block:
+    - name: Check required Vaultwarden vault variables
+      assert:
+        that:
+          - vault_vaultwarden_admin_password is defined
+          - vault_vaultwarden_database_password is defined
+          - vault_vaultwarden_api_key is defined
+          - vault_vaultwarden_secret_key is defined
+          - vault_vaultwarden_encryption_key is defined
+          - vault_vaultwarden_jwt_secret is defined
+        fail_msg: "Required Vaultwarden vault variables are not defined"
+        success_msg: "All required Vaultwarden vault variables are defined"
+
+    - name: Validate Vaultwarden password complexity
+      assert:
+        that:
+          - vault_vaultwarden_admin_password | length >= 12
+          - vault_vaultwarden_database_password | length >= 12
+        fail_msg: "Vaultwarden passwords must be at least 12 characters long"
+        success_msg: "Vaultwarden password complexity requirements met"
+
+- name: Validate Vaultwarden network configuration
+  block:
+    - name: Check Vaultwarden port configuration
+      assert:
+        that:
+          - vaultwarden_port is defined
+          - vaultwarden_port | int >= 1024
+          - vaultwarden_port | int <= 65535
+        fail_msg: "Vaultwarden port must be between 1024 and 65535"
+        success_msg: "Vaultwarden port configuration is valid"
+
+    - name: Check Vaultwarden domain configuration
+      assert:
+        that:
+          - domain is defined
+          - vaultwarden_subdomain is defined
+        fail_msg: "Vaultwarden domain configuration is incomplete"
+        success_msg: "Vaultwarden domain configuration is valid"
+
+- name: Validate Vaultwarden security configuration
+  block:
+    - name: Check Vaultwarden SSL configuration
+      assert:
+        that:
+          - vaultwarden_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Vaultwarden SSL configuration is invalid"
+        success_msg: "Vaultwarden SSL configuration is valid"
+
+    - name: Check Vaultwarden authentication configuration
+      assert:
+        that:
+          - vaultwarden_auth_enabled | bool
+          - vaultwarden_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Vaultwarden authentication configuration is invalid"
+        success_msg: "Vaultwarden authentication configuration is valid"
+
+- name: Validate Vaultwarden storage configuration
+  block:
+    - name: Check Vaultwarden data directories
+      assert:
+        that:
+          - vaultwarden_data_dir is defined
+          - vaultwarden_config_dir is defined
+          - vaultwarden_backup_dir is defined
+        fail_msg: "Vaultwarden storage configuration is incomplete"
+        success_msg: "Vaultwarden storage configuration is valid"
+
+    - name: Create Vaultwarden directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ vaultwarden_data_dir }}"
+        - "{{ vaultwarden_config_dir }}"
+        - "{{ vaultwarden_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Vaultwarden validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,112 @@
+---
+# Vaultwarden Alerting Configuration
+# Configures alerting for Vaultwarden
+
+- name: Configure Vaultwarden Prometheus alerting rules
+  ansible.builtin.template:
+    src: prometheus-alerts.yml.j2
+    dest: "{{ prometheus_config_dir }}/alerts/vaultwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, prometheus]
+
+- name: Configure Vaultwarden AlertManager integration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/vaultwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, alertmanager]
+
+- name: Configure Vaultwarden Grafana alerting
+  ansible.builtin.template:
+    src: grafana-alerts.yml.j2
+    dest: "{{ grafana_config_dir }}/alerts/vaultwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, grafana]
+
+- name: Configure Vaultwarden health check alerts
+  ansible.builtin.template:
+    src: health-alerts.yml.j2
+    dest: "{{ monitoring_config_dir }}/vaultwarden-health.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, health]
+
+- name: Configure Vaultwarden backup alerts
+  ansible.builtin.template:
+    src: backup-alerts.yml.j2
+    dest: "{{ monitoring_config_dir }}/vaultwarden-backup-alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true) and vaultwarden_backup_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, backup]
+
+- name: Configure Vaultwarden security alerts
+  ansible.builtin.template:
+    src: security-alerts.yml.j2
+    dest: "{{ monitoring_config_dir }}/vaultwarden-security.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, security]
+
+- name: Restart alerting services for Vaultwarden
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - prometheus
+    - alertmanager
+    - grafana
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, restart]
+
+- name: Test Vaultwarden alerting configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port }}/api/v1/alerts"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 10
+  register: vaultwarden_alerting_test
+  when: vaultwarden_alerting_enabled | default(true)
+  tags: [vaultwarden, vaultwarden-alerts, test]
+
+- name: Display Vaultwarden alerting status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN ALERTING STATUS
+      ========================================
+
+      Alerting Configuration:
+      - Enabled: {{ 'YES' if vaultwarden_alerting_enabled else 'NO' }}
+      - Provider: {{ vaultwarden_alerting_provider }}
+      - Webhook: {{ vaultwarden_alerting_webhook }}
+
+      Alert Types:
+      - Health Check: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+      - Backup: {{ 'CONFIGURED' if vaultwarden_alerting_enabled and vaultwarden_backup_enabled else 'DISABLED' }}
+      - Security: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+      - Performance: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+
+      Integration:
+      - Prometheus: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+      - AlertManager: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+      - Grafana: {{ 'CONFIGURED' if vaultwarden_alerting_enabled else 'DISABLED' }}
+
+      Test Result: {{ 'PASSED' if vaultwarden_alerting_test.status == 200 else 'FAILED' }}
+
+      ========================================
+  tags: [vaultwarden, vaultwarden-alerts, summary]

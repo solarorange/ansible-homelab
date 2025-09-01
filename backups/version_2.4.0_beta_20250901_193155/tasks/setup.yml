@@ -1,0 +1,46 @@
+---
+# Setup and Prerequisites Tasks
+# Handles collection installation and variable validation
+
+- name: Install required collections
+  ansible.builtin.command:
+    cmd: "ansible-galaxy collection install {{ item }}"
+  loop:
+    - community.general:>=5.0.0
+    - community.docker:>=3.0.0
+    - ansible.posix:>=1.4.0
+    - community.crypto:>=2.0.0
+    - community.network:>=4.0.0
+    - community.proxmox:>=1.0.0
+  register: collection_install
+  changed_when: collection_install.rc == 0
+  failed_when: collection_install.rc != 0
+  tags: [setup, always]
+
+- name: Install required roles
+  ansible.builtin.command:
+    cmd: "ansible-galaxy role install {{ item }}"
+  loop:
+    - geerlingguy.docker
+    - geerlingguy.pip
+    - geerlingguy.security
+    - geerlingguy.ntp
+    - geerlingguy.firewall
+    - geerlingguy.mysql
+    - geerlingguy.redis
+    - geerlingguy.nginx
+    - geerlingguy.certbot
+    - geerlingguy.backup
+  register: role_install
+  changed_when: role_install.rc == 0
+  failed_when: role_install.rc != 0
+  tags: [setup, always]
+
+- name: Display setup completion
+  ansible.builtin.debug:
+    msg: |
+      Setup completed successfully:
+      - Ansible collections installed
+      - Required roles installed
+      - Ready for deployment
+  tags: [setup, always]

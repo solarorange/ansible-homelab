@@ -1,0 +1,159 @@
+---
+# Radarr Configuration
+# Movie Management
+
+- name: Create Radarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/radarr/config"
+    - "{{ docker_dir }}/radarr/data"
+    - "{{ docker_dir }}/radarr/scripts"
+    - "{{ logs_dir }}/radarr"
+
+- name: Create Radarr configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/radarr/config/config.xml"
+    content: |
+      <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+      <Config>
+        <Port>7878</Port>
+        <LogLevel>info</LogLevel>
+        <LogPath>{{ logs_dir }}/radarr/app.log</LogPath>
+        <MaxLogSize>5</MaxLogSize>
+        <MaxLogFiles>5</MaxLogFiles>
+        <AdminUser>{{ radarr_username }}</AdminUser>
+        <AdminPassword>{{ radarr_password }}</AdminPassword>
+      </Config>
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create Radarr management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/radarr/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Radarr Management Script
+
+      function show_help {
+          echo "Radarr Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check Radarr status"
+          echo "  logs      - View Radarr logs"
+          echo "  restart   - Restart Radarr"
+          echo "  backup    - Backup Radarr data"
+          echo "  restore   - Restore Radarr data"
+          echo "  help      - Show this help message"
+      }
+
+      function backup_data {
+          echo "Backing up Radarr data..."
+          tar -czf "{{ docker_dir }}/radarr/backup/radarr_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/radarr" config data
+          echo "Backup completed."
+      }
+
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring Radarr data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/radarr"
+          echo "Restore completed."
+      }
+
+      case "$1" in
+          status)
+              docker ps | grep radarr
+              ;;
+          logs)
+              docker logs -f radarr
+              ;;
+          restart)
+              docker restart radarr
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Radarr health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/radarr/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Check if Radarr is running
+      if ! docker ps -f name=radarr -f status=running | grep -q radarr; then
+        echo "Radarr is not running"
+        exit 1
+      fi
+
+      # Check if Radarr is responding
+      if ! curl -s -f http://{{ ansible_default_ipv4.address }}:7878/api/v3/health > /dev/null; then
+        echo "Radarr is not responding"
+        exit 1
+      fi
+
+      # Check Radarr status
+      STATUS=$(curl -s http://{{ ansible_default_ipv4.address }}:7878/api/v3/health | jq -r .status)
+      if [ "$STATUS" != "ok" ]; then
+        echo "Radarr status is $STATUS"
+        exit 1
+      fi
+
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create Radarr log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/radarr/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/radarr/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Radarr log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate Radarr logs"
+    job: "logrotate {{ docker_dir }}/radarr/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_radarr_user }}"
+
+- name: Add Radarr backup to crontab
+  ansible.builtin.cron:
+    name: "Backup Radarr data"
+    job: "{{ docker_dir }}/radarr/scripts/manage.sh backup"
+    minute: "{{ backup_schedules.radarr.split(' ')[0] }}"
+    hour: "{{ backup_schedules.radarr.split(' ')[1] }}"
+    user: "{{ vault_radarr_user }}"

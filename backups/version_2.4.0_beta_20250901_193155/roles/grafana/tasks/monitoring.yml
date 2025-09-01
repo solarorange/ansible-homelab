@@ -1,0 +1,92 @@
+---
+# Grafana Monitoring Configuration
+# Configures health checks and performance monitoring
+
+- name: Create Grafana monitoring script
+  ansible.builtin.template:
+    src: monitoring.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/monitoring.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, monitoring, scripts]
+
+- name: Create Grafana performance monitoring script
+  ansible.builtin.template:
+    src: performance.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/performance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, monitoring, scripts]
+
+- name: Create Grafana metrics collection script
+  ansible.builtin.template:
+    src: metrics.sh.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/metrics.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [grafana, monitoring, scripts]
+
+- name: Setup Grafana monitoring cron jobs
+  ansible.builtin.cron:
+    name: "Grafana Health Check"
+    minute: "*/5"
+    job: "{{ docker_dir }}/monitoring/grafana/scripts/monitoring.sh"
+    user: "{{ vault_grafana_user }}"
+  tags: [grafana, monitoring, cron]
+
+- name: Setup Grafana performance monitoring cron
+  ansible.builtin.cron:
+    name: "Grafana Performance Monitoring"
+    minute: "*/10"
+    job: "{{ docker_dir }}/monitoring/grafana/scripts/performance.sh"
+    user: "{{ vault_grafana_user }}"
+  tags: [grafana, monitoring, cron]
+
+- name: Setup Grafana metrics collection cron
+  ansible.builtin.cron:
+    name: "Grafana Metrics Collection"
+    minute: "*/2"
+    job: "{{ docker_dir }}/monitoring/grafana/scripts/metrics.sh"
+    user: "{{ vault_grafana_user }}"
+  tags: [grafana, monitoring, cron]
+
+- name: Test Grafana health check script
+  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/monitoring.sh"
+  register: health_check_test
+  changed_when: health_check_test.rc == 0
+  failed_when: health_check_test.rc != 0
+  tags: [grafana, monitoring, test]
+
+- name: Test Grafana performance script
+  ansible.builtin.command: "{{ docker_dir }}/monitoring/grafana/scripts/performance.sh"
+  register: performance_test
+  changed_when: performance_test.rc == 0
+  failed_when: performance_test.rc != 0
+  tags: [grafana, monitoring, test]
+
+- name: Display monitoring configuration status
+  ansible.builtin.debug:
+    msg: |
+      Grafana Monitoring Configuration:
+
+      Health Check Script: {{ docker_dir }}/monitoring/grafana/scripts/monitoring.sh
+      Performance Script: {{ docker_dir }}/monitoring/grafana/scripts/performance.sh
+      Metrics Script: {{ docker_dir }}/monitoring/grafana/scripts/metrics.sh
+
+      Cron Jobs:
+      - Health Check: Every 5 minutes
+      - Performance: Every 10 minutes
+      - Metrics: Every 2 minutes
+
+      Test Results:
+      - Health Check: {{ health_check_test.rc == 0 | ternary('OK', 'Failed') }}
+      - Performance: {{ performance_test.rc == 0 | ternary('OK', 'Failed') }}
+
+      Monitoring Features:
+      - Health Checks: {{ grafana_health_check_enabled | default(false) }}
+      - Performance Monitoring: {{ grafana_performance_monitoring_enabled | default(false) }}
+      - Metrics Collection: {{ grafana_metrics_enabled | default(false) }}
+  tags: [grafana, monitoring, summary]

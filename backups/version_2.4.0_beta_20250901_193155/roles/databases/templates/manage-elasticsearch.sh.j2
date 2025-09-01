@@ -1,0 +1,35 @@
+#!/bin/bash
+# Elasticsearch Management Script
+function show_help {
+  echo "Elasticsearch Management Script"
+  echo "Usage: $0 [command]"
+  echo ""
+  echo "Commands:"
+  echo "  status    - Show Elasticsearch status"
+  echo "  logs      - Show Elasticsearch logs"
+  echo "  restart   - Restart Elasticsearch"
+  echo "  backup    - Create snapshot backup"
+  echo "  restore   - Restore from snapshot"
+  echo "  help      - Show this help"
+}
+case "$1" in
+  status)
+    docker ps -f name={{ elasticsearch_container_name }}
+    docker exec {{ elasticsearch_container_name }} curl -s -k https://{{ ansible_default_ipv4.address }}:{{ elasticsearch_web_port }}/_cluster/health
+    ;;
+  logs)
+    docker logs {{ elasticsearch_container_name }} --tail 100 -f
+    ;;
+  restart)
+    docker restart {{ elasticsearch_container_name }}
+    ;;
+  backup)
+    {{ docker_dir }}/elasticsearch/scripts/backup.sh
+    ;;
+  restore)
+    {{ docker_dir }}/elasticsearch/scripts/restore.sh "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

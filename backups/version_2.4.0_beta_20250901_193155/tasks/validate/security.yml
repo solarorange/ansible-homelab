@@ -1,0 +1,108 @@
+---
+# Security Validation
+# Validates security configurations for all services
+
+- name: Validate security configuration
+  block:
+    - name: Check for privileged containers
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "Up.*privileged" | wc -l
+      register: privileged_containers
+      changed_when: false
+
+    - name: Fail if privileged containers detected
+      ansible.builtin.fail:
+        msg: "Security violation: {{ privileged_containers.stdout }} privileged containers detected"
+      when: privileged_containers.stdout | int > 0
+      tags: [validation, security, critical]
+
+    - name: Check for containers without security options
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "SecurityOpt"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_security
+      changed_when: false
+
+    - name: Warn about containers without security options
+      ansible.builtin.debug:
+        msg: "Containers without security options: {{ containers_without_security.stdout_lines }}"
+      when: containers_without_security.stdout_lines | length > 0
+
+    - name: Check for containers running as root
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          user=$(docker inspect "$container" | jq -r '.[0].Config.User // "root"')
+          if [ "$user" = "root" ] || [ "$user" = "" ]; then
+            echo "$container"
+          fi
+        done
+      register: containers_as_root
+      changed_when: false
+
+    - name: Warn about containers running as root
+      ansible.builtin.debug:
+        msg: "Containers running as root: {{ containers_as_root.stdout_lines }}"
+      when: containers_as_root.stdout_lines | length > 0
+
+    - name: Check for containers without read-only filesystem
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "ReadonlyRootfs.*true"; then
+            echo "$container"
+          fi
+        done
+      register: containers_not_readonly
+      changed_when: false
+
+    - name: Warn about containers without read-only filesystem
+      ansible.builtin.debug:
+        msg: "Containers without read-only filesystem: {{ containers_not_readonly.stdout_lines }}"
+      when: containers_not_readonly.stdout_lines | length > 0
+
+    - name: Check for containers without tmpfs mounts
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "Tmpfs"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_tmpfs
+      changed_when: false
+
+    - name: Warn about containers without tmpfs mounts
+      ansible.builtin.debug:
+        msg: "Containers without tmpfs mounts: {{ containers_without_tmpfs.stdout_lines }}"
+      when: containers_without_tmpfs.stdout_lines | length > 0
+
+    - name: Validate Traefik security configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:8080/api/rawdata"
+        method: GET
+        status_code: [401, 403]
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: traefik_api_security
+      when: "'traefik' in enabled_services"
+
+    - name: Check Traefik API security
+      ansible.builtin.assert:
+        that:
+          - traefik_api_security.status in [401, 403]
+        fail_msg: "Traefik API is not properly secured"
+      when: "'traefik' in enabled_services"
+
+    - name: Check for exposed sensitive ports
+      ansible.builtin.shell: |
+        netstat -tlnp | grep -E ":(22|3306|5432|6379|27017|9200)" | wc -l
+      register: exposed_sensitive_ports
+      changed_when: false
+
+    - name: Warn about exposed sensitive ports
+      ansible.builtin.debug:
+        msg: "WARNING: {{ exposed_sensitive_ports.stdout }} sensitive ports exposed"
+      when: exposed_sensitive_ports.stdout | int > 0
+
+  tags: [validation, security]

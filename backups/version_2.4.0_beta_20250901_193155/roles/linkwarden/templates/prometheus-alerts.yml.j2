@@ -1,0 +1,35 @@
+# Linkwarden Prometheus Alert Rules
+# Alert rules for Linkwarden monitoring
+
+groups:
+  - name: linkwarden
+    rules:
+      - alert: LinkwardenDown
+        expr: up{job="linkwarden"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: linkwarden
+        annotations:
+          summary: "Linkwarden is down"
+          description: "Linkwarden service has been down for more than 1 minute"
+
+      - alert: LinkwardenHighResponseTime
+        expr: rate(http_request_duration_seconds_sum{job="linkwarden"}[5m]) / rate(http_request_duration_seconds_count{job="linkwarden"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: linkwarden
+        annotations:
+          summary: "Linkwarden high response time"
+          description: "Linkwarden average response time is above 2 seconds"
+
+      - alert: LinkwardenHighErrorRate
+        expr: rate(http_requests_total{job="linkwarden", status=~"5.."}[5m]) / rate(http_requests_total{job="linkwarden"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: linkwarden
+        annotations:
+          summary: "Linkwarden high error rate"
+          description: "Linkwarden error rate is above 5%" 

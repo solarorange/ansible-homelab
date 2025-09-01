@@ -1,0 +1,89 @@
+---
+# Romm Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Romm vault variables
+  block:
+    - name: Check required Romm vault variables
+      assert:
+        that:
+          - vault_romm_admin_password is defined
+          - vault_romm_database_password is defined
+          - vault_romm_api_key is defined
+          - vault_romm_secret_key is defined
+          - vault_romm_encryption_key is defined
+          - vault_romm_jwt_secret is defined
+        fail_msg: "Required Romm vault variables are not defined"
+        success_msg: "All required Romm vault variables are defined"
+
+    - name: Validate Romm password complexity
+      assert:
+        that:
+          - vault_romm_admin_password | length >= 12
+          - vault_romm_database_password | length >= 12
+        fail_msg: "Romm passwords must be at least 12 characters long"
+        success_msg: "Romm password complexity requirements met"
+
+- name: Validate Romm network configuration
+  block:
+    - name: Check Romm port configuration
+      assert:
+        that:
+          - romm_port is defined
+          - romm_port | int >= 1024
+          - romm_port | int <= 65535
+        fail_msg: "Romm port must be between 1024 and 65535"
+        success_msg: "Romm port configuration is valid"
+
+    - name: Check Romm domain configuration
+      assert:
+        that:
+          - domain is defined
+          - romm_subdomain is defined
+        fail_msg: "Romm domain configuration is incomplete"
+        success_msg: "Romm domain configuration is valid"
+
+- name: Validate Romm security configuration
+  block:
+    - name: Check Romm SSL configuration
+      assert:
+        that:
+          - romm_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Romm SSL configuration is invalid"
+        success_msg: "Romm SSL configuration is valid"
+
+    - name: Check Romm authentication configuration
+      assert:
+        that:
+          - romm_auth_enabled | bool
+          - romm_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Romm authentication configuration is invalid"
+        success_msg: "Romm authentication configuration is valid"
+
+- name: Validate Romm storage configuration
+  block:
+    - name: Check Romm data directories
+      assert:
+        that:
+          - romm_data_dir is defined
+          - romm_config_dir is defined
+          - romm_backup_dir is defined
+        fail_msg: "Romm storage configuration is incomplete"
+        success_msg: "Romm storage configuration is valid"
+
+    - name: Create Romm directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ romm_data_dir }}"
+        - "{{ romm_config_dir }}"
+        - "{{ romm_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Romm validation completed successfully - all configurations are valid and secure"

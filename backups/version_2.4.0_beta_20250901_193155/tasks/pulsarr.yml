@@ -1,0 +1,133 @@
+---
+# Pulsarr - Plex to Sonarr/Radarr Integration
+# Production-ready configuration for Plex to Sonarr/Radarr integration
+
+- name: Create Pulsarr directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop:
+    - "{{ docker_dir }}/pulsarr/config"
+    - "{{ docker_dir }}/pulsarr/data"
+  tags: [media, pulsarr]
+
+- name: Create Pulsarr docker-compose configuration
+  ansible.builtin.template:
+    src: templates/pulsarr/docker-compose.yml.j2
+    dest: "{{ docker_dir }}/pulsarr/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, pulsarr]
+
+- name: Create Pulsarr environment file
+  ansible.builtin.template:
+    src: templates/pulsarr/.env.j2
+    dest: "{{ docker_dir }}/pulsarr/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, pulsarr]
+
+- name: Create Traefik configuration for Pulsarr
+  ansible.builtin.template:
+    src: templates/pulsarr/traefik.yml.j2
+    dest: "{{ docker_dir }}/pulsarr/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [media, pulsarr]
+
+- name: Start Pulsarr container safely with rollback
+  ansible.builtin.include_tasks: "../roles/automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "pulsarr"
+    project_src: "{{ docker_dir }}/pulsarr"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8080
+  tags: [media, pulsarr, rollback]
+
+- name: Wait for Pulsarr to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8080/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: pulsarr_status
+  until: pulsarr_status.status == 200
+  retries: 30
+  delay: 10
+  tags: [media, pulsarr]
+
+- name: Configure Pulsarr Plex server
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8080/api/config/plex"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ pulsarr_api_key }}"
+  loop: "{{ pulsarr_plex_servers }}"
+  when: pulsarr_plex_servers is defined
+  tags: [media, pulsarr]
+
+- name: Configure Pulsarr Sonarr
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/sonarr"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ pulsarr_api_key }}"
+  loop: "{{ pulsarr_sonarr_servers }}"
+  when: pulsarr_sonarr_servers is defined
+  tags: [media, pulsarr]
+
+- name: Configure Pulsarr Radarr
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/radarr"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ pulsarr_api_key }}"
+  loop: "{{ pulsarr_radarr_servers }}"
+  when: pulsarr_radarr_servers is defined
+  tags: [media, pulsarr]
+
+- name: Configure Pulsarr notifications
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/config/notifications"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 200
+    headers:
+      X-Api-Key: "{{ pulsarr_api_key }}"
+  loop: "{{ pulsarr_notifications }}"
+  when: pulsarr_notifications is defined
+  tags: [media, pulsarr]
+
+- name: Verify Pulsarr configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
+    method: GET
+    status_code: 200
+    register: pulsarr_verify
+  tags: [media, pulsarr]
+
+- name: Display Pulsarr deployment status
+  ansible.builtin.debug:
+    msg: |
+      Pulsarr deployment completed successfully
+      URL: https://pulsarr.{{ domain }}
+      Status: {{ pulsarr_verify.json.status }}
+  tags: [media, pulsarr]

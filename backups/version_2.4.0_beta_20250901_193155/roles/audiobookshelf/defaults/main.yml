@@ -1,0 +1,260 @@
+---
+# Audiobookshelf Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# AUDIOBOOKSHELF SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+audiobookshelf_service_name: "audiobookshelf"
+audiobookshelf_container_name: "{{ audiobookshelf_service_name }}"
+audiobookshelf_image: "ghcr.io/advplyr/audiobookshelf:latest"
+audiobookshelf_version: "latest"
+
+# Network Configuration
+audiobookshelf_port: 13378
+audiobookshelf_external_port: "{{ audiobookshelf_port }}"
+audiobookshelf_protocol: "http"
+audiobookshelf_host: "{{ ansible_default_ipv4.address }}"
+audiobookshelf_url: "{{ audiobookshelf_protocol }}://{{ audiobookshelf_host }}:{{ audiobookshelf_port }}"
+
+# Domain Configuration
+audiobookshelf_subdomain: "audiobookshelf"
+audiobookshelf_domain: "{{ audiobookshelf_subdomain }}.{{ domain }}"
+audiobookshelf_external_url: "https://{{ audiobookshelf_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+audiobookshelf_auth_enabled: true
+audiobookshelf_auth_method: "authentik"  # Options: basic, authentik, none
+audiobookshelf_admin_username: "admin"
+audiobookshelf_admin_password: "{{ vault_audiobookshelf_admin_password }}"
+
+# API Configuration
+audiobookshelf_api_key: "{{ vault_audiobookshelf_api_key }}"
+audiobookshelf_api_token: "{{ vault_audiobookshelf_api_token }}"
+
+# Encryption & Security
+audiobookshelf_secret_key: "{{ vault_audiobookshelf_secret_key }}"
+audiobookshelf_encryption_key: "{{ vault_audiobookshelf_encryption_key }}"
+audiobookshelf_jwt_secret: "{{ vault_audiobookshelf_jwt_secret }}"
+
+# SSL/TLS Configuration
+audiobookshelf_ssl_enabled: true
+audiobookshelf_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+audiobookshelf_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+audiobookshelf_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+audiobookshelf_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+audiobookshelf_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+audiobookshelf_database_port: "{{ databases_postgresql_port | default(5432) }}"
+audiobookshelf_database_name: "audiobookshelf"
+audiobookshelf_database_username: "audiobookshelf"
+audiobookshelf_database_password: "{{ vault_audiobookshelf_database_password }}"
+
+# Redis Configuration (if using)
+audiobookshelf_redis_enabled: false
+audiobookshelf_redis_host: "{{ redis_host | default('redis') }}"
+audiobookshelf_redis_port: "{{ redis_port | default(6379) }}"
+audiobookshelf_redis_password: "{{ vault_audiobookshelf_redis_password }}"
+audiobookshelf_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+audiobookshelf_data_dir: "{{ homelab_data_dir }}/audiobookshelf"
+audiobookshelf_config_dir: "{{ audiobookshelf_data_dir }}/config"
+audiobookshelf_backup_dir: "{{ audiobookshelf_data_dir }}/backups"
+
+# Volume Mappings
+audiobookshelf_volumes:
+  - "{{ audiobookshelf_config_dir }}:/config"
+  - "{{ audiobookshelf_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+audiobookshelf_health_check_enabled: true
+audiobookshelf_health_check_path: "/health"
+audiobookshelf_health_check_interval: 30
+audiobookshelf_health_check_timeout: 10
+audiobookshelf_health_check_retries: 3
+
+# Monitoring Integration
+audiobookshelf_monitoring_enabled: true
+audiobookshelf_prometheus_enabled: true
+audiobookshelf_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+audiobookshelf_backup_enabled: true
+audiobookshelf_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+audiobookshelf_backup_retention_days: 30
+audiobookshelf_backup_encryption_enabled: true
+audiobookshelf_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+audiobookshelf_smtp_enabled: false
+audiobookshelf_smtp_host: "{{ smtp_host | default('') }}"
+audiobookshelf_smtp_port: "{{ smtp_port | default(587) }}"
+audiobookshelf_smtp_username: "{{ vault_smtp_username }}"
+audiobookshelf_smtp_password: "{{ vault_audiobookshelf_smtp_password }}"
+audiobookshelf_smtp_from: "{{ audiobookshelf_admin_email | default('admin@' + domain) }}"
+audiobookshelf_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+audiobookshelf_webhook_enabled: false
+audiobookshelf_webhook_url: "{{ vault_webhook_url | default('') }}"
+audiobookshelf_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+audiobookshelf_discovery_enabled: true
+audiobookshelf_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+audiobookshelf_cpu_limit: "1.0"
+audiobookshelf_memory_limit: "1g"
+audiobookshelf_memory_reservation: "512m"
+
+# Performance Settings
+audiobookshelf_scan_interval: 10
+audiobookshelf_parallel_downloads: 3
+audiobookshelf_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+audiobookshelf_log_level: "info"  # Options: trace, debug, info, warn, error
+audiobookshelf_log_rotation_enabled: true
+audiobookshelf_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+audiobookshelf_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+audiobookshelf_rate_limit_enabled: true
+audiobookshelf_rate_limit_requests: 100
+audiobookshelf_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+audiobookshelf_deploy_enabled: true
+audiobookshelf_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+audiobookshelf_restart_policy: "unless-stopped"
+audiobookshelf_auto_update_enabled: true
+
+# Environment Variables
+audiobookshelf_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  AUDIOBOOKSHELF_API_KEY: "{{ audiobookshelf_api_key }}"
+  AUDIOBOOKSHELF_SECRET_KEY: "{{ audiobookshelf_secret_key }}"
+  AUDIOBOOKSHELF_ENCRYPTION_KEY: "{{ audiobookshelf_encryption_key }}"
+  AUDIOBOOKSHELF_JWT_SECRET: "{{ audiobookshelf_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+audiobookshelf_validation_enabled: true
+audiobookshelf_validation_timeout: 300
+audiobookshelf_validation_retries: 3
+
+# Testing Configuration
+audiobookshelf_test_enabled: false
+audiobookshelf_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+audiobookshelf_compliance_enabled: true
+audiobookshelf_audit_logging_enabled: true
+audiobookshelf_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+audiobookshelf_automation_enabled: true
+audiobookshelf_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+audiobookshelf_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+audiobookshelf_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+audiobookshelf_fallback_enabled: true
+audiobookshelf_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

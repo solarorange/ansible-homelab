@@ -1,0 +1,275 @@
+---
+# Grafana Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# GRAFANA SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+grafana_service_name: "grafana"
+grafana_container_name: "{{ grafana_service_name }}"
+grafana_image: "grafana/grafana:latest"
+grafana_version: "latest"
+
+# Network Configuration
+grafana_port: 3001
+grafana_external_port: "{{ grafana_port }}"
+grafana_protocol: "http"
+grafana_host: "{{ ansible_default_ipv4.address }}"
+grafana_url: "{{ grafana_protocol }}://{{ grafana_host }}:{{ grafana_port }}"
+
+# Domain Configuration
+grafana_subdomain: "grafana"
+grafana_domain: "{{ grafana_subdomain }}.{{ domain }}"
+grafana_external_url: "https://{{ grafana_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+grafana_auth_enabled: true
+grafana_auth_method: "authentik"  # Options: basic, authentik, none
+grafana_admin_username: "admin"
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# API Configuration
+grafana_api_key: "{{ vault_grafana_api_key }}"
+grafana_api_token: "{{ vault_grafana_api_token }}"
+
+# Encryption & Security
+grafana_secret_key: "{{ vault_grafana_secret_key }}"
+grafana_encryption_key: "{{ vault_grafana_encryption_key }}"
+grafana_jwt_secret: "{{ vault_grafana_jwt_secret }}"
+
+# SSL/TLS Configuration
+grafana_ssl_enabled: true
+grafana_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+grafana_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+grafana_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+grafana_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+grafana_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+grafana_database_port: "{{ databases_postgresql_port | default(5432) }}"
+grafana_database_name: "grafana"
+grafana_database_username: "grafana"
+grafana_database_password: "{{ vault_grafana_database_password }}"
+
+# Redis Configuration (if using)
+grafana_redis_enabled: false
+grafana_redis_host: "{{ redis_host | default('redis') }}"
+grafana_redis_port: "{{ redis_port | default(6379) }}"
+grafana_redis_password: "{{ vault_grafana_redis_password }}"
+grafana_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+grafana_data_dir: "{{ homelab_data_dir }}/grafana"
+grafana_config_dir: "{{ grafana_data_dir }}/config"
+grafana_backup_dir: "{{ grafana_data_dir }}/backups"
+
+# Volume Mappings
+grafana_volumes:
+  - "{{ grafana_config_dir }}:/config"
+  - "{{ grafana_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+grafana_health_check_enabled: true
+grafana_health_check_path: "/health"
+grafana_health_check_interval: 30
+grafana_health_check_timeout: 10
+grafana_health_check_retries: 3
+
+# Monitoring Integration
+grafana_monitoring_enabled: true
+grafana_prometheus_enabled: true
+grafana_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+grafana_backup_enabled: true
+grafana_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+grafana_backup_retention_days: 30
+grafana_backup_encryption_enabled: true
+grafana_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+grafana_smtp_enabled: false
+grafana_smtp_host: "{{ smtp_host | default('') }}"
+grafana_smtp_port: "{{ smtp_port | default(587) }}"
+grafana_smtp_username: "{{ vault_smtp_username }}"
+grafana_smtp_password: "{{ vault_grafana_smtp_password }}"
+grafana_smtp_from: "{{ grafana_admin_email | default('admin@' + domain) }}"
+grafana_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+grafana_webhook_enabled: false
+grafana_webhook_url: "{{ vault_webhook_url | default('') }}"
+grafana_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+grafana_discovery_enabled: true
+grafana_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+grafana_cpu_limit: "1.0"
+grafana_memory_limit: "1g"
+grafana_memory_reservation: "512m"
+
+# Performance Settings
+grafana_scan_interval: 10
+grafana_parallel_downloads: 3
+grafana_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+grafana_log_level: "info"  # Options: trace, debug, info, warn, error
+grafana_log_rotation_enabled: true
+grafana_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+grafana_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+grafana_rate_limit_enabled: true
+grafana_rate_limit_requests: 100
+grafana_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+grafana_deploy_enabled: true
+grafana_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+grafana_restart_policy: "unless-stopped"
+grafana_auto_update_enabled: true
+
+# Environment Variables
+grafana_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  # Secrets provided via /run/secrets when grafana_manage_secret_files=true
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+grafana_validation_enabled: true
+grafana_validation_timeout: 300
+grafana_validation_retries: 3
+
+# Testing Configuration
+grafana_test_enabled: false
+grafana_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+grafana_compliance_enabled: true
+grafana_audit_logging_enabled: true
+grafana_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+grafana_automation_enabled: true
+grafana_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+grafana_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+grafana_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+grafana_fallback_enabled: true
+grafana_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+grafana_manage_secret_files: true
+
+grafana_secret_files:
+  - { name: "GF_SECURITY_ADMIN_PASSWORD", value: "{{ grafana_admin_password }}" }
+  - { name: "GF_DATABASE_PASSWORD", value: "{{ grafana_database_password }}" }
+  - { name: "GF_SMTP_PASSWORD", value: "{{ grafana_smtp_password }}" }
+
+grafana_required_secrets:
+  - GF_SECURITY_ADMIN_PASSWORD
+  - GF_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+grafana_direct_expose_enabled: false

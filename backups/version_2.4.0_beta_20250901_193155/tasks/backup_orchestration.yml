@@ -1,0 +1,90 @@
+---
+# Backup Orchestration
+# Manages comprehensive backup scheduling and coordination
+
+- name: Create backup orchestration directory
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/backup/orchestration"
+    state: directory
+    mode: '0755'
+  tags: [backup, orchestration, setup]
+
+- name: Configure backup schedule
+  ansible.builtin.template:
+    src: templates/backup/backup-schedule.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/schedule.yml"
+    mode: '0644'
+  tags: [backup, orchestration, schedule]
+
+- name: Create backup orchestration script
+  ansible.builtin.template:
+    src: templates/backup/backup-orchestrator.sh.j2
+    dest: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh"
+    mode: '0755'
+  tags: [backup, orchestration, script]
+
+- name: Setup backup cron jobs
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    day: "{{ item.day }}"
+    job: "{{ item.job }}"
+    user: root
+  loop:
+    - name: "Daily Backup"
+      minute: "0"
+      hour: "2"
+      day: "*"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh daily"
+    - name: "Weekly Backup"
+      minute: "0"
+      hour: "3"
+      day: "0"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh weekly"
+    - name: "Monthly Backup"
+      minute: "0"
+      hour: "4"
+      day: "1"
+      job: "{{ docker_dir }}/backup/orchestration/backup-orchestrator.sh monthly"
+  tags: [backup, orchestration, cron]
+
+- name: Configure backup retention
+  ansible.builtin.template:
+    src: templates/backup/retention-policy.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/retention.yml"
+    mode: '0644'
+  tags: [backup, orchestration, retention]
+
+- name: Setup backup monitoring
+  ansible.builtin.template:
+    src: templates/backup/backup-monitoring.yml.j2
+    dest: "{{ docker_dir }}/backup/orchestration/monitoring.yml"
+    mode: '0644'
+  tags: [backup, orchestration, monitoring]
+
+- name: Display backup orchestration status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      BACKUP ORCHESTRATION CONFIGURED
+      ========================================
+
+      Backup Directory: {{ docker_dir }}/backup/orchestration
+      Schedule Configuration: {{ docker_dir }}/backup/orchestration/schedule.yml
+      Orchestrator Script: {{ docker_dir }}/backup/orchestration/backup-orchestrator.sh
+      Retention Policy: {{ docker_dir }}/backup/orchestration/retention.yml
+      Monitoring Configuration: {{ docker_dir }}/backup/orchestration/monitoring.yml
+
+      Backup Schedule:
+      - Daily: 2:00 AM
+      - Weekly: Sunday 3:00 AM
+      - Monthly: 1st of month 4:00 AM
+
+      Retention:
+      - Daily: {{ backup_retention_days | default(7) }} days
+      - Weekly: {{ backup_retention_weeks | default(4) }} weeks
+      - Monthly: {{ backup_retention_months | default(12) }} months
+
+      ========================================
+  tags: [backup, orchestration, summary]

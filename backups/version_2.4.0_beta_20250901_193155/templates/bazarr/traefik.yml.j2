@@ -1,0 +1,44 @@
+http:
+  routers:
+    bazarr:
+      rule: "Host(`bazarr.{{ domain }}`)"
+      service: bazarr
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: cloudflare
+      middlewares:
+        - bazarr-auth
+        - bazarr-headers
+
+  middlewares:
+    bazarr-auth:
+      forwardAuth:
+        address: "http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+        trustForwardHeader: true
+    bazarr-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Host: "bazarr.{{ domain }}"
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+        customResponseHeaders:
+          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+          X-Content-Type-Options: "nosniff"
+          X-Frame-Options: "SAMEORIGIN"
+          X-XSS-Protection: "1; mode=block"
+
+  services:
+    bazarr:
+      loadBalancer:
+        servers:
+          - url: "http://bazarr:6767" 

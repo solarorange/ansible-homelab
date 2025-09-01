@@ -1,0 +1,89 @@
+---
+# Homepage Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Homepage vault variables
+  block:
+    - name: Check required Homepage vault variables
+      assert:
+        that:
+          - vault_homepage_admin_password is defined
+          - vault_homepage_database_password is defined
+          - vault_homepage_api_key is defined
+          - vault_homepage_secret_key is defined
+          - vault_homepage_encryption_key is defined
+          - vault_homepage_jwt_secret is defined
+        fail_msg: "Required Homepage vault variables are not defined"
+        success_msg: "All required Homepage vault variables are defined"
+
+    - name: Validate Homepage password complexity
+      assert:
+        that:
+          - vault_homepage_admin_password | length >= 12
+          - vault_homepage_database_password | length >= 12
+        fail_msg: "Homepage passwords must be at least 12 characters long"
+        success_msg: "Homepage password complexity requirements met"
+
+- name: Validate Homepage network configuration
+  block:
+    - name: Check Homepage port configuration
+      assert:
+        that:
+          - homepage_port is defined
+          - homepage_port | int >= 1024
+          - homepage_port | int <= 65535
+        fail_msg: "Homepage port must be between 1024 and 65535"
+        success_msg: "Homepage port configuration is valid"
+
+    - name: Check Homepage domain configuration
+      assert:
+        that:
+          - domain is defined
+          - homepage_subdomain is defined
+        fail_msg: "Homepage domain configuration is incomplete"
+        success_msg: "Homepage domain configuration is valid"
+
+- name: Validate Homepage security configuration
+  block:
+    - name: Check Homepage SSL configuration
+      assert:
+        that:
+          - homepage_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Homepage SSL configuration is invalid"
+        success_msg: "Homepage SSL configuration is valid"
+
+    - name: Check Homepage authentication configuration
+      assert:
+        that:
+          - homepage_auth_enabled | bool
+          - homepage_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Homepage authentication configuration is invalid"
+        success_msg: "Homepage authentication configuration is valid"
+
+- name: Validate Homepage storage configuration
+  block:
+    - name: Check Homepage data directories
+      assert:
+        that:
+          - homepage_data_dir is defined
+          - homepage_config_dir is defined
+          - homepage_backup_dir is defined
+        fail_msg: "Homepage storage configuration is incomplete"
+        success_msg: "Homepage storage configuration is valid"
+
+    - name: Create Homepage directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ homepage_data_dir }}"
+        - "{{ homepage_config_dir }}"
+        - "{{ homepage_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Homepage validation completed successfully - all configurations are valid and secure"

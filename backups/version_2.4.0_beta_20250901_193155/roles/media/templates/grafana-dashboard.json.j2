@@ -1,0 +1,429 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Media Stack Dashboard",
+    "tags": ["media", "homelab"],
+    "style": "dark",
+    "timezone": "{{ timezone }}",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Status",
+        "type": "stat",
+        "targets": [
+{% if media_enable_downloaders %}
+{% if media_enable_sabnzbd %}
+          {
+            "expr": "up{job=\"sabnzbd\"}",
+            "legendFormat": "SABnzbd"
+          },
+{% endif %}
+{% if media_enable_qbittorrent %}
+          {
+            "expr": "up{job=\"qbittorrent\"}",
+            "legendFormat": "qBittorrent"
+          },
+{% endif %}
+{% endif %}
+{% if media_enable_arr_services %}
+{% if media_enable_sonarr %}
+          {
+            "expr": "up{job=\"sonarr\"}",
+            "legendFormat": "Sonarr"
+          },
+{% endif %}
+{% if media_enable_radarr %}
+          {
+            "expr": "up{job=\"radarr\"}",
+            "legendFormat": "Radarr"
+          },
+{% endif %}
+{% if media_enable_lidarr %}
+          {
+            "expr": "up{job=\"lidarr\"}",
+            "legendFormat": "Lidarr"
+          },
+{% endif %}
+{% if media_enable_readarr %}
+          {
+            "expr": "up{job=\"readarr\"}",
+            "legendFormat": "Readarr"
+          },
+{% endif %}
+{% if media_enable_prowlarr %}
+          {
+            "expr": "up{job=\"prowlarr\"}",
+            "legendFormat": "Prowlarr"
+          },
+{% endif %}
+{% if media_enable_bazarr %}
+          {
+            "expr": "up{job=\"bazarr\"}",
+            "legendFormat": "Bazarr"
+          },
+{% endif %}
+{% if media_enable_pulsarr %}
+          {
+            "expr": "up{job=\"pulsarr\"}",
+            "legendFormat": "Pulsarr"
+          },
+{% endif %}
+{% if media_enable_overseerr %}
+          {
+            "expr": "up{job=\"overseerr\"}",
+            "legendFormat": "Overseerr"
+          },
+{% endif %}
+{% endif %}
+{% if media_enable_players %}
+{% if media_enable_plex %}
+          {
+            "expr": "up{job=\"plex\"}",
+            "legendFormat": "Plex"
+          },
+{% endif %}
+{% if media_enable_jellyfin %}
+          {
+            "expr": "up{job=\"jellyfin\"}",
+            "legendFormat": "Jellyfin"
+          },
+{% endif %}
+{% if media_enable_emby %}
+          {
+            "expr": "up{job=\"emby\"}",
+            "legendFormat": "Emby"
+          },
+{% endif %}
+{% endif %}
+{% if media_enable_monitoring %}
+{% if media_enable_tautulli %}
+          {
+            "expr": "up{job=\"tautulli\"}",
+            "legendFormat": "Tautulli"
+          }
+{% endif %}
+{% endif %}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "System Resources",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 3,
+        "title": "CPU Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 9
+        }
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 9
+        }
+      },
+      {
+        "id": 5,
+        "title": "Storage Usage",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"{{ media_base_dir }}\"} / node_filesystem_size_bytes{mountpoint=\"{{ media_base_dir }}\"}) * 100",
+            "legendFormat": "Storage %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 17
+        }
+      },
+      {
+        "id": 6,
+        "title": "Network Traffic",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "Receive {{ '{{' }}device{{ '}}' }}"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "Transmit {{ '{{' }}device{{ '}}' }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "Bps"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 17
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "links": []
+  }
+} 

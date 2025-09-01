@@ -1,0 +1,151 @@
+#!/bin/bash
+# Service Health Check Script
+# Monitors the health of all deployed services
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${SCRIPT_DIR}/health-check.log"
+CONFIG_FILE="${SCRIPT_DIR}/health-config.json"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   error_exit "This script must be run as root"
+fi
+
+log "Starting service health check"
+
+# Health check configuration
+declare -A service_health_checks=(
+    ["traefik"]="http://{{ ansible_default_ipv4.address }}:8080/api/health"
+    ["authentik"]="http://{{ ansible_default_ipv4.address }}:9000/if/user/"
+    ["grafana"]="http://{{ ansible_default_ipv4.address }}:/api/health"
+    ["prometheus"]="http://{{ ansible_default_ipv4.address }}:/-/healthy"
+    ["influxdb"]="http://{{ ansible_default_ipv4.address }}:/health"
+    ["loki"]="http://{{ loki_host | default('localhost') }}:{{ loki_port | default(3100) }}/ready"
+    ["alertmanager"]="http://{{ ansible_default_ipv4.address }}:/-/healthy"
+    ["postgresql"]="{{ ansible_default_ipv4.address }}:"
+    ["redis"]="{{ ansible_default_ipv4.address }}:"
+    ["sonarr"]="http://{{ ansible_default_ipv4.address }}:/health"
+    ["radarr"]="http://{{ ansible_default_ipv4.address }}:/health"
+    ["jellyfin"]="http://{{ ansible_default_ipv4.address }}:/health"
+    ["nextcloud"]="http://{{ ansible_default_ipv4.address }}:/status.php"
+    ["paperless"]="http://{{ ansible_default_ipv4.address }}:/health"
+    ["fing"]="http://{{ ansible_default_ipv4.address }}:/health"
+)
+
+# Function to check service health
+check_service_health() {
+    local service_name=$1
+    local health_url=$2
+    
+    log "Checking health of ${service_name}..."
+    
+    if [[ "$health_url" == *":"* && "$health_url" != *"http"* ]]; then
+        # TCP port check
+        local host=$(echo "$health_url" | cut -d: -f1)
+        local port=$(echo "$health_url" | cut -d: -f2)
+        
+        if timeout 5 bash -c "</dev/tcp/$host/$port" 2>/dev/null; then
+            log "✓ ${service_name} is healthy (TCP port ${port})"
+            return 0
+        else
+            log "✗ ${service_name} is unhealthy (TCP port ${port})"
+            return 1
+        fi
+    else
+        # HTTP health check
+        if curl -f -s "$health_url" >/dev/null 2>&1; then
+            log "✓ ${service_name} is healthy (HTTP)"
+            return 0
+        else
+            log "✗ ${service_name} is unhealthy (HTTP)"
+            return 1
+        fi
+    fi
+}
+
+# Function to check Docker container status
+check_container_status() {
+    local service_name=$1
+    
+    if docker ps --format "table {{.Names}}" | grep -q "${service_name}"; then
+        local status=$(docker ps --format "table {{.Names}}\t{{.Status}}" | grep "${service_name}" | awk '{print $2}')
+        if [[ "$status" == *"Up"* ]]; then
+            log "✓ ${service_name} container is running"
+            return 0
+        else
+            log "✗ ${service_name} container is not running properly"
+            return 1
+        fi
+    else
+        log "✗ ${service_name} container is not running"
+        return 1
+    fi
+}
+
+# Check system resources
+log "Checking system resources..."
+
+# Check disk usage
+disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+if [[ $disk_usage -gt 90 ]]; then
+    log "⚠ WARNING: Disk usage is ${disk_usage}%"
+else
+    log "✓ Disk usage is ${disk_usage}%"
+fi
+
+# Check memory usage
+memory_usage=$(free | grep Mem | awk '{printf("%.0f", $3/$2 * 100.0)}')
+if [[ $memory_usage -gt 90 ]]; then
+    log "⚠ WARNING: Memory usage is ${memory_usage}%"
+else
+    log "✓ Memory usage is ${memory_usage}%"
+fi
+
+# Check CPU load
+cpu_load=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
+log "✓ CPU load average: ${cpu_load}"
+
+# Check Docker daemon
+if systemctl is-active --quiet docker; then
+    log "✓ Docker daemon is running"
+else
+    log "✗ Docker daemon is not running"
+    error_exit "Docker daemon is required for health checks"
+fi
+
+# Check each service
+failed_services=()
+for service in "${!service_health_checks[@]}"; do
+    if check_container_status "$service"; then
+        if check_service_health "$service" "${service_health_checks[$service]}"; then
+            log "✓ ${service} is healthy"
+        else
+            log "✗ ${service} health check failed"
+            failed_services+=("$service")
+        fi
+    else
+        failed_services+=("$service")
+    fi
+done
+
+# Summary
+if [[ ${#failed_services[@]} -eq 0 ]]; then
+    log "✓ All services are healthy"
+    exit 0
+else
+    log "✗ The following services have issues: ${failed_services[*]}"
+    exit 1
+fi 

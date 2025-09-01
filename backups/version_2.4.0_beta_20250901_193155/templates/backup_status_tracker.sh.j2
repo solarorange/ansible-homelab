@@ -1,0 +1,289 @@
+#!/bin/bash
+
+# Backup Status Tracker
+# Monitors backup progress and sends status updates to monitoring stack
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs"
+STATUS_DIR="$SCRIPT_DIR/status"
+CONFIG_FILE="$SCRIPT_DIR/config.yml"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_DIR/status_tracker.log"
+}
+
+# Configuration
+ALERTMANAGER_URL="http://alertmanager:9093"
+LOKI_URL="http://loki:3100"
+PROMETHEUS_URL="http://prometheus:9090"
+
+# Track backup status
+track_backup_status() {
+    local current_time=$(date +%s)
+    local total_services=0
+    local running_services=0
+    local completed_services=0
+    local failed_services=0
+    local timed_out_services=0
+    
+    # Get all service status files
+    for status_file in "$STATUS_DIR"/*.status; do
+        if [ ! -f "$status_file" ]; then
+            continue
+        fi
+        
+        local service=$(basename "$status_file" .status)
+        local status=$(cat "$status_file" 2>/dev/null || echo "unknown")
+        local pid_file="$STATUS_DIR/${service}.pid"
+        local started_file="$STATUS_DIR/${service}.started"
+        
+        total_services=$((total_services + 1))
+        
+        case $status in
+            "running")
+                running_services=$((running_services + 1))
+                
+                # Check if process is still alive
+                if [ -f "$pid_file" ]; then
+                    local pid=$(cat "$pid_file" 2>/dev/null || echo "")
+                    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                        # Check for timeout
+                        if [ -f "$started_file" ]; then
+                            local started_time=$(cat "$started_file" | xargs date -d +%s 2>/dev/null || echo "0")
+                            if [ "$started_time" -gt 0 ]; then
+                                local duration_minutes=$(( (current_time - started_time) / 60 ))
+                                local max_duration={{ backup_resource_limits.max_backup_duration_minutes }}
+                                
+                                if [ "$duration_minutes" -gt "$max_duration" ]; then
+                                    log "Service $service has been running for ${duration_minutes} minutes (timeout: ${max_duration})"
+                                    echo "timeout" > "$status_file"
+                                    echo "Timed out after ${duration_minutes} minutes" > "$STATUS_DIR/${service}.error"
+                                    timed_out_services=$((timed_out_services + 1))
+                                    running_services=$((running_services - 1))
+                                    
+                                    # Send timeout notification
+                                    if [ -f "$SCRIPT_DIR/notifications.sh" ]; then
+                                        "$SCRIPT_DIR/notifications.sh" "backup_timeout" "$service" "$duration_minutes"
+                                    fi
+                                fi
+                            fi
+                        fi
+                    else
+                        log "Service $service process not running but status is 'running'"
+                        echo "failed" > "$status_file"
+                        echo "Process died unexpectedly" > "$STATUS_DIR/${service}.error"
+                        failed_services=$((failed_services + 1))
+                        running_services=$((running_services - 1))
+                    fi
+                else
+                    log "Service $service status is 'running' but no PID file"
+                    echo "failed" > "$status_file"
+                    echo "No PID file found" > "$STATUS_DIR/${service}.error"
+                    failed_services=$((failed_services + 1))
+                    running_services=$((running_services - 1))
+                fi
+                ;;
+            
+            "completed")
+                completed_services=$((completed_services + 1))
+                ;;
+            
+            "failed")
+                failed_services=$((failed_services + 1))
+                ;;
+            
+            "timeout")
+                timed_out_services=$((timed_out_services + 1))
+                ;;
+        esac
+    done
+    
+    # Send status metrics to Prometheus
+    send_prometheus_metrics "$total_services" "$running_services" "$completed_services" "$failed_services" "$timed_out_services"
+    
+    # Send status log to Loki
+    send_loki_status "$total_services" "$running_services" "$completed_services" "$failed_services" "$timed_out_services"
+    
+    # Check for critical failures
+    if [ "$failed_services" -gt 0 ] || [ "$timed_out_services" -gt 0 ]; then
+        send_alertmanager_status "warning" "$total_services" "$running_services" "$completed_services" "$failed_services" "$timed_out_services"
+    else
+        send_alertmanager_status "info" "$total_services" "$running_services" "$completed_services" "$failed_services" "$timed_out_services"
+    fi
+    
+    log "Status tracking completed - Total: $total_services, Running: $running_services, Completed: $completed_services, Failed: $failed_services, Timeout: $timed_out_services"
+}
+
+# Send metrics to Prometheus
+send_prometheus_metrics() {
+    local total="$1"
+    local running="$2"
+    local completed="$3"
+    local failed="$4"
+    local timeout="$5"
+    
+    local metrics=$(cat <<EOF
+# HELP backup_services_total Total number of backup services
+# TYPE backup_services_total gauge
+backup_services_total $total
+
+# HELP backup_services_running Number of currently running backups
+# TYPE backup_services_running gauge
+backup_services_running $running
+
+# HELP backup_services_completed Number of completed backups
+# TYPE backup_services_completed gauge
+backup_services_completed $completed
+
+# HELP backup_services_failed Number of failed backups
+# TYPE backup_services_failed gauge
+backup_services_failed $failed
+
+# HELP backup_services_timeout Number of timed out backups
+# TYPE backup_services_timeout gauge
+backup_services_timeout $timeout
+
+# HELP backup_success_rate Success rate of backups (0-1)
+# TYPE backup_success_rate gauge
+backup_success_rate $(echo "scale=2; $completed / ($total + 0.001)" | bc -l)
+EOF
+)
+    
+    log "Sending metrics to Prometheus"
+    echo "$metrics" | curl -s -X POST "${PROMETHEUS_URL}/api/v1/import/prometheus" \
+        -H "Content-Type: text/plain" \
+        --data-binary @- || log "Failed to send metrics to Prometheus"
+}
+
+# Send status log to Loki
+send_loki_status() {
+    local total="$1"
+    local running="$2"
+    local completed="$3"
+    local failed="$4"
+    local timeout="$5"
+    
+    local timestamp=$(date +%s)000000000
+    local message="Backup status - Total: $total, Running: $running, Completed: $completed, Failed: $failed, Timeout: $timeout"
+    
+    local log_data=$(cat <<EOF
+{
+  "streams": [
+    {
+      "stream": {
+        "job": "backup_orchestration",
+        "service": "status_tracker",
+        "level": "info",
+        "host": "$(hostname)"
+      },
+      "values": [
+        ["${timestamp}", "${message}"]
+      ]
+    }
+  ]
+}
+EOF
+)
+    
+    log "Sending status log to Loki"
+    curl -s -X POST "${LOKI_URL}/loki/api/v1/push" \
+        -H "Content-Type: application/json" \
+        -d "$log_data" || log "Failed to send status log to Loki"
+}
+
+# Send status alert to Alertmanager
+send_alertmanager_status() {
+    local severity="$1"
+    local total="$2"
+    local running="$3"
+    local completed="$4"
+    local failed="$5"
+    local timeout="$6"
+    
+    local summary="Backup status update"
+    local description="Backup orchestration status - Total: $total, Running: $running, Completed: $completed, Failed: $failed, Timeout: $timeout"
+    
+    local alert_data=$(cat <<EOF
+{
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "backup_status_update",
+        "severity": "${severity}",
+        "service": "backup_orchestration",
+        "instance": "$(hostname)"
+      },
+      "annotations": {
+        "summary": "${summary}",
+        "description": "${description}",
+        "dashboard": "https://grafana.{{ domain }}/d/backup-orchestration"
+      },
+      "startsAt": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+      "endsAt": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+    }
+  ]
+}
+EOF
+)
+    
+    log "Sending status alert to Alertmanager"
+    curl -s -X POST "${ALERTMANAGER_URL}/api/v1/alerts" \
+        -H "Content-Type: application/json" \
+        -d "$alert_data" || log "Failed to send status alert to Alertmanager"
+}
+
+# Clean up old status files
+cleanup_old_status() {
+    local max_age_hours=24
+    local current_time=$(date +%s)
+    
+    for status_file in "$STATUS_DIR"/*.status; do
+        if [ ! -f "$status_file" ]; then
+            continue
+        fi
+        
+        local file_time=$(stat -c %Y "$status_file" 2>/dev/null || echo "0")
+        local age_hours=$(( (current_time - file_time) / 3600 ))
+        
+        if [ "$age_hours" -gt "$max_age_hours" ]; then
+            local service=$(basename "$status_file" .status)
+            log "Removing old status file for $service (age: ${age_hours}h)"
+            rm -f "$status_file"
+            rm -f "$STATUS_DIR/${service}.pid"
+            rm -f "$STATUS_DIR/${service}.started"
+            rm -f "$STATUS_DIR/${service}.error"
+        fi
+    done
+}
+
+# Main tracking loop
+main() {
+    log "Starting backup status tracking"
+    
+    while true; do
+        # Track current backup status
+        track_backup_status
+        
+        # Clean up old status files
+        cleanup_old_status
+        
+        # Sleep for tracking interval
+        sleep 60  # 1 minute
+    done
+}
+
+# Handle script termination
+trap 'log "Backup status tracking stopped"; exit 0' SIGTERM SIGINT
+
+# Start tracking
+main 

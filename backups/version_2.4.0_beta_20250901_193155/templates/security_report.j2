@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Report - {{ security_results.service }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #f4f4f4;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .section {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .critical {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f1c40f;
+        }
+        .success {
+            color: #2ecc71;
+        }
+        .vulnerability {
+            background-color: #fff3f3;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #e74c3c;
+        }
+        .recommendation {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #2ecc71;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Security Report - {{ security_results.service }}</h1>
+            <p>Timestamp: {{ security_results.timestamp }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Port Scan Results</h2>
+            <pre>{{ security_results.port_scan | join('\n') }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>SSL/TLS Configuration</h2>
+            <pre>{{ security_results.ssl_scan | join('\n') }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>Security Headers</h2>
+            <ul>
+                {% for key, value in security_results.security_headers.items() %}
+                <li>{{ key }}: {{ value }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Authentication Check</h2>
+            <pre>{{ security_results.auth_check | to_json(indent=2) }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>File Permissions</h2>
+            <ul>
+                {% for file in security_results.file_permissions %}
+                <li>{{ file.path }}: {{ file.mode }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Firewall Rules</h2>
+            <pre>{{ security_results.firewall_rules | join('\n') }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>Vulnerability Scan Results</h2>
+            <pre>{{ security_results.nikto_scan | join('\n') }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>System Security Scan</h2>
+            <pre>{{ security_results.lynis_scan | join('\n') }}</pre>
+        </div>
+
+        <div class="section">
+            <h2>Security Recommendations</h2>
+            {% if security_results.nikto_scan | regex_search('OSVDB-') %}
+            <div class="vulnerability">
+                <h3>Critical Vulnerabilities Found</h3>
+                <ul>
+                    {% for line in security_results.nikto_scan %}
+                    {% if 'OSVDB-' in line %}
+                    <li>{{ line }}</li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if security_results.lynis_scan | regex_search('Warning') %}
+            <div class="warning">
+                <h3>System Warnings</h3>
+                <ul>
+                    {% for line in security_results.lynis_scan %}
+                    {% if 'Warning' in line %}
+                    <li>{{ line }}</li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="recommendation">
+                <h3>Recommended Actions</h3>
+                <ul>
+                    {% if security_results.security_headers | dict2items | selectattr('key', 'match', '^X-') | list | length < 5 %}
+                    <li>Implement additional security headers</li>
+                    {% endif %}
+                    {% if security_results.port_scan | regex_search('open') | list | length > security_results.service_ports | length %}
+                    <li>Close unnecessary open ports</li>
+                    {% endif %}
+                    {% if security_results.ssl_scan | regex_search('weak') %}
+                    <li>Strengthen SSL/TLS configuration</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

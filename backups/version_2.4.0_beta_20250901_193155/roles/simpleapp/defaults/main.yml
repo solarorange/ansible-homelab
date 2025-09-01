@@ -1,0 +1,65 @@
+---
+# Simple App Role Default Variables
+# Enhanced for seamless automatic deployment
+
+# =============================================================================
+# CORE CONFIGURATION
+# =============================================================================
+
+# Service enablement
+simpleapp_enabled: true
+
+# Container configuration
+simpleapp_image: "simpleapp:latest"
+simpleapp_version: "latest"
+simpleapp_container_name: "simpleapp"
+simpleapp_restart_policy: "unless-stopped"
+
+# Port configuration
+simpleapp_port: 8080
+simpleapp_external_port: "8080"
+simpleapp_internal_port: "8080"
+
+# Domain configuration
+simpleapp_domain: "simpleapp.{{ domain | default(ansible_default_ipv4.address) }}"
+simpleapp_subdomain: "simpleapp"
+
+# =============================================================================
+# AUTHENTICATION CONFIGURATION
+# =============================================================================
+
+simpleapp_auth_enabled: true
+simpleapp_auth_method: "authentik"
+simpleapp_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+simpleapp_admin_password: "{{ vault_simpleapp_admin_password | default('') }}"
+simpleapp_secret_key: "{{ vault_simpleapp_secret_key | default('') }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+simpleapp_database_enabled: true
+simpleapp_database_type: "sqlite"
+simpleapp_database_host: "{{ postgresql_host | default(ansible_default_ipv4.address) }}"
+simpleapp_database_port: 5432
+simpleapp_database_name: "simpleapp"
+simpleapp_database_user: "{{ vault_simpleapp_database_user | default('simpleapp') }}"
+simpleapp_database_password: "{{ vault_simpleapp_database_password | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+simpleapp_manage_secret_files: true
+
+simpleapp_secret_files:
+  - { name: "SIMPLEAPP_ADMIN_PASSWORD", value: "{{ simpleapp_admin_password }}" }
+  - { name: "SIMPLEAPP_SECRET_KEY", value: "{{ simpleapp_secret_key }}" }
+  - { name: "SIMPLEAPP_DATABASE_PASSWORD", value: "{{ simpleapp_database_password }}" }
+
+simpleapp_required_secrets:
+  - SIMPLEAPP_ADMIN_PASSWORD
+  - SIMPLEAPP_SECRET_KEY
+
+# Prefer Traefik ingress; gate direct host port exposure
+simpleapp_direct_expose_enabled: false

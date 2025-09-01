@@ -1,0 +1,495 @@
+---
+# Enhanced AlertManager Configuration
+# Production-ready alert management with certificate monitoring
+
+- name: Create AlertManager directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/alertmanager/config"
+    - "{{ docker_dir }}/monitoring/alertmanager/templates"
+    - "{{ docker_dir }}/monitoring/alertmanager/scripts"
+    - "{{ logs_dir }}/monitoring/alertmanager"
+
+- name: Create Enhanced AlertManager configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/config/alertmanager.yml"
+    content: |
+      global:
+        resolve_timeout: 5m
+        http_config:
+          follow_redirects: true
+        smtp_smarthost: '{{ smtp_host | default("smtp.gmail.com") }}:{{ smtp_port | default(587) }}'
+        smtp_from: '{{ monitoring_email | default("monitoring@" + domain) }}'
+        smtp_auth_username: '{{ smtp_username | default("") }}'
+        smtp_auth_password: "{{ vault_alertmanager_password }}"
+        smtp_require_tls: true
+
+      route:
+        group_by: ['alertname', 'job', 'severity', 'service']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: 'default'
+        routes:
+          # Critical alerts - immediate notification
+          - match:
+              severity: critical
+            receiver: 'critical'
+            continue: true
+            group_wait: 10s
+            group_interval: 1m
+            repeat_interval: 1h
+
+          # SSL certificate alerts - immediate notification
+          - match:
+              service: ssl
+            receiver: 'ssl'
+            continue: true
+            group_wait: 10s
+            group_interval: 1m
+            repeat_interval: 30m
+
+          # System alerts - moderate urgency
+          - match:
+              service: system
+            receiver: 'system'
+            continue: true
+            group_wait: 1m
+            group_interval: 5m
+            repeat_interval: 2h
+
+          # Service availability alerts
+          - match:
+              service: availability
+            receiver: 'availability'
+            continue: true
+            group_wait: 30s
+            group_interval: 2m
+            repeat_interval: 1h
+
+          # Docker alerts
+          - match:
+              service: docker
+            receiver: 'docker'
+            continue: true
+            group_wait: 1m
+            group_interval: 5m
+            repeat_interval: 2h
+
+          # Network alerts
+          - match:
+              service: network
+            receiver: 'network'
+            continue: true
+            group_wait: 1m
+            group_interval: 5m
+            repeat_interval: 2h
+
+          # Monitoring alerts - high priority
+          - match:
+              service: monitoring
+            receiver: 'monitoring'
+            continue: true
+            group_wait: 10s
+            group_interval: 1m
+            repeat_interval: 30m
+
+          # Backup alerts - critical for data safety
+          - match:
+              service: backup
+            receiver: 'backup'
+            continue: true
+            group_wait: 10s
+            group_interval: 1m
+            repeat_interval: 1h
+
+      receivers:
+        - name: 'default'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '{{ "{{" }} .GroupLabels.alertname {{ "}}" }} - {{ "{{" }} .GroupLabels.severity {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email.html" . {{ "}}" }}
+
+        - name: 'critical'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '🚨 CRITICAL: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_critical.html" . {{ "}}" }}
+          {% if telegram_bot_token and telegram_chat_id %}
+          webhook_configs:
+            - url: 'https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage'
+              send_resolved: true
+              http_config:
+                follow_redirects: true
+              max_alerts: 0
+              title: '🚨 CRITICAL ALERT'
+              message: |
+                {{ "{{" }} range .Alerts {{ "}}" }}
+                🚨 {{ "{{" }} .Annotations.summary {{ "}}" }}
+                📝 {{ "{{" }} .Annotations.description {{ "}}" }}
+                🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
+                {{ "{{" }} end {{ "}}" }}
+          {% endif %}
+
+        - name: 'ssl'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '🔒 SSL: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_ssl.html" . {{ "}}" }}
+          {% if telegram_bot_token and telegram_chat_id %}
+          webhook_configs:
+            - url: 'https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage'
+              send_resolved: true
+              http_config:
+                follow_redirects: true
+              max_alerts: 0
+              title: '🔒 SSL CERTIFICATE ALERT'
+              message: |
+                {{ "{{" }} range .Alerts {{ "}}" }}
+                🔒 {{ "{{" }} .Annotations.summary {{ "}}" }}
+                📝 {{ "{{" }} .Annotations.description {{ "}}" }}
+                🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
+                {{ "{{" }} end {{ "}}" }}
+          {% endif %}
+
+        - name: 'system'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '💻 SYSTEM: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_system.html" . {{ "}}" }}
+
+        - name: 'availability'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '🌐 AVAILABILITY: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_availability.html" . {{ "}}" }}
+
+        - name: 'docker'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '🐳 DOCKER: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_docker.html" . {{ "}}" }}
+
+        - name: 'network'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '🌐 NETWORK: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_network.html" . {{ "}}" }}
+
+        - name: 'monitoring'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '📊 MONITORING: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_monitoring.html" . {{ "}}" }}
+          {% if telegram_bot_token and telegram_chat_id %}
+          webhook_configs:
+            - url: 'https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage'
+              send_resolved: true
+              http_config:
+                follow_redirects: true
+              max_alerts: 0
+              title: '📊 MONITORING ALERT'
+              message: |
+                {{ "{{" }} range .Alerts {{ "}}" }}
+                📊 {{ "{{" }} .Annotations.summary {{ "}}" }}
+                📝 {{ "{{" }} .Annotations.description {{ "}}" }}
+                🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
+                {{ "{{" }} end {{ "}}" }}
+          {% endif %}
+
+        - name: 'backup'
+          email_configs:
+            - to: '{{ admin_email }}'
+              send_resolved: true
+              headers:
+                subject: '💾 BACKUP: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}'
+              html: |
+                {{ "{{" }} template "email_backup.html" . {{ "}}" }}
+          {% if telegram_bot_token and telegram_chat_id %}
+          webhook_configs:
+            - url: 'https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage'
+              send_resolved: true
+              http_config:
+                follow_redirects: true
+              max_alerts: 0
+              title: '💾 BACKUP ALERT'
+              message: |
+                {{ "{{" }} range .Alerts {{ "}}" }}
+                💾 {{ "{{" }} .Annotations.summary {{ "}}" }}
+                📝 {{ "{{" }} .Annotations.description {{ "}}" }}
+                🔗 {{ "{{" }} .GeneratorURL {{ "}}" }}
+                {{ "{{" }} end {{ "}}" }}
+          {% endif %}
+
+      templates:
+        - '/etc/alertmanager/templates/*.tmpl'
+
+      inhibit_rules:
+        # Inhibit system alerts when the host is down
+        - source_match:
+            alertname: 'ServiceDown'
+          target_match:
+            service: 'system'
+          equal: ['instance']
+
+        # Inhibit service alerts when the monitoring system is down
+        - source_match:
+            service: 'monitoring'
+          target_match:
+            service: 'availability'
+          equal: ['instance']
+
+        # Inhibit SSL alerts when the service is down
+        - source_match:
+            service: 'availability'
+          target_match:
+            service: 'ssl'
+          equal: ['instance']
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create AlertManager email templates
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/templates/email.html"
+    content: |
+      {{ "{{" }} define "email.html" {{ "}}" }}
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>{{ "{{" }} .GroupLabels.alertname {{ "}}" }}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .alert { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+          .critical { border-left: 5px solid #d32f2f; background-color: #ffebee; }
+          .warning { border-left: 5px solid #f57c00; background-color: #fff3e0; }
+          .info { border-left: 5px solid #1976d2; background-color: #e3f2fd; }
+          .severity-critical { color: #d32f2f; font-weight: bold; }
+          .severity-warning { color: #f57c00; font-weight: bold; }
+          .severity-info { color: #1976d2; font-weight: bold; }
+          .timestamp { color: #666; font-size: 0.9em; }
+          .description { margin: 10px 0; }
+          .labels { background-color: #f5f5f5; padding: 10px; border-radius: 3px; margin: 10px 0; }
+          .label { display: inline-block; margin: 2px 5px; padding: 2px 8px; background-color: #e0e0e0; border-radius: 3px; }
+        </style>
+      </head>
+      <body>
+        <h2>{{ "{{" }} .GroupLabels.alertname {{ "}}" }}</h2>
+        <p class="severity-{{ "{{" }} .GroupLabels.severity {{ "}}" }}">Severity: {{ "{{" }} .GroupLabels.severity | toUpper {{ "}}" }}</p>
+        <p class="timestamp">Time: {{ "{{" }} .StartsAt | since {{ "}}" }}</p>
+
+        {{ "{{" }} range .Alerts {{ "}}" }}
+        <div class="alert {{ "{{" }} if eq .Labels.severity "critical" {{ "}}" }}critical{{ "{{" }} else if eq .Labels.severity "warning" {{ "}}" }}warning{{ "{{" }} else {{ "}}" }}info{{ "{{" }} end {{ "}}" }}">
+          <h3>{{ "{{" }} .Annotations.summary {{ "}}" }}</h3>
+          <div class="description">{{ "{{" }} .Annotations.description {{ "}}" }}</div>
+          <div class="labels">
+            {{ "{{" }} range .Labels.SortedPairs {{ "}}" }}
+            <span class="label">{{ "{{" }} .Name {{ "}}" }}: {{ "{{" }} .Value {{ "}}" }}</span>
+            {{ "{{" }} end {{ "}}" }}
+          </div>
+          <p><a href="{{ "{{" }} .GeneratorURL {{ "}}" }}">View in Prometheus</a></p>
+        </div>
+        {{ "{{" }} end {{ "}}" }}
+      </body>
+      </html>
+      {{ "{{" }} end {{ "}}" }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create AlertManager SSL email template
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/templates/email_ssl.html"
+    content: |
+      {{ "{{" }} define "email_ssl.html" {{ "}}" }}
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>🔒 SSL: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; background-color: #fff3e0; }
+          .alert { border: 2px solid #f57c00; margin: 10px 0; padding: 20px; border-radius: 5px; background-color: white; }
+          .ssl { border-left: 8px solid #f57c00; }
+          .severity-critical { color: #d32f2f; font-weight: bold; font-size: 1.2em; }
+          .severity-warning { color: #f57c00; font-weight: bold; font-size: 1.2em; }
+          .timestamp { color: #666; font-size: 0.9em; }
+          .description { margin: 15px 0; font-size: 1.1em; }
+          .labels { background-color: #f5f5f5; padding: 15px; border-radius: 3px; margin: 15px 0; }
+          .label { display: inline-block; margin: 3px 8px; padding: 3px 10px; background-color: #e0e0e0; border-radius: 3px; }
+          .ssl-info { background-color: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 5px solid #4caf50; }
+        </style>
+      </head>
+      <body>
+        <h2>🔒 SSL Certificate Alert</h2>
+        <p class="severity-{{ "{{" }} .GroupLabels.severity {{ "}}" }}">Severity: {{ "{{" }} .GroupLabels.severity | toUpper {{ "}}" }}</p>
+        <p class="timestamp">Time: {{ "{{" }} .StartsAt | since {{ "}}" }}</p>
+
+        {{ "{{" }} range .Alerts {{ "}}" }}
+        <div class="alert ssl">
+          <h3>{{ "{{" }} .Annotations.summary {{ "}}" }}</h3>
+          <div class="description">{{ "{{" }} .Annotations.description {{ "}}" }}</div>
+          <div class="ssl-info">
+            <strong>SSL Certificate Information:</strong><br>
+            Domain: {{ "{{" }} .Labels.instance {{ "}}" }}<br>
+            Expiry: {{ "{{" }} .Labels.probe_ssl_earliest_cert_expiry {{ "}}" }}<br>
+            Days Remaining: {{ "{{" }} .Labels.probe_ssl_earliest_cert_expiry | sub (now | unixEpoch) | div 86400 | round 0 {{ "}}" }}
+          </div>
+          <div class="labels">
+            {{ "{{" }} range .Labels.SortedPairs {{ "}}" }}
+            <span class="label">{{ "{{" }} .Name {{ "}}" }}: {{ "{{" }} .Value {{ "}}" }}</span>
+            {{ "{{" }} end {{ "}}" }}
+          </div>
+          <p><a href="{{ "{{" }} .GeneratorURL {{ "}}" }}">View in Prometheus</a></p>
+        </div>
+        {{ "{{" }} end {{ "}}" }}
+      </body>
+      </html>
+      {{ "{{" }} end {{ "}}" }}
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create AlertManager management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # Enhanced AlertManager Management Script
+
+      function show_help {
+        echo "Enhanced AlertManager Management Script"
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  status    - Show AlertManager status"
+        echo "  logs      - Show AlertManager logs"
+        echo "  restart   - Restart AlertManager"
+        echo "  reload    - Reload configuration"
+        echo "  alerts    - Show current alerts"
+        echo "  silences  - Show current silences"
+        echo "  test      - Test notification channels"
+        echo "  help      - Show this help"
+      }
+
+      case "$1" in
+        status)
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/-/healthy
+          echo ""
+          ;;
+        logs)
+          docker logs alertmanager --tail 100 -f
+          ;;
+        restart)
+          docker restart alertmanager
+          ;;
+        reload)
+          curl -X POST http://{{ ansible_default_ipv4.address }}:9093/-/reload
+          ;;
+        alerts)
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/alerts | jq '.'
+          ;;
+        silences)
+          curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/silences | jq '.'
+          ;;
+        test)
+          echo "Testing notification channels..."
+          curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v2/alerts \
+            -H "Content-Type: application/json" \
+            -d '[{"labels":{"alertname":"TestAlert","severity":"warning"},"annotations":{"summary":"Test Alert","description":"This is a test alert"},"startsAt":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"}]'
+          ;;
+        help|*)
+          show_help
+          ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create AlertManager health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Enhanced AlertManager Health Check Script
+
+      # Check if AlertManager is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/-/healthy > /dev/null; then
+        echo "AlertManager is not responding"
+        exit 1
+      fi
+
+      # Check if we can access the API
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/status > /dev/null; then
+        echo "AlertManager API is not responding"
+        exit 1
+      fi
+
+      # Check if configuration is valid
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:9093/api/v2/status | jq -e '.config' > /dev/null; then
+        echo "AlertManager configuration is invalid"
+        exit 1
+      fi
+
+      echo "AlertManager is healthy"
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create AlertManager log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/monitoring/alertmanager/*.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add AlertManager log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate AlertManager logs"
+    job: "logrotate {{ docker_dir }}/monitoring/alertmanager/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_alertmanager_user }}"

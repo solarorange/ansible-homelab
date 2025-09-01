@@ -2,39 +2,6 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
-  pull_request:
-    branches: ["**"]
-
-jobs:
-  validate-compose-templates:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install Jinja2 PyYAML
-
-      - name: Show Docker and Compose versions
-        run: |
-          docker --version || true
-          docker compose version || docker-compose --version || true
-
-      - name: Render and validate all docker compose templates
-        run: |
-          python scripts/ci/render_and_validate_compose.py
-name: CI
-
-on:
-  push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
@@ -53,7 +20,7 @@ jobs:
 
       - name: Install tooling
         run: |
-          pip install ansible ansible-lint yamllint
+          pip install ansible ansible-lint yamllint Jinja2 PyYAML
           sudo apt-get update
           sudo apt-get install -y docker.io
 
@@ -65,6 +32,11 @@ jobs:
 
       - name: YAML Lint
         run: yamllint . || true
+
+      - name: Show Docker and Compose versions
+        run: |
+          docker --version || true
+          docker compose version || docker-compose --version || true
 
       - name: Validate docker-compose templates (if present)
         shell: bash
@@ -83,5 +55,10 @@ jobs:
             exit 0
           fi
           echo "Template presence validated"
+
+      - name: Render and validate all docker compose templates
+        run: |
+          python scripts/ci/render_and_validate_compose.py
+        if: hashFiles('scripts/ci/render_and_validate_compose.py') != ''
 
 

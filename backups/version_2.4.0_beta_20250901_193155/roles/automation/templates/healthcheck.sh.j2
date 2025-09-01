@@ -1,0 +1,45 @@
+#!/bin/bash
+set -euo pipefail
+
+LOG_FILE="{{ logs_dir }}/automation/healthcheck.log"
+FAILURES=0
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "${LOG_FILE}"
+}
+
+check_service() {
+    NAME=$1
+    URL=$2
+    log "Checking health of ${NAME} at ${URL}..."
+    if ! curl -s -f "${URL}" > /dev/null; then
+        log "ERROR: ${NAME} is not responding."
+        FAILURES=$((FAILURES + 1))
+    else
+        log "SUCCESS: ${NAME} is healthy."
+    fi
+}
+
+{% if home_assistant_enabled %}
+check_service "Home Assistant" "http://{{ ansible_default_ipv4.address }}:{{ home_assistant_port }}"
+{% endif %}
+
+{% if zigbee2mqtt_enabled %}
+check_service "Zigbee2MQTT" "http://{{ ansible_default_ipv4.address }}:{{ zigbee2mqtt_port }}"
+{% endif %}
+
+{% if node_red_enabled %}
+check_service "Node-RED" "http://{{ ansible_default_ipv4.address }}:{{ node_red_port }}"
+{% endif %}
+
+{% if n8n_enabled %}
+check_service "n8n" "http://{{ ansible_default_ipv4.address }}:{{ n8n_port }}/healthz"
+{% endif %}
+
+if [ "${FAILURES}" -gt 0 ]; then
+    log "ERROR: ${FAILURES} service(s) are unhealthy."
+    exit 1
+fi
+
+log "All automation services are healthy."
+exit 0 

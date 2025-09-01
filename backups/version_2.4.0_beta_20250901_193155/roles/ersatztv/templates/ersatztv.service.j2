@@ -1,0 +1,16 @@
+[Unit]
+Description=ErsatzTV Service
+Documentation=https://github.com/ErsatzTV/ErsatzTV
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ ersatztv_config_dir }}
+ExecStart=/usr/local/bin/docker-compose -f {{ ersatztv_config_dir }}/docker-compose.yml up -d
+ExecStop=/usr/local/bin/docker-compose -f {{ ersatztv_config_dir }}/docker-compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,0 +1,260 @@
+---
+# Kopia Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# KOPIA SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+kopia_service_name: "kopia"
+kopia_container_name: "{{ kopia_service_name }}"
+kopia_image: "kopia/kopia:latest"
+kopia_version: "latest"
+
+# Network Configuration
+kopia_port: 51515
+kopia_external_port: "{{ kopia_port }}"
+kopia_protocol: "http"
+kopia_host: "{{ ansible_default_ipv4.address }}"
+kopia_url: "{{ kopia_protocol }}://{{ kopia_host }}:{{ kopia_port }}"
+
+# Domain Configuration
+kopia_subdomain: "kopia"
+kopia_domain: "{{ kopia_subdomain }}.{{ domain }}"
+kopia_external_url: "https://{{ kopia_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+kopia_auth_enabled: true
+kopia_auth_method: "authentik"  # Options: basic, authentik, none
+kopia_admin_username: "admin"
+kopia_admin_password: "{{ vault_kopia_admin_password }}"
+
+# API Configuration
+kopia_api_key: "{{ vault_kopia_api_key }}"
+kopia_api_token: "{{ vault_kopia_api_token }}"
+
+# Encryption & Security
+kopia_secret_key: "{{ vault_kopia_secret_key }}"
+kopia_encryption_key: "{{ vault_kopia_encryption_key }}"
+kopia_jwt_secret: "{{ vault_kopia_jwt_secret }}"
+
+# SSL/TLS Configuration
+kopia_ssl_enabled: true
+kopia_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+kopia_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+kopia_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+kopia_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+kopia_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+kopia_database_port: "{{ databases_postgresql_port | default(5432) }}"
+kopia_database_name: "kopia"
+kopia_database_username: "kopia"
+kopia_database_password: "{{ vault_kopia_database_password }}"
+
+# Redis Configuration (if using)
+kopia_redis_enabled: false
+kopia_redis_host: "{{ redis_host | default('redis') }}"
+kopia_redis_port: "{{ redis_port | default(6379) }}"
+kopia_redis_password: "{{ vault_kopia_redis_password }}"
+kopia_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+kopia_data_dir: "{{ homelab_data_dir }}/kopia"
+kopia_config_dir: "{{ kopia_data_dir }}/config"
+kopia_backup_dir: "{{ kopia_data_dir }}/backups"
+
+# Volume Mappings
+kopia_volumes:
+  - "{{ kopia_config_dir }}:/config"
+  - "{{ kopia_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+kopia_health_check_enabled: true
+kopia_health_check_path: "/health"
+kopia_health_check_interval: 30
+kopia_health_check_timeout: 10
+kopia_health_check_retries: 3
+
+# Monitoring Integration
+kopia_monitoring_enabled: true
+kopia_prometheus_enabled: true
+kopia_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+kopia_backup_enabled: true
+kopia_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+kopia_backup_retention_days: 30
+kopia_backup_encryption_enabled: true
+kopia_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+kopia_smtp_enabled: false
+kopia_smtp_host: "{{ smtp_host | default('') }}"
+kopia_smtp_port: "{{ smtp_port | default(587) }}"
+kopia_smtp_username: "{{ vault_smtp_username }}"
+kopia_smtp_password: "{{ vault_kopia_smtp_password }}"
+kopia_smtp_from: "{{ kopia_admin_email | default('admin@' + domain) }}"
+kopia_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+kopia_webhook_enabled: false
+kopia_webhook_url: "{{ vault_webhook_url | default('') }}"
+kopia_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+kopia_discovery_enabled: true
+kopia_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+kopia_cpu_limit: "1.0"
+kopia_memory_limit: "1g"
+kopia_memory_reservation: "512m"
+
+# Performance Settings
+kopia_scan_interval: 10
+kopia_parallel_downloads: 3
+kopia_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+kopia_log_level: "info"  # Options: trace, debug, info, warn, error
+kopia_log_rotation_enabled: true
+kopia_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+kopia_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+kopia_rate_limit_enabled: true
+kopia_rate_limit_requests: 100
+kopia_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+kopia_deploy_enabled: true
+kopia_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+kopia_restart_policy: "unless-stopped"
+kopia_auto_update_enabled: true
+
+# Environment Variables
+kopia_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  KOPIA_API_KEY: "{{ kopia_api_key }}"
+  KOPIA_SECRET_KEY: "{{ kopia_secret_key }}"
+  KOPIA_ENCRYPTION_KEY: "{{ kopia_encryption_key }}"
+  KOPIA_JWT_SECRET: "{{ kopia_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+kopia_validation_enabled: true
+kopia_validation_timeout: 300
+kopia_validation_retries: 3
+
+# Testing Configuration
+kopia_test_enabled: false
+kopia_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+kopia_compliance_enabled: true
+kopia_audit_logging_enabled: true
+kopia_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+kopia_automation_enabled: true
+kopia_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+kopia_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+kopia_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+kopia_fallback_enabled: true
+kopia_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

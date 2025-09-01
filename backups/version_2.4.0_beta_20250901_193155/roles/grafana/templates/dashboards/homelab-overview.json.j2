@@ -1,0 +1,808 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Homelab Overview",
+    "tags": ["homelab", "overview", "system", "monitoring", "dashboard"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
+      "hidden": false,
+      "collapse": false
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(node_cpu_seconds_total, instance)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Instance",
+          "description": "Select hosts to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(up, job)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Service",
+          "description": "Select services to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "container",
+          "type": "query",
+          "query": "label_values(container_cpu_usage_seconds_total, name)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Container",
+          "description": "Select containers to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "severity",
+          "type": "custom",
+          "query": "critical,warning,info",
+          "includeAll": true,
+          "multi": true,
+          "label": "Alert Severity",
+          "description": "Filter by alert severity",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "datacenter",
+          "type": "custom",
+          "query": "primary,secondary,backup",
+          "includeAll": true,
+          "multi": true,
+          "label": "Datacenter",
+          "description": "Select datacenter location",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "environment",
+          "type": "custom",
+          "query": "production,staging,development",
+          "includeAll": true,
+          "multi": true,
+          "label": "Environment",
+          "description": "Select environment",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "service_category",
+          "type": "custom",
+          "query": "media,security,storage,network,automation,utilities",
+          "includeAll": true,
+          "multi": true,
+          "label": "Service Category",
+          "description": "Filter by service category",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "time_range",
+          "type": "custom",
+          "query": "1h,6h,12h,24h,7d,30d",
+          "includeAll": false,
+          "multi": false,
+          "label": "Time Range",
+          "description": "Select time range for metrics",
+          "regex": "",
+          "sort": 1,
+          "current": {
+            "selected": true,
+            "text": "1h",
+            "value": "1h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "changes(up[1m]) > 0",
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "titleFormat": "Service Deployment",
+          "textFormat": "Service {{ $labels.job }} was deployed",
+          "fillColor": "rgba(0, 211, 255, 0.1)",
+          "lineColor": "rgba(0, 211, 255, 1)"
+        },
+        {
+          "name": "Alerts",
+          "datasource": "Prometheus",
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "iconColor": "rgba(255, 96, 96, 1)",
+          "titleFormat": "Alert: {{ $labels.alertname }}",
+          "textFormat": "{{ $annotations.description }}",
+          "fillColor": "rgba(255, 96, 96, 0.1)",
+          "lineColor": "rgba(255, 96, 96, 1)"
+        },
+        {
+          "name": "Backups",
+          "datasource": "Prometheus",
+          "expr": "backup_job_status",
+          "iconColor": "rgba(0, 255, 0, 1)",
+          "titleFormat": "Backup: {{ $labels.job }}",
+          "textFormat": "Backup {{ $labels.job }} completed with status {{ $value }}",
+          "fillColor": "rgba(0, 255, 0, 0.1)",
+          "lineColor": "rgba(0, 255, 0, 1)"
+        },
+        {
+          "name": "Security Events",
+          "datasource": "Prometheus",
+          "expr": "rate(crowdsec_alerts_total[5m]) > 0",
+          "iconColor": "rgba(255, 165, 0, 1)",
+          "titleFormat": "Security Event",
+          "textFormat": "Security threat detected: {{ $labels.threat_level }}",
+          "fillColor": "rgba(255, 165, 0, 0.1)",
+          "lineColor": "rgba(255, 165, 0, 1)"
+        },
+        {
+          "name": "System Updates",
+          "datasource": "Prometheus",
+          "expr": "changes(node_uname_info[1h]) > 0",
+          "iconColor": "rgba(128, 0, 128, 1)",
+          "titleFormat": "System Update",
+          "textFormat": "System updated: {{ $labels.release }}",
+          "fillColor": "rgba(128, 0, 128, 0.1)",
+          "lineColor": "rgba(128, 0, 128, 1)"
+        },
+        {
+          "name": "Container Events",
+          "datasource": "Prometheus",
+          "expr": "increase(container_restart_count[5m]) > 0",
+          "iconColor": "rgba(255, 193, 7, 1)",
+          "titleFormat": "Container Restart: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} restarted",
+          "fillColor": "rgba(255, 193, 7, 0.1)",
+          "lineColor": "rgba(255, 193, 7, 1)"
+        },
+        {
+          "name": "SSL Certificate Events",
+          "datasource": "Prometheus",
+          "expr": "ssl_certificate_expiry_days < 30",
+          "iconColor": "rgba(255, 0, 0, 1)",
+          "titleFormat": "SSL Certificate Expiring: {{ $labels.domain }}",
+          "textFormat": "SSL certificate for {{ $labels.domain }} expires in {{ $value }} days",
+          "fillColor": "rgba(255, 0, 0, 0.1)",
+          "lineColor": "rgba(255, 0, 0, 1)"
+        },
+        {
+          "name": "Network Events",
+          "datasource": "Prometheus",
+          "expr": "changes(node_network_up[5m]) > 0",
+          "iconColor": "rgba(0, 128, 255, 1)",
+          "titleFormat": "Network Interface Change: {{ $labels.device }}",
+          "textFormat": "Network interface {{ $labels.device }} status changed",
+          "fillColor": "rgba(0, 128, 255, 0.1)",
+          "lineColor": "rgba(0, 128, 255, 1)"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System CPU Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$instance\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "links": [
+          {
+            "title": "View Details",
+            "url": "/d/docker-services?var-instance=$instance"
+          }
+        ],
+        "description": "Current CPU usage across all monitored instances"
+      },
+      {
+        "id": 2,
+        "title": "System Memory Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "links": [
+          {
+            "title": "View Details",
+            "url": "/d/docker-services?var-instance=$instance"
+          }
+        ],
+        "description": "Current memory usage across all monitored instances"
+      },
+      {
+        "id": 3,
+        "title": "System Disk Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "((node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes) * 100",
+            "legendFormat": "{{instance}} - {{mountpoint}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 85},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "links": [
+          {
+            "title": "View Details",
+            "url": "/d/backup-storage?var-instance=$instance"
+          }
+        ],
+        "description": "Current disk usage across all monitored filesystems"
+      },
+      {
+        "id": 4,
+        "title": "Network Traffic",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (RX)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (TX)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "links": [
+          {
+            "title": "View Details",
+            "url": "/d/network-infrastructure?var-instance=$instance"
+          }
+        ],
+        "description": "Network traffic rates across all interfaces"
+      },
+      {
+        "id": 5,
+        "title": "Service Health Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "up{job=~\"$service\"}",
+            "legendFormat": "{{job}} on {{instance}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "custom": {
+              "displayMode": "color-background",
+              "align": "center"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Value"
+            }
+          ]
+        },
+        "description": "Current health status of all monitored services"
+      },
+      {
+        "id": 6,
+        "title": "Container Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "container_cpu_usage_seconds_total{name=~\"$container\"}",
+            "legendFormat": "{{name}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "custom": {
+              "displayMode": "list",
+              "align": "left"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Value"
+            }
+          ]
+        },
+        "description": "Current status and resource usage of containers"
+      },
+      {
+        "id": 7,
+        "title": "Active Alerts",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ALERTS{alertstate=\"firing\", severity=~\"$severity\"}",
+            "legendFormat": "{{alertname}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            },
+            "custom": {
+              "displayMode": "color-background",
+              "align": "left"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Value"
+            }
+          ]
+        },
+        "description": "Currently firing alerts by severity level"
+      },
+      {
+        "id": 8,
+        "title": "SSL Certificate Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ssl_certificate_expiry_days",
+            "legendFormat": "{{domain}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 30},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "d",
+            "custom": {
+              "displayMode": "color-background",
+              "align": "center"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Value"
+            }
+          ]
+        },
+        "description": "SSL certificate expiry days remaining"
+      },
+      {
+        "id": 9,
+        "title": "CPU Usage Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$instance\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "description": "CPU usage trends over time"
+      },
+      {
+        "id": 10,
+        "title": "Memory Usage Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "description": "Memory usage trends over time"
+      },
+      {
+        "id": 11,
+        "title": "Network Traffic Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (RX)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (TX)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "description": "Network traffic trends over time"
+      },
+      {
+        "id": 12,
+        "title": "Disk I/O Trend",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_disk_read_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (Read)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(node_disk_written_bytes_total[5m])",
+            "legendFormat": "{{instance}} - {{device}} (Write)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "description": "Disk I/O trends over time"
+      },
+      {
+        "id": 13,
+        "title": "System Load Average",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "node_load1",
+            "legendFormat": "{{instance}} - 1m",
+            "refId": "A"
+          },
+          {
+            "expr": "node_load5",
+            "legendFormat": "{{instance}} - 5m",
+            "refId": "B"
+          },
+          {
+            "expr": "node_load15",
+            "legendFormat": "{{instance}} - 15m",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "min": 0,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "description": "System load average trends"
+      },
+      {
+        "id": 14,
+        "title": "Temperature Sensors",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "node_hwmon_temp_celsius",
+            "legendFormat": "{{instance}} - {{chip}} - {{sensor}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "celsius",
+            "min": 0,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 60},
+                {"color": "red", "value": 80}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "description": "Hardware temperature sensor readings"
+      },
+      {
+        "id": 15,
+        "title": "Quick Actions",
+        "type": "text",
+        "content": "## Quick Actions\n\n- [Docker Services Dashboard](https://grafana.{{ domain }}/d/docker-services)\n- [Media Stack Dashboard](https://grafana.{{ domain }}/d/media-stack)\n- [Security Monitoring](https://grafana.{{ domain }}/d/security-monitoring)\n- [Network & Infrastructure](https://grafana.{{ domain }}/d/network-infrastructure)\n- [Backup & Storage](https://grafana.{{ domain }}/d/backup-storage)\n\n## External Links\n\n- [Homepage](https://homepage.{{ domain }})\n- [Portainer](https://portainer.{{ domain }})\n- [Traefik Dashboard](https://traefik.{{ domain }})\n- [Documentation](https://docs.{{ domain }})",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 48},
+        "description": "Quick access to other dashboards and external services"
+      }
+    ],
+    "links": [
+      {
+        "title": "Docker Services Dashboard",
+        "url": "https://grafana.{{ domain }}/d/docker-services",
+        "targetBlank": true
+      },
+      {
+        "title": "Media Stack Dashboard",
+        "url": "https://grafana.{{ domain }}/d/media-stack",
+        "targetBlank": true
+      },
+      {
+        "title": "Security Monitoring Dashboard",
+        "url": "https://grafana.{{ domain }}/d/security-monitoring",
+        "targetBlank": true
+      },
+      {
+        "title": "Network & Infrastructure Dashboard",
+        "url": "https://grafana.{{ domain }}/d/network-infrastructure",
+        "targetBlank": true
+      },
+      {
+        "title": "Backup & Storage Dashboard",
+        "url": "https://grafana.{{ domain }}/d/backup-storage",
+        "targetBlank": true
+      }
+    ],
+    "version": 1,
+    "description": "Comprehensive overview of homelab infrastructure health, performance, and status. This dashboard provides real-time monitoring of system resources, service health, security threats, and active alerts across all monitored instances and services."
+  }
+} 
+  }
+} 

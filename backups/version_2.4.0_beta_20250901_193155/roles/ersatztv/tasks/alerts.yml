@@ -1,0 +1,78 @@
+---
+# ErsatzTV Alerting Configuration
+# Configure alerting and notifications for ErsatzTV
+
+- name: Create ErsatzTV alerting configuration
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: "{{ ersatztv_config_dir }}/alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV email alerting configuration
+  ansible.builtin.template:
+    src: email-alerts.yml.j2
+    dest: "{{ ersatztv_config_dir }}/email-alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_alerting_channels is defined and ('email' in ersatztv_alerting_channels)
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV Slack alerting configuration
+  ansible.builtin.template:
+    src: slack-alerts.yml.j2
+    dest: "{{ ersatztv_config_dir }}/slack-alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_alerting_channels is defined and ('slack' in ersatztv_alerting_channels)
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV Discord alerting configuration
+  ansible.builtin.template:
+    src: discord-alerts.yml.j2
+    dest: "{{ ersatztv_config_dir }}/discord-alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  when: ersatztv_alerting_channels is defined and ('discord' in ersatztv_alerting_channels)
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV alerting script
+  ansible.builtin.template:
+    src: send-alert.sh.j2
+    dest: "{{ ersatztv_config_dir }}/send-alert.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV alert monitoring script
+  ansible.builtin.template:
+    src: alert-monitor.sh.j2
+    dest: "{{ ersatztv_config_dir }}/alert-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, alerts]
+
+- name: Create ErsatzTV alerting cron job
+  ansible.builtin.cron:
+    name: "ErsatzTV Alert Monitoring"
+    minute: "*/5"
+    job: "{{ ersatztv_config_dir }}/alert-monitor.sh >> {{ ersatztv_logs_dir }}/alerts.log 2>&1"
+    user: "{{ vault_ersatztv_user }}"
+  when: ersatztv_alerting_enabled
+  tags: [ersatztv, alerts]
+
+- name: Display ErsatzTV alerting configuration
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Alerting Configuration:
+      - Alerting Enabled: {{ ersatztv_alerting_enabled }}
+      - Alerting Channels: {{ ersatztv_alerting_channels | join(', ') }}
+      - Alerting Conditions: {{ ersatztv_alerting_conditions | join(', ') }}
+  tags: [ersatztv, alerts]

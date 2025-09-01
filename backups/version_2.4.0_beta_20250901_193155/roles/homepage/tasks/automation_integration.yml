@@ -1,0 +1,194 @@
+---
+# Homepage Automation Integration Tasks
+# Handles Python configuration script execution, service validation, and monitoring integration
+
+- name: Ensure Python dependencies are installed
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+      - python3-requests
+      - python3-yaml
+      - python3-docker
+    state: present
+  become: true
+  tags: [homepage, automation, dependencies]
+
+- name: Install Python requirements for Homepage automation
+  ansible.builtin.pip:
+    name:
+      - requests
+      - pyyaml
+      - docker
+      - jinja2
+      - click
+      - rich
+      - tabulate
+    state: present
+  become: true
+  tags: [homepage, automation, dependencies]
+
+- name: Create Homepage automation configuration
+  ansible.builtin.template:
+    src: automation_config.yml.j2
+    dest: "{{ homepage_docker_dir }}/scripts/automation_config.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: homepage_automation_config_creation
+  tags: [homepage, automation, config]
+
+- name: Create Homepage service discovery script
+  ansible.builtin.template:
+    src: service_discovery.py.j2
+    dest: "{{ homepage_docker_dir }}/scripts/service_discovery.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: homepage_service_discovery_creation
+  tags: [homepage, automation, scripts]
+
+- name: Create Homepage configuration automation script
+  ansible.builtin.template:
+    src: homepage_automation.py.j2
+    dest: "{{ homepage_docker_dir }}/scripts/homepage_automation.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: homepage_automation_script_creation
+  tags: [homepage, automation, scripts]
+
+- name: Wait for Homepage API to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: homepage_api_health_check
+  retries: 30
+  delay: 10
+  until: homepage_api_health_check.status in [200, 302, 401]
+  tags: [homepage, automation, wait]
+
+- name: Run Homepage service discovery
+  ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/service_discovery.py"
+  args:
+    chdir: "{{ homepage_docker_dir }}/scripts"
+  register: homepage_service_discovery_result
+  environment:
+    PYTHONPATH: "{{ homepage_docker_dir }}/scripts"
+  tags: [homepage, automation, discovery]
+
+- name: Run Homepage configuration automation
+  ansible.builtin.command: "{{ homepage_docker_dir }}/scripts/homepage_automation.py --config automation_config.yml"
+  args:
+    chdir: "{{ homepage_docker_dir }}/scripts"
+  register: homepage_automation_result
+  environment:
+    PYTHONPATH: "{{ homepage_docker_dir }}/scripts"
+  retries: 3
+  delay: 30
+  until: homepage_automation_result.rc == 0
+  tags: [homepage, automation, configure]
+
+- name: Validate Homepage service configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: homepage_services_validation
+  tags: [homepage, automation, validate]
+
+- name: Configure Homepage monitoring integration
+  ansible.builtin.template:
+    src: monitoring_integration.yml.j2
+    dest: "{{ homepage_config_dir }}/monitoring.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: homepage_monitoring_integration_creation
+  tags: [homepage, automation, monitoring]
+
+- name: Configure Homepage authentication integration
+  ansible.builtin.template:
+    src: auth_integration.yml.j2
+    dest: "{{ homepage_config_dir }}/auth.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: homepage_auth_integration_creation
+  tags: [homepage, automation, auth]
+
+- name: Configure Homepage Traefik integration
+  ansible.builtin.template:
+    src: traefik_integration.yml.j2
+    dest: "{{ homepage_config_dir }}/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: homepage_traefik_integration_creation
+  tags: [homepage, automation, traefik]
+
+- name: Restart Homepage to apply configuration changes
+  community.docker.docker_compose_v2:
+    project_src: "{{ homepage_docker_dir }}"
+    state: present
+    restarted: true
+  register: homepage_restart_result
+  tags: [homepage, automation, restart]
+
+- name: Wait for Homepage to be ready after restart
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: homepage_post_restart_health_check
+  retries: 30
+  delay: 10
+  until: homepage_post_restart_health_check.status in [200, 302, 401]
+  tags: [homepage, automation, wait]
+
+- name: Validate Homepage automation integration
+  ansible.builtin.include_tasks: validation.yml
+  tags: [homepage, automation, validate]
+
+- name: Display Homepage automation integration summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      HOMEPAGE AUTOMATION INTEGRATION SUMMARY
+      ========================================
+
+      Automation Status: {{ 'SUCCESS' if homepage_automation_result.rc == 0 else 'FAILED' }}
+
+      Configuration Files Created:
+      - Automation Config: {{ homepage_automation_config_creation.changed }}
+      - Service Discovery: {{ homepage_service_discovery_creation.changed }}
+      - Automation Script: {{ homepage_automation_script_creation.changed }}
+      - Monitoring Integration: {{ homepage_monitoring_integration_creation.changed }}
+      - Auth Integration: {{ homepage_auth_integration_creation.changed }}
+      - Traefik Integration: {{ homepage_traefik_integration_creation.changed }}
+
+      Service Discovery Results:
+      - Services Found: {{ homepage_service_discovery_result.stdout_lines | length if homepage_service_discovery_result.stdout_lines else 0 }}
+      - Configuration Applied: {{ homepage_automation_result.stdout_lines | length if homepage_automation_result.stdout_lines else 0 }}
+
+      Integration Status:
+      - API Health: {{ homepage_post_restart_health_check.status | default('Unknown') }}
+      - Services Validation: {{ homepage_services_validation.status | default('Unknown') }}
+      - Monitoring Integration: {{ homepage_monitoring_integration_creation.changed }}
+      - Authentication Integration: {{ homepage_auth_integration_creation.changed }}
+      - Traefik Integration: {{ homepage_traefik_integration_creation.changed }}
+
+      Automation Features:
+      - Service Auto-Discovery: Enabled
+      - Configuration Automation: Enabled
+      - Monitoring Integration: Enabled
+      - Authentication Integration: Enabled
+      - Traefik Integration: Enabled
+      - Health Monitoring: Enabled
+
+      ========================================
+  tags: [homepage, automation, summary]

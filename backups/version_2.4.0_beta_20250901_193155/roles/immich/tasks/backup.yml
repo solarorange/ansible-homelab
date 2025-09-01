@@ -1,0 +1,151 @@
+---
+# Configure Immich Backup
+# Production-ready backup tasks for Immich
+
+- name: Configure Immich backup
+  block:
+    - name: Generate Immich backup configuration
+      ansible.builtin.template:
+        src: backup.yml.j2
+        dest: "{{ immich_config_dir }}/backup.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, backup]
+
+    - name: Create Immich backup script
+      ansible.builtin.template:
+        src: backup.sh.j2
+        dest: "{{ immich_config_dir }}/backup.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, backup]
+
+    - name: Create Immich restore script
+      ansible.builtin.template:
+        src: restore.sh.j2
+        dest: "{{ immich_config_dir }}/restore.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, backup]
+
+    - name: Setup Immich backup cron job
+      ansible.builtin.cron:
+        name: "Immich Backup"
+        minute: "{{ immich_backup_schedule.split()[0] }}"
+        hour: "{{ immich_backup_schedule.split()[1] }}"
+        day: "{{ immich_backup_schedule.split()[2] }}"
+        month: "{{ immich_backup_schedule.split()[3] }}"
+        weekday: "{{ immich_backup_schedule.split()[4] }}"
+        job: "{{ immich_config_dir }}/backup.sh >> {{ logs_dir }}/immich/backup/backup.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, backup]
+
+    - name: Create Immich backup directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - "{{ backup_dir }}/immich"
+        - "{{ backup_dir }}/immich/database"
+        - "{{ backup_dir }}/immich/config"
+        - "{{ backup_dir }}/immich/photos"
+        - "{{ backup_dir }}/immich/logs"
+        - "{{ logs_dir }}/immich/backup"
+      tags: [immich, backup]
+
+    - name: Generate Immich backup verification script
+      ansible.builtin.template:
+        src: verify-backup.sh.j2
+        dest: "{{ immich_config_dir }}/verify-backup.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, backup]
+
+    - name: Setup Immich backup verification cron
+      ansible.builtin.cron:
+        name: "Immich Backup Verification"
+        hour: "3"
+        minute: "0"
+        job: "{{ immich_config_dir }}/verify-backup.sh >> {{ logs_dir }}/immich/backup/verification.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, backup]
+
+    - name: Create Immich backup retention script
+      ansible.builtin.template:
+        src: cleanup-backups.sh.j2
+        dest: "{{ immich_config_dir }}/cleanup-backups.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, backup]
+
+    - name: Setup Immich backup cleanup cron
+      ansible.builtin.cron:
+        name: "Immich Backup Cleanup"
+        hour: "4"
+        minute: "0"
+        job: "{{ immich_config_dir }}/cleanup-backups.sh >> {{ logs_dir }}/immich/backup/cleanup.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, backup]
+
+    - name: Generate Immich backup monitoring script
+      ansible.builtin.template:
+        src: backup-monitor.sh.j2
+        dest: "{{ immich_config_dir }}/backup-monitor.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, backup]
+
+    - name: Setup Immich backup monitoring cron
+      ansible.builtin.cron:
+        name: "Immich Backup Monitoring"
+        minute: "*/30"
+        job: "{{ immich_config_dir }}/backup-monitor.sh >> {{ logs_dir }}/immich/backup/monitor.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, backup]
+
+    - name: Create Immich backup systemd service
+      ansible.builtin.template:
+        src: immich-backup.service.j2
+        dest: /etc/systemd/system/immich-backup.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, backup]
+
+    - name: Create Immich backup timer
+      ansible.builtin.template:
+        src: immich-backup.timer.j2
+        dest: /etc/systemd/system/immich-backup.timer
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, backup]
+
+    - name: Enable and start Immich backup timer
+      ansible.builtin.systemd:
+        name: immich-backup.timer
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: [immich, backup]
+
+    - name: Create Immich backup notification script
+      ansible.builtin.template:
+        src: backup-notify.sh.j2
+        dest: "{{ immich_config_dir }}/backup-notify.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      when: immich_backup_notifications_enabled | default(true)
+      tags: [immich, backup]
+
+  tags: [immich, backup, always]

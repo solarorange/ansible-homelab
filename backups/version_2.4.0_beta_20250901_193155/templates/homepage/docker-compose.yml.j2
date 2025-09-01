@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    # Prefer Traefik ingress; disable direct host mapping by default
+    # ports:
+    #   - "{{ homepage_port | default('3000') }}:3000"
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PUID={{ homepage_puid | default('1000') }}
+      - PGID={{ homepage_pgid | default('1000') }}
+      - TZ={{ homepage_timezone | default('America/New_York') }}
+    networks:
+      - {{ homepage_network | default('watchtower') }}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.{{ domain }}`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls=true"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      # Loki/Promtail scraping labels
+      - "logging=promtail"
+      - "promtail-job=homepage"
+      - "promtail-service=homepage"
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  {{ homepage_network | default('watchtower') }}:
+    external: true 

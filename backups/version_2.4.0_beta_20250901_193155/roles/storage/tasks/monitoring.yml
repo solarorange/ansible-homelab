@@ -1,0 +1,88 @@
+---
+- name: Enable SMART monitoring service
+  ansible.builtin.systemd:
+    name: smartd
+    enabled: true
+    state: started
+
+- name: Configure SMART monitoring
+  ansible.builtin.copy:
+    dest: /etc/smartd.conf
+    backup: true
+    content: |
+      DEVICESCAN -a -o on -S on -s (S/../.././02|L/../../6/03) \
+        -m {{ username }}@{{ ansible_default_ipv4.address }} \
+        -M exec /usr/share/smartmontools/smartd-runner
+
+- name: Create disk usage monitoring script
+  ansible.builtin.copy:
+    dest: "{{ config_dir }}/storage-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      REPORT_FILE="{{ logs_dir }}/storage-report-$(date +%Y%m%d).log"
+      THRESHOLD=80
+      echo "Storage Report - $(date)" > "$REPORT_FILE"
+      echo "=========================" >> "$REPORT_FILE"
+      echo -e "\nDisk Usage Summary:" >> "$REPORT_FILE"
+      df -h >> "$REPORT_FILE"
+      echo -e "\nInode Usage:" >> "$REPORT_FILE"
+      df -i >> "$REPORT_FILE"
+      echo -e "\nDirectory Sizes (Top 10):" >> "$REPORT_FILE"
+      du -sh {{ data_dir }}/* 2>/dev/null | sort -hr | head -10 >> "$REPORT_FILE"
+      echo -e "\nDocker Storage Usage:" >> "$REPORT_FILE"
+      docker system df >> "$REPORT_FILE"
+      echo -e "\nSMART Status:" >> "$REPORT_FILE"
+      for device in $(lsblk -dnio NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}'); do
+          echo "Device: $device" >> "$REPORT_FILE"
+          smartctl -H "$device" 2>/dev/null | grep -E "SMART overall-health|PASSED|FAILED" >> "$REPORT_FILE"
+      done
+      echo -e "\nDisk Usage Alerts:" >> "$REPORT_FILE"
+      df -h | awk -v threshold="$THRESHOLD" '
+      NR>1 {
+          gsub(/%/, "", $5)
+          if ($5 > threshold) {
+              print "⚠️  WARNING: " $6 " is " $5 "% full"
+          }
+      }' >> "$REPORT_FILE"
+      echo -e "\nDocker Volume Usage:" >> "$REPORT_FILE"
+      docker volume ls -q | xargs -I {} docker volume inspect {} | \
+        jq -r '.[] | .Name + ": " + .Mountpoint' >> "$REPORT_FILE"
+
+- name: Create health check scripts for Samba, Syncthing, Nextcloud
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/health_check_samba.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! nc -z {{ ansible_default_ipv4.address }} 445; then
+        echo "Samba is not responding on port 445"
+        exit 1
+      fi
+      exit 0
+
+- name: Create health check script for Syncthing
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/health_check_syncthing.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! curl -s -f "https://syncthing.{{ domain_name }}/rest/system/status" | grep -q '"status":"OK"'; then
+        echo "Syncthing is not responding correctly"
+        exit 1
+      fi
+      exit 0
+
+- name: Create health check script for Nextcloud
+  ansible.builtin.copy:
+    dest: "{{ scripts_dir }}/health_check_nextcloud.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! curl -s -f "https://nextcloud.{{ domain_name }}/status.php" | grep -q '"installed":true'; then
+        echo "Nextcloud is not responding correctly"
+        exit 1
+      fi
+      exit 0

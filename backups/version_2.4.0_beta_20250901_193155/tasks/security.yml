@@ -1,0 +1,804 @@
+---
+# Security Hardening for Enhanced Homelab
+# Production-ready security configuration with comprehensive protection
+#
+# This playbook implements a multi-layered security strategy:
+# 1. System Hardening
+#    - SSH security
+#    - Firewall configuration
+#    - System auditing
+#    - Access control
+#
+# 2. Intrusion Prevention
+#    - Fail2Ban for brute force protection
+#    - AppArmor for application confinement
+#    - Rootkit detection
+#    - File integrity monitoring
+#
+# 3. Monitoring & Logging
+#    - System auditing
+#    - Log monitoring
+#    - Security alerts
+#    - Activity tracking
+#
+# 4. Maintenance & Updates
+#    - Automated security updates
+#    - System health checks
+#    - Security scanning
+#    - Vulnerability assessment
+#
+# Prerequisites:
+# - Root access
+# - Network connectivity
+# - Sufficient disk space
+# - Backup of current configuration
+
+- name: Install security packages
+  ansible.builtin.package:
+    name:
+      - fail2ban        # Brute force protection
+      - ufw             # Firewall management
+      - rkhunter        # Rootkit detection
+      - chkrootkit      # Additional rootkit scanning
+      - lynis           # Security auditing
+      - aide            # File integrity monitoring
+      - auditd          # System auditing
+      - apparmor        # Application confinement
+      - apparmor-utils  # AppArmor utilities
+      - clamav          # Antivirus scanning
+      - clamav-daemon   # Antivirus daemon
+      - unattended-upgrades  # Automated security updates
+      - needrestart     # Service restart management
+      - logwatch        # Log analysis and reporting
+    state: present
+  # Installs essential security packages
+  # Each package serves a specific security purpose
+
+- name: Configure SSH hardening
+  block:
+    - name: Backup original SSH config
+      ansible.builtin.copy:
+        src: /etc/ssh/sshd_config
+        dest: /etc/ssh/sshd_config.backup
+        remote_src: true
+        backup: true
+      # Creates backup of original SSH configuration
+      # Ensures safe rollback if needed
+
+    - name: Configure SSH security settings
+      ansible.builtin.blockinfile:
+        path: /etc/ssh/sshd_config
+        block: |
+          # Enhanced SSH Security Configuration
+
+          # Authentication
+          PermitRootLogin no                # Disable root login
+          PasswordAuthentication no         # Require key-based auth
+          PubkeyAuthentication yes          # Enable public key auth
+          AuthorizedKeysFile .ssh/authorized_keys  # Key file location
+          ChallengeResponseAuthentication no  # Disable challenge-response
+          UsePAM yes                        # Enable PAM authentication
+
+          # Protocol settings
+          Protocol 2                        # Use SSH protocol 2
+          Port 22                           # Default SSH port
+          AddressFamily inet                # IPv4 only
+
+          # Connection limits
+          MaxAuthTries 3                    # Limit authentication attempts
+          MaxSessions 2                     # Limit concurrent sessions
+          MaxStartups 2:30:10              # Connection rate limiting
+          LoginGraceTime 30                # Login timeout
+          ClientAliveInterval 300          # Keep-alive interval
+          ClientAliveCountMax 2            # Keep-alive retries
+
+          # User restrictions
+          AllowUsers {{ username }}        # Allow specific user
+          DenyUsers root                    # Explicitly deny root
+
+          # Security features
+          X11Forwarding no                 # Disable X11 forwarding
+          AllowAgentForwarding no          # Disable agent forwarding
+          AllowTcpForwarding no            # Disable TCP forwarding
+          GatewayPorts no                  # Disable gateway ports
+          PermitTunnel no                  # Disable tunneling
+          PermitUserEnvironment no         # Disable user environment
+
+          # Logging
+          LogLevel VERBOSE                 # Detailed logging
+          SyslogFacility AUTH              # Auth facility for logs
+
+          # Host key algorithms
+          HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256  # Strong key algorithms
+          KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512  # Key exchange
+          Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr  # Encryption
+          MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512  # Message authentication
+        marker: "# {mark} HOMELAB SSH HARDENING"
+        backup: true
+      notify: restart ssh
+      # Configures comprehensive SSH security settings
+      # Implements modern security best practices
+      # Requires SSH service restart
+
+    - name: Test SSH configuration
+      ansible.builtin.command: sshd -t
+      changed_when: false
+      # Validates SSH configuration before applying
+      # Prevents service disruption
+
+- name: Configure Fail2Ban
+  block:
+    - name: Create Fail2Ban local configuration
+      ansible.builtin.copy:
+        content: |
+          [DEFAULT]
+          # Global settings
+          bantime = 3600        # Ban duration in seconds
+          findtime = 600        # Time window for retries
+          maxretry = 3          # Maximum retry attempts
+          backend = systemd     # Use systemd backend
+
+          # Email notifications
+          destemail = {{ username }}@{{ ansible_default_ipv4.address }}  # Alert recipient
+          sendername = Fail2Ban-{{ inventory_hostname }}  # Sender name
+          mta = sendmail        # Mail transfer agent
+          action = %(action_mwl)s  # Action with mail notification
+
+          [sshd]
+          enabled = true        # Enable SSH protection
+          port = ssh           # SSH port
+          filter = sshd        # SSH filter
+          logpath = /var/log/auth.log  # Auth log path
+          maxretry = 3         # SSH retry limit
+          bantime = 7200       # SSH ban duration
+
+          [nginx-http-auth]
+          enabled = true       # Enable Nginx auth protection
+          filter = nginx-http-auth  # Nginx auth filter
+          logpath = {{ logs_dir }}/nginx/*.log  # Nginx log path
+          maxretry = 5         # Auth retry limit
+
+          [nginx-noscript]
+          enabled = true       # Enable Nginx script protection
+          filter = nginx-noscript  # Nginx script filter
+          logpath = {{ logs_dir }}/nginx/*.log  # Nginx log path
+          maxretry = 6         # Script retry limit
+
+          [nginx-badbots]
+          enabled = true       # Enable bad bot protection
+          filter = nginx-badbots  # Bad bot filter
+          logpath = {{ logs_dir }}/nginx/*.log  # Nginx log path
+          maxretry = 2         # Bot retry limit
+
+          [docker-auth]
+          enabled = true       # Enable Docker auth protection
+          filter = docker-auth  # Docker auth filter
+          logpath = {{ logs_dir }}/docker/*.log  # Docker log path
+          maxretry = 3         # Docker retry limit
+          bantime = 3600       # Docker ban duration
+        dest: /etc/fail2ban/jail.local
+        backup: true
+      notify: restart fail2ban
+      # Configures Fail2Ban with multiple protection layers
+      # Includes SSH, Nginx, and Docker protection
+      # Implements email notifications
+
+    - name: Create custom Fail2Ban filter for Docker
+      ansible.builtin.copy:
+        content: |
+          [Definition]
+          failregex = ^.*\[error\].*authentication failed.*client: <HOST>.*$
+                     ^.*\[error\].*access forbidden.*client: <HOST>.*$
+          ignoreregex =
+        dest: /etc/fail2ban/filter.d/docker-auth.conf
+      notify: restart fail2ban
+      # Creates custom filter for Docker authentication
+      # Detects failed login attempts
+      # Triggers ban on repeated failures
+
+    - name: Enable and start Fail2Ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+      # Ensures Fail2Ban starts on boot
+      # Activates protection immediately
+
+- name: Configure system auditing
+  block:
+    - name: Configure auditd rules
+      ansible.builtin.copy:
+        content: |
+          # Enhanced audit rules for homelab security
+
+          # Remove any existing rules
+          -D
+
+          # Buffer settings
+          -b 8192              # Audit buffer size
+
+          # Failure mode (0=silent, 1=printk, 2=panic)
+          -f 1                 # Print failure messages
+
+          # Monitor file access
+          -w /etc/passwd -p wa -k identity  # Password file changes
+          -w /etc/group -p wa -k identity   # Group file changes
+          -w /etc/shadow -p wa -k identity  # Shadow file changes
+          -w /etc/gshadow -p wa -k identity # GShadow file changes
+          -w /etc/sudoers -p wa -k sudo     # Sudoers changes
+          -w /etc/sudoers.d/ -p wa -k sudo  # Sudoers.d changes
+
+          # Monitor SSH
+          -w /etc/ssh/sshd_config -p wa -k ssh  # SSH config changes
+          -w /home/{{ username }}/.ssh/ -p wa -k ssh  # SSH key changes
+
+          # Monitor Docker
+          -w /usr/bin/docker -p x -k docker  # Docker binary execution
+          -w /var/lib/docker/ -p wa -k docker  # Docker data changes
+          -w {{ docker_dir }}/ -p wa -k docker-homelab  # Homelab Docker changes
+
+          # Monitor system calls
+          -a always,exit -F arch=b64 -S execve -k exec  # 64-bit exec calls
+          -a always,exit -F arch=b32 -S execve -k exec  # 32-bit exec calls
+
+          # Monitor network configuration
+          -a always,exit -F arch=b64 -S socket -F a0=10 -k network  # IPv6 sockets
+          -a always,exit -F arch=b64 -S socket -F a0=2 -k network   # IPv4 sockets
+
+          # Monitor file operations
+          -a always,exit -F arch=b64 -S open -F exit=-EACCES -k access  # Access failures
+          -a always,exit -F arch=b64 -S open -F exit=-EPERM -k access   # Permission failures
+
+          # Lock the rules
+          -e 2                 # Make rules immutable
+        dest: /etc/audit/rules.d/homelab.rules
+        backup: true
+      notify: restart auditd
+      # Configures comprehensive system auditing
+      # Monitors critical system files and operations
+      # Tracks security-relevant events
+
+    - name: Enable and start auditd
+      ansible.builtin.systemd:
+        name: auditd
+        enabled: true
+        state: started
+      # Ensures audit daemon starts on boot
+      # Activates auditing immediately
+
+- name: Configure AppArmor
+  block:
+    - name: Enable AppArmor
+      ansible.builtin.systemd:
+        name: apparmor
+        enabled: true
+        state: started
+      # Enables AppArmor service
+      # Starts application confinement
+
+    - name: Set AppArmor profiles to enforce mode
+      ansible.builtin.shell: |
+        aa-enforce /etc/apparmor.d/*
+      register: apparmor_enforce
+      ignore_errors: true
+
+    - name: Handle AppArmor enforce errors
+      ansible.builtin.debug:
+        msg: "AppArmor enforce completed with warnings: {{ apparmor_enforce.stderr | default('None') }}"
+      when: apparmor_enforce is failed
+      # Sets all profiles to enforce mode
+      # Provides maximum security
+
+    - name: Create Docker AppArmor profile
+      ansible.builtin.copy:
+        content: |
+          #include <tunables/global>
+
+          profile docker-default flags=(attach_disconnected,mediate_deleted) {
+            #include <abstractions/base>
+
+            network,              # Allow network access
+            capability,           # Allow capabilities
+            file,                 # Allow file operations
+            umount,               # Allow unmounting
+
+            # Allow Docker operations
+            /usr/bin/docker rix,  # Execute Docker binary
+            /var/lib/docker/** rw,  # Docker data access
+            /var/run/docker.sock rw,  # Docker socket access
+
+            # Allow container access
+            {{ docker_dir }}/** rw,  # Homelab Docker access
+            {{ data_dir }}/** rw,    # Data directory access
+          }
+        dest: /etc/apparmor.d/docker-homelab
+      notify: restart apparmor
+      # Creates custom AppArmor profile for Docker
+      # Restricts Docker capabilities
+      # Allows necessary operations
+
+- name: Configure intrusion detection
+  block:
+    - name: Initialize AIDE database
+      ansible.builtin.shell: |
+        aideinit
+        mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+      args:
+        creates: /var/lib/aide/aide.db
+
+    - name: Configure AIDE
+      ansible.builtin.blockinfile:
+        path: /etc/aide/aide.conf
+        block: |
+          # Homelab-specific AIDE configuration
+
+          # Monitor critical directories
+          {{ docker_dir }} NORMAL
+          {{ config_dir }} NORMAL
+          /home/{{ username }}/.ssh NORMAL
+
+          # Exclude volatile directories
+          !/var/log/.*
+          !/tmp/.*
+          !/proc/.*
+          !/sys/.*
+          !{{ logs_dir }}/.*
+        marker: "# {mark} HOMELAB AIDE CONFIG"
+
+    - name: Schedule daily AIDE check
+      ansible.builtin.cron:
+        name: "AIDE integrity check"
+        hour: "3"
+        minute: "30"
+        job: "/usr/bin/aide --check 2>&1 | mail -s 'AIDE Report' {{ username }}@{{ ansible_default_ipv4.address }}"
+        user: root
+
+- name: Configure ClamAV antivirus
+  block:
+    - name: Update ClamAV signatures
+      ansible.builtin.command: freshclam
+      register: clamav_update
+      ignore_errors: true
+
+    - name: Handle ClamAV update errors
+      ansible.builtin.debug:
+        msg: "ClamAV update completed with warnings: {{ clamav_update.stderr | default('None') }}"
+      when: clamav_update is failed
+
+    - name: Configure ClamAV daemon
+      ansible.builtin.lineinfile:
+        path: /etc/clamav/clamd.conf
+        regexp: '^#?{{ item.key }}'
+        line: '{{ item.key }} {{ item.value }}'
+        backup: true
+      loop:
+        - { key: 'LogFile', value: '/var/log/clamav/clamav.log' }
+        - { key: 'LogTime', value: 'yes' }
+        - { key: 'DatabaseDirectory', value: '/var/lib/clamav' }
+        - { key: 'LocalSocket', value: '/var/run/clamav/clamd.ctl' }
+        - { key: 'MaxThreads', value: '2' }
+        - { key: 'MaxDirectoryRecursion', value: '15' }
+        - { key: 'FollowDirectorySymlinks', value: 'no' }
+        - { key: 'ScanArchive', value: 'yes' }
+      notify: restart clamav
+
+    - name: Enable ClamAV services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - clamav-daemon
+        - clamav-freshclam
+
+    - name: Schedule weekly antivirus scan
+      ansible.builtin.cron:
+        name: "Weekly antivirus scan"
+        weekday: "0"
+        hour: "2"
+        minute: "0"
+        job: "clamscan -r {{ data_dir }} --log={{ logs_dir }}/clamav-scan.log --infected --remove"
+        user: root
+
+- name: Create security monitoring scripts
+  block:
+    - name: Create security monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Comprehensive security monitoring script
+
+          REPORT_FILE="{{ logs_dir }}/security-report-$(date +%Y%m%d).log"
+
+          echo "Security Report - $(date)" > "$REPORT_FILE"
+          echo "=================================" >> "$REPORT_FILE"
+
+          # System information
+          echo -e "\nSystem Information:" >> "$REPORT_FILE"
+          echo "Hostname: $(hostname)" >> "$REPORT_FILE"
+          echo "Uptime: $(uptime)" >> "$REPORT_FILE"
+          echo "Kernel: $(uname -r)" >> "$REPORT_FILE"
+
+          # User activity
+          echo -e "\nUser Activity:" >> "$REPORT_FILE"
+          who >> "$REPORT_FILE"
+          last -n 10 >> "$REPORT_FILE"
+
+          # Failed login attempts
+          echo -e "\nFailed Login Attempts:" >> "$REPORT_FILE"
+          grep "Failed password" /var/log/auth.log | tail -10 >> "$REPORT_FILE"
+
+          # Fail2Ban status
+          echo -e "\nFail2Ban Status:" >> "$REPORT_FILE"
+          fail2ban-client status >> "$REPORT_FILE"
+
+          # Network connections
+          echo -e "\nNetwork Connections:" >> "$REPORT_FILE"
+          ss -tuln | head -20 >> "$REPORT_FILE"
+
+          # Process list
+          echo -e "\nRunning Processes:" >> "$REPORT_FILE"
+          ps aux --sort=-%cpu | head -15 >> "$REPORT_FILE"
+
+          # Disk usage
+          echo -e "\nDisk Usage:" >> "$REPORT_FILE"
+          df -h >> "$REPORT_FILE"
+
+          # Docker security
+          echo -e "\nDocker Security:" >> "$REPORT_FILE"
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" >> "$REPORT_FILE"
+
+          # Check for rootkits
+          echo -e "\nRootkit Check:" >> "$REPORT_FILE"
+          rkhunter --check --sk --report-warnings-only >> "$REPORT_FILE" 2>&1
+
+          # System file changes (if AIDE is available)
+          if command -v aide >/dev/null 2>&1; then
+              echo -e "\nFile Integrity Check:" >> "$REPORT_FILE"
+              aide --check 2>&1 | head -20 >> "$REPORT_FILE"
+          fi
+
+          echo -e "\nReport completed: $(date)" >> "$REPORT_FILE"
+        dest: "{{ config_dir }}/security-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create security incident response script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Security incident response script
+
+          INCIDENT_DIR="{{ logs_dir }}/incidents"
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          INCIDENT_FILE="$INCIDENT_DIR/incident-$TIMESTAMP.log"
+
+          mkdir -p "$INCIDENT_DIR"
+
+          echo "Security Incident Response - $TIMESTAMP" > "$INCIDENT_FILE"
+          echo "========================================" >> "$INCIDENT_FILE"
+
+          # Immediate system snapshot
+          echo -e "\nSystem Snapshot:" >> "$INCIDENT_FILE"
+          echo "Date: $(date)" >> "$INCIDENT_FILE"
+          echo "Uptime: $(uptime)" >> "$INCIDENT_FILE"
+          echo "Load: $(cat /proc/loadavg)" >> "$INCIDENT_FILE"
+          echo "Memory: $(free -h)" >> "$INCIDENT_FILE"
+
+          # Network activity
+          echo -e "\nNetwork Activity:" >> "$INCIDENT_FILE"
+          ss -tuln >> "$INCIDENT_FILE"
+          netstat -i >> "$INCIDENT_FILE"
+
+          # Process information
+          echo -e "\nRunning Processes:" >> "$INCIDENT_FILE"
+          ps auxf >> "$INCIDENT_FILE"
+
+          # Container status
+          echo -e "\nDocker Containers:" >> "$INCIDENT_FILE"
+          docker ps -a >> "$INCIDENT_FILE"
+
+          # Recent logs
+          echo -e "\nRecent System Logs:" >> "$INCIDENT_FILE"
+          journalctl --since "1 hour ago" --no-pager | tail -50 >> "$INCIDENT_FILE"
+
+          # Authentication logs
+          echo -e "\nAuthentication Logs:" >> "$INCIDENT_FILE"
+          grep -E "(Failed|Accepted)" /var/log/auth.log | tail -20 >> "$INCIDENT_FILE"
+
+          # Fail2Ban bans
+          echo -e "\nFail2Ban Activity:" >> "$INCIDENT_FILE"
+          fail2ban-client status | xargs -I {} fail2ban-client status {} >> "$INCIDENT_FILE"
+
+          # File system check
+          echo -e "\nFile System Status:" >> "$INCIDENT_FILE"
+          df -h >> "$INCIDENT_FILE"
+          mount >> "$INCIDENT_FILE"
+
+          echo -e "\nIncident response completed: $(date)" >> "$INCIDENT_FILE"
+          echo "Incident file: $INCIDENT_FILE"
+
+          # Alert administrator (customize as needed)
+          echo "Security incident detected on $(hostname) at $(date)" | \
+            mail -s "SECURITY INCIDENT" {{ username }}@{{ ansible_default_ipv4.address }} 2>/dev/null || true
+        dest: "{{ config_dir }}/incident-response.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create security update script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Automated security updates script
+
+          LOG_FILE="{{ logs_dir }}/security-updates.log"
+
+          echo "Security Updates - $(date)" >> "$LOG_FILE"
+          echo "===========================" >> "$LOG_FILE"
+
+          # Update package lists
+          apt update >> "$LOG_FILE" 2>&1
+
+          # List available security updates
+          echo -e "\nAvailable Security Updates:" >> "$LOG_FILE"
+          apt list --upgradable 2>/dev/null | grep -i security >> "$LOG_FILE"
+
+          # Apply security updates
+          echo -e "\nApplying Security Updates:" >> "$LOG_FILE"
+          unattended-upgrade -d >> "$LOG_FILE" 2>&1
+
+          # Update Docker images
+          echo -e "\nUpdating Docker Images:" >> "$LOG_FILE"
+          cd {{ docker_dir }}
+          docker-compose pull >> "$LOG_FILE" 2>&1
+
+          # Update ClamAV signatures
+          echo -e "\nUpdating Antivirus Signatures:" >> "$LOG_FILE"
+          freshclam >> "$LOG_FILE" 2>&1
+
+          # Update rootkit signatures
+          echo -e "\nUpdating Rootkit Signatures:" >> "$LOG_FILE"
+          rkhunter --update >> "$LOG_FILE" 2>&1
+
+          echo -e "\nSecurity updates completed: $(date)" >> "$LOG_FILE"
+        dest: "{{ config_dir }}/security-updates.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+- name: Schedule security tasks
+  block:
+    - name: Schedule daily security monitoring
+      ansible.builtin.cron:
+        name: "Daily security monitoring"
+        hour: "7"
+        minute: "0"
+        job: "{{ config_dir }}/security-monitor.sh"
+        user: "{{ vault_security_user }}"
+
+    - name: Schedule security updates
+      ansible.builtin.cron:
+        name: "Weekly security updates"
+        weekday: "1"
+        hour: "4"
+        minute: "0"
+        job: "{{ config_dir }}/security-updates.sh"
+        user: root
+
+    - name: Schedule ClamAV updates
+      ansible.builtin.cron:
+        name: "Daily ClamAV updates"
+        hour: "5"
+        minute: "0"
+        job: "freshclam"
+        user: clamav
+
+- name: Display security configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Security Hardening Complete:
+
+      Security Services Enabled:
+      - SSH hardened (no root login, key auth only)
+      - Fail2Ban active (SSH, web services)
+      - UFW firewall configured
+      - AppArmor profiles enforced
+      - Audit logging enabled
+      - ClamAV antivirus running
+      - AIDE integrity monitoring
+
+      Security Scripts:
+      - Monitor: {{ config_dir }}/security-monitor.sh
+      - Incident Response: {{ config_dir }}/incident-response.sh
+      - Updates: {{ config_dir }}/security-updates.sh
+
+      Scheduled Tasks:
+      - Daily security monitoring at 07:00
+      - Weekly security updates on Monday at 04:00
+      - Daily antivirus signature updates at 05:00
+      - Weekly full antivirus scan on Sunday at 02:00
+      - Daily AIDE integrity check at 03:30
+
+      Security Features:
+      - Intrusion detection and prevention
+      - File integrity monitoring
+      - Antivirus scanning
+      - Audit logging
+      - Automated security updates
+      - Incident response procedures
+
+- name: Configure SSH security
+  block:
+    - name: Set secure SSH configuration
+      template:
+        src: sshd_config.j2
+        dest: /etc/ssh/sshd_config
+        mode: '0600'
+      notify: restart sshd
+
+    - name: Configure SSH access control
+      template:
+        src: ssh_access.j2
+        dest: /etc/ssh/sshd_config.d/access.conf
+        mode: '0600'
+      notify: restart sshd
+
+- name: Implement firewall rules
+  block:
+    - name: Configure UFW
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 22    # SSH
+        - 80    # HTTP
+        - 443   # HTTPS
+        - 9090  # Prometheus
+        - 3000  # Grafana
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+        policy: deny
+  when: not (firewall.centralized | default(false))
+
+- name: Security scanning and validation
+  block:
+    - name: Install security tools
+      apt:
+        name:
+          - lynis
+          - rkhunter
+          - fail2ban
+          - auditd
+        state: present
+        update_cache: yes
+
+    - name: Configure fail2ban
+      template:
+        src: fail2ban.j2
+        dest: /etc/fail2ban/jail.local
+        mode: '0644'
+      notify: restart fail2ban
+
+    - name: Run security scan
+      command: lynis audit system
+      register: security_scan
+      changed_when: false
+
+    - name: Run rootkit scan
+      command: rkhunter --check
+      register: rootkit_scan
+      changed_when: false
+
+- name: Implement secure defaults
+  block:
+    - name: Set secure system defaults
+      template:
+        src: security_defaults.j2
+        dest: /etc/sysctl.d/99-security.conf
+        mode: '0644'
+      notify: reload sysctl
+
+    - name: Configure secure permissions
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+      loop:
+        - { path: '/etc/shadow', mode: '0000', owner: 'root', group: 'root' }
+        - { path: '/etc/gshadow', mode: '0000', owner: 'root', group: 'root' }
+        - { path: '/etc/passwd', mode: '0644', owner: 'root', group: 'root' }
+        - { path: '/etc/group', mode: '0644', owner: 'root', group: 'root' }
+
+- name: Configure audit logging
+  block:
+    - name: Set up audit rules
+      template:
+        src: audit.rules.j2
+        dest: /etc/audit/rules.d/audit.rules
+        mode: '0640'
+      notify: restart auditd
+
+    - name: Enable audit service
+      systemd:
+        name: auditd
+        state: started
+        enabled: yes
+
+- name: Ensure vault directory exists
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0700'
+  loop:
+    - "{{ ansible_user_home }}/.ansible"
+    - "{{ ansible_user_home }}/.ssh"
+
+- name: Generate vault password if not exists
+  stat:
+    path: "{{ ansible_user_home }}/.ansible/vault_pass"
+  register: vault_pass_file
+
+- name: Create vault password file
+  copy:
+    content: "{{ vault_fail2ban_secret_key }}"
+    dest: "{{ ansible_user_home }}/.ansible/vault_pass"
+    mode: '0600'
+  when: not vault_pass_file.stat.exists
+
+- name: Generate SSH key pair if not exists
+  stat:
+    path: "{{ ansible_user_home }}/.ssh/homelab_key"
+  register: ssh_key_file
+
+- name: Create SSH key pair
+  openssh_keypair:
+    path: "{{ ansible_user_home }}/.ssh/homelab_key"
+    type: ed25519
+    mode: '0600'
+  when: not ssh_key_file.stat.exists
+
+- name: Ensure vault file exists
+  stat:
+    path: "{{ playbook_dir }}/group_vars/all/vault.yml"
+  register: vault_file
+
+- name: Create initial vault file
+  copy:
+    content: |
+      ---
+      # Encrypted sensitive data
+      vault_ssh_keys:
+        homelab_key: "{{ lookup('file', ansible_user_home + '/.ssh/homelab_key') }}"
+        homelab_pub: "{{ lookup('file', ansible_user_home + '/.ssh/homelab_key.pub') }}"
+
+      vault_credentials:
+        admin_password: "{{ vault_security_password }}"
+        database_password: "{{ vault_security_password }}"
+        api_keys:
+          traefik: "{{ vault_traefik_api_key }}"
+          portainer: "{{ vault_portainer_api_key }}"
+          monitoring: "{{ vault_grafana_api_key }}"
+
+      vault_certificates:
+        ssl_cert: "{{ vault_ssl_cert_key }}"
+        ssl_key: "{{ vault_ssl_private_key }}"
+
+      vault_secrets:
+        jwt_secret: "{{ vault_jwt_secret }}"
+        encryption_key: "{{ vault_encryption_key }}"
+    dest: "{{ playbook_dir }}/group_vars/all/vault.yml"
+    mode: '0600'
+  when: not vault_file.stat.exists
+
+- name: Encrypt vault file
+  command: ansible-vault encrypt "{{ playbook_dir }}/group_vars/all/vault.yml"
+  args:
+    creates: "{{ playbook_dir }}/group_vars/all/vault.yml"
+  environment:
+    ANSIBLE_VAULT_PASSWORD_FILE: "{{ ansible_user_home }}/.ansible/vault_pass"

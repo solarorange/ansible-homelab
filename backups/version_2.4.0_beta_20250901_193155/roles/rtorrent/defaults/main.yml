@@ -1,0 +1,260 @@
+---
+# Rtorrent Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# RTORRENT SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+rtorrent_service_name: "rtorrent"
+rtorrent_container_name: "{{ rtorrent_service_name }}"
+rtorrent_image: "linuxserver/rutorrent:latest"
+rtorrent_version: "latest"
+
+# Network Configuration
+rtorrent_port: 80
+rtorrent_external_port: "{{ rtorrent_port }}"
+rtorrent_protocol: "http"
+rtorrent_host: "{{ ansible_default_ipv4.address }}"
+rtorrent_url: "{{ rtorrent_protocol }}://{{ rtorrent_host }}:{{ rtorrent_port }}"
+
+# Domain Configuration
+rtorrent_subdomain: "rtorrent"
+rtorrent_domain: "{{ rtorrent_subdomain }}.{{ domain }}"
+rtorrent_external_url: "https://{{ rtorrent_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+rtorrent_auth_enabled: true
+rtorrent_auth_method: "authentik"  # Options: basic, authentik, none
+rtorrent_admin_username: "admin"
+rtorrent_admin_password: "{{ vault_rtorrent_admin_password }}"
+
+# API Configuration
+rtorrent_api_key: "{{ vault_rtorrent_api_key }}"
+rtorrent_api_token: "{{ vault_rtorrent_api_token }}"
+
+# Encryption & Security
+rtorrent_secret_key: "{{ vault_rtorrent_secret_key }}"
+rtorrent_encryption_key: "{{ vault_rtorrent_encryption_key }}"
+rtorrent_jwt_secret: "{{ vault_rtorrent_jwt_secret }}"
+
+# SSL/TLS Configuration
+rtorrent_ssl_enabled: true
+rtorrent_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+rtorrent_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+rtorrent_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+rtorrent_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+rtorrent_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+rtorrent_database_port: "{{ databases_postgresql_port | default(5432) }}"
+rtorrent_database_name: "rtorrent"
+rtorrent_database_username: "rtorrent"
+rtorrent_database_password: "{{ vault_rtorrent_database_password }}"
+
+# Redis Configuration (if using)
+rtorrent_redis_enabled: false
+rtorrent_redis_host: "{{ redis_host | default('redis') }}"
+rtorrent_redis_port: "{{ redis_port | default(6379) }}"
+rtorrent_redis_password: "{{ vault_rtorrent_redis_password }}"
+rtorrent_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+rtorrent_data_dir: "{{ homelab_data_dir }}/rtorrent"
+rtorrent_config_dir: "{{ rtorrent_data_dir }}/config"
+rtorrent_backup_dir: "{{ rtorrent_data_dir }}/backups"
+
+# Volume Mappings
+rtorrent_volumes:
+  - "{{ rtorrent_config_dir }}:/config"
+  - "{{ rtorrent_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+rtorrent_health_check_enabled: true
+rtorrent_health_check_path: "/health"
+rtorrent_health_check_interval: 30
+rtorrent_health_check_timeout: 10
+rtorrent_health_check_retries: 3
+
+# Monitoring Integration
+rtorrent_monitoring_enabled: true
+rtorrent_prometheus_enabled: true
+rtorrent_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+rtorrent_backup_enabled: true
+rtorrent_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+rtorrent_backup_retention_days: 30
+rtorrent_backup_encryption_enabled: true
+rtorrent_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+rtorrent_smtp_enabled: false
+rtorrent_smtp_host: "{{ smtp_host | default('') }}"
+rtorrent_smtp_port: "{{ smtp_port | default(587) }}"
+rtorrent_smtp_username: "{{ vault_smtp_username }}"
+rtorrent_smtp_password: "{{ vault_rtorrent_smtp_password }}"
+rtorrent_smtp_from: "{{ rtorrent_admin_email | default('admin@' + domain) }}"
+rtorrent_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+rtorrent_webhook_enabled: false
+rtorrent_webhook_url: "{{ vault_webhook_url | default('') }}"
+rtorrent_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+rtorrent_discovery_enabled: true
+rtorrent_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+rtorrent_cpu_limit: "1.0"
+rtorrent_memory_limit: "1g"
+rtorrent_memory_reservation: "512m"
+
+# Performance Settings
+rtorrent_scan_interval: 10
+rtorrent_parallel_downloads: 3
+rtorrent_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+rtorrent_log_level: "info"  # Options: trace, debug, info, warn, error
+rtorrent_log_rotation_enabled: true
+rtorrent_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+rtorrent_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+rtorrent_rate_limit_enabled: true
+rtorrent_rate_limit_requests: 100
+rtorrent_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+rtorrent_deploy_enabled: true
+rtorrent_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+rtorrent_restart_policy: "unless-stopped"
+rtorrent_auto_update_enabled: true
+
+# Environment Variables
+rtorrent_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  RTORRENT_API_KEY: "{{ rtorrent_api_key }}"
+  RTORRENT_SECRET_KEY: "{{ rtorrent_secret_key }}"
+  RTORRENT_ENCRYPTION_KEY: "{{ rtorrent_encryption_key }}"
+  RTORRENT_JWT_SECRET: "{{ rtorrent_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+rtorrent_validation_enabled: true
+rtorrent_validation_timeout: 300
+rtorrent_validation_retries: 3
+
+# Testing Configuration
+rtorrent_test_enabled: false
+rtorrent_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+rtorrent_compliance_enabled: true
+rtorrent_audit_logging_enabled: true
+rtorrent_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+rtorrent_automation_enabled: true
+rtorrent_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+rtorrent_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+rtorrent_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+rtorrent_fallback_enabled: true
+rtorrent_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

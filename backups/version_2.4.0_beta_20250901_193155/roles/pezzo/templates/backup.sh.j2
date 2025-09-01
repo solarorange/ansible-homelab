@@ -1,0 +1,151 @@
+#!/bin/bash
+# Pezzo Backup Script
+# Automated backup for Pezzo data and configuration
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+BACKUP_DIR="{{ pezzo_backup_dir }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/backup"
+BACKUP_LOG="$LOGS_DIR/backup.log"
+RETENTION_DAYS="{{ pezzo_backup_retention_days | default(7) }}"
+
+# Create directories
+mkdir -p "$BACKUP_DIR" "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$BACKUP_LOG"
+}
+
+# Function to create database backup
+backup_database() {
+    log "Starting database backup"
+    
+    local backup_file="$BACKUP_DIR/pezzo_postgres_$(date +%Y%m%d_%H%M%S).sql"
+    
+    if docker exec pezzo-postgres pg_dump -U {{ pezzo_database_user }} {{ pezzo_database_name }} > "$backup_file" 2>/dev/null; then
+        log "Database backup completed: $backup_file"
+        echo "$backup_file"
+    else
+        log "ERROR: Database backup failed"
+        return 1
+    fi
+}
+
+# Function to backup configuration
+backup_config() {
+    log "Starting configuration backup"
+    
+    local backup_file="$BACKUP_DIR/pezzo_config_$(date +%Y%m%d_%H%M%S).tar.gz"
+    
+    if tar -czf "$backup_file" -C "$PEZZO_CONFIG_DIR" . 2>/dev/null; then
+        log "Configuration backup completed: $backup_file"
+        echo "$backup_file"
+    else
+        log "ERROR: Configuration backup failed"
+        return 1
+    fi
+}
+
+# Function to backup logs
+backup_logs() {
+    log "Starting logs backup"
+    
+    local backup_file="$BACKUP_DIR/pezzo_logs_$(date +%Y%m%d_%H%M%S).tar.gz"
+    
+    if tar -czf "$backup_file" -C "{{ logs_dir }}/pezzo" . 2>/dev/null; then
+        log "Logs backup completed: $backup_file"
+        echo "$backup_file"
+    else
+        log "ERROR: Logs backup failed"
+        return 1
+    fi
+}
+
+# Function to verify backup
+verify_backup() {
+    local backup_file="$1"
+    local backup_type="$2"
+    
+    log "Verifying $backup_type backup: $backup_file"
+    
+    if [ -f "$backup_file" ]; then
+        local file_size=$(stat -c%s "$backup_file" 2>/dev/null || echo "0")
+        if [ "$file_size" -gt 0 ]; then
+            log "Backup verification successful: $backup_file (${file_size} bytes)"
+            return 0
+        else
+            log "ERROR: Backup verification failed - empty file: $backup_file"
+            return 1
+        fi
+    else
+        log "ERROR: Backup verification failed - file not found: $backup_file"
+        return 1
+    fi
+}
+
+# Function to cleanup old backups
+cleanup_old_backups() {
+    log "Cleaning up backups older than $RETENTION_DAYS days"
+    
+    local deleted_count=0
+    while IFS= read -r -d '' file; do
+        if rm "$file" 2>/dev/null; then
+            log "Deleted old backup: $file"
+            ((deleted_count++))
+        fi
+    done < <(find "$BACKUP_DIR" -name "pezzo_*" -type f -mtime +$RETENTION_DAYS -print0)
+    
+    log "Cleanup completed: $deleted_count files deleted"
+}
+
+# Main backup function
+main_backup() {
+    log "Starting Pezzo backup process"
+    
+    local db_backup=""
+    local config_backup=""
+    local logs_backup=""
+    local success=true
+    
+    # Database backup
+    if [ "{{ pezzo_backup_include_database | default(true) }}" = "true" ]; then
+        if db_backup=$(backup_database); then
+            verify_backup "$db_backup" "database" || success=false
+        else
+            success=false
+        fi
+    fi
+    
+    # Configuration backup
+    if [ "{{ pezzo_backup_include_config | default(true) }}" = "true" ]; then
+        if config_backup=$(backup_config); then
+            verify_backup "$config_backup" "configuration" || success=false
+        else
+            success=false
+        fi
+    fi
+    
+    # Logs backup
+    if logs_backup=$(backup_logs); then
+        verify_backup "$logs_backup" "logs" || success=false
+    else
+        success=false
+    fi
+    
+    # Cleanup old backups
+    cleanup_old_backups
+    
+    if [ "$success" = true ]; then
+        log "Pezzo backup process completed successfully"
+        exit 0
+    else
+        log "ERROR: Pezzo backup process failed"
+        exit 1
+    fi
+}
+
+# Execute main backup function
+main_backup "$@" 

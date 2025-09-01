@@ -1,0 +1,625 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Media Stack",
+    "tags": ["media", "plex", "sonarr", "radarr", "bazarr", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
+      "hidden": false,
+      "collapse": false
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "media_service",
+          "type": "custom",
+          "query": "plex,sonarr,radarr,bazarr,prowlarr,overseerr,tautulli,jellyfin,emby",
+          "includeAll": true,
+          "multi": true,
+          "label": "Media Service",
+          "description": "Select media services to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=~\"plex|sonarr|radarr|bazarr|prowlarr|overseerr|tautulli|jellyfin|emby\"}, instance)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Instance",
+          "description": "Select instances to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "media_type",
+          "type": "custom",
+          "query": "movie,tv,music,book,photo",
+          "includeAll": true,
+          "multi": true,
+          "label": "Media Type",
+          "description": "Filter by media type",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "quality_profile",
+          "type": "custom",
+          "query": "4K,1080p,720p,SD",
+          "includeAll": true,
+          "multi": true,
+          "label": "Quality Profile",
+          "description": "Filter by quality profile",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "time_range",
+          "type": "custom",
+          "query": "1h,6h,12h,24h,7d,30d",
+          "includeAll": false,
+          "multi": false,
+          "label": "Time Range",
+          "description": "Select time range for metrics",
+          "regex": "",
+          "sort": 1,
+          "current": {
+            "selected": true,
+            "text": "1h",
+            "value": "1h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Media Downloads",
+          "datasource": "Prometheus",
+          "expr": "increase(sonarr_downloads_total[5m]) > 0 or increase(radarr_downloads_total[5m]) > 0",
+          "iconColor": "rgba(0, 255, 0, 1)",
+          "titleFormat": "Media Download: {{ $labels.job }}",
+          "textFormat": "{{ $labels.job }} downloaded new media",
+          "fillColor": "rgba(0, 255, 0, 0.1)",
+          "lineColor": "rgba(0, 255, 0, 1)"
+        },
+        {
+          "name": "Media Processing",
+          "datasource": "Prometheus",
+          "expr": "increase(bazarr_processing_total[5m]) > 0",
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "titleFormat": "Media Processing: {{ $labels.job }}",
+          "textFormat": "{{ $labels.job }} processed media files",
+          "fillColor": "rgba(0, 211, 255, 0.1)",
+          "lineColor": "rgba(0, 211, 255, 1)"
+        },
+        {
+          "name": "Plex Activity",
+          "datasource": "Prometheus",
+          "expr": "increase(plex_plays_total[5m]) > 0",
+          "iconColor": "rgba(255, 193, 7, 1)",
+          "titleFormat": "Plex Activity",
+          "textFormat": "Plex media playback activity detected",
+          "fillColor": "rgba(255, 193, 7, 0.1)",
+          "lineColor": "rgba(255, 193, 7, 1)"
+        },
+        {
+          "name": "Service Errors",
+          "datasource": "Prometheus",
+          "expr": "increase(sonarr_errors_total[5m]) > 0 or increase(radarr_errors_total[5m]) > 0 or increase(bazarr_errors_total[5m]) > 0",
+          "iconColor": "rgba(255, 0, 0, 1)",
+          "titleFormat": "Service Error: {{ $labels.job }}",
+          "textFormat": "{{ $labels.job }} encountered an error",
+          "fillColor": "rgba(255, 0, 0, 0.1)",
+          "lineColor": "rgba(255, 0, 0, 1)"
+        },
+        {
+          "name": "Disk Space Warnings",
+          "datasource": "Prometheus",
+          "expr": "node_filesystem_avail_bytes / node_filesystem_size_bytes * 100 < 10",
+          "iconColor": "rgba(255, 165, 0, 1)",
+          "titleFormat": "Low Disk Space: {{ $labels.mountpoint }}",
+          "textFormat": "Low disk space on {{ $labels.mountpoint }}: {{ $value }}% available",
+          "fillColor": "rgba(255, 165, 0, 0.1)",
+          "lineColor": "rgba(255, 165, 0, 1)"
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "Homelab Overview",
+        "url": "https://grafana.{{ domain }}/d/homelab-overview",
+        "icon": "external link",
+        "tooltip": "Return to homelab overview"
+      },
+      {
+        "title": "Plex",
+        "url": "https://plex.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Plex media server"
+      },
+      {
+        "title": "Sonarr",
+        "url": "https://sonarr.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Sonarr TV management"
+      },
+      {
+        "title": "Radarr",
+        "url": "https://radarr.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Radarr movie management"
+      },
+      {
+        "title": "Bazarr",
+        "url": "https://bazarr.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Bazarr subtitle management"
+      },
+      {
+        "title": "Overseerr",
+        "url": "https://overseerr.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Overseerr request management"
+      },
+      {
+        "title": "Tautulli",
+        "url": "https://tautulli.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Tautulli Plex statistics"
+      }
+    ],
+    "panels": [
+      {
+        "id": 1,
+        "title": "Media Services Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(up{job=~\"plex|sonarr|radarr|bazarr|prowlarr|overseerr|tautulli|jellyfin|emby\"}) / count(up{job=~\"plex|sonarr|radarr|bazarr|prowlarr|overseerr|tautulli|jellyfin|emby\"}) * 100",
+            "legendFormat": "Services Health",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "description": "Overall health of media services"
+      },
+      {
+        "id": 2,
+        "title": "Total Media Library Size",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(sonarr_series_total) + sum(radarr_movies_total)",
+            "legendFormat": "Total Items",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "description": "Total number of media items in library"
+      },
+      {
+        "id": 3,
+        "title": "Active Downloads",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(sonarr_downloads_active) + sum(radarr_downloads_active)",
+            "legendFormat": "Active Downloads",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "description": "Number of active downloads"
+      },
+      {
+        "id": 4,
+        "title": "Plex Streams",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "plex_streams_active",
+            "legendFormat": "Active Streams",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "description": "Number of active Plex streams"
+      },
+      {
+        "id": 5,
+        "title": "Media Service Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"plex|sonarr|radarr|bazarr|prowlarr|overseerr|tautulli|jellyfin|emby\"}",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "vertical"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "description": "Status of all media services"
+      },
+      {
+        "id": 6,
+        "title": "Library Statistics",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sonarr_series_total",
+            "legendFormat": "TV Shows",
+            "refId": "A",
+            "format": "table"
+          },
+          {
+            "expr": "radarr_movies_total",
+            "legendFormat": "Movies",
+            "refId": "B",
+            "format": "table"
+          },
+          {
+            "expr": "sonarr_episodes_total",
+            "legendFormat": "TV Episodes",
+            "refId": "C",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "description": "Library statistics by media type"
+      },
+      {
+        "id": 7,
+        "title": "Download Activity Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(sonarr_downloads_total[5m])",
+            "legendFormat": "Sonarr Downloads",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(radarr_downloads_total[5m])",
+            "legendFormat": "Radarr Downloads",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "description": "Download activity trends over time"
+      },
+      {
+        "id": 8,
+        "title": "Plex Activity Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(plex_plays_total[5m])",
+            "legendFormat": "Plex Plays",
+            "refId": "A"
+          },
+          {
+            "expr": "plex_streams_active",
+            "legendFormat": "Active Streams",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "description": "Plex activity trends over time"
+      },
+      {
+        "id": 9,
+        "title": "Processing Activity",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(bazarr_processing_total[5m])",
+            "legendFormat": "Bazarr Processing",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(sonarr_processing_total[5m])",
+            "legendFormat": "Sonarr Processing",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(radarr_processing_total[5m])",
+            "legendFormat": "Radarr Processing",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "description": "Media processing activity over time"
+      },
+      {
+        "id": 10,
+        "title": "Error Rates",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(sonarr_errors_total[5m])",
+            "legendFormat": "Sonarr Errors",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(radarr_errors_total[5m])",
+            "legendFormat": "Radarr Errors",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(bazarr_errors_total[5m])",
+            "legendFormat": "Bazarr Errors",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "description": "Error rates for media services"
+      },
+      {
+        "id": 11,
+        "title": "Disk Usage for Media",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100",
+            "legendFormat": "{{mountpoint}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "description": "Disk usage on media storage volumes"
+      },
+      {
+        "id": 12,
+        "title": "Quality Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (quality) (sonarr_episodes_total)",
+            "legendFormat": "{{quality}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        },
+        "description": "Distribution of media quality in library"
+      }
+    ]
+  }
+} 

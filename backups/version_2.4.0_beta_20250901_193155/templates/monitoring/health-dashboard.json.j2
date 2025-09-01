@@ -1,0 +1,153 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Homelab Health Dashboard",
+    "tags": ["homelab", "health", "monitoring"],
+    "style": "dark",
+    "timezone": "{{ timezone }}",
+    "refresh": "15s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "{{ $labels.job }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Container Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(container_cpu_usage_seconds_total)",
+            "legendFormat": "Running Containers"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Failed Containers",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(container_cpu_usage_seconds_total{container=~\".*\"}) - count(container_cpu_usage_seconds_total)",
+            "legendFormat": "Failed Containers"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Service Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "probe_duration_seconds",
+            "legendFormat": "{{ $labels.job }}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "System Resource Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Usage %"
+          },
+          {
+            "expr": "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100",
+            "legendFormat": "Disk Usage %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Network Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_errs_total[5m])",
+            "legendFormat": "Network Errors"
+          },
+          {
+            "expr": "rate(node_network_transmit_errs_total[5m])",
+            "legendFormat": "Transmit Errors"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Database Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "PostgreSQL Connections"
+          },
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Redis Connections"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Security Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"crowdsec|fail2ban\"}",
+            "legendFormat": "Security Services"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Backup Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "backup_last_success_timestamp",
+            "legendFormat": "Last Backup"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24}
+      }
+    ]
+  }
+} 

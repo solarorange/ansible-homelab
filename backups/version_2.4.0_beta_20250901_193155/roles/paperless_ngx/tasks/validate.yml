@@ -1,0 +1,89 @@
+---
+# Paperless_Ngx Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Paperless_Ngx vault variables
+  block:
+    - name: Check required Paperless_Ngx vault variables
+      assert:
+        that:
+          - vault_paperless_ngx_admin_password is defined
+          - vault_paperless_ngx_database_password is defined
+          - vault_paperless_ngx_api_key is defined
+          - vault_paperless_ngx_secret_key is defined
+          - vault_paperless_ngx_encryption_key is defined
+          - vault_paperless_ngx_jwt_secret is defined
+        fail_msg: "Required Paperless_Ngx vault variables are not defined"
+        success_msg: "All required Paperless_Ngx vault variables are defined"
+
+    - name: Validate Paperless_Ngx password complexity
+      assert:
+        that:
+          - vault_paperless_ngx_admin_password | length >= 12
+          - vault_paperless_ngx_database_password | length >= 12
+        fail_msg: "Paperless_Ngx passwords must be at least 12 characters long"
+        success_msg: "Paperless_Ngx password complexity requirements met"
+
+- name: Validate Paperless_Ngx network configuration
+  block:
+    - name: Check Paperless_Ngx port configuration
+      assert:
+        that:
+          - paperless_ngx_port is defined
+          - paperless_ngx_port | int >= 1024
+          - paperless_ngx_port | int <= 65535
+        fail_msg: "Paperless_Ngx port must be between 1024 and 65535"
+        success_msg: "Paperless_Ngx port configuration is valid"
+
+    - name: Check Paperless_Ngx domain configuration
+      assert:
+        that:
+          - domain is defined
+          - paperless_ngx_subdomain is defined
+        fail_msg: "Paperless_Ngx domain configuration is incomplete"
+        success_msg: "Paperless_Ngx domain configuration is valid"
+
+- name: Validate Paperless_Ngx security configuration
+  block:
+    - name: Check Paperless_Ngx SSL configuration
+      assert:
+        that:
+          - paperless_ngx_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Paperless_Ngx SSL configuration is invalid"
+        success_msg: "Paperless_Ngx SSL configuration is valid"
+
+    - name: Check Paperless_Ngx authentication configuration
+      assert:
+        that:
+          - paperless_ngx_auth_enabled | bool
+          - paperless_ngx_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Paperless_Ngx authentication configuration is invalid"
+        success_msg: "Paperless_Ngx authentication configuration is valid"
+
+- name: Validate Paperless_Ngx storage configuration
+  block:
+    - name: Check Paperless_Ngx data directories
+      assert:
+        that:
+          - paperless_ngx_data_dir is defined
+          - paperless_ngx_config_dir is defined
+          - paperless_ngx_backup_dir is defined
+        fail_msg: "Paperless_Ngx storage configuration is incomplete"
+        success_msg: "Paperless_Ngx storage configuration is valid"
+
+    - name: Create Paperless_Ngx directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ paperless_ngx_data_dir }}"
+        - "{{ paperless_ngx_config_dir }}"
+        - "{{ paperless_ngx_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Paperless_Ngx validation completed successfully - all configurations are valid and secure"

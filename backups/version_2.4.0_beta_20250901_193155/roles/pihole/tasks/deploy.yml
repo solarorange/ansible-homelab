@@ -1,0 +1,57 @@
+---
+# Pihole Deployment Tasks
+
+- name: Create Pihole directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/pihole"
+    - "{{ docker_dir }}/pihole/secrets"
+    - "{{ logs_dir }}/pihole"
+
+- name: Prepare Pihole secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "pihole"
+    secret_dir_root: "{{ docker_dir }}/pihole"
+    secret_files: "{{ pihole_secret_files if pihole_manage_secret_files else [] }}"
+  when: pihole_manage_secret_files | bool
+
+- name: Validate required Pihole secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/pihole/secrets/{{ item }}"
+  register: pihole_secret_stats
+  loop: "{{ pihole_required_secrets | default([]) }}"
+  when: pihole_manage_secret_files | bool and (pihole_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Pihole secret files are missing
+  ansible.builtin.assert:
+    that: "{{ pihole_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/pihole/secrets.
+      Missing: {{ (pihole_required_secrets | default([])) | reject('in', (pihole_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: pihole_manage_secret_files | bool and (pihole_required_secrets | default([]) | length > 0)
+
+- name: Render Pihole docker-compose
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/pihole/docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/pihole/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Deploy Pihole with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "pihole"
+    project_src: "{{ docker_dir }}/pihole"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "53"
+  tags: [pihole, deploy, rollback]
+

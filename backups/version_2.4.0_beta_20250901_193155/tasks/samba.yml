@@ -1,0 +1,130 @@
+---
+- name: Create Samba directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - "{{ docker_data_root }}/samba"
+    - "{{ docker_data_root }}/samba/config"
+    - "{{ docker_data_root }}/samba/data"
+    - "{{ docker_data_root }}/samba/logs"
+
+- name: Create Samba share directories
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: '0775'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop: "{{ samba_shares }}"
+
+- name: Create Samba configuration file
+  copy:
+    dest: "{{ docker_data_root }}/samba/config/smb.conf"
+    content: |
+      [global]
+      workgroup = {{ samba_workgroup }}
+      server string = {{ samba_server_string }}
+      security = {{ samba_security }}
+      map to guest = {{ samba_map_to_guest }}
+      dns proxy = no
+      log file = /var/log/samba/log.%m
+      max log size = 50
+      socket options = TCP_NODELAY IPTOS_LOWDELAY
+      local master = yes
+      os level = 20
+      domain master = yes
+      preferred master = yes
+      wins support = yes
+      unix charset = UTF-8
+      dos charset = CP932
+      display charset = UTF-8
+      vfs objects = acl_xattr
+      map acl inherit = yes
+      store dos attributes = yes
+      create mask = 0664
+      directory mask = 0775
+      force create mode = 0664
+      force directory mode = 0775
+      force user = {{ username }}
+      force group = {{ username }}
+
+      {% for share in samba_shares %}
+      [{{ share.name }}]
+      path = {{ share.path }}
+      browseable = {{ share.browseable }}
+      read only = {{ share.read_only }}
+      guest ok = {{ share.guest_ok }}
+      create mask = 0664
+      directory mask = 0775
+      force user = {{ username }}
+      force group = {{ username }}
+      {% endfor %}
+
+- name: Create Samba docker-compose service
+  blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Samba"
+    block: |
+      samba:
+        image: dperson/samba:latest
+        container_name: samba
+        volumes:
+          - {{ docker_data_root }}/samba/config:/etc/samba
+          - {{ docker_data_root }}/samba/data:/data
+          - {{ docker_data_root }}/samba/logs:/var/log/samba
+        ports:
+          - "137:137/udp"
+          - "138:138/udp"
+          - "139:139/tcp"
+          - "445:445/tcp"
+        environment:
+          - TZ={{ timezone }}
+        restart: unless-stopped
+        networks:
+          - traefik_network
+
+- name: Create Samba health check script
+  copy:
+    dest: "{{ scripts_dir }}/health_check_samba.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      if ! nc -z {{ ansible_default_ipv4.address }} 445; then
+        echo "Samba is not responding on port 445"
+        exit 1
+      fi
+      exit 0
+
+- name: Create Samba backup script
+  copy:
+    dest: "{{ scripts_dir }}/backup_samba.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      BACKUP_DIR="{{ backup_root }}/samba"
+      mkdir -p "$BACKUP_DIR"
+      tar -czf "$BACKUP_DIR/samba_$(date +%Y%m%d_%H%M%S).tar.gz" -C {{ docker_data_root }}/samba config
+
+- name: Add Samba backup to crontab
+  cron:
+    name: "Backup Samba"
+    job: "{{ scripts_dir }}/backup_samba.sh"
+    hour: "3"
+    minute: "15"
+    state: present
+
+- name: Create Samba log rotation configuration
+  copy:
+    dest: /etc/logrotate.d/samba
+    content: |
+      {{ docker_data_root }}/samba/logs/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root root
+      }

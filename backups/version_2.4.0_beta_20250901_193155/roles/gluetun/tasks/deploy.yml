@@ -1,0 +1,94 @@
+---
+# Gluetun Deployment Tasks
+
+- name: Create Gluetun directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/gluetun"
+    - "{{ docker_config_root }}/gluetun"
+    - "{{ docker_logs_root }}/gluetun"
+    - "{{ docker_backup_root }}/gluetun"
+  tags: [gluetun, deploy]
+
+- name: Generate Gluetun environment file
+  template:
+    src: env.j2
+    dest: "{{ docker_config_root }}/gluetun/.env"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart gluetun
+  tags: [gluetun, deploy]
+
+- name: Prepare Gluetun secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "gluetun"
+    secret_dir_root: "{{ docker_dir }}/gluetun"
+    secret_files: "{{ gluetun_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ gluetun_environment | default({}) }}"
+  when: gluetun_manage_secret_files | default(true) | bool
+  tags: [gluetun, deploy, setup]
+
+- name: Validate required Gluetun secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/gluetun/secrets/{{ item }}"
+  register: gluetun_secret_stats
+  loop: "{{ gluetun_required_secrets | default([]) }}"
+  when: gluetun_manage_secret_files | default(true) | bool and (gluetun_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Gluetun secret files are missing
+  ansible.builtin.assert:
+    that: "{{ gluetun_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/gluetun/secrets.
+      Missing: {{ (gluetun_required_secrets | default([])) | reject('in', (gluetun_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: gluetun_manage_secret_files | default(true) | bool and (gluetun_required_secrets | default([]) | length > 0)
+
+- name: Deploy Gluetun Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/gluetun/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart gluetun
+  tags: [gluetun, deploy]
+
+- name: Start Gluetun container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/gluetun"
+    state: present
+    restarted: yes
+  tags: [gluetun, deploy]
+
+- name: Wait for Gluetun to be ready
+  uri:
+    url: "http://{ ansible_default_ipv4.address }:{{ gluetun_external_port }}"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+  tags: [gluetun, deploy]
+
+- name: Setup Gluetun authentication
+  include_tasks: auth_setup.yml
+  when: gluetun_auth_enabled | default(true)
+  tags: [gluetun, deploy, auth]
+
+- name: Setup Gluetun database
+  include_tasks: database_setup.yml
+  when: gluetun_database_enabled | default(true)
+  tags: [gluetun, deploy, database]
+
+- name: Setup Gluetun API
+  include_tasks: api_setup.yml
+  when: gluetun_api_enabled | default(true)
+  tags: [gluetun, deploy, api]

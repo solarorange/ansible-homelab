@@ -1,0 +1,54 @@
+---
+# Automation Stack Backup Procedures
+
+- name: Create automation backup scripts
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ scripts_dir }}/backup_{{ item.name }}.sh"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0755"
+  loop:
+    - { name: 'homeassistant', enabled: "{{ home_assistant_enabled }}", path: "{{ docker_data_root }}/homeassistant", dir_to_backup: "config", backup_dir: "{{ home_assistant_backup_dir }}" }
+    - { name: 'zigbee2mqtt', enabled: "{{ zigbee2mqtt_enabled }}", path: "{{ docker_data_root }}/zigbee2mqtt", dir_to_backup: "data", backup_dir: "{{ zigbee2mqtt_backup_dir }}" }
+    - { name: 'nodered', enabled: "{{ node_red_enabled }}", path: "{{ docker_data_root }}/nodered", dir_to_backup: "data", backup_dir: "{{ backup_root }}/nodered" }
+    - { name: 'n8n', enabled: "{{ n8n_enabled }}", path: "{{ docker_data_root }}/n8n", dir_to_backup: ".n8n", backup_dir: "{{ backup_root }}/n8n" }
+  vars:
+    service_name: "{{ item.name }}"
+    data_to_backup_path: "{{ item.path }}"
+    data_to_backup_dir: "{{ item.dir_to_backup }}"
+    target_backup_dir: "{{ item.backup_dir }}"
+  when: item.enabled | default(true)
+
+- name: Schedule automation backups
+  ansible.builtin.cron:
+    name: "Backup {{ item.name }}"
+    job: "{{ scripts_dir }}/backup_{{ item.name }}.sh"
+    hour: "{{ item.hour }}"
+    minute: "{{ item.minute }}"
+    user: "{{ vault_automation_user }}"
+  loop:
+    - { name: 'homeassistant', enabled: "{{ home_assistant_enabled }}", hour: "2", minute: "0" }
+    - { name: 'zigbee2mqtt', enabled: "{{ zigbee2mqtt_enabled }}", hour: "2", minute: "30" }
+    - { name: 'nodered', enabled: "{{ node_red_enabled }}", hour: "3", minute: "0" }
+    - { name: 'n8n', enabled: "{{ n8n_enabled }}", hour: "3", minute: "30" }
+  when: item.enabled | default(true)
+
+- name: Create log rotation for automation logs
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/automation
+    content: |
+      {{ logs_dir }}/automation/*.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ automation_username }} {{ automation_username }}
+      }
+    owner: root
+    group: root
+    mode: '0644'
+
+# Add additional backup scripts and schedules for other automation configs as needed

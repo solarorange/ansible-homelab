@@ -1,0 +1,49 @@
+---
+# Rollback tasks for failed deployments
+- name: Identify failed services
+  ansible.builtin.set_fact:
+    failed_services: "{{ failed_services | default([]) + [item] }}"
+  loop: "{{ critical_services }}"
+  when: item not in successful_services | default([])
+
+- name: Stop failed services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop: "{{ failed_services }}"
+  when: failed_services | length > 0
+
+- name: Restore from backup
+  ansible.builtin.unarchive:
+    src: "{{ backup_dir }}/{{ inventory_hostname }}-{{ backup_timestamp }}-{{ item }}.tar.gz"
+    dest: "/"
+    remote_src: yes
+  loop:
+    - docker
+    - ansible
+    - systemd
+    - opt
+  when: backup_timestamp is defined
+
+- name: Restart restored services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+  loop: "{{ failed_services }}"
+  when: failed_services | length > 0
+
+- name: Verify rollback
+  ansible.builtin.include_tasks: tasks/validate.yml
+  loop: "{{ failed_services }}"
+  loop_control:
+    loop_var: service_name
+  when: failed_services | length > 0
+
+- name: Report rollback status
+  ansible.builtin.debug:
+    msg: |
+      Rollback Summary:
+      - Failed Services: {{ failed_services | join(', ') }}
+      - Backup Restored: {{ 'Yes' if backup_timestamp is defined else 'No' }}
+      - Services Restarted: {{ failed_services | length }}
+  when: failed_services | length > 0

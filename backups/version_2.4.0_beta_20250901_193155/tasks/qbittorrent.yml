@@ -1,0 +1,208 @@
+---
+# qBittorrent Configuration
+# Torrent Client - TRaSH Guides compatible
+
+- name: Create qBittorrent directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/qbittorrent/config"
+    - "{{ docker_dir }}/qbittorrent/data"
+    - "{{ docker_dir }}/qbittorrent/scripts"
+    - "{{ logs_dir }}/qbittorrent"
+
+- name: Create qBittorrent docker-compose service
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/qbittorrent/docker-compose.yml"
+    content: |
+      version: '3.8'
+      services:
+        qbittorrent:
+          image: linuxserver/qbittorrent:latest
+          container_name: qbittorrent
+          environment:
+            - PUID={{ user_id }}
+            - PGID={{ group_id }}
+            - TZ={{ timezone }}
+            - WEBUI_PORT=8081
+          volumes:
+            - {{ docker_dir }}/qbittorrent/config:/config
+            - {{ data_dir }}/downloads/torrents/incomplete:/incomplete-downloads
+            - {{ data_dir }}/downloads/torrents/complete:/complete-downloads
+            - {{ logs_dir }}/qbittorrent:/logs
+          ports:
+            - "8081:8080"
+            - "6881:6881"
+            - "6881:6881/udp"
+          restart: unless-stopped
+          networks:
+            - media
+            - homelab
+          labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=homelab"
+            - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.{{ domain }}`)"
+            - "traefik.http.routers.qbittorrent.entrypoints=https"
+            - "traefik.http.routers.qbittorrent.tls=true"
+            - "traefik.http.routers.qbittorrent.middlewares=authentik@docker"
+            - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
+          healthcheck:
+            test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v2/app/version || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+      networks:
+        media:
+          external: true
+        homelab:
+          external: true
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create qBittorrent health check script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/qbittorrent/scripts/healthcheck.sh"
+    content: |
+      #!/bin/bash
+
+      # Check if qBittorrent is running
+      if ! docker ps | grep -q qbittorrent; then
+          echo "qBittorrent is not running"
+          exit 1
+      fi
+
+      # Check if qBittorrent is responding
+      if ! curl -s http://{{ ansible_default_ipv4.address }}:8080/api/v2/app/version | grep -q "version"; then
+          echo "qBittorrent is not responding"
+          exit 1
+      fi
+
+      exit 0
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Add qBittorrent log rotation to crontab
+  ansible.builtin.cron:
+    name: "Rotate qBittorrent logs"
+    job: "logrotate {{ docker_dir }}/qbittorrent/config/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_qbittorrent_user }}"
+
+- name: Create qBittorrent configuration file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/qbittorrent/config/qBittorrent.conf"
+    content: |
+      [General]
+      WebUI\Address=*
+      WebUI\Port=8080
+      WebUI\Username={{ qbittorrent_username }}
+      WebUI\Password_PBKDF2={{ qbittorrent_password_hash }}
+      WebUI\CSRFProtection=true
+      WebUI\ClickjackingProtection=true
+      WebUI\SecureCookie=true
+      WebUI\{{ ansible_default_ipv4.address }}Auth=true
+      WebUI\AlternativeUIEnabled=false
+      WebUI\RootFolder={{ docker_dir }}/qbittorrent/data
+      WebUI\SavePath={{ docker_dir }}/qbittorrent/data/downloads
+      WebUI\TempPath={{ docker_dir }}/qbittorrent/data/temp
+      WebUI\LogPath={{ logs_dir }}/qbittorrent
+      WebUI\LogLevel=info
+      WebUI\MaxLogSize=5
+      WebUI\MaxLogFiles=5
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Create qBittorrent management script
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/qbittorrent/scripts/manage.sh"
+    content: |
+      #!/bin/bash
+
+      # qBittorrent Management Script
+
+      function show_help {
+          echo "qBittorrent Management Script"
+          echo "Usage: $0 [command]"
+          echo ""
+          echo "Commands:"
+          echo "  status    - Check qBittorrent status"
+          echo "  logs      - View qBittorrent logs"
+          echo "  restart   - Restart qBittorrent"
+          echo "  backup    - Backup qBittorrent data"
+          echo "  restore   - Restore qBittorrent data"
+          echo "  help      - Show this help message"
+      }
+
+      function backup_data {
+          echo "Backing up qBittorrent data..."
+          tar -czf "{{ docker_dir }}/qbittorrent/backup/qbittorrent_backup_$(date +%Y%m%d_%H%M%S).tar.gz" \
+              -C "{{ docker_dir }}/qbittorrent" config data
+          echo "Backup completed."
+      }
+
+      function restore_data {
+          if [ -z "$1" ]; then
+              echo "Please specify backup file to restore"
+              exit 1
+          fi
+          echo "Restoring qBittorrent data from $1..."
+          tar -xzf "$1" -C "{{ docker_dir }}/qbittorrent"
+          echo "Restore completed."
+      }
+
+      case "$1" in
+          status)
+              docker ps | grep qbittorrent
+              ;;
+          logs)
+              docker logs -f qbittorrent
+              ;;
+          restart)
+              docker restart qbittorrent
+              ;;
+          backup)
+              backup_data
+              ;;
+          restore)
+              restore_data "$2"
+              ;;
+          help|*)
+              show_help
+              ;;
+      esac
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Create qBittorrent log rotation configuration
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/qbittorrent/config/logrotate.conf"
+    content: |
+      {{ logs_dir }}/qbittorrent/*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ username }} {{ username }}
+      }
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add qBittorrent backup cron job
+  ansible.builtin.cron:
+    name: "Backup qBittorrent data"
+    job: "{{ docker_dir }}/qbittorrent/scripts/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ vault_qbittorrent_user }}"

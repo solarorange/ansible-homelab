@@ -1,0 +1,246 @@
+# Infrastructure Validation Report
+
+**Generated:** {{ ansible_date_time.iso8601 }}  
+**Domain:** {{ domain }}  
+**Server IP:** {{ ansible_default_ipv4.address }}  
+**Validation Status:** {% if validation_result.rc == 0 %}✅ PASSED{% else %}❌ FAILED{% endif %}
+
+---
+
+## Executive Summary
+
+{% if validation_result.rc == 0 %}
+The infrastructure validation completed successfully. All critical checks passed, and the system is ready for deployment.
+
+{% if validation_data.errors %}
+**⚠️ Warnings:** {{ validation_data.errors | length }} error(s) were found that should be addressed.
+{% endif %}
+
+{% if validation_data.warnings %}
+**⚠️ Recommendations:** {{ validation_data.warnings | length }} warning(s) were found that should be reviewed.
+{% endif %}
+
+{% else %}
+The infrastructure validation failed. Critical issues were found that must be resolved before deployment can proceed.
+{% endif %}
+
+---
+
+## Detailed Results
+
+### DNS Records Validation
+
+**Status:** {% if validation_result.rc == 0 and not validation_data.errors | selectattr('message', 'search', 'DNS') | list %}✅ PASSED{% else %}❌ FAILED{% endif %}
+
+**Domains Checked:**
+{% for domain_name in [
+    domain,
+    "traefik." + domain,
+    "auth." + domain,
+    "grafana." + domain,
+    "pihole." + domain,
+    "homepage." + domain,
+    "portainer." + domain,
+    "sonarr." + domain,
+    "radarr." + domain,
+    "jellyfin." + domain,
+    "overseerr." + domain,
+    "nextcloud." + domain,
+    "git." + domain,
+    "vault." + domain,
+    "vpn." + domain
+] %}
+- {{ domain_name }}
+{% endfor %}
+
+**Expected Resolution:** All domains should resolve to {{ ansible_default_ipv4.address }}
+
+{% if validation_data.errors | selectattr('message', 'search', 'DNS') | list %}
+**Issues Found:**
+{% for error in validation_data.errors | selectattr('message', 'search', 'DNS') %}
+- {{ error }}
+{% endfor %}
+{% endif %}
+
+---
+
+### Firewall Rules Validation
+
+**Status:** {% if validation_result.rc == 0 and not validation_data.errors | selectattr('message', 'search', 'firewall') | list %}✅ PASSED{% else %}❌ FAILED{% endif %}
+
+**Required Open Ports:**
+- **22/tcp** - SSH access
+- **80/tcp** - HTTP traffic
+- **443/tcp** - HTTPS traffic
+- **53/tcp** - DNS TCP
+- **53/udp** - DNS UDP
+- **51820/udp** - WireGuard VPN
+
+**Critical Ports (Should Be Blocked):**
+- **21/tcp** - FTP
+- **23/tcp** - Telnet
+- **25/tcp** - SMTP
+- **110/tcp** - POP3
+- **143/tcp** - IMAP
+- **3306/tcp** - MySQL
+- **5432/tcp** - PostgreSQL
+- **6379/tcp** - Redis
+- **27017/tcp** - MongoDB
+
+{% if validation_data.errors | selectattr('message', 'search', 'firewall') | list %}
+**Issues Found:**
+{% for error in validation_data.errors | selectattr('message', 'search', 'firewall') %}
+- {{ error }}
+{% endfor %}
+{% endif %}
+
+{% if validation_data.warnings | selectattr('message', 'search', 'firewall') | list %}
+**Warnings:**
+{% for warning in validation_data.warnings | selectattr('message', 'search', 'firewall') %}
+- {{ warning }}
+{% endfor %}
+{% endif %}
+
+---
+
+### SSL Certificate Validation
+
+**Status:** {% if validation_result.rc == 0 and not validation_data.errors | selectattr('message', 'search', 'SSL') | list %}✅ PASSED{% else %}❌ FAILED{% endif %}
+
+**Certificates Checked:**
+{% for domain_name in [
+    domain,
+    "traefik." + domain,
+    "auth." + domain,
+    "grafana." + domain,
+    "pihole." + domain,
+    "homepage." + domain,
+    "portainer." + domain,
+    "sonarr." + domain,
+    "radarr." + domain,
+    "jellyfin." + domain,
+    "overseerr." + domain,
+    "nextcloud." + domain,
+    "git." + domain,
+    "vault." + domain,
+    "vpn." + domain
+] %}
+- {{ domain_name }}
+{% endfor %}
+
+**Validation Criteria:**
+- ✅ Certificate is not expired
+- ✅ Certificate is not expiring within 30 days
+- ✅ Certificate subject matches domain name
+- ✅ Certificate chain is valid
+- ✅ Certificate is issued by a trusted CA
+
+{% if validation_data.errors | selectattr('message', 'search', 'SSL') | list %}
+**Issues Found:**
+{% for error in validation_data.errors | selectattr('message', 'search', 'SSL') %}
+- {{ error }}
+{% endfor %}
+{% endif %}
+
+{% if validation_data.warnings | selectattr('message', 'search', 'SSL') | list %}
+**Warnings:**
+{% for warning in validation_data.warnings | selectattr('message', 'search', 'SSL') %}
+- {{ warning }}
+{% endfor %}
+{% endif %}
+
+---
+
+### Traefik Status Validation
+
+**Status:** {% if validation_result.rc == 0 and not validation_data.errors | selectattr('message', 'search', 'Traefik') | list %}✅ PASSED{% else %}❌ FAILED{% endif %}
+
+**Checks Performed:**
+- ✅ Traefik container is running
+- ✅ Traefik API is responding
+- ✅ Certificate resolver is configured
+
+{% if validation_data.errors | selectattr('message', 'search', 'Traefik') | list %}
+**Issues Found:**
+{% for error in validation_data.errors | selectattr('message', 'search', 'Traefik') %}
+- {{ error }}
+{% endfor %}
+{% endif %}
+
+---
+
+## Recommendations
+
+{% if validation_data.errors %}
+### Critical Issues to Fix
+
+The following issues must be resolved before deployment:
+
+{% for error in validation_data.errors %}
+1. **{{ error }}**
+   - Impact: High
+   - Action Required: Fix before deployment
+{% endfor %}
+{% endif %}
+
+{% if validation_data.warnings %}
+### Recommended Improvements
+
+The following warnings should be addressed for optimal security and performance:
+
+{% for warning in validation_data.warnings %}
+1. **{{ warning }}**
+   - Impact: Medium
+   - Action Required: Review and address when possible
+{% endfor %}
+{% endif %}
+
+{% if not validation_data.errors and not validation_data.warnings %}
+### All Systems Operational
+
+✅ No issues found. The infrastructure is properly configured and ready for deployment.
+{% endif %}
+
+---
+
+## Next Steps
+
+{% if validation_result.rc == 0 %}
+1. **If errors found:** Fix the critical issues listed above
+2. **If warnings found:** Review and address the warnings when possible
+3. **If all passed:** Proceed with deployment
+{% else %}
+1. **Review errors:** Fix all critical issues listed above
+2. **Re-run validation:** Execute the validation again to confirm fixes
+3. **Proceed with deployment:** Only after all validation checks pass
+{% endif %}
+
+---
+
+## Troubleshooting Guide
+
+### DNS Issues
+- Verify DNS records point to {{ ansible_default_ipv4.address }}
+- Check DNS propagation (can take up to 48 hours)
+- Ensure DNS provider is configured correctly
+
+### Firewall Issues
+- Verify UFW is enabled: `sudo ufw status`
+- Check required ports are open: `sudo ufw status numbered`
+- Ensure critical ports are blocked for security
+
+### SSL Certificate Issues
+- Check certificate expiration: `openssl s_client -connect {{ domain }}:443 -servername {{ domain }}`
+- Verify certificate matches domain
+- Ensure Traefik is properly configured for certificate renewal
+
+### Traefik Issues
+- Check container status: `docker ps | grep traefik`
+- Verify API access: `curl http://{{ ansible_default_ipv4.address }}:8080/api/health`
+- Check logs: `docker logs traefik`
+
+---
+
+**Report generated by Ansible Infrastructure Validation**  
+**Version:** 1.0  
+**Generated on:** {{ ansible_date_time.iso8601 }} 

@@ -1,0 +1,288 @@
+---
+# Immich Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# IMMICH SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+immich_service_name: "immich"
+immich_container_name: "{{ immich_service_name }}"
+immich_image: "ghcr.io/immich-app/immich-server:latest"
+immich_version: "latest"
+
+# Network Configuration
+immich_port: 3007
+immich_external_port: "{{ immich_port }}"
+immich_protocol: "http"
+immich_host: "{{ ansible_default_ipv4.address }}"
+immich_url: "{{ immich_protocol }}://{{ immich_host }}:{{ immich_port }}"
+
+# Domain Configuration
+immich_subdomain: "immich"
+immich_domain: "{{ immich_subdomain }}.{{ domain }}"
+immich_external_url: "https://{{ immich_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+immich_auth_enabled: true
+immich_auth_method: "authentik"  # Options: basic, authentik, none
+immich_admin_username: "admin"
+immich_admin_password: "{{ vault_immich_admin_password }}"
+
+# API Configuration
+immich_api_key: "{{ vault_immich_api_key }}"
+immich_api_token: "{{ vault_immich_api_token }}"
+
+# Encryption & Security
+immich_secret_key: "{{ vault_immich_secret_key }}"
+immich_encryption_key: "{{ vault_immich_encryption_key }}"
+immich_jwt_secret: "{{ vault_immich_jwt_secret }}"
+
+# SSL/TLS Configuration
+immich_ssl_enabled: true
+immich_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+immich_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+immich_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+immich_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+immich_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+immich_database_port: "{{ databases_postgresql_port | default(5432) }}"
+immich_database_name: "immich"
+immich_database_username: "immich"
+immich_database_password: "{{ vault_immich_database_password }}"
+
+# Redis Configuration (if using)
+immich_redis_enabled: false
+immich_redis_host: "{{ redis_host | default('redis') }}"
+immich_redis_port: "{{ redis_port | default(6379) }}"
+immich_redis_password: "{{ vault_immich_redis_password }}"
+immich_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+immich_data_dir: "{{ homelab_data_dir }}/immich"
+immich_config_dir: "{{ immich_data_dir }}/config"
+immich_backup_dir: "{{ immich_data_dir }}/backups"
+
+# Volume Mappings
+immich_volumes:
+  - "{{ immich_config_dir }}:/config"
+  - "{{ immich_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+immich_health_check_enabled: true
+immich_health_check_path: "/health"
+immich_health_check_interval: 30
+immich_health_check_timeout: 10
+immich_health_check_retries: 3
+
+# Monitoring Integration
+immich_monitoring_enabled: true
+immich_prometheus_enabled: true
+immich_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+immich_backup_enabled: true
+immich_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+immich_backup_retention_days: 30
+immich_backup_encryption_enabled: true
+immich_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+immich_smtp_enabled: false
+immich_smtp_host: "{{ smtp_host | default('') }}"
+immich_smtp_port: "{{ smtp_port | default(587) }}"
+immich_smtp_username: "{{ vault_smtp_username }}"
+immich_smtp_password: "{{ vault_immich_smtp_password }}"
+immich_smtp_from: "{{ immich_admin_email | default('admin@' + domain) }}"
+immich_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+immich_webhook_enabled: false
+immich_webhook_url: "{{ vault_webhook_url | default('') }}"
+immich_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+immich_discovery_enabled: true
+immich_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+immich_cpu_limit: "1.0"
+immich_memory_limit: "1g"
+immich_memory_reservation: "512m"
+
+# Performance Settings
+immich_scan_interval: 10
+immich_parallel_downloads: 3
+immich_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+immich_log_level: "info"  # Options: trace, debug, info, warn, error
+immich_log_rotation_enabled: true
+immich_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+immich_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+immich_rate_limit_enabled: true
+immich_rate_limit_requests: 100
+immich_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+immich_deploy_enabled: true
+immich_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+immich_restart_policy: "unless-stopped"
+immich_auto_update_enabled: true
+
+# Environment Variables
+immich_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  IMMICH_API_KEY: "{{ immich_api_key }}"
+  IMMICH_SECRET_KEY: "{{ immich_secret_key }}"
+  IMMICH_ENCRYPTION_KEY: "{{ immich_encryption_key }}"
+  IMMICH_JWT_SECRET: "{{ immich_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+immich_validation_enabled: true
+immich_validation_timeout: 300
+immich_validation_retries: 3
+
+# Testing Configuration
+immich_test_enabled: false
+immich_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+immich_compliance_enabled: true
+immich_audit_logging_enabled: true
+immich_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+immich_automation_enabled: true
+immich_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+immich_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+immich_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+immich_fallback_enabled: true
+immich_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+immich_manage_secret_files: true
+
+immich_secret_files:
+  # server/web common secrets
+  - { name: "IMMICH_ADMIN_PASSWORD", value: "{{ immich_admin_password }}" }
+  - { name: "IMMICH_SECRET_KEY", value: "{{ immich_secret_key }}" }
+  - { name: "IMMICH_JWT_SECRET", value: "{{ immich_jwt_secret }}" }
+  - { name: "IMMICH_ENCRYPTION_KEY", value: "{{ immich_encryption_key }}" }
+  # database and redis
+  - { name: "POSTGRES_PASSWORD", value: "{{ immich_database_password }}" }
+  - { name: "REDIS_PASSWORD", value: "{{ immich_redis_password }}" }
+  # smtp
+  - { name: "SMTP_PASSWORD", value: "{{ immich_smtp_password }}" }
+
+immich_required_secrets:
+  - POSTGRES_PASSWORD
+  - REDIS_PASSWORD
+  - IMMICH_JWT_SECRET
+
+# Prefer Traefik ingress; gate direct host port exposure
+immich_direct_expose_server: false
+immich_direct_expose_web: false
+immich_direct_expose_ml: false

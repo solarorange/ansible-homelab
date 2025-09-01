@@ -1,0 +1,89 @@
+---
+# Storage Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Storage vault variables
+  block:
+    - name: Check required Storage vault variables
+      assert:
+        that:
+          - vault_storage_admin_password is defined
+          - vault_storage_database_password is defined
+          - vault_storage_api_key is defined
+          - vault_storage_secret_key is defined
+          - vault_storage_encryption_key is defined
+          - vault_storage_jwt_secret is defined
+        fail_msg: "Required Storage vault variables are not defined"
+        success_msg: "All required Storage vault variables are defined"
+
+    - name: Validate Storage password complexity
+      assert:
+        that:
+          - vault_storage_admin_password | length >= 12
+          - vault_storage_database_password | length >= 12
+        fail_msg: "Storage passwords must be at least 12 characters long"
+        success_msg: "Storage password complexity requirements met"
+
+- name: Validate Storage network configuration
+  block:
+    - name: Check Storage port configuration
+      assert:
+        that:
+          - storage_port is defined
+          - storage_port | int >= 1024
+          - storage_port | int <= 65535
+        fail_msg: "Storage port must be between 1024 and 65535"
+        success_msg: "Storage port configuration is valid"
+
+    - name: Check Storage domain configuration
+      assert:
+        that:
+          - domain is defined
+          - storage_subdomain is defined
+        fail_msg: "Storage domain configuration is incomplete"
+        success_msg: "Storage domain configuration is valid"
+
+- name: Validate Storage security configuration
+  block:
+    - name: Check Storage SSL configuration
+      assert:
+        that:
+          - storage_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Storage SSL configuration is invalid"
+        success_msg: "Storage SSL configuration is valid"
+
+    - name: Check Storage authentication configuration
+      assert:
+        that:
+          - storage_auth_enabled | bool
+          - storage_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Storage authentication configuration is invalid"
+        success_msg: "Storage authentication configuration is valid"
+
+- name: Validate Storage storage configuration
+  block:
+    - name: Check Storage data directories
+      assert:
+        that:
+          - storage_data_dir is defined
+          - storage_config_dir is defined
+          - storage_backup_dir is defined
+        fail_msg: "Storage storage configuration is incomplete"
+        success_msg: "Storage storage configuration is valid"
+
+    - name: Create Storage directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ storage_data_dir }}"
+        - "{{ storage_config_dir }}"
+        - "{{ storage_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Storage validation completed successfully - all configurations are valid and secure"

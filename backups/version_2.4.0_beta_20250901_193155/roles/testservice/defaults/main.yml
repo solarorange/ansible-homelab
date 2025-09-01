@@ -1,0 +1,64 @@
+---
+# Test Service Role Default Variables
+# Enhanced for seamless automatic deployment
+
+# =============================================================================
+# CORE CONFIGURATION
+# =============================================================================
+
+# Service enablement
+testservice_enabled: true
+
+# Container configuration
+testservice_image: "testservice:latest"
+testservice_version: "latest"
+testservice_container_name: "testservice"
+testservice_restart_policy: "unless-stopped"
+
+# Port configuration
+testservice_port: 8080
+testservice_external_port: "8080"
+testservice_internal_port: "8080"
+
+# Domain configuration
+testservice_domain: "testservice.{{ domain | default(ansible_default_ipv4.address) }}"
+testservice_subdomain: "testservice"
+
+# =============================================================================
+# AUTHENTICATION CONFIGURATION
+# =============================================================================
+
+testservice_auth_enabled: true
+testservice_auth_method: "authentik"
+testservice_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+testservice_admin_password: "{{ vault_testservice_admin_password | default('') }}"
+testservice_secret_key: "{{ vault_testservice_secret_key | default('') }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+testservice_database_enabled: true
+testservice_database_type: "sqlite"
+testservice_database_host: "{{ postgresql_host | default(ansible_default_ipv4.address) }}"
+testservice_database_port: 5432
+testservice_database_name: "testservice"
+testservice_database_user: "{{ vault_testservice_database_user | default('testservice') }}"
+testservice_database_password: "{{ vault_testservice_database_password | default('') }}"
+
+# Secrets management
+testservice_manage_secret_files: true
+
+testservice_secret_files:
+  - { name: "TESTSERVICE_ADMIN_PASSWORD", value: "{{ testservice_admin_password }}" }
+  - { name: "TESTSERVICE_SECRET_KEY", value: "{{ testservice_secret_key }}" }
+  - { name: "TESTSERVICE_DATABASE_PASSWORD", value: "{{ testservice_database_password }}" }
+  - { name: "TESTSERVICE_EMAIL_PASSWORD", value: "{{ testservice_email_password | default('') }}" }
+  - { name: "TESTSERVICE_API_KEY", value: "{{ testservice_api_key | default('') }}" }
+
+testservice_required_secrets:
+  - TESTSERVICE_ADMIN_PASSWORD
+  - TESTSERVICE_SECRET_KEY
+
+# Prefer Traefik ingress; gate direct host port exposure
+testservice_direct_expose_enabled: false

@@ -1,0 +1,427 @@
+---
+# ErsatzTV Service Deployment
+# Deploy ErsatzTV service using Docker Compose
+
+- name: Create ErsatzTV Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ ersatztv_config_dir }}/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV Docker Compose override file
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
+    dest: "{{ ersatztv_config_dir }}/docker-compose.override.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  when: ersatztv_advanced_enabled
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ ersatztv_config_dir }}/.env"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0640'
+  tags: [ersatztv, deploy]
+
+- name: Pull ErsatzTV Docker image
+  community.docker.docker_image:
+    name: "{{ ersatztv_image }}"
+    source: pull
+    force_source: "{{ ersatztv_image_pull_policy == 'always' }}"
+  tags: [ersatztv, deploy]
+
+- name: Stop existing ErsatzTV container
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: stopped
+  ignore_errors: yes
+  tags: [ersatztv, deploy]
+
+- name: Remove existing ErsatzTV container
+  community.docker.docker_container:
+    name: "{{ ersatztv_container_name }}"
+    state: absent
+  ignore_errors: yes
+  tags: [ersatztv, deploy]
+
+- name: Deploy ErsatzTV safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "ersatztv"
+    project_src: "{{ ersatztv_config_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ ersatztv_port }}"
+  tags: [ersatztv, deploy, rollback]
+
+- name: Wait for ErsatzTV service to start
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ ersatztv_port }}"
+    delay: 10
+    timeout: 300
+    state: started
+  tags: [ersatztv, deploy]
+
+- name: Check ErsatzTV container status
+  community.docker.docker_container_info:
+    name: "{{ ersatztv_container_name }}"
+  register: ersatztv_container_info
+  tags: [ersatztv, deploy]
+
+- name: Display ErsatzTV container status
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Container Status:
+      - Name: {{ ersatztv_container_info.container.State.Status }}
+      - Running: {{ ersatztv_container_info.container.State.Running }}
+      - Health: {{ ersatztv_container_info.container.State.Health.Status | default('N/A') }}
+      - IP: {{ ersatztv_container_info.container.NetworkSettings.Networks[ersatztv_network_name].IPAddress | default('N/A') }}
+  tags: [ersatztv, deploy]
+
+- name: Verify ErsatzTV web interface
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
+    method: GET
+    status_code: [200, 302, 404]
+    timeout: 30
+  register: ersatztv_web_check
+  retries: 3
+  delay: 10
+  until: ersatztv_web_check.status in [200, 302, 404]
+  tags: [ersatztv, deploy]
+  when: ersatztv_direct_expose_enabled | default(false)
+
+- name: Display ErsatzTV web interface status
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Web Interface Status:
+      - Status Code: {{ ersatztv_web_check.status }}
+      - Response Time: {{ ersatztv_web_check.elapsed }}s
+      - URL: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}
+  tags: [ersatztv, deploy]
+
+- name: Verify ErsatzTV via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ ersatztv_domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (ersatztv_direct_expose_enabled | default(false))
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service health check
+  ansible.builtin.template:
+    src: healthcheck.yml.j2
+    dest: "{{ ersatztv_config_dir }}/healthcheck.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service restart script
+  ansible.builtin.template:
+    src: restart.sh.j2
+    dest: "{{ ersatztv_config_dir }}/restart.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service stop script
+  ansible.builtin.template:
+    src: stop.sh.j2
+    dest: "{{ ersatztv_config_dir }}/stop.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service logs script
+  ansible.builtin.template:
+    src: logs.sh.j2
+    dest: "{{ ersatztv_config_dir }}/logs.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service update script
+  ansible.builtin.template:
+    src: update.sh.j2
+    dest: "{{ ersatztv_config_dir }}/update.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service status script
+  ansible.builtin.template:
+    src: status.sh.j2
+    dest: "{{ ersatztv_config_dir }}/status.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service shell script
+  ansible.builtin.template:
+    src: shell.sh.j2
+    dest: "{{ ersatztv_config_dir }}/shell.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service exec script
+  ansible.builtin.template:
+    src: exec.sh.j2
+    dest: "{{ ersatztv_config_dir }}/exec.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service config script
+  ansible.builtin.template:
+    src: config.sh.j2
+    dest: "{{ ersatztv_config_dir }}/config.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service data script
+  ansible.builtin.template:
+    src: data.sh.j2
+    dest: "{{ ersatztv_config_dir }}/data.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service logs script
+  ansible.builtin.template:
+    src: logs.sh.j2
+    dest: "{{ ersatztv_config_dir }}/logs.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service cache script
+  ansible.builtin.template:
+    src: cache.sh.j2
+    dest: "{{ ersatztv_config_dir }}/cache.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service transcode script
+  ansible.builtin.template:
+    src: transcode.sh.j2
+    dest: "{{ ersatztv_config_dir }}/transcode.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service media script
+  ansible.builtin.template:
+    src: media.sh.j2
+    dest: "{{ ersatztv_config_dir }}/media.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service channels script
+  ansible.builtin.template:
+    src: channels.sh.j2
+    dest: "{{ ersatztv_config_dir }}/channels.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service collections script
+  ansible.builtin.template:
+    src: collections.sh.j2
+    dest: "{{ ersatztv_config_dir }}/collections.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service filler script
+  ansible.builtin.template:
+    src: filler.sh.j2
+    dest: "{{ ersatztv_config_dir }}/filler.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service database script
+  ansible.builtin.template:
+    src: database.sh.j2
+    dest: "{{ ersatztv_config_dir }}/database.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service api script
+  ansible.builtin.template:
+    src: api.sh.j2
+    dest: "{{ ersatztv_config_dir }}/api.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service metrics script
+  ansible.builtin.template:
+    src: metrics.sh.j2
+    dest: "{{ ersatztv_config_dir }}/metrics.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service streaming script
+  ansible.builtin.template:
+    src: streaming.sh.j2
+    dest: "{{ ersatztv_config_dir }}/streaming.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service transcoding script
+  ansible.builtin.template:
+    src: transcoding.sh.j2
+    dest: "{{ ersatztv_config_dir }}/transcoding.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service hardware script
+  ansible.builtin.template:
+    src: hardware.sh.j2
+    dest: "{{ ersatztv_config_dir }}/hardware.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service plex script
+  ansible.builtin.template:
+    src: plex.sh.j2
+    dest: "{{ ersatztv_config_dir }}/plex.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service jellyfin script
+  ansible.builtin.template:
+    src: jellyfin.sh.j2
+    dest: "{{ ersatztv_config_dir }}/jellyfin.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service emby script
+  ansible.builtin.template:
+    src: emby.sh.j2
+    dest: "{{ ersatztv_config_dir }}/emby.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service subtitles script
+  ansible.builtin.template:
+    src: subtitles.sh.j2
+    dest: "{{ ersatztv_config_dir }}/subtitles.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service music script
+  ansible.builtin.template:
+    src: music.sh.j2
+    dest: "{{ ersatztv_config_dir }}/music.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service movies script
+  ansible.builtin.template:
+    src: movies.sh.j2
+    dest: "{{ ersatztv_config_dir }}/movies.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service tv script
+  ansible.builtin.template:
+    src: tv.sh.j2
+    dest: "{{ ersatztv_config_dir }}/tv.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service anime script
+  ansible.builtin.template:
+    src: anime.sh.j2
+    dest: "{{ ersatztv_config_dir }}/anime.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Create ErsatzTV service help script
+  ansible.builtin.template:
+    src: help.sh.j2
+    dest: "{{ ersatztv_config_dir }}/help.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+  tags: [ersatztv, deploy]
+
+- name: Display ErsatzTV deployment summary
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Deployment Summary:
+      - Container: {{ ersatztv_container_name }}
+      - Status: {{ ersatztv_container_info.container.State.Status }}
+      - Port: {{ ersatztv_port }}
+      - Web Interface: http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}
+      - Domain: https://{{ ersatztv_domain }}
+      - Config Directory: {{ ersatztv_config_dir }}
+      - Data Directory: {{ ersatztv_data_dir }}
+      - Logs Directory: {{ ersatztv_logs_dir }}
+      - Network: {{ ersatztv_network_name }}
+      - Hardware Acceleration: {{ ersatztv_hardware_acceleration }}
+      - Streaming Mode: {{ ersatztv_streaming_mode }}
+      - Transcoding: {{ ersatztv_transcode_enabled }}
+  tags: [ersatztv, deploy]

@@ -1,0 +1,23 @@
+---
+# Pinchflat Validation Tasks
+
+- name: Validate Pinchflat configuration
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/health"
+    method: GET
+  register: health_check
+  tags: [pinchflat, validate]
+
+- name: Check Pinchflat service status
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/status"
+    method: GET
+  register: status_check
+  tags: [pinchflat, validate]
+
+- name: Validate Pinchflat authentication
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/auth/status"
+    method: GET
+  register: auth_check
+  tags: [pinchflat, validate]

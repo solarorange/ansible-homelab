@@ -1,0 +1,31 @@
+---
+# Linkwarden Role Handlers
+# Handlers for Linkwarden service management
+
+- name: restart linkwarden
+  community.docker.docker_compose_v2:
+    project_src: "{{ linkwarden_config_dir }}"
+    state: present
+    build: false
+  listen: "restart linkwarden"
+
+- name: reload linkwarden configuration
+  community.docker.docker_compose_v2:
+    project_src: "{{ linkwarden_config_dir }}"
+    state: present
+    build: false
+  listen: "reload linkwarden config"
+
+- name: restart linkwarden database
+  community.docker.docker_container:
+    name: "{{ linkwarden_postgres_container_name }}"
+    state: started
+    restart: true
+  listen: "restart linkwarden database"
+
+- name: restart linkwarden app
+  community.docker.docker_container:
+    name: "{{ linkwarden_app_container_name }}"
+    state: started
+    restart: true
+  listen: "restart linkwarden app"

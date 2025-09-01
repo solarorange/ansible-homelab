@@ -1,0 +1,89 @@
+---
+# Tdarr Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Tdarr vault variables
+  block:
+    - name: Check required Tdarr vault variables
+      assert:
+        that:
+          - vault_tdarr_admin_password is defined
+          - vault_tdarr_database_password is defined
+          - vault_tdarr_api_key is defined
+          - vault_tdarr_secret_key is defined
+          - vault_tdarr_encryption_key is defined
+          - vault_tdarr_jwt_secret is defined
+        fail_msg: "Required Tdarr vault variables are not defined"
+        success_msg: "All required Tdarr vault variables are defined"
+
+    - name: Validate Tdarr password complexity
+      assert:
+        that:
+          - vault_tdarr_admin_password | length >= 12
+          - vault_tdarr_database_password | length >= 12
+        fail_msg: "Tdarr passwords must be at least 12 characters long"
+        success_msg: "Tdarr password complexity requirements met"
+
+- name: Validate Tdarr network configuration
+  block:
+    - name: Check Tdarr port configuration
+      assert:
+        that:
+          - tdarr_port is defined
+          - tdarr_port | int >= 1024
+          - tdarr_port | int <= 65535
+        fail_msg: "Tdarr port must be between 1024 and 65535"
+        success_msg: "Tdarr port configuration is valid"
+
+    - name: Check Tdarr domain configuration
+      assert:
+        that:
+          - domain is defined
+          - tdarr_subdomain is defined
+        fail_msg: "Tdarr domain configuration is incomplete"
+        success_msg: "Tdarr domain configuration is valid"
+
+- name: Validate Tdarr security configuration
+  block:
+    - name: Check Tdarr SSL configuration
+      assert:
+        that:
+          - tdarr_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Tdarr SSL configuration is invalid"
+        success_msg: "Tdarr SSL configuration is valid"
+
+    - name: Check Tdarr authentication configuration
+      assert:
+        that:
+          - tdarr_auth_enabled | bool
+          - tdarr_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Tdarr authentication configuration is invalid"
+        success_msg: "Tdarr authentication configuration is valid"
+
+- name: Validate Tdarr storage configuration
+  block:
+    - name: Check Tdarr data directories
+      assert:
+        that:
+          - tdarr_data_dir is defined
+          - tdarr_config_dir is defined
+          - tdarr_backup_dir is defined
+        fail_msg: "Tdarr storage configuration is incomplete"
+        success_msg: "Tdarr storage configuration is valid"
+
+    - name: Create Tdarr directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ tdarr_data_dir }}"
+        - "{{ tdarr_config_dir }}"
+        - "{{ tdarr_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Tdarr validation completed successfully - all configurations are valid and secure"

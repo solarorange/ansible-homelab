@@ -1,0 +1,84 @@
+---
+# Security Stack Homepage Integration
+# Configure homepage entries for all security services
+
+- name: Create security stack homepage group
+  ansible.builtin.copy:
+    dest: "{{ homepage_config_dir }}/services/security.yml"
+    content: |
+      - name: {{ security_homepage_category }}
+        icon: {{ security_homepage_icon }}
+        items: []
+        description: {{ security_homepage_description }}
+
+- name: Add authentik to homepage
+  community.general.yaml_patch:
+    src: "{{ homepage_config_dir }}/services/security.yml"
+    dest: "{{ homepage_config_dir }}/services/security.yml"
+    actions:
+      - op: add
+        path: "/-1/items/-"
+        value:
+          name: Authentik
+          logo: /assets/icons/authentik.png
+          href: "https://{{ security_authentik.subdomain }}.{{ domain }}"
+          description: "SSO & Identity Provider"
+  when: security_authentik.enabled | default(true)
+
+- name: Add traefik to homepage
+  community.general.yaml_patch:
+    src: "{{ homepage_config_dir }}/services/security.yml"
+    dest: "{{ homepage_config_dir }}/services/security.yml"
+    actions:
+      - op: add
+        path: "/-1/items/-"
+        value:
+          name: Traefik
+          logo: /assets/icons/traefik.png
+          href: "https://traefik.{{ domain }}"
+          description: "Reverse Proxy Dashboard"
+  when: security_traefik.enabled | default(true)
+
+- name: Add pihole to homepage
+  community.general.yaml_patch:
+    src: "{{ homepage_config_dir }}/services/security.yml"
+    dest: "{{ homepage_config_dir }}/services/security.yml"
+    actions:
+      - op: add
+        path: "/-1/items/-"
+        value:
+          name: Pi-hole
+          logo: /assets/icons/pihole.png
+          href: "https://{{ security_pihole.subdomain }}.{{ domain }}"
+          description: "DNS Ad-blocker"
+  when: security_pihole.enabled | default(true)
+
+- name: Integrate authentication with homepage
+  import_role:
+    name: security/authentication
+    tasks_from: homepage.yml
+  when: security_authentication_enabled | default(true)
+
+- name: Integrate proxy with homepage
+  import_role:
+    name: security/proxy
+    tasks_from: homepage.yml
+  when: security_proxy_enabled | default(true)
+
+- name: Integrate DNS with homepage
+  import_role:
+    name: security/dns
+    tasks_from: homepage.yml
+  when: security_dns_enabled | default(true)
+
+- name: Integrate firewall with homepage
+  import_role:
+    name: security/firewall
+    tasks_from: homepage.yml
+  when: security_firewall_enabled | default(true)
+
+- name: Integrate VPN with homepage
+  import_role:
+    name: security/vpn
+    tasks_from: homepage.yml
+  when: security_vpn_enabled | default(true)

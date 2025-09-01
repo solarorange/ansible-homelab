@@ -1,0 +1,14 @@
+---
+# Test Service Alerting Rules
+
+groups:
+  - name: Test Service
+    rules:
+      - alert: Test ServiceDown
+        expr: up{job="testservice"} == 0
+        for: 1m
+        labels:
+          severity: {{ testservice_alert_severity | default('warning') }}
+        annotations:
+          summary: "Test Service is down"
+          description: "Test Service has been down for more than 1 minute"

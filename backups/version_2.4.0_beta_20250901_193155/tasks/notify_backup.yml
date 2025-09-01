@@ -1,0 +1,25 @@
+---
+# Notify Backup
+# Sends notifications after backup completion or failure
+
+- name: Notify via email on backup completion
+  ansible.builtin.mail:
+    host: "{{ vault_backup_smtp_server }}"
+    port: "{{ vault_backup_smtp_port | default(587) }}"
+    username: "{{ vault_backup_smtp_username }}"
+    password: "{{ vault_service_password }}"
+    to: "{{ vault_backup_to_address }}"
+    subject: "[Homelab] Backup Completed"
+    body: "Backup completed successfully at {{ ansible_date_time.iso8601 }}."
+  when: backup_status is defined and backup_status == 'success'
+  tags: [backup, notify, email]
+
+- name: Notify via Slack on backup failure
+  ansible.builtin.uri:
+    url: "{{ vault_backup_slack_webhook }}"
+    method: POST
+    body_format: json
+    body:
+      text: "[Homelab] Backup failed at {{ ansible_date_time.iso8601 }}. Please check the logs."
+  when: backup_status is defined and backup_status == 'failure'
+  tags: [backup, notify, slack]

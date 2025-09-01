@@ -1,0 +1,205 @@
+---
+# Media Stack Prerequisites
+# Setup tasks for media stack deployment
+
+- name: Setup Media Stack prerequisites
+  block:
+    - name: Create media directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      loop:
+        # Media directories
+        - "{{ data_dir }}/media"
+        - "{{ data_dir }}/media/movies"
+        - "{{ data_dir }}/media/tv"
+        - "{{ data_dir }}/media/anime"
+        - "{{ data_dir }}/media/music"
+        - "{{ data_dir }}/media/books"
+        - "{{ data_dir }}/media/audiobooks"
+        - "{{ data_dir }}/media/comics"
+        - "{{ data_dir }}/media/podcasts"
+        - "{{ data_dir }}/media/photos"
+
+        # Download directories
+        - "{{ data_dir }}/downloads"
+        - "{{ data_dir }}/downloads/usenet"
+        - "{{ data_dir }}/downloads/usenet/incomplete"
+        - "{{ data_dir }}/downloads/usenet/complete"
+        - "{{ data_dir }}/downloads/torrents"
+        - "{{ data_dir }}/downloads/torrents/incomplete"
+        - "{{ data_dir }}/downloads/torrents/complete"
+
+        # Service-specific directories
+        - "{{ data_dir }}/downloads/sabnzbd"
+        - "{{ data_dir }}/downloads/qbittorrent"
+        - "{{ data_dir }}/downloads/sonarr"
+        - "{{ data_dir }}/downloads/radarr"
+        - "{{ data_dir }}/downloads/lidarr"
+        - "{{ data_dir }}/downloads/readarr"
+        - "{{ data_dir }}/downloads/prowlarr"
+        - "{{ data_dir }}/downloads/bazarr"
+
+        # Docker configuration directories
+        - "{{ docker_dir }}/media"
+        - "{{ docker_dir }}/sabnzbd/config"
+        - "{{ docker_dir }}/qbittorrent/config"
+        - "{{ docker_dir }}/prowlarr/config"
+        - "{{ docker_dir }}/sonarr/config"
+        - "{{ docker_dir }}/radarr/config"
+        - "{{ docker_dir }}/lidarr/config"
+        - "{{ docker_dir }}/readarr/config"
+        - "{{ docker_dir }}/bazarr/config"
+        - "{{ docker_dir }}/pulsarr/config"
+        - "{{ docker_dir }}/pulsarr/data"
+        - "{{ docker_dir }}/jellyfin/config"
+        - "{{ docker_dir }}/jellyfin/cache"
+        - "{{ docker_dir }}/jellyfin/metadata"
+        - "{{ docker_dir }}/immich/server"
+        - "{{ docker_dir }}/immich/web"
+        - "{{ docker_dir }}/immich/postgres"
+        - "{{ docker_dir }}/immich/redis"
+        - "{{ docker_dir }}/immich/ml"
+
+        # Log directories
+        - "{{ logs_dir }}/media"
+        - "{{ logs_dir }}/media/health"
+        - "{{ logs_dir }}/media/backup"
+        - "{{ logs_dir }}/sabnzbd"
+        - "{{ logs_dir }}/qbittorrent"
+        - "{{ logs_dir }}/prowlarr"
+        - "{{ logs_dir }}/sonarr"
+        - "{{ logs_dir }}/radarr"
+        - "{{ logs_dir }}/lidarr"
+        - "{{ logs_dir }}/readarr"
+        - "{{ logs_dir }}/bazarr"
+        - "{{ logs_dir }}/pulsarr"
+        - "{{ logs_dir }}/jellyfin"
+        - "{{ logs_dir }}/immich/server"
+        - "{{ logs_dir }}/immich/web"
+        - "{{ logs_dir }}/immich/postgres"
+        - "{{ logs_dir }}/immich/redis"
+        - "{{ logs_dir }}/immich/ml"
+      register: dir_creation
+
+    - name: Set proper permissions for media directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+        recurse: true
+      loop:
+        - "{{ data_dir }}/media"
+        - "{{ data_dir }}/downloads"
+        - "{{ docker_dir }}/media"
+        - "{{ logs_dir }}/media"
+
+    - name: Create media stack configuration directory
+      ansible.builtin.file:
+        path: "{{ config_dir }}/media"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Install required packages for media stack
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - jq
+        - bc
+        - htop
+        - iotop
+        - nethogs
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for media stack (RedHat)
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - jq
+        - bc
+        - htop
+        - iotop
+        - nethogs
+      when: ansible_os_family == "RedHat"
+
+    - name: Create media stack environment file
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ docker_dir }}/media/.env"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Create media stack docker-compose file
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ docker_dir }}/media/docker-compose.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Prepare Media secret files
+      ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+      vars:
+        service_name: "media"
+        secret_files: "{{ media_secret_files if media_manage_secret_files else [] }}"
+      when: media_manage_secret_files | bool
+
+    - name: Validate required Media secret files exist
+      ansible.builtin.stat:
+        path: "{{ docker_dir }}/media/secrets/{{ item }}"
+      register: media_secret_stats
+      loop: "{{ media_required_secrets | default([]) }}"
+      when: media_manage_secret_files | bool and (media_required_secrets | default([]) | length > 0)
+
+    - name: Fail if required Media secret files are missing
+      ansible.builtin.assert:
+        that: "{{ media_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+        fail_msg: >-
+          One or more required secret files are missing under {{ docker_dir }}/media/secrets.
+          Missing: {{ (media_required_secrets | default([])) | reject('in', (media_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+      when: media_manage_secret_files | bool and (media_required_secrets | default([]) | length > 0)
+
+    - name: Create media stack health check script
+      ansible.builtin.template:
+        src: healthcheck.sh.j2
+        dest: "{{ config_dir }}/media-health.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create media stack backup script
+      ansible.builtin.template:
+        src: backup.sh.j2
+        dest: "{{ config_dir }}/media-backup.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule media stack health checks
+      ansible.builtin.cron:
+        name: "Media stack health check"
+        minute: "*/15"
+        job: "{{ config_dir }}/media-health.sh"
+        user: "{{ vault_media_user }}"
+
+    - name: Schedule media stack backup
+      ansible.builtin.cron:
+        name: "Media stack backup"
+        hour: "2"
+        minute: "0"
+        job: "{{ config_dir }}/media-backup.sh"
+        user: "{{ vault_media_user }}"
+      when: media_backup_enabled | default(true)
+
+  tags: [media, setup]

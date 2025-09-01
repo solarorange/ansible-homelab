@@ -1,0 +1,157 @@
+#!/bin/bash
+# Linkwarden Management Script
+# Production-ready management script for Linkwarden
+
+set -euo pipefail
+
+# Configuration
+DOCKER_DIR="{{ linkwarden_config_dir }}"
+APP_CONTAINER="{{ linkwarden_app_container_name }}"
+DB_CONTAINER="{{ linkwarden_postgres_container_name }}"
+LOG_FILE="{{ logs_dir }}/linkwarden/manage.log"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+trap 'log "ERROR: Management operation failed with exit code $?"; exit 1' ERR
+
+# Function to show usage
+usage() {
+    echo "Usage: $0 {start|stop|restart|status|logs|update|backup|restore}"
+    echo ""
+    echo "Commands:"
+    echo "  start   - Start Linkwarden services"
+    echo "  stop    - Stop Linkwarden services"
+    echo "  restart - Restart Linkwarden services"
+    echo "  status  - Show service status"
+    echo "  logs    - Show service logs"
+    echo "  update  - Update Linkwarden to latest version"
+    echo "  backup  - Create backup"
+    echo "  restore - Restore from backup"
+    exit 1
+}
+
+# Function to start services
+start_services() {
+    log "Starting Linkwarden services..."
+    cd "$DOCKER_DIR"
+    docker-compose up -d
+    log "Services started successfully"
+}
+
+# Function to stop services
+stop_services() {
+    log "Stopping Linkwarden services..."
+    cd "$DOCKER_DIR"
+    docker-compose down
+    log "Services stopped successfully"
+}
+
+# Function to restart services
+restart_services() {
+    log "Restarting Linkwarden services..."
+    stop_services
+    sleep 5
+    start_services
+    log "Services restarted successfully"
+}
+
+# Function to show status
+show_status() {
+    log "Checking Linkwarden service status..."
+    cd "$DOCKER_DIR"
+    docker-compose ps
+    echo ""
+    echo "Container logs:"
+    docker-compose logs --tail=20
+}
+
+# Function to show logs
+show_logs() {
+    log "Showing Linkwarden logs..."
+    cd "$DOCKER_DIR"
+    docker-compose logs -f
+}
+
+# Function to update services
+update_services() {
+    log "Updating Linkwarden services..."
+    cd "$DOCKER_DIR"
+    
+    # Backup before update
+    log "Creating backup before update..."
+    ./scripts/backup.sh
+    
+    # Pull latest images
+    log "Pulling latest images..."
+    docker-compose pull
+    
+    # Restart services
+    log "Restarting services with new images..."
+    docker-compose up -d
+    
+    log "Update completed successfully"
+}
+
+# Function to create backup
+create_backup() {
+    log "Creating Linkwarden backup..."
+    ./scripts/backup.sh
+    log "Backup completed successfully"
+}
+
+# Function to restore from backup
+restore_backup() {
+    if [ -z "$1" ]; then
+        echo "Usage: $0 restore <backup_file>"
+        exit 1
+    fi
+    
+    log "Restoring Linkwarden from backup: $1"
+    
+    # Stop services
+    stop_services
+    
+    # Restore database
+    log "Restoring database..."
+    docker exec -i "$DB_CONTAINER" psql -U {{ linkwarden_database_user }} {{ linkwarden_database_name }} < "$1"
+    
+    # Restart services
+    start_services
+    
+    log "Restore completed successfully"
+}
+
+# Main script logic
+case "${1:-}" in
+    start)
+        start_services
+        ;;
+    stop)
+        stop_services
+        ;;
+    restart)
+        restart_services
+        ;;
+    status)
+        show_status
+        ;;
+    logs)
+        show_logs
+        ;;
+    update)
+        update_services
+        ;;
+    backup)
+        create_backup
+        ;;
+    restore)
+        restore_backup "$2"
+        ;;
+    *)
+        usage
+        ;;
+esac 

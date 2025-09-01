@@ -1,0 +1,89 @@
+---
+# Media Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Media vault variables
+  block:
+    - name: Check required Media vault variables
+      assert:
+        that:
+          - vault_media_admin_password is defined
+          - vault_media_database_password is defined
+          - vault_media_api_key is defined
+          - vault_media_secret_key is defined
+          - vault_media_encryption_key is defined
+          - vault_media_jwt_secret is defined
+        fail_msg: "Required Media vault variables are not defined"
+        success_msg: "All required Media vault variables are defined"
+
+    - name: Validate Media password complexity
+      assert:
+        that:
+          - vault_media_admin_password | length >= 12
+          - vault_media_database_password | length >= 12
+        fail_msg: "Media passwords must be at least 12 characters long"
+        success_msg: "Media password complexity requirements met"
+
+- name: Validate Media network configuration
+  block:
+    - name: Check Media port configuration
+      assert:
+        that:
+          - media_port is defined
+          - media_port | int >= 1024
+          - media_port | int <= 65535
+        fail_msg: "Media port must be between 1024 and 65535"
+        success_msg: "Media port configuration is valid"
+
+    - name: Check Media domain configuration
+      assert:
+        that:
+          - domain is defined
+          - media_subdomain is defined
+        fail_msg: "Media domain configuration is incomplete"
+        success_msg: "Media domain configuration is valid"
+
+- name: Validate Media security configuration
+  block:
+    - name: Check Media SSL configuration
+      assert:
+        that:
+          - media_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Media SSL configuration is invalid"
+        success_msg: "Media SSL configuration is valid"
+
+    - name: Check Media authentication configuration
+      assert:
+        that:
+          - media_auth_enabled | bool
+          - media_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Media authentication configuration is invalid"
+        success_msg: "Media authentication configuration is valid"
+
+- name: Validate Media storage configuration
+  block:
+    - name: Check Media data directories
+      assert:
+        that:
+          - media_data_dir is defined
+          - media_config_dir is defined
+          - media_backup_dir is defined
+        fail_msg: "Media storage configuration is incomplete"
+        success_msg: "Media storage configuration is valid"
+
+    - name: Create Media directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ media_data_dir }}"
+        - "{{ media_config_dir }}"
+        - "{{ media_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Media validation completed successfully - all configurations are valid and secure"

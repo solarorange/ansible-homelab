@@ -1,0 +1,91 @@
+apiVersion: 1
+
+notifiers:
+  # Email Notifications
+  - name: Email Alerts
+    type: email
+    uid: email_alerts
+    org_id: 1
+    is_default: true
+    settings:
+      addresses: "{{ grafana_email_addresses | default('admin@' + domain) }}"
+      singleEmail: true
+    secure_settings: {}
+    send_reminder: true
+    frequency: "1m"
+    disable_resolve_message: false
+
+  # Discord Notifications
+  {% if grafana_discord_webhook_url %}
+  - name: Discord Alerts
+    type: discord
+    uid: discord_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_discord_webhook_url }}"
+      use_discord_username: true
+      username: "Homelab Monitor"
+      icon_emoji: "🏠"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Slack Notifications
+  {% if grafana_slack_webhook_url %}
+  - name: Slack Alerts
+    type: slack
+    uid: slack_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_slack_webhook_url }}"
+      username: "Homelab Monitor"
+      icon_emoji: ":house:"
+      channel: "{{ grafana_slack_channel | default('#homelab') }}"
+      mentionChannel: "here"
+      mentionUsers: "{{ grafana_slack_mention_users | default('') }}"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Telegram Notifications
+  {% if grafana_telegram_bot_token and grafana_telegram_chat_id %}
+  - name: Telegram Alerts
+    type: telegram
+    uid: telegram_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      bottoken: "{{ grafana_telegram_bot_token }}"
+      chatid: "{{ grafana_telegram_chat_id }}"
+      message: "🏠 *Homelab Alert*\n\n**{{ .AlertName }}**\n{{ .Message }}\n\n**Severity:** {{ .Labels.severity }}\n**Service:** {{ .Labels.service }}\n**Instance:** {{ .Labels.instance }}\n\n**Dashboard:** {{ .DashboardURL }}"
+      parseMode: "Markdown"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %}
+
+  # Webhook Notifications
+  {% if grafana_webhook_url %}
+  - name: Webhook Alerts
+    type: webhook
+    uid: webhook_alerts
+    org_id: 1
+    is_default: false
+    settings:
+      url: "{{ grafana_webhook_url }}"
+      httpMethod: "POST"
+      maxAlerts: 0
+      title: "Homelab Alert: {{ .AlertName }}"
+      message: "{{ .Message }}\n\nSeverity: {{ .Labels.severity }}\nService: {{ .Labels.service }}\nInstance: {{ .Labels.instance }}\n\nDashboard: {{ .DashboardURL }}"
+    secure_settings: {}
+    send_reminder: true
+    frequency: "5m"
+    disable_resolve_message: false
+  {% endif %} 

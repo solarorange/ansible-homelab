@@ -1,0 +1,86 @@
+---
+# Handlers for Databases Role
+
+# Systemd handlers (for host-installed databases)
+- name: restart postgresql
+  ansible.builtin.service:
+    name: postgresql
+    state: restarted
+  when: postgresql_host_installed | default(false)
+
+- name: restart mariadb
+  ansible.builtin.service:
+    name: mariadb
+    state: restarted
+  when: mariadb_host_installed | default(false)
+
+- name: restart redis
+  ansible.builtin.service:
+    name: redis
+    state: restarted
+  when: redis_host_installed | default(false)
+
+- name: restart elasticsearch
+  ansible.builtin.service:
+    name: elasticsearch
+    state: restarted
+  when: elasticsearch_host_installed | default(false)
+
+- name: restart kibana
+  ansible.builtin.service:
+    name: kibana
+    state: restarted
+  when: kibana_host_installed | default(false)
+
+# Docker Compose handlers (for containerized databases)
+- name: Restart PostgreSQL container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/postgresql"
+    restarted: true
+  when: postgresql_enabled | default(false)
+
+- name: Restart MariaDB container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/mariadb"
+    restarted: true
+  when: mariadb_enabled | default(false)
+
+- name: Restart Redis container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/redis"
+    restarted: true
+  when: redis_enabled | default(false)
+
+- name: Restart Elasticsearch container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/elasticsearch"
+    restarted: true
+  when: elasticsearch_enabled | default(false)
+
+- name: Restart Kibana container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/kibana"
+    restarted: true
+  when: kibana_enabled | default(false)
+
+# Health check handlers
+- name: Check PostgreSQL health
+  ansible.builtin.command: docker exec {{ postgresql_container_name }} pg_isready -U {{ postgresql_admin_user }}
+  register: postgresql_health
+  changed_when: false
+  failed_when: postgresql_health.rc != 0
+  when: postgresql_enabled | default(false)
+
+- name: Check MariaDB health
+  ansible.builtin.command: docker exec {{ mariadb_container_name }} bash -lc 'mysqladmin ping -u root -p"$(cat /run/secrets/mariadb_root_password)"'
+  register: mariadb_health
+  changed_when: false
+  failed_when: mariadb_health.rc != 0
+  when: mariadb_enabled | default(false)
+
+- name: Check Redis health
+  ansible.builtin.command: docker exec {{ redis_container_name }} redis-cli ping
+  register: redis_health
+  changed_when: false
+  failed_when: redis_health.rc != 0
+  when: redis_enabled | default(false)

@@ -1,0 +1,66 @@
+---
+# Handlers for Logging Role
+
+# Systemd handlers
+- name: restart logrotate
+  ansible.builtin.systemd:
+    name: logrotate
+    state: restarted
+  when: logrotate_enabled | default(true)
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when: docker_enabled | default(true)
+
+# Docker Compose handlers (for containerized services)
+- name: Restart Loki container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/monitoring/loki"
+    restarted: true
+  when: loki_enabled | default(false)
+
+- name: Restart Promtail container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/monitoring/promtail"
+    restarted: true
+  when: promtail_enabled | default(false)
+
+- name: Restart Prometheus
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/monitoring/prometheus"
+    restarted: true
+  when: logging_prometheus_enabled | default(false)
+
+- name: Restart Grafana
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/monitoring/grafana"
+    restarted: true
+  when: logging_grafana_enabled | default(false)
+
+# Health check handlers
+- name: Check Loki health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:3100/ready"
+    method: GET
+    status_code: [200]
+  register: loki_health
+  when: loki_enabled | default(false)
+
+- name: Check Promtail health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:9080/ready"
+    method: GET
+    status_code: [200]
+  register: promtail_health
+  when: promtail_enabled | default(false)
+
+# Configuration reload handlers
+- name: Reload Promtail configuration
+  ansible.builtin.command: docker exec {{ promtail_container_name }} kill -HUP 1
+  when: promtail_enabled | default(false)
+
+- name: Reload Loki configuration
+  ansible.builtin.command: docker exec {{ loki_container_name }} kill -HUP 1
+  when: loki_enabled | default(false)

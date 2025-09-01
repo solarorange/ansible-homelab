@@ -1,0 +1,33 @@
+---
+# SSL/TLS Hardening
+# Applies secure SSL/TLS configuration to web services
+
+- name: Ensure SSL configuration directory exists
+  ansible.builtin.file:
+    path: "{{ config_dir }}/ssl"
+    state: directory
+    mode: '0755'
+  tags: [security, ssl, tls, setup]
+
+- name: Deploy strong SSL/TLS configuration for Traefik
+  ansible.builtin.template:
+    src: templates/traefik-tls.yml.j2
+    dest: "{{ config_dir }}/ssl/traefik-tls.yml"
+    mode: '0644'
+  tags: [security, ssl, tls, traefik]
+
+- name: Ensure only strong ciphers and protocols are enabled
+  ansible.builtin.lineinfile:
+    path: "{{ config_dir }}/ssl/traefik-tls.yml"
+    regexp: '^\s*ciphers:'
+    line: '  ciphers: "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"'
+    state: present
+  tags: [security, ssl, tls, ciphers]
+
+- name: Ensure HTTP Strict Transport Security (HSTS) is enabled
+  ansible.builtin.lineinfile:
+    path: "{{ config_dir }}/ssl/traefik-tls.yml"
+    regexp: '^\s*hsts:'
+    line: '  hsts: true'
+    state: present
+  tags: [security, ssl, tls, hsts]

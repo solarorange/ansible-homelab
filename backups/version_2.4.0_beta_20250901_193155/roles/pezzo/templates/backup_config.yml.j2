@@ -1,0 +1,121 @@
+# Pezzo Backup Configuration
+# Automated backup configuration for Pezzo services
+
+backup:
+  enabled: {{ pezzo_backup_enabled | default(true) }}
+  schedule: "{{ pezzo_backup_schedule | default('0 3 * * *') }}"
+  retention_days: {{ pezzo_backup_retention_days | default(7) }}
+  compression: {{ pezzo_backup_compression | default(true) }}
+  notifications: {{ pezzo_backup_notifications_enabled | default(true) }}
+
+  # Backup components
+  components:
+    database:
+      enabled: {{ pezzo_backup_include_database | default(true) }}
+      type: "postgresql"
+      host: "pezzo-postgres"
+      port: 5432
+      user: "{{ pezzo_database_user }}"
+      password: "{{ pezzo_database_password }}"
+      database: "{{ pezzo_database_name }}"
+      format: "sql"
+      
+    configuration:
+      enabled: {{ pezzo_backup_include_config | default(true) }}
+      source: "{{ pezzo_config_dir }}"
+      format: "tar.gz"
+      exclude:
+        - "*.tmp"
+        - "*.log"
+        - "cache/*"
+        - "temp/*"
+        
+    logs:
+      enabled: true
+      source: "{{ logs_dir }}/pezzo"
+      format: "tar.gz"
+      retention_days: 30
+      exclude:
+        - "*.tmp"
+        - "*.lock"
+        
+    redis:
+      enabled: true
+      host: "pezzo-redis"
+      port: 6379
+      password: "{{ pezzo_redis_password }}"
+      format: "rdb"
+      
+    clickhouse:
+      enabled: true
+      host: "pezzo-clickhouse"
+      port: 8123
+      format: "sql"
+
+  # Storage configuration
+  storage:
+    local:
+      enabled: true
+      path: "{{ pezzo_backup_dir }}"
+      max_size: "10GB"
+      
+    remote:
+      enabled: false
+      type: "s3"  # Options: s3, ftp, scp, rsync
+      endpoint: ""
+      bucket: ""
+      access_key: ""
+      secret_key: ""
+      region: "us-east-1"
+
+  # Verification
+  verification:
+    enabled: true
+    check_integrity: true
+    test_restore: false
+    max_verification_time: 300
+
+  # Notifications
+  notifications:
+    email:
+      enabled: false
+      smtp_host: ""
+      smtp_port: 587
+      smtp_user: ""
+      smtp_password: ""
+      from_address: ""
+      to_address: "{{ pezzo_admin_email | default('admin@' + domain) }}"
+      
+    webhook:
+      enabled: false
+      url: ""
+      method: "POST"
+      headers: {}
+      
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#pezzo-backups"
+
+  # Monitoring
+  monitoring:
+    enabled: true
+    metrics:
+      backup_duration: true
+      backup_size: true
+      backup_success_rate: true
+      restore_duration: true
+      
+    alerts:
+      backup_failure: true
+      backup_too_large: true
+      backup_too_slow: true
+      restore_failure: true
+
+  # Logging
+  logging:
+    level: "info"
+    file: "{{ pezzo_backup_log_file | default(logs_dir + '/pezzo/backup/backup.log') }}"
+    max_size: "{{ pezzo_backup_max_log_size | default('10M') }}"
+    max_files: 5
+    format: "json" 

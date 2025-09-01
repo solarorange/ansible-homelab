@@ -1,0 +1,354 @@
+---
+# Performance and Load Testing
+# Comprehensive testing of system performance and scalability
+
+- name: Setup performance test environment
+  block:
+    - name: Install performance testing tools
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apache2-utils
+        - siege
+        - wrk
+        - htop
+        - iotop
+        - nload
+      tags: [performance, setup]
+
+    - name: Create performance test directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ test_dir }}/performance"
+        - "{{ test_dir }}/performance/results"
+        - "{{ test_dir }}/performance/logs"
+      tags: [performance, setup]
+
+  tags: [performance, setup]
+
+- name: Baseline performance measurement
+  block:
+    - name: Measure baseline CPU usage
+      ansible.builtin.shell: |
+        top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%//'
+      register: baseline_cpu
+      changed_when: false
+      tags: [performance, baseline]
+
+    - name: Measure baseline memory usage
+      ansible.builtin.shell: |
+        free -m | awk 'NR==2{printf "%.2f", $3*100/$2 }'
+      register: baseline_memory
+      changed_when: false
+      tags: [performance, baseline]
+
+    - name: Measure baseline disk I/O
+      ansible.builtin.shell: |
+        iostat -x 1 1 | grep -E "(sda|nvme)" | awk '{print $6, $7}'
+      register: baseline_disk_io
+      changed_when: false
+      tags: [performance, baseline]
+
+    - name: Measure baseline network usage
+      ansible.builtin.shell: |
+        cat /proc/net/dev | grep -E "(eth0|enp)" | awk '{print $2, $10}'
+      register: baseline_network
+      changed_when: false
+      tags: [performance, baseline]
+
+  tags: [performance, baseline]
+
+- name: Load test web services
+  block:
+    - name: Load test Traefik
+      ansible.builtin.shell: |
+        ab -n 1000 -c 10 -r https://{{ domain }}/ping
+      register: traefik_load_test
+      changed_when: false
+      tags: [performance, load]
+
+    - name: Load test Grafana
+      ansible.builtin.shell: |
+        ab -n 500 -c 5 -r https://grafana.{{ domain }}/
+      register: grafana_load_test
+      changed_when: false
+      tags: [performance, load]
+
+    - name: Load test Sonarr API
+      ansible.builtin.shell: |
+        ab -n 200 -c 5 -r http://{{ ansible_default_ipv4.address }}:8989/api/v3/health
+      register: sonarr_load_test
+      changed_when: false
+      tags: [performance, load]
+
+    - name: Load test Prometheus
+      ansible.builtin.shell: |
+        ab -n 1000 -c 10 -r http://{{ ansible_default_ipv4.address }}:9090/api/v1/query?query=up
+      register: prometheus_load_test
+      changed_when: false
+      tags: [performance, load]
+
+  tags: [performance, load]
+
+- name: Database performance testing
+  block:
+    - name: PostgreSQL performance test
+      ansible.builtin.shell: |
+        PGPASSWORD={{ vault_postgresql_password }} psql -h {{ ansible_default_ipv4.address }} -U {{ vault_postgresql_user }} -d homelab -c "
+        SELECT
+          schemaname,
+          tablename,
+          attname,
+          n_distinct,
+          correlation
+        FROM pg_stats
+        WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+        LIMIT 10;"
+      register: postgres_performance_test
+      changed_when: false
+      tags: [performance, database]
+
+    - name: Redis performance test
+      ansible.builtin.shell: |
+        redis-benchmark -h {{ ansible_default_ipv4.address }} -p 6379 -a {{ vault_redis_password }} -n 10000 -c 10
+      register: redis_performance_test
+      changed_when: false
+      tags: [performance, database]
+
+    - name: Test database connections
+      ansible.builtin.shell: |
+        for i in {1..50}; do
+          PGPASSWORD={{ vault_postgresql_password }} psql -h {{ ansible_default_ipv4.address }} -U {{ vault_postgresql_user }} -d homelab -c "SELECT 1;" &
+        done
+        wait
+      register: db_connection_test
+      changed_when: false
+      tags: [performance, database]
+
+  when: "'postgresql' in enabled_services or 'redis' in enabled_services"
+  tags: [performance, database]
+
+- name: Docker performance testing
+  block:
+    - name: Test Docker daemon performance
+      ansible.builtin.shell: |
+        time docker ps
+        time docker images
+        time docker system df
+      register: docker_performance_test
+      changed_when: false
+      tags: [performance, docker]
+
+    - name: Test container startup performance
+      ansible.builtin.shell: |
+        time docker-compose -f {{ docker_dir }}/sonarr/docker-compose.yml up -d
+        sleep 5
+        time docker-compose -f {{ docker_dir }}/sonarr/docker-compose.yml down
+      register: container_startup_test
+      changed_when: false
+      tags: [performance, docker]
+
+    - name: Test Docker network performance
+      ansible.builtin.shell: |
+        docker network ls
+        docker network inspect homelab
+        docker network inspect monitoring
+      register: docker_network_test
+      changed_when: false
+      tags: [performance, docker]
+
+  tags: [performance, docker]
+
+- name: Monitoring performance testing
+  block:
+    - name: Test Prometheus query performance
+      ansible.builtin.shell: |
+        time curl -s "http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up" | jq '.data.result | length'
+      register: prometheus_query_test
+      changed_when: false
+      tags: [performance, monitoring]
+
+    - name: Test Grafana dashboard loading
+      ansible.builtin.shell: |
+        time curl -s "http://{{ ansible_default_ipv4.address }}:/api/dashboards" -H "Authorization: Basic {{ ('admin:' + vault_grafana_admin_password) | b64encode }}"
+      register: grafana_dashboard_test
+      changed_when: false
+      tags: [performance, monitoring]
+
+    - name: Test alert evaluation performance
+      ansible.builtin.shell: |
+        time curl -s "http://{{ ansible_default_ipv4.address }}:/api/v1/rules" | jq '.data.groups | length'
+      register: alert_evaluation_test
+      changed_when: false
+      tags: [performance, monitoring]
+
+  when: "'prometheus' in enabled_services and 'grafana' in enabled_services"
+  tags: [performance, monitoring]
+
+- name: Stress testing
+  block:
+    - name: CPU stress test
+      ansible.builtin.shell: |
+        stress-ng --cpu 4 --timeout 30s
+      register: cpu_stress_test
+      changed_when: false
+      tags: [performance, stress]
+
+    - name: Memory stress test
+      ansible.builtin.shell: |
+        stress-ng --vm 2 --vm-bytes 1G --timeout 30s
+      register: memory_stress_test
+      changed_when: false
+      tags: [performance, stress]
+
+    - name: I/O stress test
+      ansible.builtin.shell: |
+        stress-ng --io 4 --timeout 30s
+      register: io_stress_test
+      changed_when: false
+      tags: [performance, stress]
+
+  tags: [performance, stress]
+
+- name: Concurrent user simulation
+  block:
+    - name: Simulate concurrent web users
+      ansible.builtin.shell: |
+        siege -c 20 -t 30S https://{{ domain }}/ping
+      register: concurrent_users_test
+      changed_when: false
+      tags: [performance, concurrent]
+
+    - name: Simulate concurrent API users
+      ansible.builtin.shell: |
+        siege -c 10 -t 30S http://{{ ansible_default_ipv4.address }}:/api/v3/health
+      register: concurrent_api_test
+      changed_when: false
+      tags: [performance, concurrent]
+
+    - name: Simulate concurrent database connections
+      ansible.builtin.shell: |
+        for i in {1..20}; do
+          PGPASSWORD={{ vault_postgresql_password }} psql -h {{ ansible_default_ipv4.address }} -U {{ vault_postgresql_user | default('homelab') }} -d homelab -c "SELECT pg_sleep(1);" &
+        done
+        wait
+      register: concurrent_db_test
+      changed_when: false
+      tags: [performance, concurrent]
+
+  tags: [performance, concurrent]
+
+- name: Resource monitoring during tests
+  block:
+    - name: Monitor system resources during tests
+      ansible.builtin.shell: |
+        while true; do
+          echo "$(date): CPU: $(top -bn1 | grep 'Cpu(s)' | awk '{print $2}')%, Memory: $(free -m | awk 'NR==2{printf "%.1f", $3*100/$2 }')%, Load: $(uptime | awk -F'load average:' '{print $2}')"
+          sleep 5
+        done
+      register: resource_monitoring
+      async: 300
+      poll: 0
+      tags: [performance, monitoring]
+
+    - name: Wait for resource monitoring
+      ansible.builtin.async_status:
+        jid: "{{ resource_monitoring.ansible_job_id }}"
+      register: resource_monitoring_result
+      until: resource_monitoring_result.finished
+      retries: 60
+      delay: 5
+      tags: [performance, monitoring]
+
+  tags: [performance, monitoring]
+
+- name: Performance analysis
+  block:
+    - name: Analyze load test results
+      ansible.builtin.set_fact:
+        performance_analysis:
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          host: "{{ ansible_hostname }}"
+          baseline:
+            cpu: "{{ baseline_cpu.stdout }}"
+            memory: "{{ baseline_memory.stdout }}"
+            disk_io: "{{ baseline_disk_io.stdout }}"
+            network: "{{ baseline_network.stdout }}"
+          load_tests:
+            traefik: "{{ traefik_load_test.stdout_lines[-1] if traefik_load_test.stdout_lines else 'N/A' }}"
+            grafana: "{{ grafana_load_test.stdout_lines[-1] if grafana_load_test.stdout_lines else 'N/A' }}"
+            sonarr: "{{ sonarr_load_test.stdout_lines[-1] if sonarr_load_test.stdout_lines else 'N/A' }}"
+            prometheus: "{{ prometheus_load_test.stdout_lines[-1] if prometheus_load_test.stdout_lines else 'N/A' }}"
+          database_tests:
+            postgres: "{{ 'PASS' if postgres_performance_test.rc == 0 else 'FAIL' }}"
+            redis: "{{ 'PASS' if redis_performance_test.rc == 0 else 'FAIL' }}"
+            connections: "{{ 'PASS' if db_connection_test.rc == 0 else 'FAIL' }}"
+          docker_tests:
+            daemon: "{{ 'PASS' if docker_performance_test.rc == 0 else 'FAIL' }}"
+            startup: "{{ 'PASS' if container_startup_test.rc == 0 else 'FAIL' }}"
+            network: "{{ 'PASS' if docker_network_test.rc == 0 else 'FAIL' }}"
+          stress_tests:
+            cpu: "{{ 'PASS' if cpu_stress_test.rc == 0 else 'FAIL' }}"
+            memory: "{{ 'PASS' if memory_stress_test.rc == 0 else 'FAIL' }}"
+            io: "{{ 'PASS' if io_stress_test.rc == 0 else 'FAIL' }}"
+          concurrent_tests:
+            web: "{{ 'PASS' if concurrent_users_test.rc == 0 else 'FAIL' }}"
+            api: "{{ 'PASS' if concurrent_api_test.rc == 0 else 'FAIL' }}"
+            database: "{{ 'PASS' if concurrent_db_test.rc == 0 else 'FAIL' }}"
+
+    - name: Display performance analysis
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          PERFORMANCE ANALYSIS SUMMARY
+          ========================================
+
+          Timestamp: {{ performance_analysis.timestamp }}
+          Host: {{ performance_analysis.host }}
+
+          Baseline Performance:
+          - CPU Usage: {{ performance_analysis.baseline.cpu }}%
+          - Memory Usage: {{ performance_analysis.baseline.memory }}%
+          - Disk I/O: {{ performance_analysis.baseline.disk_io }}
+          - Network: {{ performance_analysis.baseline.network }}
+
+          Load Test Results:
+          - Traefik: {{ performance_analysis.load_tests.traefik }}
+          - Grafana: {{ performance_analysis.load_tests.grafana }}
+          - Sonarr: {{ performance_analysis.load_tests.sonarr }}
+          - Prometheus: {{ performance_analysis.load_tests.prometheus }}
+
+          Database Performance:
+          - PostgreSQL: {{ performance_analysis.database_tests.postgres }}
+          - Redis: {{ performance_analysis.database_tests.redis }}
+          - Connections: {{ performance_analysis.database_tests.connections }}
+
+          Docker Performance:
+          - Daemon: {{ performance_analysis.docker_tests.daemon }}
+          - Startup: {{ performance_analysis.docker_tests.startup }}
+          - Network: {{ performance_analysis.docker_tests.network }}
+
+          Stress Tests:
+          - CPU: {{ performance_analysis.stress_tests.cpu }}
+          - Memory: {{ performance_analysis.stress_tests.memory }}
+          - I/O: {{ performance_analysis.stress_tests.io }}
+
+          Concurrent Tests:
+          - Web: {{ performance_analysis.concurrent_tests.web }}
+          - API: {{ performance_analysis.concurrent_tests.api }}
+          - Database: {{ performance_analysis.concurrent_tests.database }}
+
+          ========================================
+      tags: [performance, analysis]
+
+    - name: Save performance report
+      ansible.builtin.template:
+        src: templates/performance_report.yml.j2
+        dest: "{{ test_dir }}/performance/results/performance_report_{{ ansible_date_time.epoch }}.yml"
+      tags: [performance, report]
+
+  tags: [performance, analysis]

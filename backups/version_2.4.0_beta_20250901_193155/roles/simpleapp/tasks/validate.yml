@@ -1,0 +1,23 @@
+---
+# Simple App Validation Tasks
+
+- name: Validate Simple App configuration
+  uri:
+    url: "https://{{ simpleapp_domain }}/api/health"
+    method: GET
+  register: health_check
+  tags: [simpleapp, validate]
+
+- name: Check Simple App service status
+  uri:
+    url: "https://{{ simpleapp_domain }}/api/status"
+    method: GET
+  register: status_check
+  tags: [simpleapp, validate]
+
+- name: Validate Simple App authentication
+  uri:
+    url: "https://{{ simpleapp_domain }}/api/auth/status"
+    method: GET
+  register: auth_check
+  tags: [simpleapp, validate]

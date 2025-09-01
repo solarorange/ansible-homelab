@@ -1,0 +1,89 @@
+---
+# Sabnzbd Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Sabnzbd vault variables
+  block:
+    - name: Check required Sabnzbd vault variables
+      assert:
+        that:
+          - vault_sabnzbd_admin_password is defined
+          - vault_sabnzbd_database_password is defined
+          - vault_sabnzbd_api_key is defined
+          - vault_sabnzbd_secret_key is defined
+          - vault_sabnzbd_encryption_key is defined
+          - vault_sabnzbd_jwt_secret is defined
+        fail_msg: "Required Sabnzbd vault variables are not defined"
+        success_msg: "All required Sabnzbd vault variables are defined"
+
+    - name: Validate Sabnzbd password complexity
+      assert:
+        that:
+          - vault_sabnzbd_admin_password | length >= 12
+          - vault_sabnzbd_database_password | length >= 12
+        fail_msg: "Sabnzbd passwords must be at least 12 characters long"
+        success_msg: "Sabnzbd password complexity requirements met"
+
+- name: Validate Sabnzbd network configuration
+  block:
+    - name: Check Sabnzbd port configuration
+      assert:
+        that:
+          - sabnzbd_port is defined
+          - sabnzbd_port | int >= 1024
+          - sabnzbd_port | int <= 65535
+        fail_msg: "Sabnzbd port must be between 1024 and 65535"
+        success_msg: "Sabnzbd port configuration is valid"
+
+    - name: Check Sabnzbd domain configuration
+      assert:
+        that:
+          - domain is defined
+          - sabnzbd_subdomain is defined
+        fail_msg: "Sabnzbd domain configuration is incomplete"
+        success_msg: "Sabnzbd domain configuration is valid"
+
+- name: Validate Sabnzbd security configuration
+  block:
+    - name: Check Sabnzbd SSL configuration
+      assert:
+        that:
+          - sabnzbd_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Sabnzbd SSL configuration is invalid"
+        success_msg: "Sabnzbd SSL configuration is valid"
+
+    - name: Check Sabnzbd authentication configuration
+      assert:
+        that:
+          - sabnzbd_auth_enabled | bool
+          - sabnzbd_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Sabnzbd authentication configuration is invalid"
+        success_msg: "Sabnzbd authentication configuration is valid"
+
+- name: Validate Sabnzbd storage configuration
+  block:
+    - name: Check Sabnzbd data directories
+      assert:
+        that:
+          - sabnzbd_data_dir is defined
+          - sabnzbd_config_dir is defined
+          - sabnzbd_backup_dir is defined
+        fail_msg: "Sabnzbd storage configuration is incomplete"
+        success_msg: "Sabnzbd storage configuration is valid"
+
+    - name: Create Sabnzbd directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ sabnzbd_data_dir }}"
+        - "{{ sabnzbd_config_dir }}"
+        - "{{ sabnzbd_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Sabnzbd validation completed successfully - all configurations are valid and secure"

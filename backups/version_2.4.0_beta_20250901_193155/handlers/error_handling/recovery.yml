@@ -1,0 +1,71 @@
+---
+# Recovery procedures for failed tasks
+- name: Attempt service recovery
+  block:
+    - name: Check service status
+      ansible.builtin.service_facts:
+
+    - name: Restart failed service
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ ansible_facts.services | selectattr('status', 'match', 'failed') | map(attribute='name') | list }}"
+      when: ansible_facts.services is defined
+
+    - name: Verify service recovery
+      ansible.builtin.service_facts:
+      register: service_status
+      changed_when: false
+
+    - name: Set recovery status
+      ansible.builtin.set_fact:
+        recovery_successful: "{{ service_status.ansible_facts.services | selectattr('status', 'match', 'running') | list | length > 0 }}"
+
+- name: Attempt configuration recovery
+  block:
+    - name: Restore last known good configuration
+      ansible.builtin.copy:
+        src: "{{ backup_dir }}/{{ item }}/last_known_good"
+        dest: "{{ item }}"
+        remote_src: true
+      loop: "{{ failed_config_files | default([]) }}"
+      when: failed_config_files is defined
+
+    - name: Verify configuration
+      ansible.builtin.command: "{{ item }}"
+      loop: "{{ config_verification_commands | default([]) }}"
+      when: config_verification_commands is defined
+      register: config_verification
+      changed_when: false
+
+    - name: Set configuration recovery status
+      ansible.builtin.set_fact:
+        config_recovery_successful: "{{ config_verification is success }}"
+
+- name: Attempt resource recovery
+  block:
+    - name: Check system resources
+      ansible.builtin.shell: |
+        df -h
+        free -m
+        ps aux | sort -rn -k3 | head -n 10
+      register: resource_check
+      changed_when: false
+
+    - name: Clean up temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ temp_dirs | default([]) }}"
+      when: temp_dirs is defined
+
+    - name: Restart critical services
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ critical_services | default([]) }}"
+      when: critical_services is defined
+
+- name: Final recovery status
+  ansible.builtin.set_fact:
+    recovery_complete: "{{ recovery_successful | default(false) and config_recovery_successful | default(false) }}"

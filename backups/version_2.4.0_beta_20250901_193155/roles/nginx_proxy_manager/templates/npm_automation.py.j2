@@ -1,0 +1,377 @@
+#!/usr/bin/env python3
+"""
+Nginx Proxy Manager Automation Script
+Comprehensive automation for NPM deployment, configuration, and management
+"""
+
+import argparse
+import json
+import logging
+import os
+import sys
+import time
+import yaml
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
+
+import requests
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.panel import Panel
+from rich.text import Text
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+class NPMAutomation:
+    """Nginx Proxy Manager Automation Class"""
+    
+    def __init__(self, config_path: str):
+        """Initialize NPM automation with configuration"""
+        self.console = Console()
+        self.config = self._load_config(config_path)
+        self.api_url = self.config['api']['url']
+        self.api_token = self.config['api']['token']
+        self.domain = self.config['domain']
+        self.services = self.config['services']
+        
+        # API session
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Authorization': f"Bearer {self.api_token}"
+        })
+    
+    def _load_config(self, config_path: str) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Failed to load config: {e}")
+            sys.exit(1)
+    
+    def _make_api_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
+        """Make API request to NPM"""
+        url = f"{self.api_url}{endpoint}"
+        
+        try:
+            if method.upper() == 'GET':
+                response = self.session.get(url, timeout=30)
+            elif method.upper() == 'POST':
+                response = self.session.post(url, json=data, timeout=30)
+            elif method.upper() == 'PUT':
+                response = self.session.put(url, json=data, timeout=30)
+            elif method.upper() == 'DELETE':
+                response = self.session.delete(url, timeout=30)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            response.raise_for_status()
+            return response.json()
+        
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {e}")
+            return {}
+    
+    def discover_services(self) -> List[Dict]:
+        """Discover running services and their configurations"""
+        discovered_services = []
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console
+        ) as progress:
+            task = progress.add_task("Discovering services...", total=len(self.services))
+            
+            for service in self.services:
+                try:
+                    # Check if service container is running
+                    service_url = f"http://{service['name']}:{service['port']}"
+                    response = requests.get(f"{service_url}/health", timeout=5)
+                    
+                    if response.status_code == 200:
+                        discovered_services.append({
+                            'name': service['name'],
+                            'subdomain': service['subdomain'],
+                            'port': service['port'],
+                            'ssl': service.get('ssl', True),
+                            'auth': service.get('auth', False),
+                            'health': 'healthy',
+                            'url': service_url
+                        })
+                        self.console.print(f"✓ Discovered {service['name']}", style="green")
+                    else:
+                        self.console.print(f"⚠ {service['name']} not healthy", style="yellow")
+                
+                except requests.exceptions.RequestException:
+                    self.console.print(f"✗ {service['name']} not accessible", style="red")
+                
+                progress.advance(task)
+        
+        return discovered_services
+    
+    def create_proxy_hosts(self, services: List[Dict]) -> List[Dict]:
+        """Create proxy hosts for discovered services"""
+        created_hosts = []
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console
+        ) as progress:
+            task = progress.add_task("Creating proxy hosts...", total=len(services))
+            
+            for service in services:
+                try:
+                    proxy_host_data = {
+                        'domain_names': [f"{service['subdomain']}.{self.domain}"],
+                        'forward_scheme': 'http',
+                        'forward_host': service['name'],
+                        'forward_port': service['port'],
+                        'ssl_force_redirect': service['ssl'],
+                        'ssl_http2': True,
+                        'ssl_hsts': True,
+                        'ssl_hsts_subdomains': True,
+                        'ssl_hsts_preload': True,
+                        'ssl_hsts_max_age': 31536000,
+                        'ssl_ocsp_stapling': True,
+                        'ssl_ocsp_stapling_verify': True,
+                        'ssl_session_cache': 'shared:SSL:10m',
+                        'ssl_session_timeout': '10m',
+                        'ssl_protocols': 'TLSv1.2 TLSv1.3',
+                        'ssl_ciphers': 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
+                        'ssl_prefer_server_ciphers': True
+                    }
+                    
+                    if service['auth']:
+                        proxy_host_data['access_list_id'] = 1
+                    
+                    result = self._make_api_request('POST', '/api/nginx/proxy-hosts', proxy_host_data)
+                    
+                    if result:
+                        created_hosts.append({
+                            'service': service['name'],
+                            'domain': f"{service['subdomain']}.{self.domain}",
+                            'status': 'created',
+                            'id': result.get('id')
+                        })
+                        self.console.print(f"✓ Created proxy host for {service['name']}", style="green")
+                    else:
+                        self.console.print(f"✗ Failed to create proxy host for {service['name']}", style="red")
+                
+                except Exception as e:
+                    logger.error(f"Failed to create proxy host for {service['name']}: {e}")
+                    self.console.print(f"✗ Error creating proxy host for {service['name']}", style="red")
+                
+                progress.advance(task)
+        
+        return created_hosts
+    
+    def manage_ssl_certificates(self, services: List[Dict]) -> List[Dict]:
+        """Manage SSL certificates for services"""
+        ssl_results = []
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console
+        ) as progress:
+            task = progress.add_task("Managing SSL certificates...", total=len(services))
+            
+            for service in services:
+                if not service['ssl']:
+                    progress.advance(task)
+                    continue
+                
+                try:
+                    ssl_data = {
+                        'provider': 'letsencrypt',
+                        'email': self.config['ssl']['email'],
+                        'staging': self.config['ssl'].get('staging', False),
+                        'domains': [f"{service['subdomain']}.{self.domain}"],
+                        'force_renewal': False
+                    }
+                    
+                    result = self._make_api_request('POST', '/api/ssl', ssl_data)
+                    
+                    if result:
+                        ssl_results.append({
+                            'service': service['name'],
+                            'domain': f"{service['subdomain']}.{self.domain}",
+                            'status': 'created',
+                            'provider': 'letsencrypt'
+                        })
+                        self.console.print(f"✓ SSL certificate created for {service['name']}", style="green")
+                    else:
+                        self.console.print(f"⚠ SSL certificate already exists for {service['name']}", style="yellow")
+                
+                except Exception as e:
+                    logger.error(f"Failed to manage SSL for {service['name']}: {e}")
+                    self.console.print(f"✗ Error managing SSL for {service['name']}", style="red")
+                
+                progress.advance(task)
+        
+        return ssl_results
+    
+    def check_health(self) -> Dict[str, Any]:
+        """Check health of all proxy hosts"""
+        health_results = {
+            'total': 0,
+            'healthy': 0,
+            'unhealthy': 0,
+            'services': []
+        }
+        
+        try:
+            proxy_hosts = self._make_api_request('GET', '/api/nginx/proxy-hosts')
+            
+            for host in proxy_hosts:
+                health_results['total'] += 1
+                
+                try:
+                    domain = host['domain_names'][0]
+                    response = requests.get(f"https://{domain}", timeout=10, verify=False)
+                    
+                    if response.status_code == 200:
+                        health_results['healthy'] += 1
+                        status = 'healthy'
+                        style = 'green'
+                    else:
+                        health_results['unhealthy'] += 1
+                        status = 'unhealthy'
+                        style = 'red'
+                
+                except requests.exceptions.RequestException:
+                    health_results['unhealthy'] += 1
+                    status = 'unreachable'
+                    style = 'red'
+                
+                health_results['services'].append({
+                    'domain': domain,
+                    'status': status,
+                    'response_time': response.elapsed.total_seconds() if 'response' in locals() else None
+                })
+                
+                self.console.print(f"{'✓' if status == 'healthy' else '✗'} {domain}: {status}", style=style)
+        
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+        
+        return health_results
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get NPM statistics and metrics"""
+        try:
+            stats = self._make_api_request('GET', '/api/statistics')
+            return stats
+        except Exception as e:
+            logger.error(f"Failed to get statistics: {e}")
+            return {}
+    
+    def display_summary(self, services: List[Dict], proxy_hosts: List[Dict], ssl_results: List[Dict]):
+        """Display automation summary"""
+        table = Table(title="NPM Automation Summary")
+        table.add_column("Service", style="cyan")
+        table.add_column("Domain", style="magenta")
+        table.add_column("Status", style="green")
+        table.add_column("SSL", style="yellow")
+        table.add_column("Auth", style="blue")
+        
+        for service in services:
+            proxy_host = next((h for h in proxy_hosts if h['service'] == service['name']), None)
+            ssl_result = next((s for s in ssl_results if s['service'] == service['name']), None)
+            
+            table.add_row(
+                service['name'],
+                f"{service['subdomain']}.{self.domain}",
+                proxy_host['status'] if proxy_host else 'failed',
+                '✓' if ssl_result else '✗',
+                '✓' if service['auth'] else '✗'
+            )
+        
+        self.console.print(table)
+        
+        # Display statistics
+        stats = self.get_statistics()
+        if stats:
+            stats_panel = Panel(
+                f"Total Proxy Hosts: {stats.get('total_proxy_hosts', 0)}\n"
+                f"Total SSL Certificates: {stats.get('total_ssl_certificates', 0)}\n"
+                f"Total Access Lists: {stats.get('total_access_lists', 0)}\n"
+                f"Uptime: {stats.get('uptime', 'N/A')}",
+                title="NPM Statistics",
+                border_style="blue"
+            )
+            self.console.print(stats_panel)
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description="Nginx Proxy Manager Automation")
+    parser.add_argument('--config', required=True, help='Configuration file path')
+    parser.add_argument('--discover-services', action='store_true', help='Discover running services')
+    parser.add_argument('--create-proxy-hosts', action='store_true', help='Create proxy hosts')
+    parser.add_argument('--auto-ssl', action='store_true', help='Manage SSL certificates')
+    parser.add_argument('--health-check', action='store_true', help='Check service health')
+    parser.add_argument('--summary', action='store_true', help='Display summary')
+    
+    args = parser.parse_args()
+    
+    console = Console()
+    
+    try:
+        # Initialize automation
+        npm = NPMAutomation(args.config)
+        
+        services = []
+        proxy_hosts = []
+        ssl_results = []
+        
+        # Discover services
+        if args.discover_services:
+            console.print("\n[bold blue]Discovering Services...[/bold blue]")
+            services = npm.discover_services()
+        
+        # Create proxy hosts
+        if args.create_proxy_hosts and services:
+            console.print("\n[bold blue]Creating Proxy Hosts...[/bold blue]")
+            proxy_hosts = npm.create_proxy_hosts(services)
+        
+        # Manage SSL certificates
+        if args.auto_ssl and services:
+            console.print("\n[bold blue]Managing SSL Certificates...[/bold blue]")
+            ssl_results = npm.manage_ssl_certificates(services)
+        
+        # Health check
+        if args.health_check:
+            console.print("\n[bold blue]Checking Health...[/bold blue]")
+            health_results = npm.check_health()
+            
+            health_panel = Panel(
+                f"Total: {health_results['total']}\n"
+                f"Healthy: {health_results['healthy']}\n"
+                f"Unhealthy: {health_results['unhealthy']}",
+                title="Health Check Results",
+                border_style="green" if health_results['unhealthy'] == 0 else "red"
+            )
+            console.print(health_panel)
+        
+        # Display summary
+        if args.summary and services:
+            console.print("\n[bold blue]Automation Summary[/bold blue]")
+            npm.display_summary(services, proxy_hosts, ssl_results)
+        
+        console.print("\n[bold green]NPM Automation completed successfully![/bold green]")
+        
+    except Exception as e:
+        console.print(f"\n[bold red]Automation failed: {e}[/bold red]")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main() 

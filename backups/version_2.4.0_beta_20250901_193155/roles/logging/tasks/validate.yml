@@ -1,0 +1,89 @@
+---
+# Logging Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Logging vault variables
+  block:
+    - name: Check required Logging vault variables
+      assert:
+        that:
+          - vault_logging_admin_password is defined
+          - vault_logging_database_password is defined
+          - vault_logging_api_key is defined
+          - vault_logging_secret_key is defined
+          - vault_logging_encryption_key is defined
+          - vault_logging_jwt_secret is defined
+        fail_msg: "Required Logging vault variables are not defined"
+        success_msg: "All required Logging vault variables are defined"
+
+    - name: Validate Logging password complexity
+      assert:
+        that:
+          - vault_logging_admin_password | length >= 12
+          - vault_logging_database_password | length >= 12
+        fail_msg: "Logging passwords must be at least 12 characters long"
+        success_msg: "Logging password complexity requirements met"
+
+- name: Validate Logging network configuration
+  block:
+    - name: Check Logging port configuration
+      assert:
+        that:
+          - logging_port is defined
+          - logging_port | int >= 1024
+          - logging_port | int <= 65535
+        fail_msg: "Logging port must be between 1024 and 65535"
+        success_msg: "Logging port configuration is valid"
+
+    - name: Check Logging domain configuration
+      assert:
+        that:
+          - domain is defined
+          - logging_subdomain is defined
+        fail_msg: "Logging domain configuration is incomplete"
+        success_msg: "Logging domain configuration is valid"
+
+- name: Validate Logging security configuration
+  block:
+    - name: Check Logging SSL configuration
+      assert:
+        that:
+          - logging_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Logging SSL configuration is invalid"
+        success_msg: "Logging SSL configuration is valid"
+
+    - name: Check Logging authentication configuration
+      assert:
+        that:
+          - logging_auth_enabled | bool
+          - logging_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Logging authentication configuration is invalid"
+        success_msg: "Logging authentication configuration is valid"
+
+- name: Validate Logging storage configuration
+  block:
+    - name: Check Logging data directories
+      assert:
+        that:
+          - logging_data_dir is defined
+          - logging_config_dir is defined
+          - logging_backup_dir is defined
+        fail_msg: "Logging storage configuration is incomplete"
+        success_msg: "Logging storage configuration is valid"
+
+    - name: Create Logging directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ logging_data_dir }}"
+        - "{{ logging_config_dir }}"
+        - "{{ logging_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Logging validation completed successfully - all configurations are valid and secure"

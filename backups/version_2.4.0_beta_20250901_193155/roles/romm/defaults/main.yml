@@ -1,0 +1,280 @@
+---
+# Romm Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# ROMM SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+romm_service_name: "romm"
+romm_container_name: "{{ romm_service_name }}"
+romm_image: "rommapp/romm:latest"
+romm_version: "latest"
+
+# Network Configuration
+romm_port: 3012
+romm_external_port: "{{ romm_port }}"
+romm_protocol: "http"
+romm_host: "{{ ansible_default_ipv4.address }}"
+romm_url: "{{ romm_protocol }}://{{ romm_host }}:{{ romm_port }}"
+
+# Domain Configuration
+romm_subdomain: "romm"
+romm_domain: "{{ romm_subdomain }}.{{ domain }}"
+romm_external_url: "https://{{ romm_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+romm_auth_enabled: true
+romm_auth_method: "authentik"  # Options: basic, authentik, none
+romm_admin_username: "admin"
+romm_admin_password: "{{ vault_romm_admin_password }}"
+
+# API Configuration
+romm_api_key: "{{ vault_romm_api_key }}"
+romm_api_token: "{{ vault_romm_api_token }}"
+
+# Encryption & Security
+romm_secret_key: "{{ vault_romm_secret_key }}"
+romm_encryption_key: "{{ vault_romm_encryption_key }}"
+romm_jwt_secret: "{{ vault_romm_jwt_secret }}"
+
+# SSL/TLS Configuration
+romm_ssl_enabled: true
+romm_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+romm_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+romm_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+romm_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+romm_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+romm_database_port: "{{ databases_postgresql_port | default(5432) }}"
+romm_database_name: "romm"
+romm_database_username: "romm"
+romm_database_password: "{{ vault_romm_database_password }}"
+
+# Redis Configuration (if using)
+romm_redis_enabled: false
+romm_redis_host: "{{ redis_host | default('redis') }}"
+romm_redis_port: "{{ redis_port | default(6379) }}"
+romm_redis_password: "{{ vault_romm_redis_password }}"
+romm_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+romm_data_dir: "{{ homelab_data_dir }}/romm"
+romm_config_dir: "{{ romm_data_dir }}/config"
+romm_backup_dir: "{{ romm_data_dir }}/backups"
+
+# Volume Mappings
+romm_volumes:
+  - "{{ romm_config_dir }}:/config"
+  - "{{ romm_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+romm_health_check_enabled: true
+romm_health_check_path: "/health"
+romm_health_check_interval: 30
+romm_health_check_timeout: 10
+romm_health_check_retries: 3
+
+# Monitoring Integration
+romm_monitoring_enabled: true
+romm_prometheus_enabled: true
+romm_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+romm_backup_enabled: true
+romm_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+romm_backup_retention_days: 30
+romm_backup_encryption_enabled: true
+romm_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+romm_smtp_enabled: false
+romm_smtp_host: "{{ smtp_host | default('') }}"
+romm_smtp_port: "{{ smtp_port | default(587) }}"
+romm_smtp_username: "{{ vault_smtp_username }}"
+romm_smtp_password: "{{ vault_romm_smtp_password }}"
+romm_smtp_from: "{{ romm_admin_email | default('admin@' + domain) }}"
+romm_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+romm_webhook_enabled: false
+romm_webhook_url: "{{ vault_webhook_url | default('') }}"
+romm_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+romm_discovery_enabled: true
+romm_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+romm_cpu_limit: "1.0"
+romm_memory_limit: "1g"
+romm_memory_reservation: "512m"
+
+# Performance Settings
+romm_scan_interval: 10
+romm_parallel_downloads: 3
+romm_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+romm_log_level: "info"  # Options: trace, debug, info, warn, error
+romm_log_rotation_enabled: true
+romm_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+romm_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+romm_rate_limit_enabled: true
+romm_rate_limit_requests: 100
+romm_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+romm_deploy_enabled: true
+romm_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+romm_restart_policy: "unless-stopped"
+romm_auto_update_enabled: true
+
+# Environment Variables
+romm_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  ROMM_API_KEY: "{{ romm_api_key }}"
+  ROMM_SECRET_KEY: "{{ romm_secret_key }}"
+  ROMM_ENCRYPTION_KEY: "{{ romm_encryption_key }}"
+  ROMM_JWT_SECRET: "{{ romm_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+romm_validation_enabled: true
+romm_validation_timeout: 300
+romm_validation_retries: 3
+
+# Testing Configuration
+romm_test_enabled: false
+romm_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+romm_compliance_enabled: true
+romm_audit_logging_enabled: true
+romm_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+romm_automation_enabled: true
+romm_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+romm_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+romm_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+romm_fallback_enabled: true
+romm_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+romm_manage_secret_files: true
+
+romm_secret_files:
+  - { name: "ROMM_ADMIN_PASSWORD", value: "{{ romm_admin_password }}" }
+  - { name: "ROMM_SECRET_KEY", value: "{{ romm_secret_key }}" }
+  - { name: "ROMM_DATABASE_PASSWORD", value: "{{ romm_database_password }}" }
+  - { name: "ROMM_SMTP_PASSWORD", value: "{{ romm_smtp_password }}" }
+
+romm_required_secrets:
+  - ROMM_ADMIN_PASSWORD
+  - ROMM_SECRET_KEY
+  - ROMM_DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+romm_direct_expose_enabled: false

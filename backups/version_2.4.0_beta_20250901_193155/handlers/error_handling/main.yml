@@ -1,0 +1,55 @@
+---
+# Main error handling handler
+- name: Handle task failure
+  block:
+    - name: Log error details
+      ansible.builtin.debug:
+        msg: |
+          Task failed: {{ ansible_failed_task.name }}
+          Error: {{ ansible_failed_result.msg }}
+          Module: {{ ansible_failed_task.action }}
+          Host: {{ inventory_hostname }}
+      when: ansible_failed_task is defined
+
+    - name: Create error log entry
+      ansible.builtin.copy:
+        content: |
+          Timestamp: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Task: {{ ansible_failed_task.name }}
+          Error: {{ ansible_failed_result.msg }}
+          Module: {{ ansible_failed_task.action }}
+        dest: "/var/log/ansible/errors/{{ inventory_hostname }}_{{ ansible_date_time.iso8601 }}.log"
+        mode: '0644'
+      when: ansible_failed_task is defined
+
+    - name: Notify on critical failure
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url | default('') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "Critical Ansible task failed on {{ inventory_hostname }}: {{ ansible_failed_task.name }}"
+          }
+        status_code: [200, 201, 202]
+      when:
+        - ansible_failed_task is defined
+        - notification_webhook_url is defined
+        - ansible_failed_task.tags is defined
+        - "'critical' in ansible_failed_task.tags"
+
+
+    - name: Attempt automatic recovery
+      ansible.builtin.include_tasks: recovery.yml
+      when: ansible_failed_task is defined
+
+    - name: Create backup before rollback
+      ansible.builtin.include_tasks: backup.yml
+      when: ansible_failed_task is defined
+
+    - name: Execute rollback if needed
+      ansible.builtin.include_tasks: rollback.yml
+      when:
+        - ansible_failed_task is defined
+        - rollback_required | default(false) | bool

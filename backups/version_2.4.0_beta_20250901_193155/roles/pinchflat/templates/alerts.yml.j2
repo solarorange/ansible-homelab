@@ -1,0 +1,14 @@
+---
+# Pinchflat Alerting Rules
+
+groups:
+  - name: Pinchflat
+    rules:
+      - alert: PinchflatDown
+        expr: up{job="pinchflat"} == 0
+        for: 1m
+        labels:
+          severity: {{ pinchflat_alert_severity | default('warning') }}
+        annotations:
+          summary: "Pinchflat is down"
+          description: "Pinchflat has been down for more than 1 minute"

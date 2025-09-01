@@ -1,0 +1,144 @@
+---
+# Fing Alerting Configuration
+# Configures alerting and notifications for Fing
+
+- name: Create Fing alerting configuration
+  ansible.builtin.template:
+    src: "alerts.yml.j2"
+    dest: "{{ docker_dir }}/fing/alerts/alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing alert rules
+  ansible.builtin.template:
+    src: "alert-rules.yml.j2"
+    dest: "{{ docker_dir }}/fing/alerts/rules.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing notification templates
+  ansible.builtin.template:
+    src: "notification-templates.yml.j2"
+    dest: "{{ docker_dir }}/fing/alerts/templates.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Fing alert monitoring script
+  ansible.builtin.template:
+    src: "alert-monitor.sh.j2"
+    dest: "{{ docker_dir }}/fing/alert-monitor.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing alert testing script
+  ansible.builtin.template:
+    src: "alert-test.sh.j2"
+    dest: "{{ docker_dir }}/fing/alert-test.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing alert history script
+  ansible.builtin.template:
+    src: "alert-history.sh.j2"
+    dest: "{{ docker_dir }}/fing/alert-history.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing alert statistics script
+  ansible.builtin.template:
+    src: "alert-stats.sh.j2"
+    dest: "{{ docker_dir }}/fing/alert-stats.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing alert escalation script
+  ansible.builtin.template:
+    src: "alert-escalation.sh.j2"
+    dest: "{{ docker_dir }}/fing/alert-escalation.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Create Fing alert cron jobs
+  ansible.builtin.cron:
+    name: "Fing alert monitoring"
+    minute: "*/1"
+    job: "{{ docker_dir }}/fing/alert-monitor.sh"
+    user: "{{ vault_fing_user }}"
+
+- name: Create Fing alert testing cron
+  ansible.builtin.cron:
+    name: "Fing alert testing"
+    minute: "0"
+    hour: "*/6"
+    job: "{{ docker_dir }}/fing/alert-test.sh"
+    user: "{{ vault_fing_user }}"
+
+- name: Create Fing alert history cron
+  ansible.builtin.cron:
+    name: "Fing alert history"
+    minute: "0"
+    hour: "1"
+    job: "{{ docker_dir }}/fing/alert-history.sh"
+    user: "{{ vault_fing_user }}"
+
+- name: Create Fing alert statistics cron
+  ansible.builtin.cron:
+    name: "Fing alert statistics"
+    minute: "0"
+    hour: "7"
+    job: "{{ docker_dir }}/fing/alert-stats.sh"
+    user: "{{ vault_fing_user }}"
+
+- name: Create Fing alert escalation cron
+  ansible.builtin.cron:
+    name: "Fing alert escalation"
+    minute: "*/5"
+    job: "{{ docker_dir }}/fing/alert-escalation.sh"
+    user: "{{ vault_fing_user }}"
+
+- name: Display Fing alerting configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Alerting Configuration Complete:
+
+      Alerting Configuration:
+      - Provider: {{ fing_alerting_provider }}
+      - Webhook: {{ fing_alerting_webhook }}
+      - Config File: {{ docker_dir }}/fing/alerts/alerts.yml
+      - Rules File: {{ docker_dir }}/fing/alerts/rules.yml
+      - Templates File: {{ docker_dir }}/fing/alerts/templates.yml
+
+      Alert Scripts:
+      - Monitor: {{ docker_dir }}/fing/alert-monitor.sh
+      - Test: {{ docker_dir }}/fing/alert-test.sh
+      - History: {{ docker_dir }}/fing/alert-history.sh
+      - Statistics: {{ docker_dir }}/fing/alert-stats.sh
+      - Escalation: {{ docker_dir }}/fing/alert-escalation.sh
+
+      Notification Channels:
+      - Email: {{ fing_email_enabled | default(false) | ternary('Enabled', 'Disabled') }}
+      - Slack: {{ fing_slack_enabled | default(false) | ternary('Enabled', 'Disabled') }}
+      - Discord: {{ fing_discord_enabled | default(false) | ternary('Enabled', 'Disabled') }}
+      - Webhook: {{ fing_webhooks_enabled | default(true) | ternary('Enabled', 'Disabled') }}
+
+      Cron Jobs:
+      - Alert Monitoring: Every minute
+      - Alert Testing: Every 6 hours
+      - Alert History: Daily at 1 AM
+      - Alert Statistics: Daily at 7 AM
+      - Alert Escalation: Every 5 minutes
+
+      Next Steps:
+      1. Test alert functionality
+      2. Configure notification channels
+      3. Set up alert escalation rules
+      4. Monitor alert statistics
+      5. Configure alert dashboards

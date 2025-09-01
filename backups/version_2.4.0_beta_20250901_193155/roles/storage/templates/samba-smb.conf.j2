@@ -1,0 +1,38 @@
+[global]
+workgroup = {{ samba_workgroup }}
+server string = {{ samba_server_string }}
+security = {{ samba_security }}
+map to guest = {{ samba_map_to_guest }}
+dns proxy = no
+log file = /var/log/samba/log.%m
+max log size = 50
+socket options = TCP_NODELAY IPTOS_LOWDELAY
+local master = yes
+os level = 20
+domain master = yes
+preferred master = yes
+wins support = yes
+unix charset = UTF-8
+dos charset = CP932
+display charset = UTF-8
+vfs objects = acl_xattr
+map acl inherit = yes
+store dos attributes = yes
+create mask = 0664
+directory mask = 0775
+force create mode = 0664
+force directory mode = 0775
+force user = {{ username }}
+force group = {{ username }}
+
+{% for share in samba_shares %}
+[{{ share.name }}]
+path = {{ share.path }}
+browseable = {{ share.browseable }}
+read only = {{ share.read_only }}
+guest ok = {{ share.guest_ok }}
+create mask = 0664
+directory mask = 0775
+force user = {{ username }}
+force group = {{ username }}
+{% endfor %} 

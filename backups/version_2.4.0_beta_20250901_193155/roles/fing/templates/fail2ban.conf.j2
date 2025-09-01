@@ -1,0 +1,81 @@
+# Fing Fail2ban Configuration
+# Monitors Fing API access logs for security threats
+
+[DEFAULT]
+# Ban hosts for 1 hour
+bantime = 3600
+# Check for repeated failures for 10 minutes
+findtime = 600
+# Allow 5 failures before banning
+maxretry = 5
+# Ban on all interfaces
+banaction = ufw
+# Log level
+loglevel = info
+# Log target
+logtarget = /var/log/fail2ban.log
+# Use syslog
+syslogsocket = auto
+# Use systemd
+backend = systemd
+
+# Fing API Jail
+[fing-api]
+enabled = true
+port = {{ fing_web_port }},{{ fing_api_port }}
+filter = fing-api
+logpath = {{ fing_log_dir }}/fing.log
+maxretry = 3
+findtime = 300
+bantime = 3600
+ignoreip = {{ ansible_default_ipv4.address }}/8 ::1 {{ fing_trusted_ips | default('') }}
+failregex = ^.*ERROR.*Authentication failed for IP <HOST>.*$
+            ^.*ERROR.*Unauthorized access attempt from <HOST>.*$
+            ^.*ERROR.*Invalid API key from <HOST>.*$
+            ^.*ERROR.*Rate limit exceeded for <HOST>.*$
+ignoreregex = ^.*INFO.*Legitimate access from <HOST>.*$
+
+# Fing Network Scan Jail
+[fing-network-scan]
+enabled = true
+port = {{ fing_web_port }},{{ fing_api_port }}
+filter = fing-network-scan
+logpath = {{ fing_log_dir }}/fing.log
+maxretry = 2
+findtime = 600
+bantime = 7200
+ignoreip = {{ ansible_default_ipv4.address }}/8 ::1 {{ fing_trusted_ips | default('') }}
+failregex = ^.*WARN.*Network scan detected from <HOST>.*$
+            ^.*ERROR.*Port scanning activity from <HOST>.*$
+            ^.*ERROR.*Aggressive network discovery from <HOST>.*$
+ignoreregex = ^.*INFO.*Legitimate network discovery from <HOST>.*$
+
+# Fing Brute Force Jail
+[fing-brute-force]
+enabled = true
+port = {{ fing_web_port }},{{ fing_api_port }}
+filter = fing-brute-force
+logpath = {{ fing_log_dir }}/fing.log
+maxretry = 5
+findtime = 300
+bantime = 14400
+ignoreip = {{ ansible_default_ipv4.address }}/8 ::1 {{ fing_trusted_ips | default('') }}
+failregex = ^.*ERROR.*Multiple failed login attempts from <HOST>.*$
+            ^.*ERROR.*Brute force attack detected from <HOST>.*$
+            ^.*ERROR.*Repeated authentication failures from <HOST>.*$
+ignoreregex = ^.*INFO.*Legitimate login attempts from <HOST>.*$
+
+# Fing API Abuse Jail
+[fing-api-abuse]
+enabled = true
+port = {{ fing_web_port }},{{ fing_api_port }}
+filter = fing-api-abuse
+logpath = {{ fing_log_dir }}/fing.log
+maxretry = 10
+findtime = 600
+bantime = 1800
+ignoreip = {{ ansible_default_ipv4.address }}/8 ::1 {{ fing_trusted_ips | default('') }}
+failregex = ^.*WARN.*API rate limit exceeded for <HOST>.*$
+            ^.*ERROR.*Excessive API requests from <HOST>.*$
+            ^.*ERROR.*API abuse detected from <HOST>.*$
+ignoreregex = ^.*INFO.*Normal API usage from <HOST>.*$ 

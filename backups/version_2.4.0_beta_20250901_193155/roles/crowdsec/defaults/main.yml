@@ -1,0 +1,260 @@
+---
+# Crowdsec Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# CROWDSEC SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+crowdsec_service_name: "crowdsec"
+crowdsec_container_name: "{{ crowdsec_service_name }}"
+crowdsec_image: "crowdsecurity/crowdsec:latest"
+crowdsec_version: "latest"
+
+# Network Configuration
+crowdsec_port: 8088
+crowdsec_external_port: "{{ crowdsec_port }}"
+crowdsec_protocol: "http"
+crowdsec_host: "{{ ansible_default_ipv4.address }}"
+crowdsec_url: "{{ crowdsec_protocol }}://{{ crowdsec_host }}:{{ crowdsec_port }}"
+
+# Domain Configuration
+crowdsec_subdomain: "crowdsec"
+crowdsec_domain: "{{ crowdsec_subdomain }}.{{ domain }}"
+crowdsec_external_url: "https://{{ crowdsec_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+crowdsec_auth_enabled: true
+crowdsec_auth_method: "authentik"  # Options: basic, authentik, none
+crowdsec_admin_username: "admin"
+crowdsec_admin_password: "{{ vault_crowdsec_admin_password }}"
+
+# API Configuration
+crowdsec_api_key: "{{ vault_crowdsec_api_key }}"
+crowdsec_api_token: "{{ vault_crowdsec_api_token }}"
+
+# Encryption & Security
+crowdsec_secret_key: "{{ vault_crowdsec_secret_key }}"
+crowdsec_encryption_key: "{{ vault_crowdsec_encryption_key }}"
+crowdsec_jwt_secret: "{{ vault_crowdsec_jwt_secret }}"
+
+# SSL/TLS Configuration
+crowdsec_ssl_enabled: true
+crowdsec_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+crowdsec_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+crowdsec_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+crowdsec_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+crowdsec_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+crowdsec_database_port: "{{ databases_postgresql_port | default(5432) }}"
+crowdsec_database_name: "crowdsec"
+crowdsec_database_username: "crowdsec"
+crowdsec_database_password: "{{ vault_crowdsec_database_password }}"
+
+# Redis Configuration (if using)
+crowdsec_redis_enabled: false
+crowdsec_redis_host: "{{ redis_host | default('redis') }}"
+crowdsec_redis_port: "{{ redis_port | default(6379) }}"
+crowdsec_redis_password: "{{ vault_crowdsec_redis_password }}"
+crowdsec_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+crowdsec_data_dir: "{{ homelab_data_dir }}/crowdsec"
+crowdsec_config_dir: "{{ crowdsec_data_dir }}/config"
+crowdsec_backup_dir: "{{ crowdsec_data_dir }}/backups"
+
+# Volume Mappings
+crowdsec_volumes:
+  - "{{ crowdsec_config_dir }}:/config"
+  - "{{ crowdsec_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+crowdsec_health_check_enabled: true
+crowdsec_health_check_path: "/health"
+crowdsec_health_check_interval: 30
+crowdsec_health_check_timeout: 10
+crowdsec_health_check_retries: 3
+
+# Monitoring Integration
+crowdsec_monitoring_enabled: true
+crowdsec_prometheus_enabled: true
+crowdsec_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+crowdsec_backup_enabled: true
+crowdsec_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+crowdsec_backup_retention_days: 30
+crowdsec_backup_encryption_enabled: true
+crowdsec_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+crowdsec_smtp_enabled: false
+crowdsec_smtp_host: "{{ smtp_host | default('') }}"
+crowdsec_smtp_port: "{{ smtp_port | default(587) }}"
+crowdsec_smtp_username: "{{ vault_smtp_username }}"
+crowdsec_smtp_password: "{{ vault_crowdsec_smtp_password }}"
+crowdsec_smtp_from: "{{ crowdsec_admin_email | default('admin@' + domain) }}"
+crowdsec_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+crowdsec_webhook_enabled: false
+crowdsec_webhook_url: "{{ vault_webhook_url | default('') }}"
+crowdsec_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+crowdsec_discovery_enabled: true
+crowdsec_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+crowdsec_cpu_limit: "1.0"
+crowdsec_memory_limit: "1g"
+crowdsec_memory_reservation: "512m"
+
+# Performance Settings
+crowdsec_scan_interval: 10
+crowdsec_parallel_downloads: 3
+crowdsec_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+crowdsec_log_level: "info"  # Options: trace, debug, info, warn, error
+crowdsec_log_rotation_enabled: true
+crowdsec_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+crowdsec_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+crowdsec_rate_limit_enabled: true
+crowdsec_rate_limit_requests: 100
+crowdsec_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+crowdsec_deploy_enabled: true
+crowdsec_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+crowdsec_restart_policy: "unless-stopped"
+crowdsec_auto_update_enabled: true
+
+# Environment Variables
+crowdsec_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  CROWDSEC_API_KEY: "{{ crowdsec_api_key }}"
+  CROWDSEC_SECRET_KEY: "{{ crowdsec_secret_key }}"
+  CROWDSEC_ENCRYPTION_KEY: "{{ crowdsec_encryption_key }}"
+  CROWDSEC_JWT_SECRET: "{{ crowdsec_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+crowdsec_validation_enabled: true
+crowdsec_validation_timeout: 300
+crowdsec_validation_retries: 3
+
+# Testing Configuration
+crowdsec_test_enabled: false
+crowdsec_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+crowdsec_compliance_enabled: true
+crowdsec_audit_logging_enabled: true
+crowdsec_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+crowdsec_automation_enabled: true
+crowdsec_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+crowdsec_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+crowdsec_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+crowdsec_fallback_enabled: true
+crowdsec_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

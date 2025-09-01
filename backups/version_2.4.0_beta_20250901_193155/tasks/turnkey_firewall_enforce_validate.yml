@@ -1,0 +1,31 @@
+---
+# Turnkey Firewall Enforcement & Public Ports Validation
+#
+# What it is:
+# - A single-file, safe, idempotent playbook to enforce centralized UFW rules
+#   and validate that only approved public ports are exposed.
+#
+# What it does:
+# - Applies the centralized firewall configuration (honors `from`/`src`)
+# - Validates that only 80/tcp and 443/tcp are publicly open, plus any
+#   environment-approved non-HTTP ports you explicitly add
+# - Fails fast if unexpected public exposure is detected
+#
+# When to use it:
+# - Post-deploy checks, CI/CD, after service or network changes, or on a schedule
+#   to prevent drift from manual changes or external tooling
+
+- name: Enforce firewall and validate approved public ports only
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    # Default approved public ports; can be overridden per inventory/group
+    firewall_approved_public_ports: ['80/tcp', '443/tcp']
+    # Optional: add environment-specific exceptions (e.g., '51820/udp' for WireGuard)
+    firewall_approved_public_ports_extra: []
+  tasks:
+    - name: Apply centralized firewall configuration
+      import_tasks: ../roles/security/tasks/firewall.yml
+    - name: Validate approved public ports only (IPv4/IPv6 aware)
+      include_tasks: validate/public_ports.yml

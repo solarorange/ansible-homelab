@@ -1,0 +1,24 @@
+---
+# Generic route-based health check task
+# Variables:
+# - route_health_check_url (string, required)
+# - route_health_check_status_codes (list[int], optional, default: [200, 302, 401])
+# - route_health_check_timeout (int, optional, default: 30)
+# - route_health_check_validate_certs (bool, optional, default: true)
+# - route_health_check_retries (int, optional, default: 10)
+# - route_health_check_delay (int, optional, default: 10)
+
+- name: Check route health via HTTPS
+  ansible.builtin.uri:
+    url: "{{ route_health_check_url }}"
+    method: GET
+    status_code: "{{ route_health_check_status_codes | default([200, 302, 401]) }}"
+    timeout: "{{ route_health_check_timeout | default(30) }}"
+    validate_certs: "{{ route_health_check_validate_certs | default(true) }}"
+  register: route_health_check_result
+  retries: "{{ route_health_check_retries | default(10) }}"
+  delay: "{{ route_health_check_delay | default(10) }}"
+  until: route_health_check_result.status in (route_health_check_status_codes | default([200, 302, 401]))
+  tags: [route, health, check]
+
+

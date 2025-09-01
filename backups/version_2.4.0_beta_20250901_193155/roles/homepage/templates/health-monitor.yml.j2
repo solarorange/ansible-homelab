@@ -1,0 +1,105 @@
+# Homepage Health Monitoring Configuration
+# Integrates with monitoring stack for health checks and alerts
+
+monitoring:
+  enabled: {{ homepage_health_check_enabled | default(true) }}
+  interval: {{ homepage_health_check_interval | default(300) }}
+  timeout: {{ homepage_health_check_timeout | default(10) }}
+
+# Health check endpoints
+endpoints:
+  - name: "homepage-web"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}"
+    method: "GET"
+    expected_status: [200, 302]
+    timeout: {{ homepage_health_check_timeout | default(10) }}
+    
+  - name: "homepage-api-health"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+    method: "GET"
+    expected_status: [200, 302, 401]
+    timeout: {{ homepage_health_check_timeout | default(10) }}
+    
+  - name: "homepage-api-services"
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/services"
+    method: "GET"
+    expected_status: [200, 302]
+    timeout: {{ homepage_health_check_timeout | default(10) }}
+
+# Alerting configuration
+alerts:
+  enabled: true
+  channels:
+    - type: "email"
+      recipients:
+        - "admin@{{ domain }}"
+      subject: "Homepage Health Alert"
+      
+    - type: "discord"
+      webhook_url: "{{ discord_webhook_url | default('') }}"
+      channel: "monitoring"
+      
+    - type: "slack"
+      webhook_url: "{{ slack_webhook_url | default('') }}"
+      channel: "#monitoring"
+
+# Metrics collection
+metrics:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    
+  grafana:
+    enabled: true
+    dashboard_id: "homepage-health"
+    datasource: "prometheus"
+
+# Performance thresholds
+thresholds:
+  response_time:
+    warning: 2.0
+    critical: 5.0
+    
+  memory_usage:
+    warning: 80
+    critical: 95
+    
+  cpu_usage:
+    warning: 70
+    critical: 90
+    
+  disk_usage:
+    warning: 85
+    critical: 95
+
+# Service dependencies
+dependencies:
+  - name: "traefik"
+    url: "http://{{ ansible_default_ipv4.address }}:/api/health"
+    
+  - name: "docker"
+    check: "docker ps | grep {{ homepage_container_name }}"
+    
+  - name: "network"
+    check: "ping -c 1 8.8.8.8"
+
+# Recovery actions
+recovery:
+  enabled: true
+  actions:
+    - name: "restart-container"
+      command: "docker restart {{ homepage_container_name }}"
+      max_attempts: 3
+      delay: 30
+      
+    - name: "restart-service"
+      command: "systemctl restart docker"
+      max_attempts: 1
+      delay: 60
+      
+    - name: "check-config"
+      command: "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
+      max_attempts: 2
+      delay: 15 

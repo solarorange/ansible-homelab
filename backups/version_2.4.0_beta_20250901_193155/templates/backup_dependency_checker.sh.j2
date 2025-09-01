@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Backup Dependency Checker
+# Ensures services backup in the correct order
+
+set -euo pipefail
+
+SERVICE="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATUS_DIR="$SCRIPT_DIR/status"
+LOG_DIR="$SCRIPT_DIR/logs"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log() {
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/dependency_checker.log"
+}
+
+# Service dependencies (hardcoded for reliability)
+declare -A DEPENDENCIES
+DEPENDENCIES["sonarr"]="postgresql qbittorrent"
+DEPENDENCIES["radarr"]="postgresql qbittorrent"
+DEPENDENCIES["lidarr"]="postgresql qbittorrent"
+DEPENDENCIES["readarr"]="postgresql qbittorrent"
+DEPENDENCIES["jellyfin"]="postgresql sonarr radarr"
+DEPENDENCIES["emby"]="postgresql sonarr radarr"
+DEPENDENCIES["nextcloud"]="postgresql redis"
+DEPENDENCIES["paperless_ngx"]="postgresql redis"
+
+# Check if service has dependencies
+if [ -z "${DEPENDENCIES[$SERVICE]:-}" ]; then
+    log "${GREEN}No dependencies for $SERVICE${NC}"
+    exit 0
+fi
+
+log "${BLUE}Checking dependencies for $SERVICE: ${DEPENDENCIES[$SERVICE]}${NC}"
+
+# Check each dependency
+for dep in ${DEPENDENCIES[$SERVICE]}; do
+    # Check if dependency backup completed successfully
+    DEP_STATUS_FILE="$STATUS_DIR/${dep}.status"
+    DEP_PID_FILE="$STATUS_DIR/${dep}.pid"
+    
+    if [ ! -f "$DEP_STATUS_FILE" ]; then
+        log "${YELLOW}Dependency $dep has no status file${NC}"
+        continue
+    fi
+    
+    DEP_STATUS=$(cat "$DEP_STATUS_FILE" 2>/dev/null || echo "unknown")
+    
+    case $DEP_STATUS in
+        "completed")
+            log "${GREEN}Dependency $dep completed successfully${NC}"
+            ;;
+        "running")
+            # Check if process is still running
+            if [ -f "$DEP_PID_FILE" ]; then
+                DEP_PID=$(cat "$DEP_PID_FILE" 2>/dev/null || echo "")
+                if [ -n "$DEP_PID" ] && kill -0 "$DEP_PID" 2>/dev/null; then
+                    log "${YELLOW}Dependency $dep is still running (PID: $DEP_PID)${NC}"
+                    exit 1
+                else
+                    log "${YELLOW}Dependency $dep process not running, but status is 'running'${NC}"
+                    exit 1
+                fi
+            else
+                log "${YELLOW}Dependency $dep status is 'running' but no PID file${NC}"
+                exit 1
+            fi
+            ;;
+        "failed")
+            log "${RED}Dependency $dep failed${NC}"
+            exit 1
+            ;;
+        "timeout")
+            log "${RED}Dependency $dep timed out${NC}"
+            exit 1
+            ;;
+        *)
+            log "${YELLOW}Dependency $dep has unknown status: $DEP_STATUS${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+log "${GREEN}All dependencies for $SERVICE are satisfied${NC}"
+exit 0 

@@ -1,0 +1,210 @@
+---
+# Traefik SSL/TLS Configuration
+# Production-ready SSL/TLS settings with security hardening
+
+# TLS Options
+tls:
+  options:
+    default:
+      minVersion: VersionTLS13
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: true
+      alpnProtocols:
+        - h2
+        - http/1.1
+      clientAuth:
+        caFiles:
+          - /etc/ssl/certs/ca-certificates.crt
+        clientAuthType: RequireAndVerifyClientCert
+
+    modern:
+      minVersion: VersionTLS13
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+      sniStrict: true
+      alpnProtocols:
+        - h2
+        - http/1.1
+
+    intermediate:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+      curvePreferences:
+        - CurveP521
+        - CurveP384
+        - CurveP256
+      sniStrict: true
+      alpnProtocols:
+        - h2
+        - http/1.1
+
+# Certificate Resolvers
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: "{{ cloudflare_email }}"
+      storage: /etc/traefik/acme/acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      httpChallenge:
+        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+      keyType: EC256
+      preferredChain: ""
+
+  letsencrypt:
+    acme:
+      email: "{{ admin_email }}"
+      storage: /etc/traefik/acme/acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      httpChallenge:
+        entryPoint: web
+      keyType: EC256
+      preferredChain: ""
+
+# Certificate Stores
+certificatesStores:
+  default:
+    defaultCertificate:
+      certFile: /etc/traefik/certs/default.crt
+      keyFile: /etc/traefik/certs/default.key
+
+# Security Headers
+securityHeaders:
+  frameDeny: true
+  contentTypeNosniff: true
+  browserXssFilter: true
+  referrerPolicy: "strict-origin-when-cross-origin"
+  permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=()"
+  contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
+  customFrameOptionsValue: "SAMEORIGIN"
+  forceSTSHeader: true
+  stsIncludeSubdomains: true
+  stsPreload: true
+  stsSeconds: 31536000
+
+# HSTS Configuration
+hsts:
+  enabled: true
+  maxAge: 31536000
+  includeSubDomains: true
+  preload: true
+
+# OCSP Stapling
+ocspStapling:
+  enabled: true
+  responderURL: "http://ocsp.int-x3.letsencrypt.org"
+
+# Certificate Transparency
+certificateTransparency:
+  enabled: true
+  logServers:
+    - "https://ct.googleapis.com/logs/argon2020"
+    - "https://ct.cloudflare.com/logs/nimbus2020"
+    - "https://ct.digicert.com/logs/ct1"
+
+# Certificate Renewal
+certificateRenewal:
+  enabled: true
+  checkInterval: "24h"
+  renewThreshold: "720h"  # 30 days
+  maxRetries: 3
+  retryDelay: "1h"
+
+# Certificate Monitoring
+certificateMonitoring:
+  enabled: true
+  checkInterval: "1h"
+  alertThreshold: "168h"  # 7 days
+  metrics:
+    enabled: true
+    path: /metrics
+    port: 8080
+
+# Backup Configuration
+certificateBackup:
+  enabled: true
+  backupDir: /etc/traefik/backups
+  retention: 30
+  compression: true
+  encryption: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+
+# Domain-specific configurations
+domains:
+  - name: "{{ domain }}"
+    certificateResolver: cloudflare
+    tlsOptions: modern
+    redirectToHTTPS: true
+    forceHTTPS: true
+    
+  - name: "*.{{ domain }}"
+    certificateResolver: cloudflare
+    tlsOptions: modern
+    redirectToHTTPS: true
+    forceHTTPS: true
+
+# Wildcard certificate configuration
+wildcardCertificates:
+  enabled: true
+  domains:
+    - "*.{{ domain }}"
+  certificateResolver: cloudflare
+  tlsOptions: modern
+
+# Certificate validation
+certificateValidation:
+  enabled: true
+  checkInterval: "1h"
+  validationMethods:
+    - http
+    - dns
+  timeout: "30s"
+  retries: 3
+
+# Certificate transparency monitoring
+ctMonitoring:
+  enabled: true
+  logServers:
+    - "https://ct.googleapis.com/logs/argon2020"
+    - "https://ct.cloudflare.com/logs/nimbus2020"
+  checkInterval: "6h"
+  alertOnFailure: true
+
+# Certificate pinning
+certificatePinning:
+  enabled: true
+  maxAge: 5184000  # 60 days
+  includeSubDomains: true
+  reportURI: "https://{{ domain }}/report-uri"
+  reportOnly: false 

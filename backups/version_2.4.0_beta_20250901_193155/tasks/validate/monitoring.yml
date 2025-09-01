@@ -1,0 +1,114 @@
+---
+# Monitoring Validation
+# Validates monitoring integration and alerting
+
+- name: Validate monitoring integration
+  block:
+    - name: Check Prometheus targets
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/targets"
+        method: GET
+        status_code: 200
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: prometheus_targets
+      when: "'prometheus' in enabled_services"
+
+    - name: Display Prometheus targets
+      ansible.builtin.debug:
+        var: prometheus_targets.json.data.activeTargets
+      when: "'prometheus' in enabled_services"
+
+    - name: Check Grafana datasources
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:3000/api/datasources"
+        method: GET
+        status_code: 200
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+        headers:
+          Authorization: "Bearer {{ vault_grafana_api_key }}"
+      register: grafana_datasources
+      when: "'grafana' in enabled_services"
+
+    - name: Display Grafana datasources
+      ansible.builtin.debug:
+        var: grafana_datasources.json
+      when: "'grafana' in enabled_services"
+
+    - name: Check Loki targets
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/loki/api/v1/targets"
+        method: GET
+        status_code: 200
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: loki_targets
+      when: "'loki' in enabled_services"
+
+    - name: Display Loki targets
+      ansible.builtin.debug:
+        var: loki_targets.json.data
+      when: "'loki' in enabled_services"
+
+    - name: Check Alertmanager configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+        method: GET
+        status_code: 200
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: alertmanager_status
+      when: "'alertmanager' in enabled_services"
+
+    - name: Display Alertmanager status
+      ansible.builtin.debug:
+        var: alertmanager_status.json
+      when: "'alertmanager' in enabled_services"
+
+    - name: Check for monitoring labels on containers
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "prometheus"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_monitoring
+      changed_when: false
+
+    - name: Warn about containers without monitoring
+      ansible.builtin.debug:
+        msg: "Containers without monitoring labels: {{ containers_without_monitoring.stdout_lines }}"
+      when: containers_without_monitoring.stdout_lines | length > 0
+
+    - name: Check for logging labels on containers
+      ansible.builtin.shell: |
+        docker ps --format "{{.Names}}" | while read container; do
+          if ! docker inspect "$container" | grep -q "loki\|promtail"; then
+            echo "$container"
+          fi
+        done
+      register: containers_without_logging
+      changed_when: false
+
+    - name: Warn about containers without logging
+      ansible.builtin.debug:
+        msg: "Containers without logging labels: {{ containers_without_logging.stdout_lines }}"
+      when: containers_without_logging.stdout_lines | length > 0
+
+    - name: Validate monitoring metrics collection
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/query?query=up"
+        method: GET
+        status_code: 200
+        timeout: 10
+        validate_certs: "{{ validate_certs | default(true) }}"
+      register: prometheus_metrics
+      when: "'prometheus' in enabled_services"
+
+    - name: Display monitoring metrics status
+      ansible.builtin.debug:
+        msg: "Prometheus metrics collection: {{ 'OK' if prometheus_metrics.status == 200 else 'FAILED' }}"
+      when: "'prometheus' in enabled_services"
+
+  tags: [validation, monitoring]

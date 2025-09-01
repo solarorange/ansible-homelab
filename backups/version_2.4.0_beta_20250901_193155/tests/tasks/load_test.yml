@@ -1,0 +1,78 @@
+---
+# Load testing tasks for services
+- name: Install load testing tools
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apache2-utils
+    - siege
+    - wrk
+  when: ansible_os_family == "Debian"
+
+- name: Prepare load test configuration
+  ansible.builtin.template:
+    src: templates/load_test_config.j2
+    dest: "/tmp/{{ service_name }}_load_test.json"
+  vars:
+    test_config:
+      service: "{{ service_name }}"
+      duration: "{{ test_duration }}"
+      users: "{{ concurrent_users }}"
+      endpoints: "{{ service_endpoints }}"
+
+- name: Run load test
+  ansible.builtin.shell: |
+    wrk -t{{ concurrent_users }} -c{{ concurrent_users }} -d{{ test_duration }}s \
+    -s /tmp/{{ service_name }}_load_test.lua \
+    {{ service_url }}
+  register: load_test_result
+  changed_when: false
+
+- name: Parse load test results
+  ansible.builtin.set_fact:
+    load_test_metrics: "{{ load_test_result.stdout | regex_findall('(\\d+\\.\\d+)') }}"
+
+- name: Check performance thresholds
+  ansible.builtin.fail:
+    msg: |
+      Load test failed for {{ service_name }}:
+      - Average Latency: {{ load_test_metrics[0] }}ms (threshold: 200ms)
+      - Requests/sec: {{ load_test_metrics[1] }} (threshold: 100)
+      - Error Rate: {{ load_test_metrics[2] }}% (threshold: 1%)
+  when: >
+    load_test_metrics[0] | float > 200 or
+    load_test_metrics[1] | float < 100 or
+    load_test_metrics[2] | float > 1
+
+- name: Generate load test report
+  ansible.builtin.template:
+    src: templates/load_test_report.j2
+    dest: "/var/log/ansible/{{ service_name }}_load_test_{{ ansible_date_time.iso8601_basic_short }}.html"
+  vars:
+    test_results:
+      service: "{{ service_name }}"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      duration: "{{ test_duration }}"
+      concurrent_users: "{{ concurrent_users }}"
+      metrics: "{{ load_test_metrics }}"
+      summary: "{{ load_test_result.stdout }}"
+
+- name: Send load test notification
+  ansible.builtin.uri:
+    url: "{{ notification_webhook_url }}"
+    method: POST
+    body_format: json
+    body: |
+      {
+        "status": "{{ 'warning' if load_test_metrics[0] | float > 200 or load_test_metrics[2] | float > 1 else 'success' }}",
+        "message": "Load test completed for {{ service_name }}",
+        "metrics": {
+          "latency": "{{ load_test_metrics[0] }}ms",
+          "requests_per_sec": "{{ load_test_metrics[1] }}",
+          "error_rate": "{{ load_test_metrics[2] }}%"
+        },
+        "host": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}"
+      }
+  when: notification_webhook_url is defined

@@ -1,0 +1,31 @@
+# Linkwarden Grafana Alerts Configuration
+# Grafana alert configuration for Linkwarden
+
+alerts:
+  - name: "Linkwarden Service Health"
+    condition: "A"
+    frequency: "1m"
+    handler: 1
+    message: "Linkwarden service is down or unhealthy"
+    noDataState: "OK"
+    notifications: []
+    orgId: 1
+    panelId: 1
+    state: "OK"
+    type: "graph"
+    uid: "linkwarden-health"
+    for: "1m"
+    grafana_alert:
+      uid: "linkwarden-health"
+      title: "Linkwarden Service Health"
+      condition: "A"
+      data:
+        - refId: "A"
+          relativeTimeRange:
+            from: 600
+            to: 0
+          datasourceUid: "prometheus"
+          model:
+            expr: "up{job=\"linkwarden\"}"
+            intervalMs: 1000
+            maxDataPoints: 43200 

@@ -1,0 +1,568 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Media Stack",
+    "tags": ["media", "plex", "jellyfin", "sonarr", "radarr", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "media_service",
+          "type": "query",
+          "query": "label_values(up, job=~\"plex|jellyfin|sonarr|radarr|bazarr|lidarr|readarr|tautulli\")",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Media Service"
+        },
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up, instance)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Instance"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Media Services Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"plex|jellyfin|sonarr|radarr|bazarr|lidarr|readarr|tautulli\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Streams",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "plex_active_streams_total",
+            "legendFormat": "Plex Streams"
+          },
+          {
+            "expr": "jellyfin_active_streams_total",
+            "legendFormat": "Jellyfin Streams"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Library Statistics",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sonarr_series_total",
+            "legendFormat": "Sonarr Series"
+          },
+          {
+            "expr": "radarr_movies_total",
+            "legendFormat": "Radarr Movies"
+          },
+          {
+            "expr": "lidarr_artists_total",
+            "legendFormat": "Lidarr Artists"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Download Queue",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sonarr_queue_total",
+            "legendFormat": "Sonarr Queue"
+          },
+          {
+            "expr": "radarr_queue_total",
+            "legendFormat": "Radarr Queue"
+          },
+          {
+            "expr": "lidarr_queue_total",
+            "legendFormat": "Lidarr Queue"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Media Services Health",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "up{job=~\"$media_service\"}",
+            "legendFormat": "{{job}} - {{instance}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "custom": {
+              "displayMode": "color-background"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Service"
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Streaming Activity",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(plex_active_streams_total[5m])",
+            "legendFormat": "Plex Streams/sec"
+          },
+          {
+            "expr": "rate(jellyfin_active_streams_total[5m])",
+            "legendFormat": "Jellyfin Streams/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Download Activity",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(sonarr_downloads_total[5m])",
+            "legendFormat": "Sonarr Downloads/sec"
+          },
+          {
+            "expr": "rate(radarr_downloads_total[5m])",
+            "legendFormat": "Radarr Downloads/sec"
+          },
+          {
+            "expr": "rate(lidarr_downloads_total[5m])",
+            "legendFormat": "Lidarr Downloads/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Transcoding Activity",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(plex_transcoding_sessions_total[5m])",
+            "legendFormat": "Plex Transcoding"
+          },
+          {
+            "expr": "rate(jellyfin_transcoding_sessions_total[5m])",
+            "legendFormat": "Jellyfin Transcoding"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Library Growth",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sonarr_series_total",
+            "legendFormat": "Sonarr Series"
+          },
+          {
+            "expr": "radarr_movies_total",
+            "legendFormat": "Radarr Movies"
+          },
+          {
+            "expr": "lidarr_artists_total",
+            "legendFormat": "Lidarr Artists"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Queue Status",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sonarr_queue_total",
+            "legendFormat": "Sonarr Queue"
+          },
+          {
+            "expr": "radarr_queue_total",
+            "legendFormat": "Radarr Queue"
+          },
+          {
+            "expr": "lidarr_queue_total",
+            "legendFormat": "Lidarr Queue"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Media Server Performance",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=~\"plex|jellyfin\"}[5m]) * 100",
+            "legendFormat": "{{name}} CPU"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 32},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 12,
+        "title": "Download Client Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"qbittorrent|transmission|sabnzbd|nzbget\"}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 32},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 13,
+        "title": "Storage Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=~\"/media|/movies|/tv|/music\"} / node_filesystem_size_bytes{mountpoint=~\"/media|/movies|/tv|/music\"})) * 100",
+            "legendFormat": "{{mountpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 32},
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 14,
+        "title": "Recent Activity",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{container_name=~\"plex|jellyfin|sonarr|radarr|lidarr\"}",
+            "legendFormat": "{{container_name}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 32},
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "showCommonLabels": false,
+          "wrapLogMessage": true,
+          "prettifyLogMessage": true,
+          "enableLogDetails": true,
+          "sortOrder": "Descending",
+          "dedupStrategy": "none"
+        }
+      }
+    ],
+    "schemaVersion": 30,
+    "version": 1
+  },
+  "folderTitle": "{{ grafana_dashboard_categories.media_stack.folder | default('Media Stack') }}",
+  "overwrite": true
+} 

@@ -1,0 +1,84 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+  monitoring:
+    name: monitoring
+    external: true
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - "{{ data_dir }}/redis:/data"
+      - "{{ config_dir }}/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro"
+      - "{{ logs_dir }}/redis:/var/log/redis"
+      - "{{ docker_dir }}/redis/secrets:/run/secrets:ro"
+    # No host port exposure; internal network access only
+    # ports:
+    #   - "6379:6379"
+    networks:
+      - homelab
+      - monitoring
+    labels:
+      - "traefik.enable=false"
+      - "prometheus.enable=true"
+      - "prometheus.job=redis"
+      - "prometheus.port=6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 26677
+        hard: 46677
+    # Resource controls for Docker Engine
+    mem_limit: 1g
+    cpus: '0.5'
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis_exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR__FILE=/run/secrets/REDIS_EXPORTER_ADDR
+      - REDIS_PASSWORD_FILE=/run/secrets/REDIS_PASSWORD
+    # No host port exposure; scrape internally
+    # ports:
+    #   - "9121:9121"
+    networks:
+      - monitoring
+    volumes:
+      - "{{ docker_dir }}/redis/secrets:/run/secrets:ro"
+    labels:
+      - "traefik.enable=false"
+      - "prometheus.enable=true"
+      - "prometheus.job=redis_exporter"
+      - "prometheus.port=9121"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9121/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 64m
+    cpus: '0.1'

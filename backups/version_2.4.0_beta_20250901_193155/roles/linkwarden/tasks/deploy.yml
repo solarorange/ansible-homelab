@@ -1,0 +1,184 @@
+---
+# Linkwarden Deployment Tasks
+# Handles Docker deployment, directory creation, and basic configuration
+
+- name: Create Linkwarden directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ linkwarden_config_dir }}"
+    - "{{ linkwarden_app_config_dir }}"
+    - "{{ linkwarden_postgres_config_dir }}"
+    - "{{ linkwarden_backup_dir }}"
+    - "{{ logs_dir }}/linkwarden"
+    - "{{ logs_dir }}/linkwarden/app"
+    - "{{ logs_dir }}/linkwarden/postgres"
+    - "{{ logs_dir }}/linkwarden/backup"
+    - "{{ logs_dir }}/linkwarden/health"
+    - "{{ linkwarden_config_dir }}/scripts"
+  register: linkwarden_dir_creation
+  tags: [linkwarden, linkwarden-deploy, directories]
+
+- name: Backup existing Linkwarden configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir }}/linkwarden/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ linkwarden_app_config_dir }}/config.json"
+    - "{{ linkwarden_config_dir }}/docker-compose.yml"
+  when: item is file
+  register: linkwarden_config_backup
+  tags: [linkwarden, linkwarden-deploy, backup]
+
+- name: Create Linkwarden Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ linkwarden_config_dir }}/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: linkwarden_docker_compose_creation
+  tags: [linkwarden, linkwarden-deploy, config]
+
+- name: Prepare Linkwarden secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "linkwarden"
+    secret_dir_root: "{{ docker_dir }}/linkwarden"
+    secret_files: "{{ linkwarden_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ linkwarden_components.app.environment | default({}) }}"
+      - "{{ linkwarden_components.postgres.environment | default({}) }}"
+  when: linkwarden_manage_secret_files | default(true) | bool
+  tags: [linkwarden, linkwarden-deploy, setup]
+
+- name: Validate Linkwarden env maps use *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ linkwarden_components.app.environment | default({}) }}"
+  when: linkwarden_manage_secret_files | default(true) | bool
+  tags: [linkwarden, linkwarden-deploy, validate]
+
+- name: Validate required Linkwarden secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/linkwarden/secrets/{{ item }}"
+  register: linkwarden_secret_stats
+  loop: "{{ linkwarden_required_secrets | default([]) }}"
+  when: linkwarden_manage_secret_files | default(true) | bool and (linkwarden_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Linkwarden secret files are missing
+  ansible.builtin.assert:
+    that: "{{ linkwarden_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/linkwarden/secrets.
+      Missing: {{ (linkwarden_required_secrets | default([])) | reject('in', (linkwarden_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: linkwarden_manage_secret_files | default(true) | bool and (linkwarden_required_secrets | default([]) | length > 0)
+
+- name: Create Linkwarden backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ linkwarden_config_dir }}/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: linkwarden_backup_script_creation
+  tags: [linkwarden, linkwarden-deploy, scripts]
+
+- name: Create Linkwarden management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ linkwarden_config_dir }}/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: linkwarden_management_script_creation
+  tags: [linkwarden, linkwarden-deploy, scripts]
+
+- name: Create Linkwarden health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ linkwarden_config_dir }}/scripts/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: linkwarden_healthcheck_script_creation
+  tags: [linkwarden, linkwarden-deploy, scripts]
+
+- name: Start Linkwarden services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "linkwarden"
+    project_src: "{{ linkwarden_config_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ linkwarden_port }}"
+  tags: [linkwarden, linkwarden-deploy, docker, rollback]
+
+- name: Wait for Linkwarden to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ linkwarden_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: linkwarden_health_check
+  retries: 30
+  delay: 10
+  until: linkwarden_health_check.status in [200, 302, 401]
+  tags: [linkwarden, linkwarden-deploy, wait]
+  when: linkwarden_direct_expose_enabled | default(false)
+
+- name: Wait for Linkwarden via Traefik to be ready
+  ansible.builtin.uri:
+    url: "https://{{ linkwarden_subdomain }}.{{ domain }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+    validate_certs: true
+  register: linkwarden_health_check_route
+  retries: 30
+  delay: 10
+  until: linkwarden_health_check_route.status in [200, 302, 401]
+  tags: [linkwarden, linkwarden-deploy, wait]
+  when: not (linkwarden_direct_expose_enabled | default(false))
+
+- name: Verify Linkwarden deployment
+  ansible.builtin.uri:
+    url: "https://{{ linkwarden_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 302]
+    timeout: 30
+  register: linkwarden_verification
+  tags: [linkwarden, linkwarden-deploy, verify]
+
+- name: Display Linkwarden deployment status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      LINKWARDEN DEPLOYMENT STATUS
+      ========================================
+
+      Status: {{ 'SUCCESS' if linkwarden_verification.status == 200 or linkwarden_verification.status == 302 else 'FAILED' }}
+      URL: https://{{ linkwarden_subdomain }}.{{ domain }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ linkwarden_port }}
+
+      Configuration:
+      - Database: {{ linkwarden_database_type }}
+      - Auth Method: {{ linkwarden_auth_method }}
+      - Monitoring: {{ linkwarden_monitoring_enabled }}
+      - Backup: {{ linkwarden_backup_enabled }}
+
+      Directories:
+      - Docker: {{ linkwarden_config_dir }}
+      - App Config: {{ linkwarden_app_config_dir }}
+      - Postgres: {{ linkwarden_postgres_config_dir }}
+      - Backup: {{ linkwarden_backup_dir }}
+      - Logs: {{ logs_dir }}/linkwarden
+
+      ========================================
+  tags: [linkwarden, linkwarden-deploy, summary]

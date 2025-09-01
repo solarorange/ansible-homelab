@@ -1,0 +1,42 @@
+---
+# Configure monitoring thresholds
+# Sets up Prometheus alerting rules with custom thresholds
+
+- name: Configure monitoring thresholds
+  hosts: monitoring
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Create alerting rules directory
+      file:
+        path: /etc/prometheus/rules
+        state: directory
+        mode: '0755'
+        owner: prometheus
+        group: prometheus
+
+    - name: Configure Prometheus alerting rules
+      template:
+        src: templates/monitoring/health-alerts.yml.j2
+        dest: /etc/prometheus/rules/homelab-alerts.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Update Prometheus configuration
+      template:
+        src: templates/monitoring/prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+      notify: restart prometheus
+
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+        enabled: yes
+      when: prometheus_service_exists.stat.exists | default(false)

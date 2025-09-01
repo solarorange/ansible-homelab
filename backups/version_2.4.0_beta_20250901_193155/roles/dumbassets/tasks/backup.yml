@@ -1,0 +1,106 @@
+---
+# DumbAssets Backup Tasks
+# Configure automated backup and restore procedures
+
+- name: Create DumbAssets backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/backup.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+  register: dumbassets_backup_script
+  tags: [dumbassets, backup, scripts]
+
+- name: Create DumbAssets restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/restore.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+  register: dumbassets_restore_script
+  tags: [dumbassets, backup, scripts]
+
+- name: Create DumbAssets backup configuration
+  ansible.builtin.template:
+    src: backup.yml.j2
+    dest: "{{ docker_config_root }}/backup/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_backup_config
+  tags: [dumbassets, backup, config]
+
+- name: Configure DumbAssets backup cron job
+  ansible.builtin.cron:
+    name: "DumbAssets Daily Backup"
+    hour: "2"
+    minute: "0"
+    job: "{{ dumbassets_docker_dir }}/scripts/backup.sh"
+    user: "{{ vault_dumbassets_user | default('homelab') }}"
+    state: present
+  register: dumbassets_backup_cron
+  tags: [dumbassets, backup, cron]
+
+- name: Configure DumbAssets backup retention
+  ansible.builtin.template:
+    src: retention.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/retention.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+  register: dumbassets_retention_script
+  tags: [dumbassets, backup, retention]
+
+- name: Create DumbAssets backup verification script
+  ansible.builtin.template:
+    src: verify_backup.sh.j2
+    dest: "{{ dumbassets_docker_dir }}/scripts/verify_backup.sh"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+  register: dumbassets_verify_script
+  tags: [dumbassets, backup, verification]
+
+- name: Configure DumbAssets backup monitoring
+  ansible.builtin.template:
+    src: backup_monitoring.yml.j2
+    dest: "{{ docker_config_root }}/prometheus/rules/dumbassets_backup.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload prometheus
+  register: dumbassets_backup_monitoring
+  tags: [dumbassets, backup, monitoring]
+
+- name: Create DumbAssets backup directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0750"
+  loop:
+    - "{{ dumbassets_backup_dir }}/daily"
+    - "{{ dumbassets_backup_dir }}/weekly"
+    - "{{ dumbassets_backup_dir }}/monthly"
+    - "{{ dumbassets_backup_dir }}/logs"
+  register: dumbassets_backup_dirs
+  tags: [dumbassets, backup, directories]
+
+- name: Display DumbAssets backup configuration summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Backup Configuration Summary:
+      - Backup Script: {{ dumbassets_backup_script.changed }}
+      - Restore Script: {{ dumbassets_restore_script.changed }}
+      - Backup Config: {{ dumbassets_backup_config.changed }}
+      - Cron Job: {{ dumbassets_backup_cron.changed }}
+      - Retention Script: {{ dumbassets_retention_script.changed }}
+      - Verify Script: {{ dumbassets_verify_script.changed }}
+      - Backup Monitoring: {{ dumbassets_backup_monitoring.changed }}
+      - Backup Directories: {{ dumbassets_backup_dirs.results | length }}
+      - Backup Retention: {{ dumbassets_backup_retention_days }} days
+      - Backup Compression: {{ dumbassets_backup_compression }}
+  tags: [dumbassets, backup, summary]

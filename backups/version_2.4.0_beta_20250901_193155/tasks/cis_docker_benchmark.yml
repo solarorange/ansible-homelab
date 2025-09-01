@@ -1,0 +1,29 @@
+---
+# CIS Docker Benchmark Compliance
+# Runs Docker security benchmarks and reports results
+
+- name: Ensure Docker Bench for Security is present
+  ansible.builtin.git:
+    repo: 'https://github.com/docker/docker-bench-security.git'
+    dest: /opt/docker-bench-security
+    version: master
+  tags: [compliance, cis, docker]
+
+- name: Run Docker Bench for Security
+  ansible.builtin.shell: |
+    sh /opt/docker-bench-security/docker-bench-security.sh
+  register: docker_bench_results
+  changed_when: false
+  tags: [compliance, cis, docker]
+
+- name: Save Docker Bench results
+  ansible.builtin.copy:
+    content: "{{ docker_bench_results.stdout }}"
+    dest: "{{ logs_dir }}/docker-bench-security.log"
+    mode: '0644'
+  tags: [compliance, cis, docker]
+
+- name: Notify on critical CIS benchmark failures
+  ansible.builtin.debug:
+    msg: "CIS Docker Benchmark completed. Review {{ logs_dir }}/docker-bench-security.log for critical findings."
+  tags: [compliance, cis, docker]

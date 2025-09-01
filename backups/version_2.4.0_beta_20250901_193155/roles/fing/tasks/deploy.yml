@@ -1,0 +1,303 @@
+---
+# Fing Service Deployment
+# Deploys Fing container with Docker Compose and Traefik integration
+
+- name: Create Fing Docker Compose file
+  ansible.builtin.template:
+    src: "docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/fing/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: fing_compose_created
+
+- name: Prepare Fing secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "fing"
+    secret_files: "{{ fing_secret_files if fing_manage_secret_files else [] }}"
+  when: fing_manage_secret_files | bool
+
+- name: Validate required Fing secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/fing/secrets/{{ item }}"
+  register: fing_secret_stats
+  loop: "{{ fing_required_secrets | default([]) }}"
+  when: fing_manage_secret_files | bool and (fing_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Fing secret files are missing
+  ansible.builtin.assert:
+    that: "{{ fing_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/fing/secrets.
+      Missing: {{ (fing_required_secrets | default([])) | reject('in', (fing_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: fing_manage_secret_files | bool and (fing_required_secrets | default([]) | length > 0)
+
+- name: Create Fing Traefik configuration
+  ansible.builtin.template:
+    src: "traefik.yml.j2"
+    dest: "{{ docker_dir }}/fing/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: fing_traefik_enabled | default(true)
+
+- name: Create Fing network configuration
+  ansible.builtin.template:
+    src: "network.yml.j2"
+    dest: "{{ docker_dir }}/fing/network.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Backup existing Fing configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir }}/fing/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ docker_dir }}/fing/docker-compose.yml"
+    - "{{ docker_dir }}/fing/config/config.yml"
+    - "{{ docker_dir }}/fing/.env"
+  when: item is file
+  register: fing_config_backup
+
+- name: Pull Fing Docker image
+  community.docker.docker_image:
+    name: "{{ fing_image }}"
+    tag: "{{ fing_version }}"
+    source: pull
+    force_source: true
+  register: fing_image_pulled
+
+- name: Create Fing Docker network
+  community.docker.docker_network:
+    name: "fing"
+    state: present
+    driver: bridge
+    ipam_config:
+      - subnet: "{{ ansible_default_ipv4.address }}/16"
+  register: fing_network_created
+
+- name: Deploy Fing container safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "fing"
+    project_src: "{{ docker_dir }}/fing"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ fing_web_port }}"
+  register: fing_deploy_result
+
+- name: Wait for Fing container to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ fing_web_port }}"
+    delay: 10
+    timeout: 300
+  when: fing_deploy_result.changed
+
+- name: Check Fing container health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}{{ fing_health_check_url }}"
+    method: GET
+    status_code: 200
+    timeout: "{{ fing_health_check_timeout }}"
+  register: fing_health_check
+  retries: "{{ fing_health_check_retries }}"
+  delay: 10
+  until: fing_health_check.status == 200
+  when:
+    - fing_deploy_result.changed
+    - fing_direct_expose_enabled | default(false)
+
+- name: Initialize Fing database
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing init-db"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_database_type == "sqlite"
+  register: fing_db_init
+
+- name: Create Fing admin user (reads password from /run/secrets/FING_ADMIN_PASSWORD)
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} sh -lc 'fing create-admin --email {{ fing_admin_email }} --password "$(cat /run/secrets/FING_ADMIN_PASSWORD)"'"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_auth_enabled | default(true)
+  register: fing_admin_created
+
+- name: Configure Fing network discovery
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-network --ranges {{ fing_network_ranges | join(',') }} --interval {{ fing_scan_interval }}"
+    chdir: "{{ docker_dir }}/fing"
+  when: fing_deploy_result.changed
+  register: fing_network_config
+
+- name: Start Fing network discovery
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing start-discovery"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_auto_discovery | default(true)
+  register: fing_discovery_started
+
+- name: Configure Fing API
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-api --key {{ fing_api_key }} --rate-limit {{ fing_api_rate_limit }}"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_api_enabled | default(true)
+  register: fing_api_config
+
+- name: Configure Fing webhooks
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-webhooks --events {{ fing_webhook_events | join(',') }}"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_webhooks_enabled | default(true)
+  register: fing_webhooks_config
+
+- name: Configure Fing notifications
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-notifications --channels {{ fing_notification_channels | join(',') }}"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_notifications_enabled | default(true)
+  register: fing_notifications_config
+
+- name: Configure Fing email notifications (reads password from /run/secrets/FING_SMTP_PASSWORD)
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} sh -lc 'fing configure-email --host {{ fing_smtp_host }} --port {{ fing_smtp_port }} --username {{ fing_smtp_username }} --password "$(cat /run/secrets/FING_SMTP_PASSWORD)"'"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_email_enabled | default(false)
+  register: fing_email_config
+
+- name: Configure Fing Slack notifications
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-slack --webhook {{ fing_slack_webhook }} --channel {{ fing_slack_channel }}"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_slack_enabled | default(false)
+  register: fing_slack_config
+
+- name: Configure Fing Discord notifications
+  ansible.builtin.command:
+    cmd: "docker exec {{ fing_container_name }} fing configure-discord --webhook {{ fing_discord_webhook }} --channel {{ fing_discord_channel }}"
+    chdir: "{{ docker_dir }}/fing"
+  when:
+    - fing_deploy_result.changed
+    - fing_discord_enabled | default(false)
+  register: fing_discord_config
+
+- name: Restart Fing container to apply configuration
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/fing"
+    state: present
+    restarted: true
+  when:
+    - fing_deploy_result.changed
+    - (fing_admin_created.changed or fing_network_config.changed or fing_api_config.changed or fing_webhooks_config.changed or fing_notifications_config.changed)
+  register: fing_restart_result
+
+- name: Wait for Fing to be ready after restart
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ fing_web_port }}"
+    delay: 10
+    timeout: 300
+  when: fing_restart_result.changed
+
+- name: Verify Fing deployment
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ fing_web_port }}{{ fing_health_check_url }}"
+    method: GET
+    status_code: 200
+    timeout: "{{ fing_health_check_timeout }}"
+  register: fing_final_health_check
+  when: fing_restart_result.changed and (fing_direct_expose_enabled | default(false))
+
+- name: Get Fing container status
+  community.docker.docker_container_info:
+    name: "{{ fing_container_name }}"
+  register: fing_container_info
+
+- name: Verify Fing via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ fing_domain }}{{ fing_health_check_url }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: "{{ fing_health_check_timeout }}"
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (fing_direct_expose_enabled | default(false))
+
+- name: Display Fing deployment summary
+  ansible.builtin.debug:
+    msg: |
+      Fing Deployment Summary:
+
+      Container Status: {{ fing_container_info.container.State.Status }}
+      Health Check: {{ fing_final_health_check.status | default('N/A') }}
+      Web Port: {{ fing_web_port }}
+      API Port: {{ fing_api_port }}
+      Domain: {{ fing_domain }}
+
+      Configuration Applied:
+      - Database: {{ fing_db_init.changed | default(false) }}
+      - Admin User: {{ fing_admin_created.changed | default(false) }}
+      - Network Discovery: {{ fing_network_config.changed | default(false) }}
+      - API: {{ fing_api_config.changed | default(false) }}
+      - Webhooks: {{ fing_webhooks_config.changed | default(false) }}
+      - Notifications: {{ fing_notifications_config.changed | default(false) }}
+
+      Access Information:
+      - Web Interface: https://{{ fing_domain }}
+      - API Endpoint: https://{{ fing_domain }}/api/{{ fing_api_version }}
+      - Admin Email: {{ fing_admin_email }}
+
+      Network Discovery:
+      - Auto Discovery: {{ fing_auto_discovery | default(true) }}
+      - Scan Interval: {{ fing_scan_interval }}s
+      - Network Ranges: {{ fing_network_ranges | join(', ') }}
+      - Max Devices: {{ fing_max_devices }}
+
+      Monitoring Integration:
+      - Metrics: {{ fing_metrics_enabled | default(true) }}
+      - Health Checks: {{ fing_health_check_enabled | default(true) }}
+      - Prometheus: {{ fing_prometheus_enabled | default(true) }}
+      - Grafana: {{ fing_grafana_enabled | default(true) }}
+
+      Security Features:
+      - Authentication: {{ fing_auth_enabled | default(true) }}
+      - Rate Limiting: {{ fing_rate_limiting | default(true) }}
+      - Security Headers: {{ fing_security_headers | default(true) }}
+      - CORS: {{ fing_cors_enabled | default(false) }}
+
+      Backup & Maintenance:
+      - Backup Enabled: {{ fing_backup_enabled | default(true) }}
+      - Maintenance Enabled: {{ fing_maintenance_enabled | default(true) }}
+      - Log Rotation: {{ fing_log_rotation | default(true) }}
+
+      Resource Usage:
+      - Memory Limit: {{ fing_memory_limit }}
+      - CPU Limit: {{ fing_cpu_limit }}
+      - Storage Limit: {{ fing_storage_limit }}
+
+      Next Steps:
+      1. Access the web interface at https://{{ fing_domain }}
+      2. Login with admin credentials
+      3. Configure network ranges and discovery settings
+      4. Set up monitoring dashboards
+      5. Configure alerting rules
+      6. Test network discovery functionality

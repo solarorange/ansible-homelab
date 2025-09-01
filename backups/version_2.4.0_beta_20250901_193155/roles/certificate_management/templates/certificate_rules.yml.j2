@@ -1,0 +1,56 @@
+groups:
+  - name: certificate_alerts
+    rules:
+      - alert: CertificateExpiringSoon
+        expr: days_remaining < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate expiring soon"
+          description: "Certificate for {{ '{{ $labels.domain }}' }} will expire in {{ '{{ $value }}' }} days"
+
+      - alert: CertificateExpiringVerySoon
+        expr: days_remaining < 7
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate expiring very soon"
+          description: "Certificate for {{ '{{ $labels.domain }}' }} will expire in {{ '{{ $value }}' }} days"
+
+      - alert: CertificateRenewalFailed
+        expr: certificate_renewal_failed > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate renewal failed"
+          description: "Failed to renew certificate for {{ '{{ $labels.domain }}' }}"
+
+      - alert: OCSPStaplingFailed
+        expr: ocsp_stapling_failed > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "OCSP stapling failed"
+          description: "OCSP stapling failed for certificate {{ '{{ $labels.domain }}' }}"
+
+      - alert: CertificateHealthCheckFailed
+        expr: certificate_health_check_failed > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate health check failed"
+          description: "Health check failed for certificate {{ '{{ $labels.domain }}' }}"
+
+      - alert: mTLSValidationFailed
+        expr: mtls_validation_failed > 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "mTLS validation failed"
+          description: "mTLS validation failed for service {{ '{{ $labels.service }}' }}" 

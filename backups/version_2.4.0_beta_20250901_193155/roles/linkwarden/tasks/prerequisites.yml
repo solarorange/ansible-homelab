@@ -1,0 +1,40 @@
+---
+# Linkwarden Prerequisites
+# Validates system requirements and dependencies
+
+- name: Check Docker availability
+  ansible.builtin.command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: docker_check.rc != 0
+  tags: [linkwarden, linkwarden-setup, prerequisites]
+
+- name: Check Docker Compose availability
+  ansible.builtin.command: docker-compose --version
+  register: docker_compose_check
+  changed_when: false
+  failed_when: docker_compose_check.rc != 0
+  tags: [linkwarden, linkwarden-setup, prerequisites]
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - linkwarden_subdomain is defined
+      - linkwarden_database_password is defined
+      - linkwarden_nextauth_secret is defined
+    fail_msg: "Required Linkwarden variables are not defined. Check group_vars/all/vars.yml"
+  tags: [linkwarden, linkwarden-setup, validation]
+
+- name: Check port availability
+  ansible.builtin.wait_for:
+    port: "{{ linkwarden_port }}"
+    state: stopped
+    timeout: 5
+  tags: [linkwarden, linkwarden-setup, prerequisites]
+
+- name: Create Docker network if not exists
+  community.docker.docker_network:
+    name: "{{ linkwarden_network_name }}"
+    state: present
+    external: "{{ linkwarden_network_external }}"
+  tags: [linkwarden, linkwarden-setup, network]

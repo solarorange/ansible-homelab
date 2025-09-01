@@ -1,0 +1,278 @@
+---
+# Pezzo Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# PEZZO SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+pezzo_service_name: "pezzo"
+pezzo_container_name: "{{ pezzo_service_name }}"
+pezzo_image: "ghcr.io/pezzo/pezzo:latest"
+pezzo_version: "latest"
+
+# Network Configuration
+pezzo_port: 3004
+pezzo_external_port: "{{ pezzo_port }}"
+pezzo_protocol: "http"
+pezzo_host: "{{ ansible_default_ipv4.address }}"
+pezzo_url: "{{ pezzo_protocol }}://{{ pezzo_host }}:{{ pezzo_port }}"
+
+# Domain Configuration
+pezzo_subdomain: "pezzo"
+pezzo_domain: "{{ pezzo_subdomain }}.{{ domain }}"
+pezzo_external_url: "https://{{ pezzo_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+pezzo_auth_enabled: true
+pezzo_auth_method: "authentik"  # Options: basic, authentik, none
+pezzo_admin_username: "admin"
+pezzo_admin_password: "{{ vault_pezzo_admin_password }}"
+
+# API Configuration
+pezzo_api_key: "{{ vault_pezzo_api_key }}"
+pezzo_api_token: "{{ vault_pezzo_api_token }}"
+
+# Encryption & Security
+pezzo_secret_key: "{{ vault_pezzo_secret_key }}"
+pezzo_encryption_key: "{{ vault_pezzo_encryption_key }}"
+pezzo_jwt_secret: "{{ vault_pezzo_jwt_secret }}"
+
+# SSL/TLS Configuration
+pezzo_ssl_enabled: true
+pezzo_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+pezzo_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+pezzo_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+pezzo_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+pezzo_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+pezzo_database_port: "{{ databases_postgresql_port | default(5432) }}"
+pezzo_database_name: "pezzo"
+pezzo_database_username: "pezzo"
+pezzo_database_password: "{{ vault_pezzo_database_password }}"
+
+# Redis Configuration (if using)
+pezzo_redis_enabled: false
+pezzo_redis_host: "{{ redis_host | default('redis') }}"
+pezzo_redis_port: "{{ redis_port | default(6379) }}"
+pezzo_redis_password: "{{ vault_pezzo_redis_password }}"
+pezzo_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+pezzo_data_dir: "{{ homelab_data_dir }}/pezzo"
+pezzo_config_dir: "{{ pezzo_data_dir }}/config"
+pezzo_backup_dir: "{{ pezzo_data_dir }}/backups"
+
+# Volume Mappings
+pezzo_volumes:
+  - "{{ pezzo_config_dir }}:/config"
+  - "{{ pezzo_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+pezzo_health_check_enabled: true
+pezzo_health_check_path: "/health"
+pezzo_health_check_interval: 30
+pezzo_health_check_timeout: 10
+pezzo_health_check_retries: 3
+
+# Monitoring Integration
+pezzo_monitoring_enabled: true
+pezzo_prometheus_enabled: true
+pezzo_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+pezzo_backup_enabled: true
+pezzo_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+pezzo_backup_retention_days: 30
+pezzo_backup_encryption_enabled: true
+pezzo_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+pezzo_smtp_enabled: false
+pezzo_smtp_host: "{{ smtp_host | default('') }}"
+pezzo_smtp_port: "{{ smtp_port | default(587) }}"
+pezzo_smtp_username: "{{ vault_smtp_username }}"
+pezzo_smtp_password: "{{ vault_pezzo_smtp_password }}"
+pezzo_smtp_from: "{{ pezzo_admin_email | default('admin@' + domain) }}"
+pezzo_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+pezzo_webhook_enabled: false
+pezzo_webhook_url: "{{ vault_webhook_url | default('') }}"
+pezzo_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+pezzo_discovery_enabled: true
+pezzo_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+pezzo_cpu_limit: "1.0"
+pezzo_memory_limit: "1g"
+pezzo_memory_reservation: "512m"
+
+# Performance Settings
+pezzo_scan_interval: 10
+pezzo_parallel_downloads: 3
+pezzo_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+pezzo_log_level: "info"  # Options: trace, debug, info, warn, error
+pezzo_log_rotation_enabled: true
+pezzo_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+pezzo_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+pezzo_rate_limit_enabled: true
+pezzo_rate_limit_requests: 100
+pezzo_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+pezzo_deploy_enabled: true
+pezzo_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+pezzo_restart_policy: "unless-stopped"
+pezzo_auto_update_enabled: true
+
+# Environment Variables
+pezzo_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  PEZZO_API_KEY: "{{ pezzo_api_key }}"
+  PEZZO_SECRET_KEY: "{{ pezzo_secret_key }}"
+  PEZZO_ENCRYPTION_KEY: "{{ pezzo_encryption_key }}"
+  PEZZO_JWT_SECRET: "{{ pezzo_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+pezzo_validation_enabled: true
+pezzo_validation_timeout: 300
+pezzo_validation_retries: 3
+
+# Testing Configuration
+pezzo_test_enabled: false
+pezzo_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+pezzo_compliance_enabled: true
+pezzo_audit_logging_enabled: true
+pezzo_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+pezzo_automation_enabled: true
+pezzo_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+pezzo_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+pezzo_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+pezzo_fallback_enabled: true
+pezzo_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+pezzo_manage_secret_files: true
+
+pezzo_secret_files:
+  - { name: "PEZZO_ADMIN_PASSWORD", value: "{{ pezzo_admin_password }}" }
+  - { name: "PEZZO_SECRET_KEY", value: "{{ pezzo_secret_key }}" }
+  - { name: "PEZZO_DATABASE_PASSWORD", value: "{{ pezzo_database_password }}" }
+  - { name: "PEZZO_REDIS_PASSWORD", value: "{{ pezzo_redis_password }}" }
+  - { name: "PEZZO_SMTP_PASSWORD", value: "{{ pezzo_smtp_password }}" }
+
+pezzo_required_secrets:
+  - PEZZO_ADMIN_PASSWORD
+  - PEZZO_SECRET_KEY
+  - PEZZO_DATABASE_PASSWORD

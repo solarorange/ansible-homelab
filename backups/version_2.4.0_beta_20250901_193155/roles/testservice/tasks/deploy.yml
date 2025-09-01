@@ -1,0 +1,94 @@
+---
+# Test Service Deployment Tasks
+
+- name: Create Test Service directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/testservice"
+    - "{{ docker_config_root }}/testservice"
+    - "{{ docker_logs_root }}/testservice"
+    - "{{ docker_backup_root }}/testservice"
+  tags: [testservice, deploy]
+
+- name: Generate Test Service environment file
+  template:
+    src: env.j2
+    dest: "{{ docker_config_root }}/testservice/.env"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart testservice
+  tags: [testservice, deploy]
+
+- name: Deploy Test Service Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/testservice/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart testservice
+  tags: [testservice, deploy]
+
+- name: Prepare Test Service secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "testservice"
+    secret_dir_root: "{{ docker_dir }}/testservice"
+    secret_files: "{{ testservice_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ testservice_environment | default({}) }}"
+  when: testservice_manage_secret_files | default(true) | bool
+  tags: [testservice, deploy, setup]
+
+- name: Validate required Test Service secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/testservice/secrets/{{ item }}"
+  register: testservice_secret_stats
+  loop: "{{ testservice_required_secrets | default([]) }}"
+  when: testservice_manage_secret_files | default(true) | bool and (testservice_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Test Service secret files are missing
+  ansible.builtin.assert:
+    that: "{{ testservice_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/testservice/secrets.
+      Missing: {{ (testservice_required_secrets | default([])) | reject('in', (testservice_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: testservice_manage_secret_files | default(true) | bool and (testservice_required_secrets | default([]) | length > 0)
+
+- name: Start Test Service container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/testservice"
+    state: present
+    restarted: yes
+  tags: [testservice, deploy]
+
+- name: Wait for Test Service to be ready
+  uri:
+    url: "http://{ ansible_default_ipv4.address }:{{ testservice_external_port }}"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+  tags: [testservice, deploy]
+
+- name: Setup Test Service authentication
+  include_tasks: auth_setup.yml
+  when: testservice_auth_enabled | default(true)
+  tags: [testservice, deploy, auth]
+
+- name: Setup Test Service database
+  include_tasks: database_setup.yml
+  when: testservice_database_enabled | default(true)
+  tags: [testservice, deploy, database]
+
+- name: Setup Test Service API
+  include_tasks: api_setup.yml
+  when: testservice_api_enabled | default(true)
+  tags: [testservice, deploy, api]

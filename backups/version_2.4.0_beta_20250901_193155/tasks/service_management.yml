@@ -1,0 +1,58 @@
+---
+# Service Management Tasks
+- name: Create service management directory
+  ansible.builtin.file:
+    path: /etc/ansible/service_management
+    state: directory
+    mode: '0755'
+  tags: [service_management]
+
+- name: Define service dependencies
+  ansible.builtin.set_fact:
+    service_dependencies:
+      traefik:
+        depends_on: []
+        required_by: ["authentik", "monitoring_infrastructure"]
+      docker:
+        depends_on: []
+        required_by: ["traefik", "monitoring_infrastructure"]
+      monitoring_infrastructure:
+        depends_on: ["docker", "traefik"]
+        required_by: []
+      authentik:
+        depends_on: ["traefik"]
+        required_by: []
+  tags: [service_management]
+
+- name: Create service health check script
+  ansible.builtin.template:
+    src: templates/service_health_check.sh.j2
+    dest: /usr/local/bin/service_health_check.sh
+    mode: '0755'
+  tags: [service_management]
+
+- name: Create service recovery script
+  ansible.builtin.template:
+    src: templates/service_recovery.sh.j2
+    dest: /usr/local/bin/service_recovery.sh
+    mode: '0755'
+  tags: [service_management]
+
+- name: Create service configuration validator
+  ansible.builtin.template:
+    src: templates/service_config_validator.sh.j2
+    dest: /usr/local/bin/service_config_validator.sh
+    mode: '0755'
+  tags: [service_management]
+
+- name: Setup service monitoring
+  ansible.builtin.include_tasks: tasks/service_monitoring.yml
+  tags: [service_management]
+
+- name: Configure service orchestration
+  ansible.builtin.include_tasks: tasks/service_orchestration.yml
+  tags: [service_management]
+
+- name: Setup service recovery procedures
+  ansible.builtin.include_tasks: tasks/service_recovery.yml
+  tags: [service_management]

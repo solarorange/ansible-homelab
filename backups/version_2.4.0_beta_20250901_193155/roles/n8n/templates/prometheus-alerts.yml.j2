@@ -1,0 +1,103 @@
+# n8n Prometheus Alert Rules
+# Alert rules for n8n workflow automation monitoring
+
+groups:
+  - name: n8n
+    rules:
+      # n8n Service Down
+      - alert: N8NDown
+        expr: up{job="n8n"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: n8n
+        annotations:
+          summary: "n8n is down"
+          description: "n8n ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes."
+
+      # n8n Database Down
+      - alert: N8NDatabaseDown
+        expr: up{job="n8n-postgres"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: n8n
+        annotations:
+          summary: "n8n database is down"
+          description: "n8n PostgreSQL database ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes."
+
+      # High Error Rate
+      - alert: N8NHighErrorRate
+        expr: rate(n8n_workflow_executions_failed_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "High n8n error rate"
+          description: "n8n is experiencing a high error rate ({{ '{{ $value }}' }} errors/sec) for more than 2 minutes."
+
+      # High Response Time
+      - alert: N8NHighResponseTime
+        expr: histogram_quantile(0.95, rate(n8n_http_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "High n8n response time"
+          description: "n8n 95th percentile response time is {{ '{{ $value }}' }}s for more than 5 minutes."
+
+      # Low Workflow Executions
+      - alert: N8NLowWorkflowExecutions
+        expr: rate(n8n_workflow_executions_total[15m]) < 0.01
+        for: 10m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "Low n8n workflow executions"
+          description: "n8n workflow execution rate is very low ({{ '{{ $value }}' }} execs/sec) for more than 10 minutes."
+
+      # High Resource Usage
+      - alert: N8NHighCPUUsage
+        expr: container_cpu_usage_seconds_total{container="n8n-app"} / container_spec_cpu_quota{container="n8n-app"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "High n8n CPU usage"
+          description: "n8n CPU usage is above 80% for more than 5 minutes."
+
+      - alert: N8NHighMemoryUsage
+        expr: container_memory_usage_bytes{container="n8n-app"} / container_spec_memory_limit_bytes{container="n8n-app"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "High n8n memory usage"
+          description: "n8n memory usage is above 80% for more than 5 minutes."
+
+      # Database Connection Issues
+      - alert: N8NDatabaseConnections
+        expr: pg_stat_database_numbackends{datname="n8n"} > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "High n8n database connections"
+          description: "n8n database has {{ '{{ $value }}' }} active connections for more than 2 minutes."
+
+      # Workflow Queue Backlog
+      - alert: N8NWorkflowQueueBacklog
+        expr: n8n_workflow_queue_size > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: n8n
+        annotations:
+          summary: "n8n workflow queue backlog"
+          description: "n8n workflow queue has {{ '{{ $value }}' }} pending items for more than 5 minutes." 

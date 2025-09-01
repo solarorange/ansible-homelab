@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  wireguard:
+    image: "{{ security_wireguard.image }}"
+    container_name: "{{ security_wireguard.container_name }}"
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=0
+    ports:
+      - "51820:51820/udp"
+    volumes:
+      - "{{ docker_dir }}/wireguard/config:/config"
+      - /lib/modules:/lib/modules
+    environment:
+      PUID: "{{ user_id }}"
+      PGID: "{{ group_id }}"
+      TZ: "{{ timezone }}"
+      SERVERURL: "{{ domain }}" # or your public IP
+      PEERS: |
+        {% for peer in security_wireguard.peers %}
+        {{ peer.name }},{{ peer.preshared_key }},{{ peer.allowed_ips }}
+        {% endfor %} 

@@ -1,0 +1,260 @@
+---
+# Emby Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# EMBY SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+emby_service_name: "emby"
+emby_container_name: "{{ emby_service_name }}"
+emby_image: "emby/embyserver:latest"
+emby_version: "latest"
+
+# Network Configuration
+emby_port: 8096
+emby_external_port: "{{ emby_port }}"
+emby_protocol: "http"
+emby_host: "{{ ansible_default_ipv4.address }}"
+emby_url: "{{ emby_protocol }}://{{ emby_host }}:{{ emby_port }}"
+
+# Domain Configuration
+emby_subdomain: "emby"
+emby_domain: "{{ emby_subdomain }}.{{ domain }}"
+emby_external_url: "https://{{ emby_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+emby_auth_enabled: true
+emby_auth_method: "authentik"  # Options: basic, authentik, none
+emby_admin_username: "admin"
+emby_admin_password: "{{ vault_emby_admin_password }}"
+
+# API Configuration
+emby_api_key: "{{ vault_emby_api_key }}"
+emby_api_token: "{{ vault_emby_api_token }}"
+
+# Encryption & Security
+emby_secret_key: "{{ vault_emby_secret_key }}"
+emby_encryption_key: "{{ vault_emby_encryption_key }}"
+emby_jwt_secret: "{{ vault_emby_jwt_secret }}"
+
+# SSL/TLS Configuration
+emby_ssl_enabled: true
+emby_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+emby_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+emby_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+emby_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+emby_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+emby_database_port: "{{ databases_postgresql_port | default(5432) }}"
+emby_database_name: "emby"
+emby_database_username: "emby"
+emby_database_password: "{{ vault_emby_database_password }}"
+
+# Redis Configuration (if using)
+emby_redis_enabled: false
+emby_redis_host: "{{ redis_host | default('redis') }}"
+emby_redis_port: "{{ redis_port | default(6379) }}"
+emby_redis_password: "{{ vault_emby_redis_password }}"
+emby_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+emby_data_dir: "{{ homelab_data_dir }}/emby"
+emby_config_dir: "{{ emby_data_dir }}/config"
+emby_backup_dir: "{{ emby_data_dir }}/backups"
+
+# Volume Mappings
+emby_volumes:
+  - "{{ emby_config_dir }}:/config"
+  - "{{ emby_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+emby_health_check_enabled: true
+emby_health_check_path: "/health"
+emby_health_check_interval: 30
+emby_health_check_timeout: 10
+emby_health_check_retries: 3
+
+# Monitoring Integration
+emby_monitoring_enabled: true
+emby_prometheus_enabled: true
+emby_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+emby_backup_enabled: true
+emby_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+emby_backup_retention_days: 30
+emby_backup_encryption_enabled: true
+emby_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+emby_smtp_enabled: false
+emby_smtp_host: "{{ smtp_host | default('') }}"
+emby_smtp_port: "{{ smtp_port | default(587) }}"
+emby_smtp_username: "{{ vault_smtp_username }}"
+emby_smtp_password: "{{ vault_emby_smtp_password }}"
+emby_smtp_from: "{{ emby_admin_email | default('admin@' + domain) }}"
+emby_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+emby_webhook_enabled: false
+emby_webhook_url: "{{ vault_webhook_url | default('') }}"
+emby_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+emby_discovery_enabled: true
+emby_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+emby_cpu_limit: "1.0"
+emby_memory_limit: "1g"
+emby_memory_reservation: "512m"
+
+# Performance Settings
+emby_scan_interval: 10
+emby_parallel_downloads: 3
+emby_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+emby_log_level: "info"  # Options: trace, debug, info, warn, error
+emby_log_rotation_enabled: true
+emby_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+emby_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+emby_rate_limit_enabled: true
+emby_rate_limit_requests: 100
+emby_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+emby_deploy_enabled: true
+emby_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+emby_restart_policy: "unless-stopped"
+emby_auto_update_enabled: true
+
+# Environment Variables
+emby_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  EMBY_API_KEY: "{{ emby_api_key }}"
+  EMBY_SECRET_KEY: "{{ emby_secret_key }}"
+  EMBY_ENCRYPTION_KEY: "{{ emby_encryption_key }}"
+  EMBY_JWT_SECRET: "{{ emby_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+emby_validation_enabled: true
+emby_validation_timeout: 300
+emby_validation_retries: 3
+
+# Testing Configuration
+emby_test_enabled: false
+emby_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+emby_compliance_enabled: true
+emby_audit_logging_enabled: true
+emby_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+emby_automation_enabled: true
+emby_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+emby_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+emby_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+emby_fallback_enabled: true
+emby_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

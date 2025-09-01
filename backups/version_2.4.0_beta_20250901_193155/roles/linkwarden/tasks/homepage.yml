@@ -1,0 +1,32 @@
+---
+# Linkwarden Homepage Integration
+# Configures Homepage integration for Linkwarden
+
+- name: Add Linkwarden to Homepage services
+  ansible.builtin.template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_homepage_enabled | default(true)
+  tags: [linkwarden, homepage]
+
+- name: Add Linkwarden to Homepage bookmarks
+  ansible.builtin.template:
+    src: homepage-bookmark.yml.j2
+    dest: "{{ homepage_config_dir }}/bookmarks/linkwarden.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: linkwarden_homepage_enabled | default(true)
+  tags: [linkwarden, homepage]
+
+- name: Reload Homepage configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/reload"
+    method: POST
+    status_code: [200, 204]
+    timeout: 30
+  when: linkwarden_homepage_enabled | default(true)
+  tags: [linkwarden, homepage]

@@ -1,0 +1,152 @@
+# Enhanced Docker Compose Template with Production Security
+version: '3.8'
+
+services:
+  {{ service_name }}:
+    image: {{ service_image }}
+    container_name: {{ service_container_name }}
+    restart: {{ service_restart_policy | default('unless-stopped') }}
+    
+    # ✅ Resource limits compatible with Docker Engine (non-Swarm)
+    mem_limit: {{ service_memory_limit | default("512M") }}
+    cpus: '{{ service_cpu_limit | default(0.5) }}'
+    
+    # ✅ CRITICAL FIX: Security hardening
+    security_opt:
+      - no-new-privileges:true
+    read_only: {{ service_read_only | default(false) }}
+    tmpfs:
+      - /tmp
+      {% if service_additional_tmpfs is defined %}
+      {% for tmpfs in service_additional_tmpfs %}
+      - {{ tmpfs }}
+      {% endfor %}
+      {% endif %}
+    
+    # ✅ CRITICAL FIX: User mapping for security
+    user: "{{ service_user | default('1000:1000') }}"
+    
+    # Environment variables
+    environment:
+      {% for key, value in service_environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    
+    # Volumes
+    volumes:
+      {% for volume in service_volumes %}
+      - {{ volume }}
+      {% endfor %}
+    
+    # Ports
+    ports:
+      {% for port in service_ports %}
+      - "{{ port }}"
+      {% endfor %}
+    
+    # Networks
+    networks:
+      {% for network in service_networks %}
+      - {{ network }}
+      {% endfor %}
+    
+    # ✅ CRITICAL FIX: Comprehensive health check
+    healthcheck:
+      test: {{ service_healthcheck_test | default('["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ service_port | default(8080) }}/health || exit 1"]') }}
+      interval: "{{ service_healthcheck_interval | default('30s') }}"
+      timeout: "{{ service_healthcheck_timeout | default('10s') }}"
+      retries: {{ service_healthcheck_retries | default(3) }}
+      start_period: "{{ service_healthcheck_start_period | default('40s') }}"
+    
+    # Dependencies
+    depends_on:
+      {% for dependency in service_dependencies %}
+      {{ dependency.name }}:
+        condition: {{ dependency.condition | default('service_started') }}
+      {% endfor %}
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "{{ service_log_max_size | default('50m') }}"
+        max-file: "{{ service_log_max_files | default(5) }}"
+    
+    # ✅ CRITICAL FIX: Labels for orchestration
+    labels:
+      {% for label in service_labels %}
+      - "{{ label }}"
+      {% endfor %}
+      - "com.homelab.service={{ service_name }}"
+      - "com.homelab.version={{ service_version | default('latest') }}"
+      - "com.homelab.managed=true"
+
+# Volumes
+volumes:
+  {% for volume in volumes %}
+  {{ volume.name }}:
+    driver: {{ volume.driver | default('local') }}
+    {% if volume.driver_opts is defined %}
+    driver_opts:
+      {% for key, value in volume.driver_opts.items() %}
+      {{ key }}: {{ value }}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+
+# Networks
+networks:
+  {% for network in networks %}
+  {{ network.name }}:
+    driver: {{ network.driver | default('bridge') }}
+    {% if network.internal is defined %}
+    internal: {{ network.internal }}
+    {% endif %}
+    {% if network.ipam_config is defined %}
+    ipam:
+      config:
+        {% for config in network.ipam_config %}
+        - subnet: {{ config.subnet }}
+          {% if config.gateway is defined %}
+          gateway: {{ config.gateway }}
+          {% endif %}
+        {% endfor %}
+    {% endif %}
+  {% endfor %}
+
+# NOTE: Swarm-only resource section intentionally commented to avoid non-Swarm Compose misuse.
+# x-resource-limits: &resource-limits
+#   deploy:
+#     resources:
+#       limits:
+#         memory: 1g
+#         cpus: '0.5'
+#       reservations:
+#         memory: 512m
+#         cpus: '0.25'
+
+# ✅ CRITICAL FIX: Security policies
+x-security-policy: &security-policy
+  security_opt:
+    - no-new-privileges:true
+  read_only: true
+  tmpfs:
+    - /tmp
+  user: "1000:1000"
+
+# ✅ CRITICAL FIX: Health check policies
+x-healthcheck-policy: &healthcheck-policy
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+# ✅ CRITICAL FIX: Logging policies
+x-logging-policy: &logging-policy
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "5"

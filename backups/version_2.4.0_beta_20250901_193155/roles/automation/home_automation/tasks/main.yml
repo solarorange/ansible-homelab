@@ -1,0 +1,115 @@
+---
+# Home Automation Tasks (Home Assistant, Zigbee2MQTT)
+
+# Removed import_tasks for home_assistant.yml and zigbee2mqtt.yml (files do not exist)
+
+- name: Create Home Assistant directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/homeassistant"
+    - "{{ docker_data_root }}/homeassistant/config"
+    - "{{ docker_data_root }}/homeassistant/ssl"
+
+- name: Deploy Home Assistant docker-compose block
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Home Assistant"
+    block: |
+      homeassistant:
+        image: ghcr.io/home-assistant/home-assistant:stable
+        container_name: homeassistant
+        volumes:
+          - {{ docker_data_root }}/homeassistant/config:/config
+          - {{ docker_data_root }}/homeassistant/ssl:/ssl
+          - /etc/localtime:/etc/localtime:ro
+        restart: unless-stopped
+        # Harden: avoid privileged/host network; map ports explicitly if needed
+        user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+        cap_drop:
+          - ALL
+        read_only: true
+        # ports:
+        #   - "8123:8123"
+        environment:
+          - TZ={{ automation_timezone }}
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.homeassistant.rule=Host(`homeassistant.{{ automation_domain }}`)"
+          - "traefik.http.routers.homeassistant.entrypoints=websecure"
+          - "traefik.http.routers.homeassistant.tls=true"
+          - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
+
+- name: Create Zigbee2MQTT directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/zigbee2mqtt"
+    - "{{ docker_data_root }}/zigbee2mqtt/data"
+
+- name: Deploy Zigbee2MQTT docker-compose block
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Zigbee2MQTT"
+    block: |
+      zigbee2mqtt:
+        image: koenkk/zigbee2mqtt:latest
+        container_name: zigbee2mqtt
+        volumes:
+          - {{ docker_data_root }}/zigbee2mqtt/data:/app/data
+          - /dev:/dev
+        ports:
+          - "8080:8080"
+        environment:
+          - TZ={{ automation_timezone }}
+        restart: unless-stopped
+        # Harden: remove privileged; keep device mapping with minimal caps if required
+        devices:
+          - /dev/ttyACM0:/dev/ttyACM0
+        cap_drop:
+          - ALL
+        read_only: true
+        networks:
+          - traefik_network
+        depends_on:
+          - mosquitto
+
+- name: Create Home Assistant configuration (optional, disabled by default)
+  ansible.builtin.copy:
+    dest: "{{ home_assistant_config_dir }}/configuration.yaml"
+    content: |
+      default_config:
+
+      http:
+        ssl_certificate: /ssl/fullchain.pem
+        ssl_key: /ssl/privkey.pem
+
+      tts:
+        - platform: google_translate
+  when: automation_home_assistant_custom_config_enabled | default(false) | bool
+
+- name: Create Zigbee2MQTT configuration file (optional, disabled by default)
+  ansible.builtin.copy:
+    dest: "{{ zigbee2mqtt_data_dir }}/configuration.yaml"
+    content: |
+      homeassistant: true
+      permit_join: false
+      mqtt:
+        server: mqtt://mosquitto:1883
+        user: zigbee2mqtt
+        # password supplied via env file/secret at runtime, do not embed here
+        # Example: set ZIGBEE2MQTT_MQTT_PASSWORD_FILE and mount secret
+      serial:
+        port: /dev/ttyACM0
+      frontend:
+        port: 8080
+      advanced:
+        log_level: info
+        pan_id: 6754
+        channel: 11
+        # network_key supplied via secret env/file; do not embed here
+  when: zigbee2mqtt_enabled | default(true) and (automation_zigbee2mqtt_custom_config_enabled | default(false) | bool)

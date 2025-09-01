@@ -1,0 +1,129 @@
+---
+- name: Service Validation Tests
+  hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Validate Traefik configuration
+      block:
+        - name: Check Traefik configuration
+          ansible.builtin.command: docker exec traefik traefik check
+          register: traefik_config
+          changed_when: false
+          failed_when: false
+
+        - name: Assert Traefik configuration
+          ansible.builtin.assert:
+            that: traefik_config.rc == 0
+            fail_msg: "Traefik configuration is invalid"
+
+    - name: Validate monitoring stack
+      block:
+        - name: Check Prometheus targets
+          ansible.builtin.uri:
+            url: "https://prometheus.{{ domain }}/api/v1/targets"
+            method: GET
+            validate_certs: false
+          register: prometheus_targets
+          failed_when: false
+          when: monitoring_enabled | default(true)
+
+        - name: Assert Prometheus targets
+          ansible.builtin.assert:
+            that: >
+              prometheus_targets.json.data.activeTargets | length > 0
+            fail_msg: "No active Prometheus targets found"
+          when: monitoring_enabled | default(true)
+
+        - name: Check Grafana datasources
+          ansible.builtin.uri:
+            url: "https://grafana.{{ domain }}/api/datasources"
+            method: GET
+            validate_certs: false
+          register: grafana_datasources
+          failed_when: false
+          when: monitoring_enabled | default(true)
+
+        - name: Assert Grafana datasources
+          ansible.builtin.assert:
+            that: >
+              grafana_datasources.json | length > 0
+            fail_msg: "No Grafana datasources configured"
+          when: monitoring_enabled | default(true)
+
+    - name: Validate media services
+      block:
+        - name: Check Sonarr API
+          ansible.builtin.uri:
+            url: "https://sonarr.{{ domain }}/api/v3/system/status"
+            method: GET
+            validate_certs: false
+          register: sonarr_status
+          failed_when: false
+          when: "'sonarr' in enabled_services"
+
+        - name: Assert Sonarr status
+          ansible.builtin.assert:
+            that: sonarr_status.status == 200
+            fail_msg: "Sonarr API is not responding"
+          when: "'sonarr' in enabled_services"
+
+        - name: Check Radarr API
+          ansible.builtin.uri:
+            url: "https://radarr.{{ domain }}/api/v3/system/status"
+            method: GET
+            validate_certs: false
+          register: radarr_status
+          failed_when: false
+          when: "'radarr' in enabled_services"
+
+        - name: Assert Radarr status
+          ansible.builtin.assert:
+            that: radarr_status.status == 200
+            fail_msg: "Radarr API is not responding"
+          when: "'radarr' in enabled_services"
+
+    - name: Validate backup services
+      block:
+        - name: Check backup service status
+          ansible.builtin.command: docker ps --filter "name=backup" --format "{{ '{{' }}.Status{{ '}}' }}"
+          register: backup_status
+          changed_when: false
+          when: backup_enabled | default(true)
+
+        - name: Assert backup service
+          ansible.builtin.assert:
+            that: backup_status.stdout_lines | length > 0
+            fail_msg: "Backup service is not running"
+          when: backup_enabled | default(true)
+
+    - name: Validate security services
+      block:
+        - name: Check CrowdSec status
+          ansible.builtin.command: docker exec crowdsec cscli status
+          register: crowdsec_status
+          changed_when: false
+          failed_when: false
+          when: "'crowdsec' in enabled_services"
+
+        - name: Assert CrowdSec status
+          ansible.builtin.assert:
+            that: crowdsec_status.rc == 0
+            fail_msg: "CrowdSec is not running properly"
+          when: "'crowdsec' in enabled_services"
+
+        - name: Check Vault status
+          ansible.builtin.uri:
+            url: "https://vault.{{ domain }}/v1/sys/health"
+            method: GET
+            validate_certs: false
+          register: vault_status
+          failed_when: false
+          when: "'vault' in enabled_services"
+
+        - name: Assert Vault status
+          ansible.builtin.assert:
+            that: vault_status.status == 200
+            fail_msg: "Vault is not healthy"
+          when: "'vault' in enabled_services"

@@ -1,0 +1,29 @@
+---
+# ISO 27001 Compliance
+# Maps and reports on ISO 27001 controls for the homelab
+
+- name: Ensure ISO 27001 mapping file exists
+  ansible.builtin.template:
+    src: templates/iso27001-mapping.yml.j2
+    dest: "{{ config_dir }}/security/iso27001-mapping.yml"
+    mode: '0644'
+  tags: [compliance, iso27001, security]
+
+- name: Check ISO 27001 control implementation status
+  ansible.builtin.shell: |
+    grep 'status:' {{ config_dir }}/security/iso27001-mapping.yml
+  register: iso27001_status
+  changed_when: false
+  tags: [compliance, iso27001, security]
+
+- name: Save ISO 27001 compliance report
+  ansible.builtin.copy:
+    content: "{{ iso27001_status.stdout }}"
+    dest: "{{ logs_dir }}/iso27001-compliance.log"
+    mode: '0644'
+  tags: [compliance, iso27001, security]
+
+- name: Notify on ISO 27001 compliance gaps
+  ansible.builtin.debug:
+    msg: "ISO 27001 compliance check completed. Review {{ logs_dir }}/iso27001-compliance.log for gaps."
+  tags: [compliance, iso27001, security]

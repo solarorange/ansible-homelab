@@ -1,0 +1,129 @@
+---
+# Pezzo Monitoring Tasks
+# Configure monitoring integration for Pezzo services
+
+- name: Create Pezzo monitoring configuration directory
+  ansible.builtin.file:
+    path: "{{ pezzo_config_dir }}/monitoring"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo Prometheus configuration
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ pezzo_config_dir }}/monitoring/prometheus.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_prometheus_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo Grafana dashboard configuration
+  ansible.builtin.template:
+    src: grafana_dashboard.json.j2
+    dest: "{{ pezzo_config_dir }}/monitoring/grafana_dashboard.json"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_grafana_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo Loki configuration
+  ansible.builtin.template:
+    src: loki_config.yml.j2
+    dest: "{{ pezzo_config_dir }}/monitoring/loki_config.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_loki_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo Telegraf configuration
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: "{{ pezzo_config_dir }}/monitoring/telegraf.conf"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: pezzo_telegraf_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo monitoring script
+  ansible.builtin.template:
+    src: monitoring.sh.j2
+    dest: "{{ pezzo_config_dir }}/monitoring.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo metrics collection script
+  ansible.builtin.template:
+    src: collect_metrics.sh.j2
+    dest: "{{ pezzo_config_dir }}/collect_metrics.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Setup Pezzo monitoring cron job
+  ansible.builtin.cron:
+    name: "Pezzo Metrics Collection"
+    minute: "*/5"
+    job: "{{ pezzo_config_dir }}/collect_metrics.sh >> {{ logs_dir }}/pezzo/monitoring/metrics.log 2>&1"
+    user: "{{ vault_pezzo_user }}"
+  when: pezzo_monitoring_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo monitoring log directory
+  ansible.builtin.file:
+    path: "{{ logs_dir }}/pezzo/monitoring"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Configure Pezzo log aggregation
+  ansible.builtin.template:
+    src: log_aggregation.conf.j2
+    dest: "{{ pezzo_config_dir }}/monitoring/log_aggregation.conf"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Create Pezzo monitoring health check
+  ansible.builtin.template:
+    src: monitoring_health_check.sh.j2
+    dest: "{{ pezzo_config_dir }}/monitoring_health_check.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, monitoring]
+
+- name: Setup Pezzo monitoring health check cron
+  ansible.builtin.cron:
+    name: "Pezzo Monitoring Health Check"
+    minute: "*/2"
+    job: "{{ pezzo_config_dir }}/monitoring_health_check.sh >> {{ logs_dir }}/pezzo/monitoring/health.log 2>&1"
+    user: "{{ vault_pezzo_user }}"
+  when: pezzo_monitoring_enabled | default(true)
+  tags: [pezzo, monitoring]
+
+- name: Display Pezzo monitoring configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Monitoring Configuration Complete:
+      - Prometheus Enabled: {{ pezzo_prometheus_enabled | default(true) }}
+      - Grafana Enabled: {{ pezzo_grafana_enabled | default(true) }}
+      - Loki Enabled: {{ pezzo_loki_enabled | default(true) }}
+      - Telegraf Enabled: {{ pezzo_telegraf_enabled | default(true) }}
+      - Metrics Collection: {{ pezzo_config_dir }}/collect_metrics.sh
+      - Health Check: {{ pezzo_config_dir }}/monitoring_health_check.sh
+      - Configuration: {{ pezzo_config_dir }}/monitoring/
+      - Logs: {{ logs_dir }}/pezzo/monitoring/
+  tags: [pezzo, monitoring]

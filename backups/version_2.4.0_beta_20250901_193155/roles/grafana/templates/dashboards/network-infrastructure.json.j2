@@ -1,0 +1,571 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Network & Infrastructure",
+    "tags": ["network", "infrastructure", "traefik", "dns", "vpn", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
+      "hidden": false,
+      "collapse": false
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "network_service",
+          "type": "custom",
+          "query": "traefik,pihole,wireguard,nginx,cloudflare",
+          "includeAll": true,
+          "multi": true,
+          "label": "Network Service",
+          "description": "Select network services to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=~\"traefik|pihole|wireguard|nginx\"}, instance)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Instance",
+          "description": "Select instances to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "interface",
+          "type": "query",
+          "query": "label_values(node_network_receive_bytes_total, device)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Network Interface",
+          "description": "Select network interfaces",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "protocol",
+          "type": "custom",
+          "query": "http,https,tcp,udp,icmp",
+          "includeAll": true,
+          "multi": true,
+          "label": "Protocol",
+          "description": "Filter by network protocol",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "time_range",
+          "type": "custom",
+          "query": "1h,6h,12h,24h,7d,30d",
+          "includeAll": false,
+          "multi": false,
+          "label": "Time Range",
+          "description": "Select time range for metrics",
+          "regex": "",
+          "sort": 1,
+          "current": {
+            "selected": true,
+            "text": "1h",
+            "value": "1h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Network Interface Changes",
+          "datasource": "Prometheus",
+          "expr": "changes(node_network_up[5m]) > 0",
+          "iconColor": "rgba(0, 128, 255, 1)",
+          "titleFormat": "Interface Change: {{ $labels.device }}",
+          "textFormat": "Network interface {{ $labels.device }} status changed",
+          "fillColor": "rgba(0, 128, 255, 0.1)",
+          "lineColor": "rgba(0, 128, 255, 1)"
+        },
+        {
+          "name": "High Network Usage",
+          "datasource": "Prometheus",
+          "expr": "rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m]) > 1000000000",
+          "iconColor": "rgba(255, 165, 0, 1)",
+          "titleFormat": "High Network Usage: {{ $labels.device }}",
+          "textFormat": "High network usage on {{ $labels.device }}: {{ $value }} B/s",
+          "fillColor": "rgba(255, 165, 0, 0.1)",
+          "lineColor": "rgba(255, 165, 0, 1)"
+        },
+        {
+          "name": "Traefik Requests",
+          "datasource": "Prometheus",
+          "expr": "increase(traefik_requests_total[5m]) > 1000",
+          "iconColor": "rgba(0, 255, 0, 1)",
+          "titleFormat": "High Traefik Traffic",
+          "textFormat": "High request volume through Traefik",
+          "fillColor": "rgba(0, 255, 0, 0.1)",
+          "lineColor": "rgba(0, 255, 0, 1)"
+        },
+        {
+          "name": "DNS Queries",
+          "datasource": "Prometheus",
+          "expr": "increase(pihole_dns_queries_total[5m]) > 1000",
+          "iconColor": "rgba(128, 0, 128, 1)",
+          "titleFormat": "High DNS Activity",
+          "textFormat": "High DNS query volume",
+          "fillColor": "rgba(128, 0, 128, 0.1)",
+          "lineColor": "rgba(128, 0, 128, 1)"
+        },
+        {
+          "name": "VPN Connections",
+          "datasource": "Prometheus",
+          "expr": "changes(wireguard_peers_total[5m]) > 0",
+          "iconColor": "rgba(255, 193, 7, 1)",
+          "titleFormat": "VPN Connection Change",
+          "textFormat": "WireGuard peer connection changed",
+          "fillColor": "rgba(255, 193, 7, 0.1)",
+          "lineColor": "rgba(255, 193, 7, 1)"
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "Homelab Overview",
+        "url": "https://grafana.{{ domain }}/d/homelab-overview",
+        "icon": "external link",
+        "tooltip": "Return to homelab overview"
+      },
+      {
+        "title": "Traefik Dashboard",
+        "url": "https://traefik.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Traefik dashboard"
+      },
+      {
+        "title": "Pi-hole",
+        "url": "https://dns.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Pi-hole DNS management"
+      },
+      {
+        "title": "Network Documentation",
+        "url": "https://docs.{{ domain }}/network",
+        "icon": "external link",
+        "tooltip": "View network documentation"
+      }
+    ],
+    "panels": [
+      {
+        "id": 1,
+        "title": "Network Services Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(up{job=~\"traefik|pihole|wireguard|nginx\"}) / count(up{job=~\"traefik|pihole|wireguard|nginx\"}) * 100",
+            "legendFormat": "Services Health",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "description": "Overall health of network services"
+      },
+      {
+        "id": 2,
+        "title": "Total Network Traffic",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(node_network_receive_bytes_total[5m])) + sum(rate(node_network_transmit_bytes_total[5m]))",
+            "legendFormat": "Total Traffic",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "description": "Total network traffic across all interfaces"
+      },
+      {
+        "id": 3,
+        "title": "Traefik Requests/sec",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(traefik_requests_total[5m]))",
+            "legendFormat": "Requests/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            },
+            "unit": "reqps",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "description": "Traefik request rate"
+      },
+      {
+        "id": 4,
+        "title": "DNS Queries/sec",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(pihole_dns_queries_total[5m]))",
+            "legendFormat": "Queries/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 200}
+              ]
+            },
+            "unit": "reqps",
+            "min": 0,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "description": "Pi-hole DNS query rate"
+      },
+      {
+        "id": 5,
+        "title": "Network Service Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\"traefik|pihole|wireguard|nginx\"}",
+            "legendFormat": "{{job}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "vertical"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "description": "Status of all network services"
+      },
+      {
+        "id": 6,
+        "title": "Network Interface Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "node_network_up",
+            "legendFormat": "{{device}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "description": "Status of network interfaces"
+      },
+      {
+        "id": 7,
+        "title": "Network Traffic Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "{{device}} (RX)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "{{device}} (TX)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "description": "Network traffic over time by interface"
+      },
+      {
+        "id": 8,
+        "title": "Traefik Request Rate Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(traefik_requests_total[5m])",
+            "legendFormat": "Requests/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "description": "Traefik request rate over time"
+      },
+      {
+        "id": 9,
+        "title": "DNS Query Rate Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(pihole_dns_queries_total[5m])",
+            "legendFormat": "Queries/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "description": "Pi-hole DNS query rate over time"
+      },
+      {
+        "id": 10,
+        "title": "Network Latency",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "ping_latency_seconds",
+            "legendFormat": "{{target}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "description": "Network latency to monitored targets"
+      },
+      {
+        "id": 11,
+        "title": "Traefik Response Codes",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (code) (rate(traefik_requests_total[5m]))",
+            "legendFormat": "{{code}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "description": "Distribution of Traefik response codes"
+      },
+      {
+        "id": 12,
+        "title": "Top DNS Queries",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (domain) (rate(pihole_dns_queries_total[5m])))",
+            "legendFormat": "{{domain}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        },
+        "description": "Top 10 most queried domains"
+      }
+    ]
+  }
+} 

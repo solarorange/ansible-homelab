@@ -1,0 +1,100 @@
+---
+# Database Stack Alerting Configuration
+# Configure alerting for database events and performance metrics
+
+- name: Configure database alert rules
+  block:
+    - name: Create Prometheus alert rules for databases
+      ansible.builtin.template:
+        src: prometheus-alert-rules.yml.j2
+        dest: "{{ config_dir }}/prometheus/rules/databases.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart prometheus
+
+    - name: Create Alertmanager configuration for databases
+      ansible.builtin.template:
+        src: alertmanager-config.yml.j2
+        dest: "{{ config_dir }}/alertmanager/config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      notify: restart alertmanager
+
+  when: databases_alerting_enabled | default(true)
+  tags: [databases, alerts, monitoring]
+
+- name: Configure database alert notifications
+  block:
+    - name: Create alert notification script
+      ansible.builtin.template:
+        src: alert-notify.sh.j2
+        dest: "{{ docker_dir }}/databases/scripts/alert-notify.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Add alert notification to crontab
+      ansible.builtin.cron:
+        name: "Database alert notification"
+        minute: "*/5"
+        job: "{{ docker_dir }}/databases/scripts/alert-notify.sh >> {{ logs_dir }}/databases/alerts.log 2>&1"
+        user: "{{ vault_databases_user }}"
+        state: present
+
+  when: databases_alerting_enabled | default(true) and databases_notifications_enabled | default(true)
+  tags: [databases, alerts, notifications]
+
+- name: Validate database alerting deployment
+  block:
+    - name: Check Prometheus alert rules
+      ansible.builtin.uri:
+        url: http://{{ ansible_default_ipv4.address }}:9090/api/v1/rules
+        return_content: yes
+      register: prometheus_rules
+      until: prometheus_rules.status == 200
+      retries: 5
+      delay: 10
+
+    - name: Verify database alert rules in Prometheus
+      ansible.builtin.assert:
+        that:
+          - "'DatabaseDown' in prometheus_rules.content"
+          - "'HighMemoryUsage' in prometheus_rules.content"
+          - "'HighCpuUsage' in prometheus_rules.content"
+        fail_msg: "Database alert rules not found in Prometheus."
+        success_msg: "Database alert rules are correctly configured in Prometheus."
+
+    - name: Check Alertmanager configuration
+      ansible.builtin.uri:
+        url: http://{{ ansible_default_ipv4.address }}:9093/api/v1/status
+        return_content: yes
+      register: alertmanager_status
+      until: alertmanager_status.status == 200
+      retries: 5
+      delay: 10
+
+    - name: Verify Alertmanager is running
+      ansible.builtin.assert:
+        that:
+          - "'config' in alertmanager_status.content"
+        fail_msg: "Alertmanager is not running or accessible."
+        success_msg: "Alertmanager is running and accessible."
+
+    - name: Display alerting configuration status
+      ansible.builtin.debug:
+        msg: |
+          Database Alerting Configuration Completed!
+
+          Alerting Components:
+          - Prometheus Rules: Configured
+          - Alertmanager: Configured
+          - Notifications: {{ 'Enabled' if databases_notifications_enabled else 'Disabled' }}
+
+          Validation:
+          - Prometheus Rules: OK
+          - Alertmanager Status: OK
+
+  when: databases_alerting_enabled | default(true)
+  tags: [databases, alerts, validation]

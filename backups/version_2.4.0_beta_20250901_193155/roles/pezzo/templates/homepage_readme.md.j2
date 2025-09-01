@@ -1,0 +1,54 @@
+# Pezzo Homepage Integration
+
+This directory contains the Homepage integration configuration for Pezzo AI prompt management platform.
+
+## Files
+
+- `service.yml` - Main service configuration for Homepage
+- `widget.yml` - Custom widget configuration for status monitoring
+- `bookmarks.yml` - Quick access bookmarks for Pezzo services
+- `pezzo.png` - Service icon for Homepage
+
+## Configuration
+
+### Service URL
+- **Main Console**: `https://{{ pezzo_subdomain }}.{{ domain }}`
+- **API Endpoint**: `https://api.{{ pezzo_subdomain }}.{{ domain }}`
+
+### Authentication
+Pezzo integrates with Authentik for authentication. Users must be authenticated to access the service.
+
+### Status Monitoring
+The integration includes:
+- Real-time service status monitoring
+- Container health checks
+- API endpoint verification
+- Automatic status updates every 5 minutes
+
+## Usage
+
+1. **Access Pezzo**: Navigate to the Pezzo service in your Homepage dashboard
+2. **API Access**: Use the API endpoint for programmatic access
+3. **Documentation**: Access official documentation via the bookmark
+
+## Troubleshooting
+
+### Service Not Accessible
+1. Check if Pezzo containers are running: `docker ps | grep pezzo`
+2. Verify Traefik configuration
+3. Check authentication settings
+
+### Status Not Updating
+1. Verify the status check script is running: `crontab -l | grep pezzo`
+2. Check logs: `tail -f {{ logs_dir }}/pezzo/homepage/status.log`
+3. Manually run status check: `{{ pezzo_config_dir }}/homepage_status.sh`
+
+## Integration Scripts
+
+- `homepage_integration.sh` - Manages Homepage configuration updates
+- `homepage_status.sh` - Monitors service status and updates Homepage
+
+## Cron Jobs
+
+- **Status Check**: Runs every 5 minutes to monitor service health
+- **Integration Update**: Runs on service deployment to update Homepage configuration 

@@ -1,0 +1,39 @@
+# Alerting rules for the automation stack
+groups:
+- name: automation_alerts
+  rules:
+  - alert: HomeAssistantDown
+    expr: up{job="homeassistant"} == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Home Assistant is down"
+      description: "Home Assistant ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes."
+
+  - alert: Zigbee2MQTTDown
+    expr: up{job="zigbee2mqtt"} == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Zigbee2MQTT is down"
+      description: "Zigbee2MQTT ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes."
+
+  - alert: NodeREDDown
+    expr: up{job="nodered"} == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Node-RED is down"
+      description: "Node-RED ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes."
+
+  - alert: N8NDown
+    expr: up{job="n8n"} == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "n8n is down"
+      description: "n8n ({{ '{{ $labels.instance }}' }}) has been down for more than 5 minutes." 

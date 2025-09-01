@@ -1,0 +1,98 @@
+---
+# Vaultwarden Backup Configuration
+# Configures backup settings for Vaultwarden
+
+- name: Create Vaultwarden backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ vaultwarden_backup_dir }}"
+    - "{{ vaultwarden_backup_dir }}/database"
+    - "{{ vaultwarden_backup_dir }}/config"
+    - "{{ vaultwarden_backup_dir }}/attachments"
+  tags: [vaultwarden, vaultwarden-backup, directories]
+
+- name: Configure Vaultwarden backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ vaultwarden_config_dir }}/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  tags: [vaultwarden, vaultwarden-backup, script]
+
+- name: Configure Vaultwarden backup cron job
+  ansible.builtin.cron:
+    name: "Vaultwarden Backup"
+    minute: "{{ vaultwarden_backup_schedule.split()[0] }}"
+    hour: "{{ vaultwarden_backup_schedule.split()[1] }}"
+    day: "{{ vaultwarden_backup_schedule.split()[2] }}"
+    month: "{{ vaultwarden_backup_schedule.split()[3] }}"
+    weekday: "{{ vaultwarden_backup_schedule.split()[4] }}"
+    job: "{{ vaultwarden_config_dir }}/scripts/backup.sh"
+    user: "{{ vault_vaultwarden_user }}"
+  tags: [vaultwarden, vaultwarden-backup, cron]
+
+- name: Configure Vaultwarden backup retention
+  ansible.builtin.template:
+    src: backup-retention.yml.j2
+    dest: "{{ backup_config_dir }}/vaultwarden-retention.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [vaultwarden, vaultwarden-backup, retention]
+
+- name: Configure Vaultwarden backup monitoring
+  ansible.builtin.template:
+    src: backup-monitoring.yml.j2
+    dest: "{{ monitoring_config_dir }}/vaultwarden-backup.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  tags: [vaultwarden, vaultwarden-backup, monitoring]
+
+- name: Test Vaultwarden backup functionality
+  ansible.builtin.command: "{{ vaultwarden_config_dir }}/scripts/backup.sh --test"
+  register: vaultwarden_backup_test
+  changed_when: false
+  failed_when: false
+  tags: [vaultwarden, vaultwarden-backup, test]
+
+- name: Verify Vaultwarden backup configuration
+  ansible.builtin.stat:
+    path: "{{ vaultwarden_backup_dir }}"
+  register: vaultwarden_backup_verification
+  tags: [vaultwarden, vaultwarden-backup, verify]
+
+- name: Display Vaultwarden backup status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN BACKUP STATUS
+      ========================================
+
+      Backup Configuration:
+      - Enabled: {{ 'YES' if vaultwarden_backup_enabled else 'NO' }}
+      - Schedule: {{ vaultwarden_backup_schedule }}
+      - Retention: {{ vaultwarden_backup_retention_days }} days
+      - Compression: {{ 'ENABLED' if vaultwarden_backup_compression else 'DISABLED' }}
+
+      Backup Components:
+      - Database: {{ 'INCLUDED' if vaultwarden_backup_include_database else 'EXCLUDED' }}
+      - Config: {{ 'INCLUDED' if vaultwarden_backup_include_config else 'EXCLUDED' }}
+      - Attachments: {{ 'INCLUDED' if vaultwarden_backup_include_attachments else 'EXCLUDED' }}
+
+      Backup Directories:
+      - Main: {{ vaultwarden_backup_dir }}
+      - Database: {{ vaultwarden_backup_dir }}/database
+      - Config: {{ vaultwarden_backup_dir }}/config
+      - Attachments: {{ vaultwarden_backup_dir }}/attachments
+
+      Test Result: {{ 'PASSED' if vaultwarden_backup_test.rc == 0 else 'FAILED' }}
+
+      ========================================
+  tags: [vaultwarden, vaultwarden-backup, summary]

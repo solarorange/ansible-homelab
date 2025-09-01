@@ -1,0 +1,402 @@
+# Health Monitoring and Alerting Rules
+# Comprehensive monitoring for homelab services
+
+groups:
+  - name: homelab-health
+    rules:
+      # Service availability alerts
+      - alert: ServiceDown
+        expr: up{job="homelab-services"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "Service {{ $labels.service }} has been down for more than 2 minutes"
+          dashboard: "https://grafana.{{ domain }}/d/homelab-overview"
+          runbook: "https://docs.{{ domain }}/runbooks/service-recovery"
+
+      - alert: ServiceUnhealthy
+        expr: health_status{job="homelab-services"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Service {{ $labels.service }} is unhealthy"
+          description: "Service {{ $labels.service }} health check is failing"
+          dashboard: "https://grafana.{{ domain }}/d/homelab-overview"
+
+      # Resource usage alerts
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{container=~".*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "High CPU usage on {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is using {{ $value }}% CPU"
+          dashboard: "https://grafana.{{ domain }}/d/container-metrics"
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{container=~".*"} / container_spec_memory_limit_bytes * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "High memory usage on {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is using {{ $value }}% memory"
+          dashboard: "https://grafana.{{ domain }}/d/container-metrics"
+
+      - alert: HighDiskUsage
+        expr: (container_fs_usage_bytes{container=~".*"} / container_fs_limit_bytes * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "High disk usage on {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is using {{ $value }}% disk space"
+          dashboard: "https://grafana.{{ domain }}/d/container-metrics"
+
+      # System resource alerts
+      - alert: SystemHighCPU
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High system CPU usage"
+          description: "System CPU usage is {{ $value }}%"
+          dashboard: "https://grafana.{{ domain }}/d/system-metrics"
+
+      - alert: SystemHighMemory
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High system memory usage"
+          description: "System memory usage is {{ $value }}%"
+          dashboard: "https://grafana.{{ domain }}/d/system-metrics"
+
+      - alert: SystemHighDisk
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High system disk usage"
+          description: "System disk usage is {{ $value }}%"
+          dashboard: "https://grafana.{{ domain }}/d/system-metrics"
+
+      # Network alerts
+      - alert: HighNetworkUsage
+        expr: rate(container_network_receive_bytes_total{container=~".*"}[5m]) > 1000000000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "High network usage on {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is receiving {{ $value }} bytes/s"
+          dashboard: "https://grafana.{{ domain }}/d/network-metrics"
+
+      - alert: NetworkErrors
+        expr: rate(container_network_receive_errors_total{container=~".*"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "Network errors on {{ $labels.container }}"
+          description: "Container {{ $labels.container }} has network errors"
+          dashboard: "https://grafana.{{ domain }}/d/network-metrics"
+
+      # Security alerts
+      - alert: FailedLoginAttempts
+        expr: rate(ssh_failed_logins_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of failed login attempts"
+          description: "{{ $value }} failed login attempts per second"
+          dashboard: "https://grafana.{{ domain }}/d/security-metrics"
+
+      - alert: PrivilegedContainer
+        expr: container_privileged{container=~".*"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "Privileged container detected: {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is running with privileged mode"
+          dashboard: "https://grafana.{{ domain }}/d/security-metrics"
+
+      - alert: RootContainer
+        expr: container_user{container=~".*"} == "root"
+        for: 0m
+        labels:
+          severity: critical
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "Container running as root: {{ $labels.container }}"
+          description: "Container {{ $labels.container }} is running as root user"
+          dashboard: "https://grafana.{{ domain }}/d/security-metrics"
+
+      # Database alerts
+      - alert: DatabaseConnectionHigh
+        expr: pg_stat_database_numbackends{datname!="template0",datname!="template1"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "postgresql"
+        annotations:
+          summary: "High database connections"
+          description: "Database {{ $labels.datname }} has {{ $value }} active connections"
+          dashboard: "https://grafana.{{ domain }}/d/database-metrics"
+
+      - alert: DatabaseSlowQueries
+        expr: rate(pg_stat_activity_max_tx_duration{datname!="template0",datname!="template1"}[5m]) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: "postgresql"
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Database {{ $labels.datname }} has queries running longer than 30 seconds"
+          dashboard: "https://grafana.{{ domain }}/d/database-metrics"
+
+      # Backup alerts
+      - alert: BackupFailed
+        expr: backup_status{job="backup-monitor"} == 0
+        for: 1h
+        labels:
+          severity: critical
+          service: "backup"
+        annotations:
+          summary: "Backup failed"
+          description: "Backup job {{ $labels.backup_job }} has failed"
+          dashboard: "https://grafana.{{ domain }}/d/backup-metrics"
+
+      - alert: BackupTooOld
+        expr: time() - backup_last_success_timestamp{job="backup-monitor"} > 86400
+        for: 1h
+        labels:
+          severity: warning
+          service: "backup"
+        annotations:
+          summary: "Backup is too old"
+          description: "Last successful backup was more than 24 hours ago"
+          dashboard: "https://grafana.{{ domain }}/d/backup-metrics"
+
+      # SSL/TLS alerts
+      - alert: SSLCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+        for: 0m
+        labels:
+          severity: warning
+          service: "ssl"
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value }} seconds"
+          dashboard: "https://grafana.{{ domain }}/d/ssl-metrics"
+
+      - alert: SSLValidationFailed
+        expr: probe_ssl_earliest_cert_expiry == 0
+        for: 0m
+        labels:
+          severity: critical
+          service: "ssl"
+        annotations:
+          summary: "SSL certificate validation failed"
+          description: "SSL certificate validation failed for {{ $labels.instance }}"
+          dashboard: "https://grafana.{{ domain }}/d/ssl-metrics"
+
+      # Docker alerts
+      - alert: DockerDaemonDown
+        expr: up{job="docker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "docker"
+        annotations:
+          summary: "Docker daemon is down"
+          description: "Docker daemon is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/docker-metrics"
+
+      - alert: DockerImagePullFailed
+        expr: rate(docker_image_pull_failures_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: "docker"
+        annotations:
+          summary: "Docker image pull failures"
+          description: "Docker image pulls are failing"
+          dashboard: "https://grafana.{{ domain }}/d/docker-metrics"
+
+      # Application-specific alerts
+      - alert: TraefikDown
+        expr: up{job="traefik"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "traefik"
+        annotations:
+          summary: "Traefik is down"
+          description: "Traefik reverse proxy is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/traefik-metrics"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "grafana"
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana monitoring dashboard is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/grafana-metrics"
+
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "prometheus"
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus metrics collection is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/prometheus-metrics"
+
+      # Media service alerts
+      - alert: JellyfinDown
+        expr: up{job="jellyfin"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "jellyfin"
+        annotations:
+          summary: "Jellyfin is down"
+          description: "Jellyfin media server is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/media-metrics"
+
+      - alert: SonarrDown
+        expr: up{job="sonarr"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "sonarr"
+        annotations:
+          summary: "Sonarr is down"
+          description: "Sonarr TV show management is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/media-metrics"
+
+      - alert: RadarrDown
+        expr: up{job="radarr"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "radarr"
+        annotations:
+          summary: "Radarr is down"
+          description: "Radarr movie management is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/media-metrics"
+
+      # Security service alerts
+      - alert: AuthentikDown
+        expr: up{job="authentik"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "authentik"
+        annotations:
+          summary: "Authentik is down"
+          description: "Authentik authentication service is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/security-metrics"
+
+      - alert: Fail2banDown
+        expr: up{job="fail2ban"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "fail2ban"
+        annotations:
+          summary: "Fail2ban is down"
+          description: "Fail2ban intrusion prevention is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/security-metrics"
+
+      # Storage alerts
+      - alert: NextcloudDown
+        expr: up{job="nextcloud"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "nextcloud"
+        annotations:
+          summary: "Nextcloud is down"
+          description: "Nextcloud file storage is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/storage-metrics"
+
+      - alert: SambaDown
+        expr: up{job="samba"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "samba"
+        annotations:
+          summary: "Samba is down"
+          description: "Samba file sharing is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/storage-metrics"
+
+      # Automation alerts
+      - alert: HomeAssistantDown
+        expr: up{job="homeassistant"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "homeassistant"
+        annotations:
+          summary: "Home Assistant is down"
+          description: "Home Assistant automation is not responding"
+          dashboard: "https://grafana.{{ domain }}/d/automation-metrics"
+
+      - alert: NodeRedDown
+        expr: up{job="nodered"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: "nodered"
+        annotations:
+          summary: "Node-RED is down"
+          description: "Node-RED automation flows are not responding"
+          dashboard: "https://grafana.{{ domain }}/d/automation-metrics"
+
+      # Information alerts
+      - alert: ServiceRestart
+        expr: changes(up{job="homelab-services"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: info
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Service {{ $labels.service }} restarted"
+          description: "Service {{ $labels.service }} has been restarted"
+          dashboard: "https://grafana.{{ domain }}/d/homelab-overview"
+
+      - alert: ContainerOOM
+        expr: rate(container_oom_events_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: "{{ $labels.container }}"
+        annotations:
+          summary: "Container {{ $labels.container }} OOM"
+          description: "Container {{ $labels.container }} experienced out-of-memory event"
+          dashboard: "https://grafana.{{ domain }}/d/container-metrics" 

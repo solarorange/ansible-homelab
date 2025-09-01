@@ -1,0 +1,295 @@
+---
+# Grafana Automation Integration Tasks
+# Handles Python configuration script execution, dashboard import, alerting, and monitoring integration
+
+- name: Ensure Python dependencies are installed for Grafana automation
+  ansible.builtin.package:
+    name:
+      - python3
+      - python3-pip
+      - python3-requests
+      - python3-yaml
+      - python3-docker
+      - python3-psycopg2-binary
+    state: present
+  become: true
+  tags: [grafana, automation, dependencies]
+
+- name: Install Python requirements for Grafana automation
+  ansible.builtin.pip:
+    name:
+      - requests
+      - pyyaml
+      - docker
+      - jinja2
+      - click
+      - rich
+      - tabulate
+      - psycopg2-binary
+      - grafana-api
+      - prometheus-api-client
+    state: present
+  become: true
+  tags: [grafana, automation, dependencies]
+
+- name: Create Grafana automation configuration
+  ansible.builtin.template:
+    src: automation_config.yml.j2
+    dest: "{{ docker_dir }}/grafana/scripts/automation_config.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: grafana_automation_config_creation
+  tags: [grafana, automation, config]
+
+- name: Create Grafana configuration automation script
+  ansible.builtin.template:
+    src: grafana_automation.py.j2
+    dest: "{{ docker_dir }}/grafana/scripts/grafana_automation.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: grafana_automation_script_creation
+  tags: [grafana, automation, scripts]
+
+- name: Create Grafana dashboard import script
+  ansible.builtin.template:
+    src: dashboard_import.py.j2
+    dest: "{{ docker_dir }}/grafana/scripts/dashboard_import.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: grafana_dashboard_import_creation
+  tags: [grafana, automation, scripts]
+
+- name: Create Grafana alerting configuration script
+  ansible.builtin.template:
+    src: alerting_config.py.j2
+    dest: "{{ docker_dir }}/grafana/scripts/alerting_config.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: grafana_alerting_config_creation
+  tags: [grafana, automation, scripts]
+
+- name: Create Grafana data source configuration script
+  ansible.builtin.template:
+    src: datasource_config.py.j2
+    dest: "{{ docker_dir }}/monitoring/grafana/scripts/datasource_config.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: grafana_datasource_config_creation
+  tags: [grafana, automation, scripts]
+
+- name: Wait for Grafana API to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_api_health_check
+  retries: 30
+  delay: 10
+  until: grafana_api_health_check.status == 200
+  tags: [grafana, automation, wait]
+
+- name: Configure Grafana initial admin credentials
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users/1/password"
+    method: PUT
+    headers:
+      Content-Type: application/json
+      Authorization: "Basic {{ ('admin:admin' | b64encode) }}"
+    body_format: json
+    body:
+      password: "{{ vault_grafana_password }}"
+    status_code: [200, 400]
+    timeout: 30
+  register: grafana_admin_password_set
+  tags: [grafana, automation, admin]
+
+- name: Run Grafana data source configuration
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/datasource_config.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/grafana/scripts"
+  register: grafana_datasource_config_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
+  retries: 3
+  delay: 30
+  until: grafana_datasource_config_result.rc == 0
+  tags: [grafana, automation, datasources]
+
+- name: Run Grafana dashboard import
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/dashboard_import.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/grafana/scripts"
+  register: grafana_dashboard_import_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
+  retries: 3
+  delay: 30
+  until: grafana_dashboard_import_result.rc == 0
+  tags: [grafana, automation, dashboards]
+
+- name: Run Grafana alerting configuration
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/alerting_config.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/grafana/scripts"
+  register: grafana_alerting_config_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
+  retries: 3
+  delay: 30
+  until: grafana_alerting_config_result.rc == 0
+  tags: [grafana, automation, alerting]
+
+- name: Run Grafana configuration automation
+  ansible.builtin.command: "{{ docker_dir }}/grafana/scripts/grafana_automation.py --config automation_config.yml"
+  args:
+    chdir: "{{ docker_dir }}/grafana/scripts"
+  register: grafana_automation_result
+  environment:
+    PYTHONPATH: "{{ docker_dir }}/grafana/scripts"
+  retries: 3
+  delay: 30
+  until: grafana_automation_result.rc == 0
+  tags: [grafana, automation, configure]
+
+- name: Validate Grafana data sources
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ grafana_api_key | default('') }}"
+    status_code: [200, 401]
+    timeout: 30
+  register: grafana_datasources_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana dashboards
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ grafana_api_key | default('') }}"
+    status_code: [200, 401]
+    timeout: 30
+  register: grafana_dashboards_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana alerting
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/v1/provisioning/alert-rules"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ grafana_api_key | default('') }}"
+    status_code: [200, 401]
+    timeout: 30
+  register: grafana_alerting_validation
+  tags: [grafana, automation, validate]
+
+- name: Configure Grafana monitoring integration
+  ansible.builtin.template:
+    src: monitoring_integration.yml.j2
+    dest: "{{ docker_dir }}/grafana/provisioning/monitoring.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: grafana_monitoring_integration_creation
+  tags: [grafana, automation, monitoring]
+
+- name: Configure Grafana authentication integration
+  ansible.builtin.template:
+    src: auth_integration.yml.j2
+    dest: "{{ docker_dir }}/grafana/provisioning/auth.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: grafana_auth_integration_creation
+  tags: [grafana, automation, auth]
+
+- name: Configure Grafana Traefik integration
+  ansible.builtin.template:
+    src: traefik_integration.yml.j2
+    dest: "{{ docker_dir }}/grafana/provisioning/traefik.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  register: grafana_traefik_integration_creation
+  tags: [grafana, automation, traefik]
+
+- name: Restart Grafana to apply configuration changes
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/grafana"
+    state: present
+    restarted: true
+  register: grafana_restart_result
+  tags: [grafana, automation, restart]
+
+- name: Wait for Grafana to be ready after restart
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_post_restart_health_check
+  retries: 30
+  delay: 10
+  until: grafana_post_restart_health_check.status == 200
+  tags: [grafana, automation, wait]
+
+- name: Validate Grafana automation integration
+  ansible.builtin.include_tasks: validation.yml
+  tags: [grafana, automation, validate]
+
+- name: Display Grafana automation integration summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      GRAFANA AUTOMATION INTEGRATION SUMMARY
+      ========================================
+
+      Automation Status: {{ 'SUCCESS' if grafana_automation_result.rc == 0 else 'FAILED' }}
+
+      Configuration Files Created:
+      - Automation Config: {{ grafana_automation_config_creation.changed }}
+      - Automation Script: {{ grafana_automation_script_creation.changed }}
+      - Dashboard Import Script: {{ grafana_dashboard_import_creation.changed }}
+      - Alerting Config Script: {{ grafana_alerting_config_creation.changed }}
+      - Datasource Config Script: {{ grafana_datasource_config_creation.changed }}
+      - Monitoring Integration: {{ grafana_monitoring_integration_creation.changed }}
+      - Auth Integration: {{ grafana_auth_integration_creation.changed }}
+      - Traefik Integration: {{ grafana_traefik_integration_creation.changed }}
+
+      Configuration Results:
+      - Admin Password Set: {{ grafana_admin_password_set.status | default('Unknown') }}
+      - Data Sources Configured: {{ grafana_datasource_config_result.rc == 0 }}
+      - Dashboards Imported: {{ grafana_dashboard_import_result.rc == 0 }}
+      - Alerting Configured: {{ grafana_alerting_config_result.rc == 0 }}
+      - General Configuration: {{ grafana_automation_result.rc == 0 }}
+
+      Validation Status:
+      - API Health: {{ grafana_post_restart_health_check.status | default('Unknown') }}
+      - Data Sources Validation: {{ grafana_datasources_validation.status | default('Unknown') }}
+      - Dashboards Validation: {{ grafana_dashboards_validation.status | default('Unknown') }}
+      - Alerting Validation: {{ grafana_alerting_validation.status | default('Unknown') }}
+
+      Integration Status:
+      - Monitoring Integration: {{ grafana_monitoring_integration_creation.changed }}
+      - Authentication Integration: {{ grafana_auth_integration_creation.changed }}
+      - Traefik Integration: {{ grafana_traefik_integration_creation.changed }}
+
+      Automation Features:
+      - Data Source Auto-Configuration: Enabled
+      - Dashboard Auto-Import: Enabled
+      - Alerting Auto-Configuration: Enabled
+      - User Management: Enabled
+      - Monitoring Integration: Enabled
+      - Authentication Integration: Enabled
+      - Traefik Integration: Enabled
+      - Health Monitoring: Enabled
+
+      ========================================
+  tags: [grafana, automation, summary]

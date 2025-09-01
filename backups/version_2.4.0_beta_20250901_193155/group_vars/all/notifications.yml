@@ -1,0 +1,297 @@
+# Notification Configuration
+# Comprehensive notification setup for homelab monitoring
+
+notifications:
+  enabled: true
+
+  # Email notifications
+  email:
+    enabled: true
+    smtp_host: "{{ vault_smtp_host | default('smtp.gmail.com') }}"
+    smtp_port: "{{ vault_smtp_port | default(587) }}"
+    smtp_username: "{{ vault_smtp_username | default('') }}"
+    smtp_password: "{{ vault_service_password | default('') }}"
+    smtp_use_tls: true
+    smtp_use_ssl: false
+    from_address: "{{ admin_email | default('admin@' + domain) }}"
+    to_addresses:
+      - "{{ admin_email | default('admin@' + domain) }}"
+      - "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+    # Email templates
+    templates:
+      critical_alert:
+        subject: "🚨 CRITICAL: {{ $labels.service }} Alert"
+        body: |
+          Critical alert triggered on {{ $labels.instance }}
+
+          Service: {{ $labels.service }}
+          Severity: {{ $labels.severity }}
+          Description: {{ $annotations.description }}
+
+          Dashboard: {{ $annotations.dashboard }}
+          Runbook: {{ $annotations.runbook | default('N/A') }}
+
+          Time: {{ $startsAt }}
+
+      warning_alert:
+        subject: "⚠️ WARNING: {{ $labels.service }} Alert"
+        body: |
+          Warning alert triggered on {{ $labels.instance }}
+
+          Service: {{ $labels.service }}
+          Severity: {{ $labels.severity }}
+          Description: {{ $annotations.description }}
+
+          Dashboard: {{ $annotations.dashboard }}
+
+          Time: {{ $startsAt }}
+
+      info_alert:
+        subject: "ℹ️ INFO: {{ $labels.service }} Notification"
+        body: |
+          Information notification from {{ $labels.instance }}
+
+          Service: {{ $labels.service }}
+          Description: {{ $annotations.description }}
+
+          Dashboard: {{ $annotations.dashboard }}
+
+          Time: {{ $startsAt }}
+
+  # Slack notifications
+  slack:
+    enabled: "{{ slack_webhook_url is defined }}"
+    webhook_url: "{{ vault_slack_webhook_url | default('') }}"
+    channel: "{{ slack_channel | default('#homelab-alerts') }}"
+    username: "Homelab Monitor"
+    icon_emoji: ":house:"
+
+    # Slack message templates
+    templates:
+      critical_alert:
+        color: "danger"
+        title: "🚨 Critical Alert: {{ $labels.service }}"
+        text: "{{ $annotations.description }}"
+        fields:
+          - title: "Service"
+            value: "{{ $labels.service }}"
+            short: true
+          - title: "Instance"
+            value: "{{ $labels.instance }}"
+            short: true
+          - title: "Dashboard"
+            value: "{{ $annotations.dashboard }}"
+            short: false
+
+      warning_alert:
+        color: "warning"
+        title: "⚠️ Warning Alert: {{ $labels.service }}"
+        text: "{{ $annotations.description }}"
+        fields:
+          - title: "Service"
+            value: "{{ $labels.service }}"
+            short: true
+          - title: "Instance"
+            value: "{{ $labels.instance }}"
+            short: true
+
+      info_alert:
+        color: "good"
+        title: "ℹ️ Info: {{ $labels.service }}"
+        text: "{{ $annotations.description }}"
+
+  # Discord notifications
+  discord:
+    enabled: "{{ discord_webhook_url is defined }}"
+    webhook_url: "{{ vault_discord_webhook_url | default('') }}"
+    username: "Homelab Monitor"
+    avatar_url: "https://cdn.discordapp.com/emojis/1234567890.png"
+
+    # Discord embed templates
+    templates:
+      critical_alert:
+        color: 16711680  # Red
+        title: "🚨 Critical Alert: {{ $labels.service }}"
+        description: "{{ $annotations.description }}"
+        fields:
+          - name: "Service"
+            value: "{{ $labels.service }}"
+            inline: true
+          - name: "Instance"
+            value: "{{ $labels.instance }}"
+            inline: true
+          - name: "Dashboard"
+            value: "[View Dashboard]({{ $annotations.dashboard }})"
+            inline: false
+
+      warning_alert:
+        color: 16776960  # Yellow
+        title: "⚠️ Warning Alert: {{ $labels.service }}"
+        description: "{{ $annotations.description }}"
+        fields:
+          - name: "Service"
+            value: "{{ $labels.service }}"
+            inline: true
+          - name: "Instance"
+            value: "{{ $labels.instance }}"
+            inline: true
+
+      info_alert:
+        color: 65280  # Green
+        title: "ℹ️ Info: {{ $labels.service }}"
+        description: "{{ $annotations.description }}"
+
+  # Telegram notifications
+  telegram:
+    enabled: "{{ telegram_bot_token is defined }}"
+    bot_token: "{{ vault_telegram_bot_token | default('') }}"
+    chat_id: "{{ vault_telegram_chat_id | default('') }}"
+    parse_mode: "HTML"
+
+    # Telegram message templates
+    templates:
+      critical_alert:
+        text: |
+          🚨 <b>Critical Alert</b>
+
+          <b>Service:</b> {{ $labels.service }}
+          <b>Instance:</b> {{ $labels.instance }}
+          <b>Description:</b> {{ $annotations.description }}
+
+          <a href="{{ $annotations.dashboard }}">View Dashboard</a>
+
+      warning_alert:
+        text: |
+          ⚠️ <b>Warning Alert</b>
+
+          <b>Service:</b> {{ $labels.service }}
+          <b>Instance:</b> {{ $labels.instance }}
+          <b>Description:</b> {{ $annotations.description }}
+
+      info_alert:
+        text: |
+          ℹ️ <b>Info</b>
+
+          <b>Service:</b> {{ $labels.service }}
+          <b>Description:</b> {{ $annotations.description }}
+
+  # PagerDuty notifications
+  pagerduty:
+    enabled: "{{ pagerduty_integration_key is defined }}"
+    integration_key: "{{ vault_pagerduty_integration_key | default('') }}"
+    service_name: "Homelab Infrastructure"
+
+    # PagerDuty event templates
+    templates:
+      critical_alert:
+        event_type: "trigger"
+        severity: "critical"
+        summary: "Critical Alert: {{ $labels.service }}"
+        description: "{{ $annotations.description }}"
+        source: "{{ $labels.instance }}"
+        custom_details:
+          service: "{{ $labels.service }}"
+          instance: "{{ $labels.instance }}"
+          dashboard: "{{ $annotations.dashboard }}"
+
+      warning_alert:
+        event_type: "trigger"
+        severity: "warning"
+        summary: "Warning Alert: {{ $labels.service }}"
+        description: "{{ $annotations.description }}"
+        source: "{{ $labels.instance }}"
+
+      resolve_alert:
+        event_type: "resolve"
+        summary: "Alert Resolved: {{ $labels.service }}"
+        description: "Alert has been resolved"
+        source: "{{ $labels.instance }}"
+
+  # Webhook notifications (generic)
+  webhook:
+    enabled: "{{ webhook_url is defined }}"
+    url: "{{ vault_webhook_url | default('') }}"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_webhook_token | default('') }}"
+
+    # Webhook payload templates
+    templates:
+      critical_alert:
+        payload: |
+          {
+            "event_type": "critical_alert",
+            "timestamp": "{{ $startsAt }}",
+            "service": "{{ $labels.service }}",
+            "instance": "{{ $labels.instance }}",
+            "severity": "critical",
+            "description": "{{ $annotations.description }}",
+            "dashboard": "{{ $annotations.dashboard }}",
+            "labels": {{ $labels | to_json }}
+          }
+
+      warning_alert:
+        payload: |
+          {
+            "event_type": "warning_alert",
+            "timestamp": "{{ $startsAt }}",
+            "service": "{{ $labels.service }}",
+            "instance": "{{ $labels.instance }}",
+            "severity": "warning",
+            "description": "{{ $annotations.description }}",
+            "labels": {{ $labels | to_json }}
+          }
+
+  # Notification routing
+  routing:
+    # Route critical alerts to all channels
+    critical:
+      - email
+      - slack
+      - discord
+      - telegram
+      - pagerduty
+      - webhook
+
+    # Route warning alerts to email, slack, and discord
+    warning:
+      - email
+      - slack
+      - discord
+      - telegram
+
+    # Route info alerts to email and slack only
+    info:
+      - email
+      - slack
+
+    # Route resolve notifications to email and slack
+    resolve:
+      - email
+      - slack
+
+  # Notification throttling
+  throttling:
+    enabled: true
+    group_by: ["alertname", "service"]
+    group_wait: "30s"
+    group_interval: "5m"
+    repeat_interval: "4h"
+
+    # Rate limiting
+    rate_limit:
+      enabled: true
+      max_alerts_per_minute: 10
+      max_alerts_per_hour: 100
+
+  # Notification testing
+  testing:
+    enabled: true
+    test_interval: "24h"
+    test_time: "09:00"
+    test_channels:
+      - email
+      - slack
+      - discord

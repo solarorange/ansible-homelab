@@ -1,0 +1,26 @@
+---
+# Vault Deployment Tasks
+
+- name: Prepare Vault secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "vault"
+    secret_dir_root: "{{ docker_dir }}/vault"
+    secret_files: "{{ vault_secret_files if vault_manage_secret_files else [] }}"
+  when: vault_manage_secret_files | bool
+
+- name: Validate required Vault secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/vault/secrets/{{ item }}"
+  register: vault_secret_stats
+  loop: "{{ vault_required_secrets | default([]) }}"
+  when: vault_manage_secret_files | bool and (vault_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Vault secret files are missing
+  ansible.builtin.assert:
+    that: "{{ vault_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/vault/secrets.
+      Missing: {{ (vault_required_secrets | default([])) | reject('in', (vault_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: vault_manage_secret_files | bool and (vault_required_secrets | default([]) | length > 0)
+

@@ -1,0 +1,55 @@
+---
+# tasks file for security/firewall
+
+# --- Fail2ban Configuration (Host-based) ---
+- name: Install Fail2ban
+  ansible.builtin.package:
+    name: fail2ban
+    state: present
+  when: security_fail2ban.enabled | default(true)
+
+- name: Create Fail2ban jail configuration for homelab services
+  ansible.builtin.template:
+    src: fail2ban-jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban service
+  when: security_fail2ban.enabled | default(true)
+
+# --- CrowdSec Configuration (Container-based) ---
+- name: Create crowdsec directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/crowdsec"
+    - "{{ docker_dir }}/crowdsec/config"
+    - "{{ docker_dir }}/crowdsec/data"
+  when: security_crowdsec.enabled | default(true)
+
+- name: Create crowdsec docker-compose file
+  ansible.builtin.template:
+    src: crowdsec-docker-compose.yml.j2
+    dest: "{{ docker_dir }}/crowdsec/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  notify: Restart crowdsec stack
+  when: security_crowdsec.enabled | default(true)
+
+- name: Start crowdsec stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/crowdsec"
+    build: false
+  register: crowdsec_result
+  when: security_crowdsec.enabled | default(true)
+
+- name: Display crowdsec deployment result
+  ansible.builtin.debug:
+    var: crowdsec_result
+  when: security_crowdsec.enabled | default(true)

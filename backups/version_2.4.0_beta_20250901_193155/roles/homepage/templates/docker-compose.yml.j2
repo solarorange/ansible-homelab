@@ -1,0 +1,84 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+
+services:
+  homepage:
+    image: "{{ homepage_image }}"
+    container_name: "{{ homepage_container_name }}"
+    restart: "{{ homepage_restart_policy }}"
+    # Ports removed (Traefik provides ingress). Enable to expose directly.
+    {% if homepage_direct_expose_enabled | default(false) %}
+    ports:
+      - "{{ homepage_port }}:3000"
+    {% endif %}
+    volumes:
+      - "{{ homepage_config_dir }}:/app/config"
+      - "{{ homepage_data_dir }}:/app/data"
+      - "{{ homepage_logs_dir }}:/app/logs"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      {% if homepage_manage_secret_files %}
+      - "{{ docker_dir }}/homepage/secrets/WEATHER_API_KEY:/run/secrets/WEATHER_API_KEY:ro"
+      - "{{ docker_dir }}/homepage/secrets/HOMEPAGE_API_SECRET:/run/secrets/HOMEPAGE_API_SECRET:ro"
+      {% endif %}
+    environment:
+      - PUID={{ user_id | default(1000) }}
+      - PGID={{ group_id | default(1000) }}
+      - TZ={{ homepage_timezone }}
+      - HOMEPAGE_TITLE={{ homepage_title }}
+      - HOMEPAGE_DESCRIPTION={{ homepage_description }}
+      - HOMEPAGE_THEME={{ homepage_theme }}
+      - HOMEPAGE_LANGUAGE={{ homepage_language }}
+      - HOMEPAGE_UNITS={{ homepage_units }}
+      {% if homepage_weather_enabled %}
+      - WEATHER_LAT={{ homepage_weather_lat }}
+      - WEATHER_LON={{ homepage_weather_lon }}
+      - WEATHER_API_KEY_FILE=/run/secrets/WEATHER_API_KEY
+      {% endif %}
+      {% if homepage_api_enabled %}
+      - HOMEPAGE_API_SECRET_FILE=/run/secrets/HOMEPAGE_API_SECRET
+      {% endif %}
+    networks:
+      - homelab
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.homepage.rule=Host(`{{ homepage_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.homepage.entrypoints=https"
+      - "traefik.http.routers.homepage.tls=true"
+      - "traefik.http.routers.homepage.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.homepage-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.homepage-headers.headers.customrequestheaders.X-Forwarded-Host={{ homepage_subdomain }}.{{ domain }}"
+      - "traefik.http.routers.homepage.middlewares=homepage-headers"
+      {% if homepage_security_headers_enabled %}
+      - "traefik.http.middlewares.homepage-security.headers.sslredirect=true"
+      - "traefik.http.middlewares.homepage-security.headers.forcestsheader=X-Forwarded-Proto:https"
+      - "traefik.http.middlewares.homepage-security.headers.customframeoptionsvalue=SAMEORIGIN"
+      - "traefik.http.middlewares.homepage-security.headers.contenttypeoptions=nosniff"
+      - "traefik.http.middlewares.homepage-security.headers.browserxssfilter=true"
+      - "traefik.http.middlewares.homepage-security.headers.referrerpolicy=strict-origin-when-cross-origin"
+      - "traefik.http.routers.homepage.middlewares=homepage-security"
+      {% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"

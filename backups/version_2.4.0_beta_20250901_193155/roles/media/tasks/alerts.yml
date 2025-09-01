@@ -1,0 +1,23 @@
+---
+# Media Stack Alerts
+# Configure alerting and notifications for media stack
+
+- name: Configure media stack alerting rules
+  ansible.builtin.template:
+    src: alerting.yml.j2
+    dest: "{{ prometheus_rules_dir }}/media-stack-alerts.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: media_alerting_enabled | default(true)
+  notify: restart prometheus
+
+- name: Configure media stack alerting notifications
+  ansible.builtin.template:
+    src: media-alerts.yml.j2
+    dest: "{{ alertmanager_config_dir }}/media-stack.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: media_alerting_enabled | default(true)
+  notify: restart alertmanager

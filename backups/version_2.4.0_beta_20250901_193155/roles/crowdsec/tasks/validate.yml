@@ -1,0 +1,89 @@
+---
+# Crowdsec Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Crowdsec vault variables
+  block:
+    - name: Check required Crowdsec vault variables
+      assert:
+        that:
+          - vault_crowdsec_admin_password is defined
+          - vault_crowdsec_database_password is defined
+          - vault_crowdsec_api_key is defined
+          - vault_crowdsec_secret_key is defined
+          - vault_crowdsec_encryption_key is defined
+          - vault_crowdsec_jwt_secret is defined
+        fail_msg: "Required Crowdsec vault variables are not defined"
+        success_msg: "All required Crowdsec vault variables are defined"
+
+    - name: Validate Crowdsec password complexity
+      assert:
+        that:
+          - vault_crowdsec_admin_password | length >= 12
+          - vault_crowdsec_database_password | length >= 12
+        fail_msg: "Crowdsec passwords must be at least 12 characters long"
+        success_msg: "Crowdsec password complexity requirements met"
+
+- name: Validate Crowdsec network configuration
+  block:
+    - name: Check Crowdsec port configuration
+      assert:
+        that:
+          - crowdsec_port is defined
+          - crowdsec_port | int >= 1024
+          - crowdsec_port | int <= 65535
+        fail_msg: "Crowdsec port must be between 1024 and 65535"
+        success_msg: "Crowdsec port configuration is valid"
+
+    - name: Check Crowdsec domain configuration
+      assert:
+        that:
+          - domain is defined
+          - crowdsec_subdomain is defined
+        fail_msg: "Crowdsec domain configuration is incomplete"
+        success_msg: "Crowdsec domain configuration is valid"
+
+- name: Validate Crowdsec security configuration
+  block:
+    - name: Check Crowdsec SSL configuration
+      assert:
+        that:
+          - crowdsec_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Crowdsec SSL configuration is invalid"
+        success_msg: "Crowdsec SSL configuration is valid"
+
+    - name: Check Crowdsec authentication configuration
+      assert:
+        that:
+          - crowdsec_auth_enabled | bool
+          - crowdsec_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Crowdsec authentication configuration is invalid"
+        success_msg: "Crowdsec authentication configuration is valid"
+
+- name: Validate Crowdsec storage configuration
+  block:
+    - name: Check Crowdsec data directories
+      assert:
+        that:
+          - crowdsec_data_dir is defined
+          - crowdsec_config_dir is defined
+          - crowdsec_backup_dir is defined
+        fail_msg: "Crowdsec storage configuration is incomplete"
+        success_msg: "Crowdsec storage configuration is valid"
+
+    - name: Create Crowdsec directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ crowdsec_data_dir }}"
+        - "{{ crowdsec_config_dir }}"
+        - "{{ crowdsec_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Crowdsec validation completed successfully - all configurations are valid and secure"

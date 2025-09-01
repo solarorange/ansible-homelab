@@ -1,0 +1,89 @@
+---
+# Security Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Security vault variables
+  block:
+    - name: Check required Security vault variables
+      assert:
+        that:
+          - vault_security_admin_password is defined
+          - vault_security_database_password is defined
+          - vault_security_api_key is defined
+          - vault_security_secret_key is defined
+          - vault_security_encryption_key is defined
+          - vault_security_jwt_secret is defined
+        fail_msg: "Required Security vault variables are not defined"
+        success_msg: "All required Security vault variables are defined"
+
+    - name: Validate Security password complexity
+      assert:
+        that:
+          - vault_security_admin_password | length >= 12
+          - vault_security_database_password | length >= 12
+        fail_msg: "Security passwords must be at least 12 characters long"
+        success_msg: "Security password complexity requirements met"
+
+- name: Validate Security network configuration
+  block:
+    - name: Check Security port configuration
+      assert:
+        that:
+          - security_port is defined
+          - security_port | int >= 1024
+          - security_port | int <= 65535
+        fail_msg: "Security port must be between 1024 and 65535"
+        success_msg: "Security port configuration is valid"
+
+    - name: Check Security domain configuration
+      assert:
+        that:
+          - domain is defined
+          - security_subdomain is defined
+        fail_msg: "Security domain configuration is incomplete"
+        success_msg: "Security domain configuration is valid"
+
+- name: Validate Security security configuration
+  block:
+    - name: Check Security SSL configuration
+      assert:
+        that:
+          - security_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Security SSL configuration is invalid"
+        success_msg: "Security SSL configuration is valid"
+
+    - name: Check Security authentication configuration
+      assert:
+        that:
+          - security_auth_enabled | bool
+          - security_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Security authentication configuration is invalid"
+        success_msg: "Security authentication configuration is valid"
+
+- name: Validate Security storage configuration
+  block:
+    - name: Check Security data directories
+      assert:
+        that:
+          - security_data_dir is defined
+          - security_config_dir is defined
+          - security_backup_dir is defined
+        fail_msg: "Security storage configuration is incomplete"
+        success_msg: "Security storage configuration is valid"
+
+    - name: Create Security directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ security_data_dir }}"
+        - "{{ security_config_dir }}"
+        - "{{ security_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Security validation completed successfully - all configurations are valid and secure"

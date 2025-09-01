@@ -1,0 +1,89 @@
+---
+# Ersatztv Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Ersatztv vault variables
+  block:
+    - name: Check required Ersatztv vault variables
+      assert:
+        that:
+          - vault_ersatztv_admin_password is defined
+          - vault_ersatztv_database_password is defined
+          - vault_ersatztv_api_key is defined
+          - vault_ersatztv_secret_key is defined
+          - vault_ersatztv_encryption_key is defined
+          - vault_ersatztv_jwt_secret is defined
+        fail_msg: "Required Ersatztv vault variables are not defined"
+        success_msg: "All required Ersatztv vault variables are defined"
+
+    - name: Validate Ersatztv password complexity
+      assert:
+        that:
+          - vault_ersatztv_admin_password | length >= 12
+          - vault_ersatztv_database_password | length >= 12
+        fail_msg: "Ersatztv passwords must be at least 12 characters long"
+        success_msg: "Ersatztv password complexity requirements met"
+
+- name: Validate Ersatztv network configuration
+  block:
+    - name: Check Ersatztv port configuration
+      assert:
+        that:
+          - ersatztv_port is defined
+          - ersatztv_port | int >= 1024
+          - ersatztv_port | int <= 65535
+        fail_msg: "Ersatztv port must be between 1024 and 65535"
+        success_msg: "Ersatztv port configuration is valid"
+
+    - name: Check Ersatztv domain configuration
+      assert:
+        that:
+          - domain is defined
+          - ersatztv_subdomain is defined
+        fail_msg: "Ersatztv domain configuration is incomplete"
+        success_msg: "Ersatztv domain configuration is valid"
+
+- name: Validate Ersatztv security configuration
+  block:
+    - name: Check Ersatztv SSL configuration
+      assert:
+        that:
+          - ersatztv_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Ersatztv SSL configuration is invalid"
+        success_msg: "Ersatztv SSL configuration is valid"
+
+    - name: Check Ersatztv authentication configuration
+      assert:
+        that:
+          - ersatztv_auth_enabled | bool
+          - ersatztv_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Ersatztv authentication configuration is invalid"
+        success_msg: "Ersatztv authentication configuration is valid"
+
+- name: Validate Ersatztv storage configuration
+  block:
+    - name: Check Ersatztv data directories
+      assert:
+        that:
+          - ersatztv_data_dir is defined
+          - ersatztv_config_dir is defined
+          - ersatztv_backup_dir is defined
+        fail_msg: "Ersatztv storage configuration is incomplete"
+        success_msg: "Ersatztv storage configuration is valid"
+
+    - name: Create Ersatztv directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ ersatztv_data_dir }}"
+        - "{{ ersatztv_config_dir }}"
+        - "{{ ersatztv_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Ersatztv validation completed successfully - all configurations are valid and secure"

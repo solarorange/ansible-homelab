@@ -1,0 +1,45 @@
+---
+# Loki Deployment Tasks
+
+- name: Render Loki docker-compose
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/monitoring/loki-docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/loki/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Deploy Loki with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "loki"
+    project_src: "{{ docker_dir }}/monitoring/loki"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports: "{{ [loki_port | default(3100)] if (loki_direct_expose_enabled | default(false)) else [] }}"
+  tags: [loki, deploy, rollback]
+
+- name: Wait for Loki local port (only if directly exposed)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ loki_port | default(3100) }}/ready"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: loki_health_local
+  retries: 5
+  delay: 10
+  until: loki_health_local.status == 200
+  when: loki_direct_expose_enabled | default(false)
+  tags: [loki, deploy, health]
+
+- name: Wait for Loki via Traefik route (default)
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://loki.{{ domain }}/ready"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (loki_direct_expose_enabled | default(false))
+  tags: [loki, deploy, health]
+

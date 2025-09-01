@@ -1,0 +1,89 @@
+---
+# Prometheus Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Prometheus vault variables
+  block:
+    - name: Check required Prometheus vault variables
+      assert:
+        that:
+          - vault_prometheus_admin_password is defined
+          - vault_prometheus_database_password is defined
+          - vault_prometheus_api_key is defined
+          - vault_prometheus_secret_key is defined
+          - vault_prometheus_encryption_key is defined
+          - vault_prometheus_jwt_secret is defined
+        fail_msg: "Required Prometheus vault variables are not defined"
+        success_msg: "All required Prometheus vault variables are defined"
+
+    - name: Validate Prometheus password complexity
+      assert:
+        that:
+          - vault_prometheus_admin_password | length >= 12
+          - vault_prometheus_database_password | length >= 12
+        fail_msg: "Prometheus passwords must be at least 12 characters long"
+        success_msg: "Prometheus password complexity requirements met"
+
+- name: Validate Prometheus network configuration
+  block:
+    - name: Check Prometheus port configuration
+      assert:
+        that:
+          - prometheus_port is defined
+          - prometheus_port | int >= 1024
+          - prometheus_port | int <= 65535
+        fail_msg: "Prometheus port must be between 1024 and 65535"
+        success_msg: "Prometheus port configuration is valid"
+
+    - name: Check Prometheus domain configuration
+      assert:
+        that:
+          - domain is defined
+          - prometheus_subdomain is defined
+        fail_msg: "Prometheus domain configuration is incomplete"
+        success_msg: "Prometheus domain configuration is valid"
+
+- name: Validate Prometheus security configuration
+  block:
+    - name: Check Prometheus SSL configuration
+      assert:
+        that:
+          - prometheus_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Prometheus SSL configuration is invalid"
+        success_msg: "Prometheus SSL configuration is valid"
+
+    - name: Check Prometheus authentication configuration
+      assert:
+        that:
+          - prometheus_auth_enabled | bool
+          - prometheus_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Prometheus authentication configuration is invalid"
+        success_msg: "Prometheus authentication configuration is valid"
+
+- name: Validate Prometheus storage configuration
+  block:
+    - name: Check Prometheus data directories
+      assert:
+        that:
+          - prometheus_data_dir is defined
+          - prometheus_config_dir is defined
+          - prometheus_backup_dir is defined
+        fail_msg: "Prometheus storage configuration is incomplete"
+        success_msg: "Prometheus storage configuration is valid"
+
+    - name: Create Prometheus directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ prometheus_data_dir }}"
+        - "{{ prometheus_config_dir }}"
+        - "{{ prometheus_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Prometheus validation completed successfully - all configurations are valid and secure"

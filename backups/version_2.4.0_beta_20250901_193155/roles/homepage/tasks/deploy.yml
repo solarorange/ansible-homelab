@@ -1,0 +1,208 @@
+---
+# Homepage Deployment Tasks
+# Handles Docker deployment, directory creation, and basic configuration
+
+- name: Create Homepage directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ homepage_docker_dir }}"
+    - "{{ homepage_config_dir }}"
+    - "{{ homepage_data_dir }}"
+    - "{{ homepage_backup_dir }}"
+    - "{{ homepage_logs_dir }}"
+    - "{{ homepage_docker_dir }}/scripts"
+  register: homepage_dir_creation
+  tags: [homepage, homepage-deploy, directories]
+
+- name: Backup existing Homepage configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir }}/homepage/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ homepage_config_dir }}/config.yml"
+    - "{{ homepage_config_dir }}/services.yml"
+    - "{{ homepage_config_dir }}/bookmarks.yml"
+    - "{{ homepage_docker_dir }}/docker-compose.yml"
+  when: item is file
+  register: homepage_config_backup
+  tags: [homepage, homepage-deploy, backup]
+
+- name: Create Homepage Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ homepage_docker_dir }}/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: homepage_docker_compose_creation
+  tags: [homepage, homepage-deploy, config]
+
+- name: Prepare Homepage secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "homepage"
+    secret_files: "{{ homepage_secret_files if homepage_manage_secret_files else [] }}"
+  when: homepage_manage_secret_files | bool
+  tags: [homepage, homepage-deploy, setup]
+
+- name: Validate required Homepage secret files exist
+  ansible.builtin.stat:
+    path: "{{ homepage_docker_dir }}/secrets/{{ item }}"
+  register: homepage_secret_stats
+  loop: "{{ homepage_required_secrets | default([]) }}"
+  when: homepage_manage_secret_files | bool and (homepage_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Homepage secret files are missing
+  ansible.builtin.assert:
+    that: "{{ homepage_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ homepage_docker_dir }}/secrets.
+      Missing: {{ (homepage_required_secrets | default([])) | reject('in', (homepage_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: homepage_manage_secret_files | bool and (homepage_required_secrets | default([]) | length > 0)
+
+- name: Create Homepage main configuration
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ homepage_config_dir }}/config.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: homepage_config_creation
+  tags: [homepage, homepage-deploy, config]
+
+- name: Create Homepage services configuration
+  ansible.builtin.template:
+    src: services.yml.j2
+    dest: "{{ homepage_config_dir }}/services.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: homepage_services_creation
+  tags: [homepage, homepage-deploy, config]
+
+- name: Create Homepage bookmarks configuration
+  ansible.builtin.template:
+    src: bookmarks.yml.j2
+    dest: "{{ homepage_config_dir }}/bookmarks.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: homepage_bookmarks_creation
+  tags: [homepage, homepage-deploy, config]
+
+- name: Create Homepage configuration script
+  ansible.builtin.template:
+    src: setup_homepage.py.j2
+    dest: "{{ homepage_docker_dir }}/scripts/setup_homepage.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: homepage_script_creation
+  tags: [homepage, homepage-deploy, scripts]
+
+- name: Create Homepage backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ homepage_docker_dir }}/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: homepage_backup_script_creation
+  tags: [homepage, homepage-deploy, scripts]
+
+- name: Create Homepage management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ homepage_docker_dir }}/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: homepage_management_script_creation
+  tags: [homepage, homepage-deploy, scripts]
+
+- name: Create Homepage health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ homepage_docker_dir }}/scripts/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: homepage_healthcheck_script_creation
+  tags: [homepage, homepage-deploy, scripts]
+
+- name: Start Homepage services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "homepage"
+    project_src: "{{ homepage_docker_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports: "{{ [homepage_port] if (homepage_direct_expose_enabled | default(false)) else [] }}"
+  tags: [homepage, homepage-deploy, docker, rollback]
+
+- name: Wait for Homepage to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: homepage_health_check
+  retries: 30
+  delay: 10
+  until: homepage_health_check.status in [200, 302, 401]
+  tags: [homepage, homepage-deploy, wait]
+  when: homepage_direct_expose_enabled | default(false)
+
+- name: Wait for Homepage via Traefik to be ready
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ homepage_subdomain }}.{{ domain }}/api/health"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 30
+    route_health_check_delay: 10
+  tags: [homepage, homepage-deploy, wait]
+  when: not (homepage_direct_expose_enabled | default(false))
+
+- name: Verify Homepage deployment
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ homepage_subdomain }}.{{ domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [homepage, homepage-deploy, verify]
+
+- name: Display Homepage deployment status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      HOMEPAGE DEPLOYMENT STATUS
+      ========================================
+
+      Status: {{ 'SUCCESS' if homepage_verification.status == 200 or homepage_verification.status == 302 else 'FAILED' }}
+      URL: https://{{ homepage_subdomain }}.{{ domain }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ homepage_port }}
+
+      Configuration:
+      - Theme: {{ homepage_theme }}
+      - Language: {{ homepage_language }}
+      - Timezone: {{ homepage_timezone }}
+      - Weather Enabled: {{ homepage_weather_enabled }}
+
+      Directories:
+      - Docker: {{ homepage_docker_dir }}
+      - Config: {{ homepage_config_dir }}
+      - Data: {{ homepage_data_dir }}
+      - Backup: {{ homepage_backup_dir }}
+      - Logs: {{ homepage_logs_dir }}
+
+      ========================================
+  tags: [homepage, homepage-deploy, summary]

@@ -1,0 +1,115 @@
+---
+# PostgreSQL deployment, configuration, backup, validation, homepage integration
+
+- name: Ensure PostgreSQL directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/postgresql/data"
+    - "{{ docker_dir }}/postgresql/config"
+    - "{{ docker_dir }}/postgresql/scripts"
+    - "{{ docker_dir }}/postgresql/backup"
+    - "{{ logs_dir }}/postgresql"
+
+- name: Deploy postgresql.conf
+  ansible.builtin.template:
+    src: postgresql.conf.j2
+    dest: "{{ docker_dir }}/postgresql/config/postgresql.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy pg_hba.conf
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "{{ docker_dir }}/postgresql/config/pg_hba.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy PostgreSQL backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ docker_dir }}/postgresql/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy PostgreSQL restore script
+  ansible.builtin.template:
+    src: restore.sh.j2
+    dest: "{{ docker_dir }}/postgresql/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy PostgreSQL management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ docker_dir }}/postgresql/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Write PostgreSQL password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/postgresql/secrets/postgres_password"
+    content: "{{ postgresql_admin_password | default(vault_postgresql_password) }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  when: postgresql_admin_password is defined or vault_postgresql_password is defined
+
+- name: Start PostgreSQL container
+  community.docker.docker_container:
+    name: "{{ postgresql_container_name }}"
+    image: "{{ postgresql_image }}"
+    restart_policy: "{{ postgresql_restart_policy }}"
+    networks:
+      - name: homelab
+    env:
+      POSTGRES_USER: "{{ postgresql_admin_user }}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - "{{ docker_dir }}/postgresql/data:/var/lib/postgresql/data"
+      - "{{ docker_dir }}/postgresql/config:/etc/postgresql"
+      - "{{ docker_dir }}/postgresql/scripts:/docker-entrypoint-initdb.d"
+      - "{{ docker_dir }}/postgresql/backup:/backup"
+      - "{{ logs_dir }}/postgresql:/var/log/postgresql"
+      - "{{ docker_dir }}/postgresql/secrets/postgres_password:/run/secrets/postgres_password:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$(cat /run/secrets/postgres_password)\" pg_isready -U {{ postgresql_admin_user }} | grep -q 'accepting connections'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    state: started
+    restart: true
+  register: postgresql_container
+
+- name: Validate PostgreSQL is running
+  ansible.builtin.command: docker exec {{ postgresql_container_name }} pg_isready -U {{ postgresql_admin_user }}
+  register: pg_isready_result
+  changed_when: false
+  failed_when: pg_isready_result.rc != 0
+
+- name: Schedule PostgreSQL backup cron job
+  ansible.builtin.cron:
+    name: "PostgreSQL Backup"
+    job: "{{ docker_dir }}/postgresql/scripts/backup.sh >> {{ logs_dir }}/postgresql/backup.log 2>&1"
+    minute: "0"
+    hour: "2"
+    user: "{{ vault_databases_user }}"
+    state: present
+
+- name: Integrate PostgreSQL with homepage
+  ansible.builtin.template:
+    src: homepage-postgresql.yml.j2
+    dest: "{{ homepage_config_dir }}/services/postgresql.yml"
+    mode: "0644"
+  when: postgresql_homepage_enabled | default(true)
+
+# Security and SSL tasks can be added here as needed

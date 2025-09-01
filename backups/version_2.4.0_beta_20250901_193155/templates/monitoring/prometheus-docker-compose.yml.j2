@@ -1,0 +1,79 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+  monitoring:
+    name: monitoring
+    external: true
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time={{ monitoring_retention_days | default(30) }}d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '{{ "--web.enable-admin-api" if prometheus_admin_api_enabled | default(false) else "" }}'
+      - '--storage.tsdb.no-lockfile'
+      - '--web.external-url=https://prometheus.{{ domain }}'
+    volumes:
+      - "{{ data_dir }}/prometheus:/prometheus"
+      - "{{ config_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "{{ config_dir }}/prometheus/rules:/etc/prometheus/rules"
+      - "{{ logs_dir }}/prometheus:/var/log/prometheus"
+    # Host port exposure is disabled by default; use Traefik for ingress
+    # ports:
+    #   - "9090:9090"
+    networks:
+      - monitoring
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.{{ domain }}`)"
+      - "traefik.http.routers.prometheus.entrypoints=https"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=cloudflare"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.middlewares.prometheus-auth.forwardauth.address=http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.prometheus-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.prometheus.middlewares=prometheus-auth"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+    user: "65534:65534"
+    ulimits:
+      nproc: 65536
+      nofile:
+        soft: 26677
+        hard: 46677
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.
+
+  prometheus-config-reloader:
+    image: jimmidyson/configmap-reload:latest
+    container_name: prometheus_config_reloader
+    restart: unless-stopped
+    command:
+      - --volume-dir=/etc/prometheus
+      - --webhook-url=http://prometheus:9090/-/reload
+    volumes:
+      - "{{ config_dir }}/prometheus:/etc/prometheus"
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    # NOTE: Swarm-only 'deploy.resources' removed for non-Swarm Compose compatibility.

@@ -1,0 +1,227 @@
+---
+# Network Diagram Data
+# Generated on {{ ansible_date_time.iso8601 }}
+
+network_topology:
+  external:
+    - name: "Internet"
+      type: "external"
+      connections:
+        - "Cloudflare DNS"
+        - "Upstream DNS"
+  
+  edge:
+    - name: "Traefik"
+      type: "reverse_proxy"
+      ip: "{{ ip_address }}"
+      ports: ["80", "443"]
+      connections:
+        - "Internet"
+        - "Internal Services"
+    
+    - name: "Firewall"
+      type: "security"
+      connections:
+        - "Internet"
+        - "Internal Network"
+  
+  internal:
+    - name: "Authentik"
+      type: "authentication"
+      ip: "{{ ip_address }}"
+      port: "9000"
+      connections:
+        - "Traefik"
+        - "Internal Services"
+    
+    - name: "Pi-hole"
+      type: "dns"
+      ip: "{{ ip_address }}"
+      port: "53"
+      connections:
+        - "Internal Network"
+        - "Upstream DNS"
+  
+  monitoring:
+    - name: "Prometheus"
+      type: "metrics"
+      ip: "{{ ip_address }}"
+      port: "9090"
+      connections:
+        - "All Services"
+    
+    - name: "Grafana"
+      type: "dashboard"
+      ip: "{{ ip_address }}"
+      port: "3000"
+      connections:
+        - "Prometheus"
+        - "Loki"
+    
+    - name: "Loki"
+      type: "logs"
+      ip: "{{ ip_address }}"
+      port: "3100"
+      connections:
+        - "All Services"
+    
+    - name: "AlertManager"
+      type: "alerts"
+      ip: "{{ ip_address }}"
+      port: "9093"
+      connections:
+        - "Prometheus"
+        - "External Notifications"
+  
+  databases:
+    - name: "PostgreSQL"
+      type: "database"
+      ip: "{{ ip_address }}"
+      port: "5432"
+      connections:
+        - "Authentik"
+        - "Media Services"
+    
+    - name: "MariaDB"
+      type: "database"
+      ip: "{{ ip_address }}"
+      port: "3306"
+      connections:
+        - "Media Services"
+    
+    - name: "Redis"
+      type: "cache"
+      ip: "{{ ip_address }}"
+      port: "6379"
+      connections:
+        - "Authentik"
+        - "Media Services"
+  
+  media:
+    - name: "Plex"
+      type: "media_server"
+      ip: "{{ ip_address }}"
+      port: "32400"
+      connections:
+        - "Traefik"
+        - "Media Storage"
+    
+    - name: "Jellyfin"
+      type: "media_server"
+      ip: "{{ ip_address }}"
+      port: "8096"
+      connections:
+        - "Traefik"
+        - "Media Storage"
+    
+    - name: "Sonarr"
+      type: "media_management"
+      ip: "{{ ip_address }}"
+      port: "8989"
+      connections:
+        - "Traefik"
+        - "Download Clients"
+    
+    - name: "Radarr"
+      type: "media_management"
+      ip: "{{ ip_address }}"
+      port: "7878"
+      connections:
+        - "Traefik"
+        - "Download Clients"
+  
+  storage:
+    - name: "Nextcloud"
+      type: "file_storage"
+      ip: "{{ ip_address }}"
+      port: "8080"
+      connections:
+        - "Traefik"
+        - "File Storage"
+    
+    - name: "Samba"
+      type: "file_sharing"
+      ip: "{{ ip_address }}"
+      port: "445"
+      connections:
+        - "Internal Network"
+        - "File Storage"
+    
+    - name: "Syncthing"
+      type: "file_sync"
+      ip: "{{ ip_address }}"
+      port: "8384"
+      connections:
+        - "Traefik"
+        - "File Storage"
+  
+  security:
+    - name: "WireGuard"
+      type: "vpn"
+      ip: "{{ ip_address }}"
+      port: "51820"
+      connections:
+        - "External Clients"
+        - "Internal Network"
+    
+    - name: "Fail2ban"
+      type: "intrusion_prevention"
+      connections:
+        - "All Services"
+
+network_segments:
+  external_network:
+    subnet: "0.0.0.0/0"
+    description: "Internet"
+  
+  internal_network:
+    subnet: "{{ network_segments[0].subnet | default('192.168.40.0/24') }}"
+    description: "Internal homelab network"
+  
+  docker_network:
+    subnet: "172.17.0.0/16"
+    description: "Docker internal network"
+
+security_zones:
+  dmz:
+    services: ["traefik", "pihole"]
+    description: "Demilitarized zone for external-facing services"
+  
+  internal:
+    services: ["authentik", "monitoring", "databases", "media", "storage"]
+    description: "Internal services with restricted access"
+  
+  management:
+    services: ["portainer", "grafana", "prometheus"]
+    description: "Management and monitoring services"
+
+connectivity_matrix:
+  external_access:
+    - service: "traefik"
+      ports: ["80", "443"]
+      purpose: "Reverse proxy and SSL termination"
+    
+    - service: "pihole"
+      ports: ["53"]
+      purpose: "DNS resolution"
+    
+    - service: "wireguard"
+      ports: ["51820"]
+      purpose: "VPN access"
+  
+  internal_access:
+    - service: "authentik"
+      ports: ["9000"]
+      purpose: "Authentication service"
+    
+    - service: "monitoring"
+      ports: ["3000", "9090", "3100", "9093"]
+      purpose: "Monitoring and alerting"
+    
+    - service: "media"
+      ports: ["32400", "8096", "8989", "7878"]
+      purpose: "Media services"
+    
+    - service: "storage"
+      ports: ["8080", "445", "8384"]
+      purpose: "File storage and sharing" 

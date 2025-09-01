@@ -1,0 +1,89 @@
+---
+# Alertmanager Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Alertmanager vault variables
+  block:
+    - name: Check required Alertmanager vault variables
+      assert:
+        that:
+          - vault_alertmanager_admin_password is defined
+          - vault_alertmanager_database_password is defined
+          - vault_alertmanager_api_key is defined
+          - vault_alertmanager_secret_key is defined
+          - vault_alertmanager_encryption_key is defined
+          - vault_alertmanager_jwt_secret is defined
+        fail_msg: "Required Alertmanager vault variables are not defined"
+        success_msg: "All required Alertmanager vault variables are defined"
+
+    - name: Validate Alertmanager password complexity
+      assert:
+        that:
+          - vault_alertmanager_admin_password | length >= 12
+          - vault_alertmanager_database_password | length >= 12
+        fail_msg: "Alertmanager passwords must be at least 12 characters long"
+        success_msg: "Alertmanager password complexity requirements met"
+
+- name: Validate Alertmanager network configuration
+  block:
+    - name: Check Alertmanager port configuration
+      assert:
+        that:
+          - alertmanager_port is defined
+          - alertmanager_port | int >= 1024
+          - alertmanager_port | int <= 65535
+        fail_msg: "Alertmanager port must be between 1024 and 65535"
+        success_msg: "Alertmanager port configuration is valid"
+
+    - name: Check Alertmanager domain configuration
+      assert:
+        that:
+          - domain is defined
+          - alertmanager_subdomain is defined
+        fail_msg: "Alertmanager domain configuration is incomplete"
+        success_msg: "Alertmanager domain configuration is valid"
+
+- name: Validate Alertmanager security configuration
+  block:
+    - name: Check Alertmanager SSL configuration
+      assert:
+        that:
+          - alertmanager_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Alertmanager SSL configuration is invalid"
+        success_msg: "Alertmanager SSL configuration is valid"
+
+    - name: Check Alertmanager authentication configuration
+      assert:
+        that:
+          - alertmanager_auth_enabled | bool
+          - alertmanager_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Alertmanager authentication configuration is invalid"
+        success_msg: "Alertmanager authentication configuration is valid"
+
+- name: Validate Alertmanager storage configuration
+  block:
+    - name: Check Alertmanager data directories
+      assert:
+        that:
+          - alertmanager_data_dir is defined
+          - alertmanager_config_dir is defined
+          - alertmanager_backup_dir is defined
+        fail_msg: "Alertmanager storage configuration is incomplete"
+        success_msg: "Alertmanager storage configuration is valid"
+
+    - name: Create Alertmanager directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ alertmanager_data_dir }}"
+        - "{{ alertmanager_config_dir }}"
+        - "{{ alertmanager_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Alertmanager validation completed successfully - all configurations are valid and secure"

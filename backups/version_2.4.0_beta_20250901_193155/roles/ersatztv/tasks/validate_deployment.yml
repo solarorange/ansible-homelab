@@ -1,0 +1,293 @@
+---
+# ErsatzTV Deployment Validation
+# Validate ErsatzTV deployment and functionality
+
+- name: Wait for ErsatzTV service to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ ersatztv_port }}"
+    delay: 10
+    timeout: 300
+    state: started
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV container status
+  community.docker.docker_container_info:
+    name: "{{ ersatztv_container_name }}"
+  register: ersatztv_container_status
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV container is running
+  ansible.builtin.assert:
+    that:
+      - ersatztv_container_status.exists
+      - ersatztv_container_status.container.State.Running
+    fail_msg: "ErsatzTV container is not running"
+    success_msg: "ErsatzTV container is running successfully"
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV container health
+  ansible.builtin.assert:
+    that:
+      - ersatztv_container_status.container.State.Health.Status == "healthy"
+    fail_msg: "ErsatzTV container health check failed"
+    success_msg: "ErsatzTV container health check passed"
+  when: ersatztv_container_status.container.State.Health is defined
+  tags: [ersatztv, validation]
+
+- name: Test ErsatzTV web interface
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}"
+    method: GET
+    status_code: [200, 302, 404]
+    timeout: 30
+  register: ersatztv_web_test
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV web interface response
+  ansible.builtin.assert:
+    that:
+      - ersatztv_web_test.status in [200, 302, 404]
+    fail_msg: "ErsatzTV web interface is not accessible"
+    success_msg: "ErsatzTV web interface is accessible"
+  tags: [ersatztv, validation]
+
+- name: Test ErsatzTV API endpoint
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/health"
+    method: GET
+    status_code: [200, 401, 404]
+    timeout: 30
+  register: ersatztv_api_test
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV API response
+  ansible.builtin.assert:
+    that:
+      - ersatztv_api_test.status in [200, 401, 404]
+    fail_msg: "ErsatzTV API endpoint is not accessible"
+    success_msg: "ErsatzTV API endpoint is accessible"
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV logs for errors
+  ansible.builtin.shell: "docker logs {{ ersatztv_container_name }} 2>&1 | grep -i error | tail -10"
+  register: ersatztv_error_logs
+  changed_when: false
+  failed_when: false
+  tags: [ersatztv, validation]
+
+- name: Display ErsatzTV error logs if any
+  ansible.builtin.debug:
+    msg: "ErsatzTV Error Logs: {{ ersatztv_error_logs.stdout }}"
+  when: ersatztv_error_logs.stdout != ""
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV resource usage
+  ansible.builtin.shell: "docker stats {{ ersatztv_container_name }} --no-stream --format 'table {{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}'"
+  register: ersatztv_resource_usage
+  changed_when: false
+  tags: [ersatztv, validation]
+
+- name: Display ErsatzTV resource usage
+  ansible.builtin.debug:
+    msg: "ErsatzTV Resource Usage: {{ ersatztv_resource_usage.stdout }}"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV network connectivity
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ping -c 1 8.8.8.8"
+  register: ersatztv_network_test
+  changed_when: false
+  failed_when: false
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV network connectivity
+  ansible.builtin.assert:
+    that:
+      - ersatztv_network_test.rc == 0
+    fail_msg: "ErsatzTV container has no network connectivity"
+    success_msg: "ErsatzTV container has network connectivity"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV volume mounts
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ls -la /config"
+  register: ersatztv_config_mount
+  changed_when: false
+  failed_when: false
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV config volume mount
+  ansible.builtin.assert:
+    that:
+      - ersatztv_config_mount.rc == 0
+    fail_msg: "ErsatzTV config volume is not mounted correctly"
+    success_msg: "ErsatzTV config volume is mounted correctly"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV data volume mounts
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ls -la /data"
+  register: ersatztv_data_mount
+  changed_when: false
+  failed_when: false
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV data volume mount
+  ansible.builtin.assert:
+    that:
+      - ersatztv_data_mount.rc == 0
+    fail_msg: "ErsatzTV data volume is not mounted correctly"
+    success_msg: "ErsatzTV data volume is mounted correctly"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV media volume mounts
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ls -la /media"
+  register: ersatztv_media_mount
+  changed_when: false
+  failed_when: false
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV media volume mount
+  ansible.builtin.assert:
+    that:
+      - ersatztv_media_mount.rc == 0
+    fail_msg: "ErsatzTV media volume is not mounted correctly"
+    success_msg: "ErsatzTV media volume is mounted correctly"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV hardware acceleration
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ffmpeg -hide_banner -f lavfi -i testsrc -t 1 -f null -"
+  register: ersatztv_hw_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_hardware_acceleration != "none"
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV hardware acceleration
+  ansible.builtin.assert:
+    that:
+      - ersatztv_hw_test.rc == 0
+    fail_msg: "ErsatzTV hardware acceleration is not working"
+    success_msg: "ErsatzTV hardware acceleration is working"
+  when: ersatztv_hardware_acceleration != "none"
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV transcoding
+  ansible.builtin.shell: "docker exec {{ ersatztv_container_name }} ffmpeg -hide_banner -f lavfi -i testsrc -t 1 -c:v libx264 -f mp4 -"
+  register: ersatztv_transcode_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_transcode_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV transcoding
+  ansible.builtin.assert:
+    that:
+      - ersatztv_transcode_test.rc == 0
+    fail_msg: "ErsatzTV transcoding is not working"
+    success_msg: "ErsatzTV transcoding is working"
+  when: ersatztv_transcode_enabled
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV streaming
+  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}/api/streams"
+  register: ersatztv_stream_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_channels_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV streaming
+  ansible.builtin.assert:
+    that:
+      - ersatztv_stream_test.stdout in ['200', '401', '404']
+    fail_msg: "ErsatzTV streaming endpoint is not accessible"
+    success_msg: "ErsatzTV streaming endpoint is accessible"
+  when: ersatztv_channels_enabled
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV monitoring
+  ansible.builtin.shell: "curl -s -o /dev/null -w '%{http_code}' http://{{ ansible_default_ipv4.address }}:{{ ersatztv_port }}{{ ersatztv_prometheus_path }}"
+  register: ersatztv_monitoring_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_prometheus_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV monitoring
+  ansible.builtin.assert:
+    that:
+      - ersatztv_monitoring_test.stdout in ['200', '401', '404']
+    fail_msg: "ErsatzTV monitoring endpoint is not accessible"
+    success_msg: "ErsatzTV monitoring endpoint is accessible"
+  when: ersatztv_prometheus_enabled
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV backup
+  ansible.builtin.shell: "{{ ersatztv_config_dir }}/backup-verify.sh"
+  register: ersatztv_backup_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_backup_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV backup
+  ansible.builtin.assert:
+    that:
+      - ersatztv_backup_test.rc == 0
+    fail_msg: "ErsatzTV backup verification failed"
+    success_msg: "ErsatzTV backup verification passed"
+  when: ersatztv_backup_enabled
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV security
+  ansible.builtin.shell: "{{ ersatztv_config_dir }}/security-audit.sh"
+  register: ersatztv_security_test
+  changed_when: false
+  failed_when: false
+  when: ersatztv_security_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV security
+  ansible.builtin.assert:
+    that:
+      - ersatztv_security_test.rc == 0
+    fail_msg: "ErsatzTV security audit failed"
+    success_msg: "ErsatzTV security audit passed"
+  when: ersatztv_security_enabled
+  tags: [ersatztv, validation]
+
+- name: Validate ErsatzTV homepage integration
+  ansible.builtin.stat:
+    path: "{{ homepage_config_dir }}/services/ersatztv.yml"
+  register: ersatztv_homepage_test
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, validation]
+
+- name: Check ErsatzTV homepage integration
+  ansible.builtin.assert:
+    that:
+      - ersatztv_homepage_test.stat.exists
+    fail_msg: "ErsatzTV homepage integration is not configured"
+    success_msg: "ErsatzTV homepage integration is configured"
+  when: ersatztv_homepage_enabled
+  tags: [ersatztv, validation]
+
+- name: Display ErsatzTV deployment validation summary
+  ansible.builtin.debug:
+    msg: |
+      ErsatzTV Deployment Validation Summary:
+      - Container Status: {{ ersatztv_container_status.container.State.Status }}
+      - Container Running: {{ ersatztv_container_status.container.State.Running }}
+      - Web Interface: {{ ersatztv_web_test.status }}
+      - API Endpoint: {{ ersatztv_api_test.status }}
+      - Network Connectivity: {{ ersatztv_network_test.rc == 0 }}
+      - Config Volume: {{ ersatztv_config_mount.rc == 0 }}
+      - Data Volume: {{ ersatztv_data_mount.rc == 0 }}
+      - Media Volume: {{ ersatztv_media_mount.rc == 0 }}
+      - Hardware Acceleration: {{ ersatztv_hw_test.rc == 0 if ersatztv_hardware_acceleration != 'none' else 'N/A' }}
+      - Transcoding: {{ ersatztv_transcode_test.rc == 0 if ersatztv_transcode_enabled else 'N/A' }}
+      - Streaming: {{ ersatztv_stream_test.stdout if ersatztv_channels_enabled else 'N/A' }}
+      - Monitoring: {{ ersatztv_monitoring_test.stdout if ersatztv_prometheus_enabled else 'N/A' }}
+      - Backup: {{ ersatztv_backup_test.rc == 0 if ersatztv_backup_enabled else 'N/A' }}
+      - Security: {{ ersatztv_security_test.rc == 0 if ersatztv_security_enabled else 'N/A' }}
+      - Homepage: {{ ersatztv_homepage_test.stat.exists if ersatztv_homepage_enabled else 'N/A' }}
+  tags: [ersatztv, validation]

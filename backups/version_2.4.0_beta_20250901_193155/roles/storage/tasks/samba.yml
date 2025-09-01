@@ -1,0 +1,51 @@
+---
+- name: Create Samba directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ docker_data_root }}/samba"
+    - "{{ docker_data_root }}/samba/config"
+    - "{{ docker_data_root }}/samba/data"
+    - "{{ docker_data_root }}/samba/logs"
+
+- name: Create Samba share directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: '0775'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  loop: "{{ samba_shares }}"
+
+- name: Create Samba configuration file
+  ansible.builtin.template:
+    src: samba-smb.conf.j2
+    dest: "{{ docker_data_root }}/samba/config/smb.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create Samba docker-compose service
+  ansible.builtin.blockinfile:
+    path: "{{ docker_compose_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Samba"
+    block: |
+      samba:
+        image: dperson/samba:latest
+        container_name: samba
+        volumes:
+          - {{ docker_data_root }}/samba/config:/etc/samba
+          - {{ docker_data_root }}/samba/data:/data
+          - {{ docker_data_root }}/samba/logs:/var/log/samba
+        ports:
+          - "137:137/udp"
+          - "138:138/udp"
+          - "139:139/tcp"
+          - "445:445/tcp"
+        environment:
+          - TZ={{ timezone }}
+        restart: unless-stopped
+        networks:
+          - traefik_network

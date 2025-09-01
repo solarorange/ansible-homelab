@@ -1,0 +1,120 @@
+---
+# Pezzo Handlers
+# Handlers for Pezzo service management
+
+- name: restart pezzo
+  community.docker.docker_compose_v2:
+    project_src: "{{ pezzo_config_dir }}"
+    state: present
+    build: no
+    pull: yes
+    remove_orphans: yes
+  listen: "restart pezzo"
+
+- name: restart pezzo server
+  community.docker.docker_container:
+    name: "{{ pezzo_server_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo server"
+
+- name: restart pezzo console
+  community.docker.docker_container:
+    name: "{{ pezzo_console_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo console"
+
+- name: restart pezzo proxy
+  community.docker.docker_container:
+    name: "{{ pezzo_proxy_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo proxy"
+
+- name: restart pezzo postgres
+  community.docker.docker_container:
+    name: "{{ pezzo_postgres_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo postgres"
+
+- name: restart pezzo redis
+  community.docker.docker_container:
+    name: "{{ pezzo_redis_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo redis"
+
+- name: restart pezzo clickhouse
+  community.docker.docker_container:
+    name: "{{ pezzo_clickhouse_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo clickhouse"
+
+- name: restart pezzo supertokens
+  community.docker.docker_container:
+    name: "{{ pezzo_supertokens_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo supertokens"
+
+- name: restart pezzo local kms
+  community.docker.docker_container:
+    name: "{{ pezzo_local_kms_container_name }}"
+    state: started
+    restart: yes
+  listen: "restart pezzo local kms"
+
+- name: reload pezzo systemd
+  ansible.builtin.systemd:
+    name: pezzo
+    daemon_reload: yes
+  listen: "reload pezzo systemd"
+
+- name: restart pezzo systemd
+  ansible.builtin.systemd:
+    name: pezzo
+    state: restarted
+  listen: "restart pezzo systemd"
+
+- name: reload pezzo configuration
+  ansible.builtin.command: "{{ pezzo_config_dir }}/manage_service.sh reload"
+  listen: "reload pezzo configuration"
+
+- name: backup pezzo
+  ansible.builtin.command: "{{ pezzo_config_dir }}/backup_full.sh"
+  listen: "backup pezzo"
+
+- name: verify pezzo backup
+  ansible.builtin.command: "{{ pezzo_config_dir }}/backup_verify.sh"
+  listen: "verify pezzo backup"
+
+- name: cleanup pezzo backups
+  ansible.builtin.command: "{{ pezzo_config_dir }}/backup_cleanup.sh"
+  listen: "cleanup pezzo backups"
+
+- name: check pezzo health
+  ansible.builtin.command: "{{ pezzo_config_dir }}/health_check.sh"
+  listen: "check pezzo health"
+
+- name: monitor pezzo
+  ansible.builtin.command: "{{ pezzo_config_dir }}/monitoring.sh"
+  listen: "monitor pezzo"
+
+- name: collect pezzo metrics
+  ansible.builtin.command: "{{ pezzo_config_dir }}/collect_metrics.sh"
+  listen: "collect pezzo metrics"
+
+- name: update pezzo homepage
+  ansible.builtin.command: "{{ pezzo_config_dir }}/homepage_integration.sh"
+  listen: "update pezzo homepage"
+
+- name: test pezzo alerts
+  ansible.builtin.command: "{{ pezzo_config_dir }}/test_alerts.sh"
+  listen: "test pezzo alerts"
+
+- name: verify pezzo deployment
+  ansible.builtin.command: "{{ pezzo_config_dir }}/verify_service.sh"
+  listen: "verify pezzo deployment"

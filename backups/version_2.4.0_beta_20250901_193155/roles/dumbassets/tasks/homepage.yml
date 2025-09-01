@@ -1,0 +1,108 @@
+---
+# DumbAssets Homepage Integration Tasks
+# Configure homepage dashboard integration
+
+- name: Create DumbAssets homepage service configuration
+  ansible.builtin.template:
+    src: homepage-service.yml.j2
+    dest: "{{ docker_config_root }}/homepage/services/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_service
+  tags: [dumbassets, homepage, service]
+
+- name: Create DumbAssets homepage widget configuration
+  ansible.builtin.template:
+    src: homepage-widget.yml.j2
+    dest: "{{ docker_config_root }}/homepage/widgets/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_widget
+  tags: [dumbassets, homepage, widget]
+
+- name: Create DumbAssets homepage bookmark
+  ansible.builtin.template:
+    src: homepage-bookmark.yml.j2
+    dest: "{{ docker_config_root }}/homepage/bookmarks/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_bookmark
+  tags: [dumbassets, homepage, bookmark]
+
+- name: Create DumbAssets homepage group configuration
+  ansible.builtin.template:
+    src: homepage-group.yml.j2
+    dest: "{{ docker_config_root }}/homepage/groups/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_group
+  tags: [dumbassets, homepage, group]
+
+- name: Create DumbAssets homepage settings configuration
+  ansible.builtin.template:
+    src: homepage-settings.yml.j2
+    dest: "{{ docker_config_root }}/homepage/settings/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_settings
+  tags: [dumbassets, homepage, settings]
+
+- name: Create DumbAssets homepage theme configuration
+  ansible.builtin.template:
+    src: homepage-theme.yml.j2
+    dest: "{{ docker_config_root }}/homepage/themes/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_theme
+  tags: [dumbassets, homepage, theme]
+
+- name: Create DumbAssets homepage notification configuration
+  ansible.builtin.template:
+    src: homepage-notifications.yml.j2
+    dest: "{{ docker_config_root }}/homepage/notifications/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_notifications
+  tags: [dumbassets, homepage, notifications]
+
+- name: Create DumbAssets homepage status configuration
+  ansible.builtin.template:
+    src: homepage-status.yml.j2
+    dest: "{{ docker_config_root }}/homepage/status/dumbassets.yml"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0644"
+  notify: reload homepage
+  register: dumbassets_homepage_status
+  tags: [dumbassets, homepage, status]
+
+- name: Display DumbAssets homepage integration summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Homepage Integration Summary:
+      - Service Config: {{ dumbassets_homepage_service.changed }}
+      - Widget Config: {{ dumbassets_homepage_widget.changed }}
+      - Bookmark Config: {{ dumbassets_homepage_bookmark.changed }}
+      - Group Config: {{ dumbassets_homepage_group.changed }}
+      - Settings Config: {{ dumbassets_homepage_settings.changed }}
+      - Theme Config: {{ dumbassets_homepage_theme.changed }}
+      - Notifications Config: {{ dumbassets_homepage_notifications.changed }}
+      - Status Config: {{ dumbassets_homepage_status.changed }}
+      - Service URL: https://{{ dumbassets_subdomain }}.{{ domain }}
+      - Service Group: {{ dumbassets_homepage_group }}
+      - Service Icon: {{ dumbassets_homepage_icon }}
+  tags: [dumbassets, homepage, summary]

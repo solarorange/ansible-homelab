@@ -1,0 +1,89 @@
+---
+# Deluge Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Deluge vault variables
+  block:
+    - name: Check required Deluge vault variables
+      assert:
+        that:
+          - vault_deluge_admin_password is defined
+          - vault_deluge_database_password is defined
+          - vault_deluge_api_key is defined
+          - vault_deluge_secret_key is defined
+          - vault_deluge_encryption_key is defined
+          - vault_deluge_jwt_secret is defined
+        fail_msg: "Required Deluge vault variables are not defined"
+        success_msg: "All required Deluge vault variables are defined"
+
+    - name: Validate Deluge password complexity
+      assert:
+        that:
+          - vault_deluge_admin_password | length >= 12
+          - vault_deluge_database_password | length >= 12
+        fail_msg: "Deluge passwords must be at least 12 characters long"
+        success_msg: "Deluge password complexity requirements met"
+
+- name: Validate Deluge network configuration
+  block:
+    - name: Check Deluge port configuration
+      assert:
+        that:
+          - deluge_port is defined
+          - deluge_port | int >= 1024
+          - deluge_port | int <= 65535
+        fail_msg: "Deluge port must be between 1024 and 65535"
+        success_msg: "Deluge port configuration is valid"
+
+    - name: Check Deluge domain configuration
+      assert:
+        that:
+          - domain is defined
+          - deluge_subdomain is defined
+        fail_msg: "Deluge domain configuration is incomplete"
+        success_msg: "Deluge domain configuration is valid"
+
+- name: Validate Deluge security configuration
+  block:
+    - name: Check Deluge SSL configuration
+      assert:
+        that:
+          - deluge_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Deluge SSL configuration is invalid"
+        success_msg: "Deluge SSL configuration is valid"
+
+    - name: Check Deluge authentication configuration
+      assert:
+        that:
+          - deluge_auth_enabled | bool
+          - deluge_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Deluge authentication configuration is invalid"
+        success_msg: "Deluge authentication configuration is valid"
+
+- name: Validate Deluge storage configuration
+  block:
+    - name: Check Deluge data directories
+      assert:
+        that:
+          - deluge_data_dir is defined
+          - deluge_config_dir is defined
+          - deluge_backup_dir is defined
+        fail_msg: "Deluge storage configuration is incomplete"
+        success_msg: "Deluge storage configuration is valid"
+
+    - name: Create Deluge directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ deluge_data_dir }}"
+        - "{{ deluge_config_dir }}"
+        - "{{ deluge_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Deluge validation completed successfully - all configurations are valid and secure"

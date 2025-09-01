@@ -1,0 +1,23 @@
+---
+# Pinchflat Monitoring Tasks
+
+- name: Configure Pinchflat monitoring
+  template:
+    src: monitoring.yml.j2
+    dest: "{{ prometheus_config_dir }}/pinchflat.yml"
+    mode: '0644'
+  notify: reload prometheus
+  tags: [pinchflat, monitoring]
+
+- name: Setup Pinchflat metrics collection
+  uri:
+    url: "https://{{ pinchflat_domain }}/api/admin/monitoring"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ vault_pinchflat_api_key | default('') }}"
+    body_format: json
+    body:
+      enabled: "{{ pinchflat_metrics_enabled | lower }}"
+      port: "{{ pinchflat_metrics_port }}"
+  tags: [pinchflat, monitoring]

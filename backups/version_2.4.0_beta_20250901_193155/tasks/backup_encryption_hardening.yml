@@ -1,0 +1,29 @@
+---
+# Backup Encryption Hardening
+# Ensures all backups are encrypted and keys are managed securely
+
+- name: Ensure GPG is installed for backup encryption
+  ansible.builtin.package:
+    name: gnupg
+    state: present
+  tags: [security, backup, encryption]
+
+- name: Deploy backup encryption script
+  ansible.builtin.template:
+    src: templates/backup-encrypt.sh.j2
+    dest: "{{ docker_dir }}/backup/backup-encrypt.sh"
+    mode: '0750'
+  tags: [security, backup, encryption]
+
+- name: Ensure backup encryption key exists
+  ansible.builtin.command:
+    cmd: "gpg --list-keys {{ vault_backup_gpg_key_id }}"
+  register: gpg_key_check
+  changed_when: false
+  failed_when: gpg_key_check.rc != 0
+  tags: [security, backup, encryption]
+
+- name: Encrypt all new backup files
+  ansible.builtin.shell: |
+    find {{ backup_dir }} -type f -name '*.tar.gz' -exec gpg --yes --batch --recipient {{ vault_backup_gpg_key_id }} --encrypt {} \;
+  tags: [security, backup, encryption]

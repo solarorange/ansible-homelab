@@ -1,0 +1,25 @@
+---
+# Media Stack ARR Services
+# Deploy ARR applications (Sonarr, Radarr, Lidarr, Readarr, Prowlarr, Bazarr, Pulsarr)
+
+- name: Deploy enabled ARR services
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    services: "{{ media_arr_services | dict2items | selectattr('value.enabled', 'equalto', true) | map(attribute='key') | list }}"
+  when: media_arr_services_enabled | default(true)
+  notify: restart arr services
+
+- name: Wait for ARR services to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: arr_health
+  retries: 30
+  delay: 10
+  until: arr_health.status == 200
+  loop: "{{ media_arr_services | dict2items }}"
+  when:
+    - media_arr_services_enabled | default(true)
+    - item.value.enabled | default(false)

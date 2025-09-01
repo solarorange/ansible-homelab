@@ -1,0 +1,150 @@
+---
+# Configure Immich Security
+# Production-ready security tasks for Immich
+
+- name: Configure Immich security
+  block:
+    - name: Generate Immich security configuration
+      ansible.builtin.template:
+        src: security.yml.j2
+        dest: "{{ immich_config_dir }}/security.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [immich, security]
+
+    - name: Configure Immich firewall rules
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ item }}"
+        action: accept
+        comment: "Immich {{ item }}"
+      loop:
+        - "{{ immich_ports.server }}"
+        - "{{ immich_ports.web }}"
+        - "{{ immich_ports.machine_learning }}"
+      tags: [immich, security]
+
+    - name: Generate Immich CrowdSec configuration
+      ansible.builtin.template:
+        src: crowdsec.yml.j2
+        dest: "{{ immich_config_dir }}/crowdsec.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_crowdsec_enabled | default(true)
+      tags: [immich, security]
+
+    - name: Generate Immich Fail2ban configuration
+      ansible.builtin.template:
+        src: fail2ban.conf.j2
+        dest: "{{ immich_config_dir }}/fail2ban.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_fail2ban_enabled | default(true)
+      tags: [immich, security]
+
+    - name: Create Immich security audit script
+      ansible.builtin.template:
+        src: security-audit.sh.j2
+        dest: "{{ immich_config_dir }}/security-audit.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, security]
+
+    - name: Setup Immich security audit cron
+      ansible.builtin.cron:
+        name: "Immich Security Audit"
+        hour: "2"
+        minute: "0"
+        job: "{{ immich_config_dir }}/security-audit.sh >> {{ logs_dir }}/immich/security/audit.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, security]
+
+    - name: Create Immich security directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0700'
+      loop:
+        - "{{ logs_dir }}/immich/security"
+        - "{{ logs_dir }}/immich/audit"
+      tags: [immich, security]
+
+    - name: Configure Immich SSL/TLS settings
+      ansible.builtin.template:
+        src: ssl-config.yml.j2
+        dest: "{{ immich_config_dir }}/ssl-config.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [immich, security]
+
+    - name: Generate Immich rate limiting configuration
+      ansible.builtin.template:
+        src: rate-limiting.yml.j2
+        dest: "{{ immich_config_dir }}/rate-limiting.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      when: immich_rate_limiting | default(true)
+      tags: [immich, security]
+
+    - name: Create Immich security monitoring script
+      ansible.builtin.template:
+        src: security-monitor.sh.j2
+        dest: "{{ immich_config_dir }}/security-monitor.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      tags: [immich, security]
+
+    - name: Setup Immich security monitoring cron
+      ansible.builtin.cron:
+        name: "Immich Security Monitoring"
+        minute: "*/10"
+        job: "{{ immich_config_dir }}/security-monitor.sh >> {{ logs_dir }}/immich/security/monitor.log 2>&1"
+        user: "{{ vault_immich_user }}"
+      tags: [immich, security]
+
+    - name: Configure Immich access control
+      ansible.builtin.template:
+        src: access-control.yml.j2
+        dest: "{{ immich_config_dir }}/access-control.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      tags: [immich, security]
+
+    - name: Generate Immich authentication configuration
+      ansible.builtin.template:
+        src: auth-config.yml.j2
+        dest: "{{ immich_config_dir }}/auth-config.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: [immich, security]
+
+    - name: Create Immich security systemd service
+      ansible.builtin.template:
+        src: immich-security.service.j2
+        dest: /etc/systemd/system/immich-security.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, security]
+
+    - name: Enable and start Immich security service
+      ansible.builtin.systemd:
+        name: immich-security
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      tags: [immich, security]
+
+  tags: [immich, security, always]

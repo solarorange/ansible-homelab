@@ -1,0 +1,152 @@
+---
+# Media Downloaders Sub-Role
+# Deploy and configure download clients (SABnzbd, qBittorrent)
+
+- name: Include downloader deployment tasks
+  block:
+    - name: Deploy SABnzbd safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "sabnzbd"
+        project_src: "{{ docker_dir }}/media"
+        compose_files:
+          - docker-compose.yml
+        services:
+          - sabnzbd
+        wait_for_ports: "{{ [ media_downloaders.sabnzbd.port ] if (media_downloaders.sabnzbd.port is defined) else [] }}"
+      when: media_downloaders.sabnzbd.enabled | default(true)
+      register: sabnzbd_deploy
+
+    - name: Deploy qBittorrent safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "qbittorrent"
+        project_src: "{{ docker_dir }}/media"
+        compose_files:
+          - docker-compose.yml
+        services:
+          - qbittorrent
+        wait_for_ports: "{{ [ media_downloaders.qbittorrent.port ] if (media_downloaders.qbittorrent.port is defined) else [] }}"
+      when: media_downloaders.qbittorrent.enabled | default(true)
+      register: qbittorrent_deploy
+
+    - name: Wait for SABnzbd to be ready
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.sabnzbd.port }}/api?mode=version"
+        method: GET
+        status_code: 200
+      register: sabnzbd_health
+      retries: 30
+      delay: 10
+      until: sabnzbd_health.status == 200
+      when: media_downloaders.sabnzbd.enabled | default(true)
+
+    - name: Wait for qBittorrent to be ready
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
+        method: GET
+        status_code: 200
+      register: qbittorrent_health
+      retries: 30
+      delay: 10
+      until: qbittorrent_health.status == 200
+      when: media_downloaders.qbittorrent.enabled | default(true)
+
+    - name: Configure SABnzbd API key
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.sabnzbd.port }}/api"
+        method: GET
+        body_format: form-urlencoded
+        body:
+          mode: "get_config"
+          section: "misc"
+          keyword: "api_key"
+      register: sabnzbd_api_key
+      when: media_downloaders.sabnzbd.enabled | default(true)
+
+    - name: Configure qBittorrent API key
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_downloaders.qbittorrent.port }}/api/v2/app/version"
+        method: GET
+        status_code: 200
+      register: qbittorrent_api_key
+      when: media_downloaders.qbittorrent.enabled | default(true)
+
+    - name: Create downloader configuration files
+      ansible.builtin.template:
+        src: "{{ item.key }}-config.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure downloader monitoring
+      ansible.builtin.template:
+        src: "{{ item.key }}-monitoring.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-monitoring.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_monitoring_enabled | default(true)
+
+    - name: Configure downloader security
+      ansible.builtin.template:
+        src: "{{ item.key }}-security.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-security.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure downloader backup
+      ansible.builtin.template:
+        src: "{{ item.key }}-backup.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-backup.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_backup_enabled | default(true)
+
+    - name: Configure downloader homepage integration
+      ansible.builtin.template:
+        src: "{{ item.key }}-homepage.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-homepage.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_homepage_enabled | default(true)
+
+    - name: Configure downloader alerts
+      ansible.builtin.template:
+        src: "{{ item.key }}-alerts.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_downloaders | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_alerting_enabled | default(true)
+
+    - name: Verify downloader deployment
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
+        method: GET
+        status_code: 200
+      loop: "{{ media_downloaders | dict2items }}"
+      when: item.value.enabled | default(false)
+      register: downloader_verification
+
+  tags: [media, downloaders, deploy]

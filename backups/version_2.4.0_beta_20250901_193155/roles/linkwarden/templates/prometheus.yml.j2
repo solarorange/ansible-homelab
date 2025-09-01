@@ -1,0 +1,12 @@
+# Linkwarden Prometheus Configuration
+# Scraping configuration for Linkwarden metrics
+
+- job_name: 'linkwarden'
+  static_configs:
+    - targets: ['{{ linkwarden_app_container_name }}:{{ linkwarden_port }}']
+      labels:
+        service: 'linkwarden'
+        instance: '{{ inventory_hostname }}'
+  metrics_path: '/metrics'
+  scrape_interval: {{ linkwarden_prometheus_scrape_interval | default(30) }}s
+  scrape_timeout: 10s 

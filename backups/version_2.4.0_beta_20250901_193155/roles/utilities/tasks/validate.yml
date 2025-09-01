@@ -1,0 +1,89 @@
+---
+# Utilities Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Utilities vault variables
+  block:
+    - name: Check required Utilities vault variables
+      assert:
+        that:
+          - vault_utilities_admin_password is defined
+          - vault_utilities_database_password is defined
+          - vault_utilities_api_key is defined
+          - vault_utilities_secret_key is defined
+          - vault_utilities_encryption_key is defined
+          - vault_utilities_jwt_secret is defined
+        fail_msg: "Required Utilities vault variables are not defined"
+        success_msg: "All required Utilities vault variables are defined"
+
+    - name: Validate Utilities password complexity
+      assert:
+        that:
+          - vault_utilities_admin_password | length >= 12
+          - vault_utilities_database_password | length >= 12
+        fail_msg: "Utilities passwords must be at least 12 characters long"
+        success_msg: "Utilities password complexity requirements met"
+
+- name: Validate Utilities network configuration
+  block:
+    - name: Check Utilities port configuration
+      assert:
+        that:
+          - utilities_port is defined
+          - utilities_port | int >= 1024
+          - utilities_port | int <= 65535
+        fail_msg: "Utilities port must be between 1024 and 65535"
+        success_msg: "Utilities port configuration is valid"
+
+    - name: Check Utilities domain configuration
+      assert:
+        that:
+          - domain is defined
+          - utilities_subdomain is defined
+        fail_msg: "Utilities domain configuration is incomplete"
+        success_msg: "Utilities domain configuration is valid"
+
+- name: Validate Utilities security configuration
+  block:
+    - name: Check Utilities SSL configuration
+      assert:
+        that:
+          - utilities_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Utilities SSL configuration is invalid"
+        success_msg: "Utilities SSL configuration is valid"
+
+    - name: Check Utilities authentication configuration
+      assert:
+        that:
+          - utilities_auth_enabled | bool
+          - utilities_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Utilities authentication configuration is invalid"
+        success_msg: "Utilities authentication configuration is valid"
+
+- name: Validate Utilities storage configuration
+  block:
+    - name: Check Utilities data directories
+      assert:
+        that:
+          - utilities_data_dir is defined
+          - utilities_config_dir is defined
+          - utilities_backup_dir is defined
+        fail_msg: "Utilities storage configuration is incomplete"
+        success_msg: "Utilities storage configuration is valid"
+
+    - name: Create Utilities directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ utilities_data_dir }}"
+        - "{{ utilities_config_dir }}"
+        - "{{ utilities_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Utilities validation completed successfully - all configurations are valid and secure"

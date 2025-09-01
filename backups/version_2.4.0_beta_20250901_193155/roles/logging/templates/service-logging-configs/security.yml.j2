@@ -1,0 +1,477 @@
+# Security Services Logging Configuration
+# Comprehensive logging setup for all security-related services
+# This file should be included in the main Promtail configuration
+
+scrape_configs:
+  # =============================================================================
+  # AUTHENTICATION & IDENTITY MANAGEMENT
+  # =============================================================================
+  
+  # Authentik - Identity Provider
+  - job_name: security_authentik
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: security_services
+          service: authentik
+          component: identity_provider
+          category: authentication
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/authentik/logs/*.log
+          - {{ logs_dir }}/security/authentik/application/*.log
+          - {{ logs_dir }}/security/authentik/api/*.log
+          - {{ logs_dir }}/security/authentik/auth/*.log
+          - {{ logs_dir }}/security/authentik/events/*.log
+          - {{ logs_dir }}/security/authentik/notifications/*.log
+          - {{ logs_dir }}/security/authentik/backup/*.log
+          - {{ logs_dir }}/security/authentik/errors/*.log
+          - {{ logs_dir }}/security/authentik/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_authentik"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # Vault - Secrets Management
+  - job_name: security_vault
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: security_services
+          service: vault
+          component: secrets_management
+          category: authentication
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/vault/logs/*.log
+          - {{ logs_dir }}/security/vault/application/*.log
+          - {{ logs_dir }}/security/vault/api/*.log
+          - {{ logs_dir }}/security/vault/auth/*.log
+          - {{ logs_dir }}/security/vault/audit/*.log
+          - {{ logs_dir }}/security/vault/notifications/*.log
+          - {{ logs_dir }}/security/vault/backup/*.log
+          - {{ logs_dir }}/security/vault/errors/*.log
+          - {{ logs_dir }}/security/vault/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_vault"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # NETWORK SECURITY
+  # =============================================================================
+  
+  # Pi-hole - DNS Ad Blocker
+  - job_name: security_pihole
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: pihole
+          component: dns_filtering
+          category: network_security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/pihole/logs/*.log
+          - {{ logs_dir }}/security/pihole/application/*.log
+          - {{ logs_dir }}/security/pihole/dns/*.log
+          - {{ logs_dir }}/security/pihole/queries/*.log
+          - {{ logs_dir }}/security/pihole/blocked/*.log
+          - {{ logs_dir }}/security/pihole/notifications/*.log
+          - {{ logs_dir }}/security/pihole/backup/*.log
+          - {{ logs_dir }}/security/pihole/errors/*.log
+          - {{ logs_dir }}/security/pihole/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_pihole"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # AdGuard Home - DNS Filtering
+  - job_name: security_adguard
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: adguard
+          component: dns_filtering
+          category: network_security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/adguard/logs/*.log
+          - {{ logs_dir }}/security/adguard/application/*.log
+          - {{ logs_dir }}/security/adguard/dns/*.log
+          - {{ logs_dir }}/security/adguard/queries/*.log
+          - {{ logs_dir }}/security/adguard/blocked/*.log
+          - {{ logs_dir }}/security/adguard/notifications/*.log
+          - {{ logs_dir }}/security/adguard/backup/*.log
+          - {{ logs_dir }}/security/adguard/errors/*.log
+          - {{ logs_dir }}/security/adguard/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_adguard"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # INTRUSION DETECTION & PREVENTION
+  # =============================================================================
+  
+  # Fail2ban - Intrusion Prevention
+  - job_name: security_fail2ban
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: fail2ban
+          component: intrusion_prevention
+          category: intrusion_detection
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/fail2ban.log
+          - {{ logs_dir }}/security/fail2ban/application/*.log
+          - {{ logs_dir }}/security/fail2ban/jail/*.log
+          - {{ logs_dir }}/security/fail2ban/actions/*.log
+          - {{ logs_dir }}/security/fail2ban/notifications/*.log
+          - {{ logs_dir }}/security/fail2ban/backup/*.log
+          - {{ logs_dir }}/security/fail2ban/errors/*.log
+          - {{ logs_dir }}/security/fail2ban/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_fail2ban"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>\w+) (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "2006-01-02 15:04:05,000"
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # CrowdSec - Modern Intrusion Detection
+  - job_name: security_crowdsec
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: crowdsec
+          component: intrusion_detection
+          category: intrusion_detection
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/crowdsec.log
+          - {{ logs_dir }}/security/crowdsec/application/*.log
+          - {{ logs_dir }}/security/crowdsec/decisions/*.log
+          - {{ logs_dir }}/security/crowdsec/alerts/*.log
+          - {{ logs_dir }}/security/crowdsec/notifications/*.log
+          - {{ logs_dir }}/security/crowdsec/backup/*.log
+          - {{ logs_dir }}/security/crowdsec/errors/*.log
+          - {{ logs_dir }}/security/crowdsec/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_crowdsec"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # FIREWALL & NETWORK MONITORING
+  # =============================================================================
+  
+  # UFW - Uncomplicated Firewall
+  - job_name: security_ufw
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: ufw
+          component: firewall
+          category: network_security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/ufw.log
+          - {{ logs_dir }}/security/ufw/application/*.log
+          - {{ logs_dir }}/security/ufw/rules/*.log
+          - {{ logs_dir }}/security/ufw/notifications/*.log
+          - {{ logs_dir }}/security/ufw/backup/*.log
+          - {{ logs_dir }}/security/ufw/errors/*.log
+          - {{ logs_dir }}/security/ufw/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_ufw"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category:
+
+  # iptables - Packet Filtering
+  - job_name: security_iptables
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: iptables
+          component: packet_filtering
+          category: network_security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/iptables.log
+          - {{ logs_dir }}/security/iptables/application/*.log
+          - {{ logs_dir }}/security/iptables/rules/*.log
+          - {{ logs_dir }}/security/iptables/notifications/*.log
+          - {{ logs_dir }}/security/iptables/backup/*.log
+          - {{ logs_dir }}/security/iptables/errors/*.log
+          - {{ logs_dir }}/security/iptables/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_iptables"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # VPN SERVICES
+  # =============================================================================
+  
+  # WireGuard - VPN
+  - job_name: security_wireguard
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: wireguard
+          component: vpn
+          category: vpn
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/wireguard.log
+          - {{ logs_dir }}/security/wireguard/application/*.log
+          - {{ logs_dir }}/security/wireguard/connections/*.log
+          - {{ logs_dir }}/security/wireguard/notifications/*.log
+          - {{ logs_dir }}/security/wireguard/backup/*.log
+          - {{ logs_dir }}/security/wireguard/errors/*.log
+          - {{ logs_dir }}/security/wireguard/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_wireguard"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category:
+
+  # OpenVPN - VPN
+  - job_name: security_openvpn
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: openvpn
+          component: vpn
+          category: vpn
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/openvpn.log
+          - {{ logs_dir }}/security/openvpn/application/*.log
+          - {{ logs_dir }}/security/openvpn/connections/*.log
+          - {{ logs_dir }}/security/openvpn/notifications/*.log
+          - {{ logs_dir }}/security/openvpn/backup/*.log
+          - {{ logs_dir }}/security/openvpn/errors/*.log
+          - {{ logs_dir }}/security/openvpn/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_openvpn"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}) (?P<hostname>\S+) (?P<service>\S+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: "Jan _2 15:04:05"
+            - labels:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # AUDIT & COMPLIANCE
+  # =============================================================================
+  
+  # Auditd - System Auditing
+  - job_name: security_auditd
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: auditd
+          component: system_auditing
+          category: audit_compliance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - /var/log/audit/audit.log
+          - {{ logs_dir }}/security/auditd/application/*.log
+          - {{ logs_dir }}/security/auditd/events/*.log
+          - {{ logs_dir }}/security/auditd/notifications/*.log
+          - {{ logs_dir }}/security/auditd/backup/*.log
+          - {{ logs_dir }}/security/auditd/errors/*.log
+          - {{ logs_dir }}/security/auditd/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_auditd"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{10}\.\d{3}:\d+) (?P<audit_type>\w+): (?P<message>.*)$'
+            - timestamp:
+                source: timestamp
+                format: Unix
+            - labels:
+                audit_type:
+                service:
+                component:
+                category:
+
+  # =============================================================================
+  # SECURITY MONITORING
+  # =============================================================================
+  
+  # Fing - Network Monitoring
+  - job_name: security_fing
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: security_services
+          service: fing
+          component: network_monitoring
+          category: security_monitoring
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/fing/logs/*.log
+          - {{ logs_dir }}/security/fing/application/*.log
+          - {{ logs_dir }}/security/fing/network/*.log
+          - {{ logs_dir }}/security/fing/devices/*.log
+          - {{ logs_dir }}/security/fing/notifications/*.log
+          - {{ logs_dir }}/security/fing/backup/*.log
+          - {{ logs_dir }}/security/fing/errors/*.log
+          - {{ logs_dir }}/security/fing/performance/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="security_fing"}'
+          stages:
+            - json:
+                expressions:
+                  timestamp: time
+                  level: level
+                  message: message
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+            - labels:
+                level:
+                service:
+                component:
+                category: 

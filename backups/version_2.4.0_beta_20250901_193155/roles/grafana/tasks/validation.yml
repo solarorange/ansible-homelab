@@ -1,0 +1,357 @@
+---
+# Grafana Validation Tasks
+# Comprehensive validation of Grafana deployment and configuration
+
+- name: Validate Grafana container status
+  community.docker.docker_container_info:
+    name: "{{ grafana_container_name }}"
+  register: grafana_container_info
+  tags: [grafana, validation, container]
+
+- name: Validate Grafana API health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: grafana_health_validation
+  tags: [grafana, validation, health]
+
+- name: Validate Grafana authentication
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/user"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: grafana_auth_validation
+  tags: [grafana, validation, auth]
+
+- name: Validate data sources
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: datasources_validation
+  tags: [grafana, validation, datasources]
+
+- name: Validate dashboards
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: dashboards_validation
+  tags: [grafana, validation, dashboards]
+
+- name: Validate folder structure
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/folders"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: folders_validation
+  tags: [grafana, validation, folders]
+
+- name: Validate alerting configuration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alert-notifications"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: alerting_validation
+  tags: [grafana, validation, alerting]
+
+- name: Validate user management
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/users"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: users_validation
+  tags: [grafana, validation, users]
+
+- name: Validate team management
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/teams/search"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  register: teams_validation
+  tags: [grafana, validation, teams]
+
+- name: Test data source connections
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources/{{ item.key }}/health"
+    method: GET
+    user: "{{ vault_grafana_user }}"
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: 200
+    timeout: 30
+  loop: "{{ grafana_datasources | dict2items }}"
+  when: item.value.enabled | default(false)
+  register: datasource_health_validation
+  tags: [grafana, validation, datasource_health]
+
+- name: Validate Grafana configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ docker_dir }}/monitoring/grafana/config/grafana.ini"
+    - "{{ docker_dir }}/monitoring/grafana/docker-compose.yml"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/datasources/datasources.yml"
+    - "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/dashboards.yml"
+  register: config_files_validation
+  tags: [grafana, validation, config]
+
+- name: Validate Grafana scripts
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ docker_dir }}/monitoring/grafana/scripts/setup_grafana.py"
+    - "{{ docker_dir }}/monitoring/grafana/scripts/healthcheck.sh"
+    - "{{ docker_dir }}/monitoring/grafana/scripts/backup.sh"
+    - "{{ docker_dir }}/monitoring/grafana/scripts/monitoring.sh"
+  register: scripts_validation
+  tags: [grafana, validation, scripts]
+
+- name: Display validation results
+  ansible.builtin.debug:
+    msg: |
+      Grafana Validation Results:
+      - Container: {{ grafana_container_info.container.State.Running | default(false) | ternary('Running', 'Stopped') }}
+      - API Health: {{ grafana_health_validation.status == 200 | ternary('OK', 'Failed') }}
+      - Data Sources: {{ datasources_validation.json | length }} configured
+      - Dashboards: {{ dashboards_validation.json | length }} found
+  tags: [grafana, validation, summary]
+
+# Grafana Automation Integration Validation Tasks
+# Validates configuration, connectivity, and integration status
+
+- name: Validate Grafana service status
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: grafana_health_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana configuration files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: grafana_config_validation
+  loop:
+    - "{{ grafana_config_dir }}/grafana.ini"
+    - "{{ grafana_config_dir }}/provisioning/datasources/datasources.yml"
+    - "{{ grafana_config_dir }}/provisioning/dashboards/dashboards.yml"
+    - "{{ grafana_config_dir }}/provisioning/alerting/alertmanager.yml"
+    - "{{ grafana_config_dir }}/automation_config.yml"
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana automation scripts
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: grafana_scripts_validation
+  loop:
+    - "{{ grafana_docker_dir }}/scripts/grafana_automation.py"
+    - "{{ grafana_docker_dir }}/scripts/dashboard_import.py"
+    - "{{ grafana_docker_dir }}/scripts/automation_config.yml"
+  tags: [grafana, automation, validate]
+
+- name: Test Grafana automation script
+  ansible.builtin.command: "{{ grafana_docker_dir }}/scripts/grafana_automation.py --validate"
+  args:
+    chdir: "{{ grafana_docker_dir }}/scripts"
+  register: grafana_automation_test
+  environment:
+    PYTHONPATH: "{{ grafana_docker_dir }}/scripts"
+  tags: [grafana, automation, validate]
+
+- name: Test Grafana dashboard import script
+  ansible.builtin.command: "{{ grafana_docker_dir }}/scripts/dashboard_import.py --validate"
+  args:
+    chdir: "{{ grafana_docker_dir }}/scripts"
+  register: grafana_dashboard_import_test
+  environment:
+    PYTHONPATH: "{{ grafana_docker_dir }}/scripts"
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana API endpoints
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: grafana_api_validation
+  loop:
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/dashboards"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/folders"
+    - "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana data sources
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/datasources"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: grafana_datasources_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana dashboards
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/search"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: grafana_dashboards_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana alerting
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/alerting/alertmanager/grafana/config"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: grafana_alerting_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana authentication integration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/admin/settings"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+  register: grafana_auth_validation
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana Traefik integration
+  ansible.builtin.uri:
+    url: "https://{{ grafana_subdomain }}.{{ domain }}/api/health"
+    method: GET
+    status_code: [200, 302, 401, 404]
+    timeout: 30
+    validate_certs: "{{ validate_certs | default(true) }}"
+  register: grafana_traefik_validation
+  tags: [grafana, automation, validate]
+
+- name: Check Grafana container logs for errors
+  community.docker.docker_container_info:
+    name: grafana
+  register: grafana_container_info
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana container health
+  ansible.builtin.assert:
+    that:
+      - grafana_container_info.exists
+      - grafana_container_info.container.State.Status == "running"
+      - grafana_container_info.container.State.Health.Status in ["healthy", "none"]
+    fail_msg: "Grafana container is not healthy"
+  tags: [grafana, automation, validate]
+
+- name: Validate Grafana database connection
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}/api/health"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: grafana_db_validation
+  tags: [grafana, automation, validate]
+
+- name: Display Grafana validation summary
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      GRAFANA VALIDATION SUMMARY
+      ========================================
+
+      Service Health:
+      - API Health: {{ grafana_health_validation.status | default('Unknown') }}
+      - Container Status: {{ grafana_container_info.container.State.Status | default('Unknown') }}
+      - Container Health: {{ grafana_container_info.container.State.Health.Status | default('Unknown') }}
+      - Database Connection: {{ grafana_db_validation.status | default('Unknown') }}
+
+      Configuration Files:
+      - Main Config: {{ grafana_config_validation.results[0].stat.exists | default(false) }}
+      - Data Sources: {{ grafana_config_validation.results[1].stat.exists | default(false) }}
+      - Dashboards: {{ grafana_config_validation.results[2].stat.exists | default(false) }}
+      - Alerting: {{ grafana_config_validation.results[3].stat.exists | default(false) }}
+      - Automation Config: {{ grafana_config_validation.results[4].stat.exists | default(false) }}
+
+      Automation Scripts:
+      - Automation Script: {{ grafana_scripts_validation.results[0].stat.exists | default(false) }}
+      - Dashboard Import: {{ grafana_scripts_validation.results[1].stat.exists | default(false) }}
+      - Config File: {{ grafana_scripts_validation.results[2].stat.exists | default(false) }}
+
+      Script Tests:
+      - Automation Test: {{ grafana_automation_test.rc == 0 if grafana_automation_test.rc is defined else 'Not Run' }}
+      - Dashboard Import Test: {{ grafana_dashboard_import_test.rc == 0 if grafana_dashboard_import_test.rc is defined else 'Not Run' }}
+
+      API Endpoints:
+      - Data Sources API: {{ grafana_api_validation.results[0].status | default('Unknown') }}
+      - Dashboards API: {{ grafana_api_validation.results[1].status | default('Unknown') }}
+      - Folders API: {{ grafana_api_validation.results[2].status | default('Unknown') }}
+      - Alerting API: {{ grafana_api_validation.results[3].status | default('Unknown') }}
+
+      Integration Status:
+      - Data Sources: {{ grafana_datasources_validation.status | default('Unknown') }}
+      - Dashboards: {{ grafana_dashboards_validation.status | default('Unknown') }}
+      - Alerting: {{ grafana_alerting_validation.status | default('Unknown') }}
+      - Authentication: {{ grafana_auth_validation.status | default('Unknown') }}
+      - Traefik: {{ grafana_traefik_validation.status | default('Unknown') }}
+
+      Data Source Count: {{ grafana_datasources_validation.json | length if grafana_datasources_validation.json else 0 }}
+      Dashboard Count: {{ grafana_dashboards_validation.json | length if grafana_dashboards_validation.json else 0 }}
+
+      Validation Results:
+      - All Config Files Present: {{ grafana_config_validation.results | map(attribute='stat.exists') | list | all }}
+      - All Scripts Present: {{ grafana_scripts_validation.results | map(attribute='stat.exists') | list | all }}
+      - Service Healthy: {{ grafana_health_validation.status in [200, 302, 401] if grafana_health_validation.status is defined else false }}
+      - Container Healthy: {{ grafana_container_info.container.State.Health.Status in ['healthy', 'none'] if grafana_container_info.container.State.Health.Status is defined else false }}
+      - Data Sources Configured: {{ grafana_datasources_validation.json | length > 0 if grafana_datasources_validation.json else false }}
+      - Dashboards Available: {{ grafana_dashboards_validation.json | length > 0 if grafana_dashboards_validation.json else false }}
+
+      ========================================
+  tags: [grafana, automation, validate, summary]
+
+- name: Set Grafana validation result
+  ansible.builtin.set_fact:
+    grafana_validation_success: "{{
+      grafana_health_validation.status in [200, 302, 401] and
+      grafana_config_validation.results | map(attribute='stat.exists') | list | all and
+      grafana_scripts_validation.results | map(attribute='stat.exists') | list | all and
+      grafana_container_info.container.State.Status == 'running' and
+      grafana_datasources_validation.json | length > 0
+    }}"
+  tags: [grafana, automation, validate]
+
+- name: Fail if Grafana validation fails
+  ansible.builtin.fail:
+    msg: "Grafana validation failed. Check the validation summary above for details."
+  when: not grafana_validation_success
+  tags: [grafana, automation, validate]

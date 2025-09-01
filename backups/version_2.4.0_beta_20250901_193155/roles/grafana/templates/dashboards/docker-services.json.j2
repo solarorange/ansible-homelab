@@ -1,0 +1,590 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Docker Services",
+    "tags": ["docker", "containers", "services", "monitoring"],
+    "style": "{{ grafana_dashboard_theme | default('dark') }}",
+    "timezone": "{{ grafana_dashboard_timezone | default('UTC') }}",
+    "refresh": "{{ grafana_dashboard_auto_refresh | default('30s') }}",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+      "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"],
+      "hidden": false,
+      "collapse": false
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "container",
+          "type": "query",
+          "query": "label_values(container_cpu_usage_seconds_total, name)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Container",
+          "description": "Select containers to monitor",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "container_state",
+          "type": "custom",
+          "query": "running,exited,created,paused",
+          "includeAll": true,
+          "multi": true,
+          "label": "Container State",
+          "description": "Filter by container state",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "service_category",
+          "type": "custom",
+          "query": "media,security,storage,network,automation,utilities,database",
+          "includeAll": true,
+          "multi": true,
+          "label": "Service Category",
+          "description": "Filter by service category",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(container_cpu_usage_seconds_total, instance)",
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "label": "Instance",
+          "description": "Select Docker hosts",
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "time_range",
+          "type": "custom",
+          "query": "1h,6h,12h,24h,7d,30d",
+          "includeAll": false,
+          "multi": false,
+          "label": "Time Range",
+          "description": "Select time range for metrics",
+          "regex": "",
+          "sort": 1,
+          "current": {
+            "selected": true,
+            "text": "1h",
+            "value": "1h"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Container Restarts",
+          "datasource": "Prometheus",
+          "expr": "increase(container_restart_count[5m]) > 0",
+          "iconColor": "rgba(255, 193, 7, 1)",
+          "titleFormat": "Container Restart: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} restarted",
+          "fillColor": "rgba(255, 193, 7, 0.1)",
+          "lineColor": "rgba(255, 193, 7, 1)"
+        },
+        {
+          "name": "Container OOM",
+          "datasource": "Prometheus",
+          "expr": "increase(container_oom_events_total[5m]) > 0",
+          "iconColor": "rgba(255, 0, 0, 1)",
+          "titleFormat": "Container OOM: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} ran out of memory",
+          "fillColor": "rgba(255, 0, 0, 0.1)",
+          "lineColor": "rgba(255, 0, 0, 1)"
+        },
+        {
+          "name": "High Memory Usage",
+          "datasource": "Prometheus",
+          "expr": "(container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 85",
+          "iconColor": "rgba(255, 165, 0, 1)",
+          "titleFormat": "High Memory: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} using {{ $value }}% memory",
+          "fillColor": "rgba(255, 165, 0, 0.1)",
+          "lineColor": "rgba(255, 165, 0, 1)"
+        },
+        {
+          "name": "High CPU Usage",
+          "datasource": "Prometheus",
+          "expr": "rate(container_cpu_usage_seconds_total[5m]) * 100 > 80",
+          "iconColor": "rgba(255, 0, 255, 1)",
+          "titleFormat": "High CPU: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} using {{ $value }}% CPU",
+          "fillColor": "rgba(255, 0, 255, 0.1)",
+          "lineColor": "rgba(255, 0, 255, 1)"
+        },
+        {
+          "name": "Container Health Checks",
+          "datasource": "Prometheus",
+          "expr": "container_health_status == 0",
+          "iconColor": "rgba(255, 0, 0, 1)",
+          "titleFormat": "Health Check Failed: {{ $labels.name }}",
+          "textFormat": "Container {{ $labels.name }} health check is failing",
+          "fillColor": "rgba(255, 0, 0, 0.1)",
+          "lineColor": "rgba(255, 0, 0, 1)"
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "Homelab Overview",
+        "url": "https://grafana.{{ domain }}/d/homelab-overview",
+        "icon": "external link",
+        "tooltip": "Return to homelab overview"
+      },
+      {
+        "title": "Portainer",
+        "url": "https://portainer.{{ domain }}",
+        "icon": "external link",
+        "tooltip": "Access Portainer container management"
+      },
+      {
+        "title": "Docker Documentation",
+        "url": "https://docs.{{ domain }}/docker",
+        "icon": "external link",
+        "tooltip": "View Docker documentation"
+      }
+    ],
+    "panels": [
+      {
+        "id": 1,
+        "title": "Container Count by State",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count by (state) (container_cpu_usage_seconds_total{name=~\"$container\"})",
+            "legendFormat": "{{state}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "description": "Number of containers in each state"
+      },
+      {
+        "id": 2,
+        "title": "Total CPU Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m])) * 100",
+            "legendFormat": "Total CPU",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "description": "Total CPU usage across all containers"
+      },
+      {
+        "id": 3,
+        "title": "Total Memory Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(container_memory_usage_bytes{name=~\"$container\"}) / sum(container_spec_memory_limit_bytes{name=~\"$container\"}) * 100",
+            "legendFormat": "Total Memory",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "displayMode": "gradient",
+              "gradientMode": "scheme"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "description": "Total memory usage across all containers"
+      },
+      {
+        "id": 4,
+        "title": "Container Restarts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(container_restart_count{name=~\"$container\"}[1h]))",
+            "legendFormat": "Restarts (1h)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "description": "Number of container restarts in the last hour"
+      },
+      {
+        "id": 5,
+        "title": "Top CPU Consumers",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m]) * 100)",
+            "legendFormat": "{{name}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 80}
+              ]
+            },
+            "unit": "percent",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "description": "Top 10 containers by CPU usage"
+      },
+      {
+        "id": 6,
+        "title": "Top Memory Consumers",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, container_memory_usage_bytes{name=~\"$container\"} / container_spec_memory_limit_bytes * 100)",
+            "legendFormat": "{{name}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "description": "Top 10 containers by memory usage"
+      },
+      {
+        "id": 7,
+        "title": "Container CPU Usage Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m]) * 100",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "description": "CPU usage trends for selected containers"
+      },
+      {
+        "id": 8,
+        "title": "Container Memory Usage Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{name=~\"$container\"} / container_spec_memory_limit_bytes * 100",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "description": "Memory usage trends for selected containers"
+      },
+      {
+        "id": 9,
+        "title": "Container Network I/O",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(container_network_receive_bytes_total{name=~\"$container\"}[5m])",
+            "legendFormat": "{{name}} (RX)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(container_network_transmit_bytes_total{name=~\"$container\"}[5m])",
+            "legendFormat": "{{name}} (TX)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "description": "Network I/O for selected containers"
+      },
+      {
+        "id": 10,
+        "title": "Container Disk I/O",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(container_fs_reads_bytes_total{name=~\"$container\"}[5m])",
+            "legendFormat": "{{name}} (Read)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(container_fs_writes_bytes_total{name=~\"$container\"}[5m])",
+            "legendFormat": "{{name}} (Write)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "Bps",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "description": "Disk I/O for selected containers"
+      },
+      {
+        "id": 11,
+        "title": "Container Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "container_health_status{name=~\"$container\"}",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1,
+            "custom": {
+              "displayMode": "list",
+              "orientation": "vertical"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "description": "Health status of containers with health checks"
+      },
+      {
+        "id": 12,
+        "title": "Container Restart History",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "increase(container_restart_count{name=~\"$container\"}[5m])",
+            "legendFormat": "{{name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        },
+        "description": "Container restart history over time"
+      }
+    ]
+  }
+} 

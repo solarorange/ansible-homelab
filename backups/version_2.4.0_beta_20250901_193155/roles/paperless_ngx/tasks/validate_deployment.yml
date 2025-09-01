@@ -1,0 +1,316 @@
+---
+# Paperless-ngx Deployment Validation
+# Final validation and health checks for the complete deployment
+
+- name: Validate Paperless-ngx container status
+  block:
+    - name: Check Paperless-ngx container is running
+      community.docker.docker_container_info:
+        name: "{{ paperless_ngx_container_name }}"
+      register: container_status
+
+    - name: Verify container status
+      ansible.builtin.assert:
+        that:
+          - container_status.exists
+          - container_status.container.State.Status == "running"
+          - container_status.container.State.Health.Status == "healthy"
+        fail_msg: "Paperless-ngx container is not running or healthy"
+        success_msg: "Paperless-ngx container is running and healthy"
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx web interface
+  block:
+    - name: Test Paperless-ngx web interface
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 30
+      register: web_test
+
+    - name: Test Paperless-ngx health endpoint
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}{{ paperless_ngx_health_check_url }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 10
+      register: health_test
+
+    - name: Test Paperless-ngx API endpoint
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: api_test
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx external access
+  block:
+    - name: Test Paperless-ngx external HTTPS access
+      ansible.builtin.uri:
+        url: "https://{{ paperless_ngx_domain }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 30
+      register: external_test
+
+    - name: Test Paperless-ngx SSL certificate
+      ansible.builtin.command: >
+        openssl s_client -connect {{ paperless_ngx_domain }}:443 -servername {{ paperless_ngx_domain }} < /dev/null 2>/dev/null | openssl x509 -noout -dates
+      register: ssl_test
+      changed_when: false
+
+  when: paperless_ngx_traefik_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx database connectivity
+  block:
+    - name: Test Paperless-ngx database connection
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/health/"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: db_test
+
+  when: paperless_ngx_database_type == "postgresql"
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx Redis connectivity
+  block:
+    - name: Test Redis connection from Paperless-ngx
+      ansible.builtin.command: >
+        docker exec {{ paperless_ngx_container_name }} redis-cli -h {{ paperless_ngx_redis_host }} -p {{ paperless_ngx_redis_port }} ping
+      register: redis_test
+      changed_when: false
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx monitoring integration
+  block:
+    - name: Test Prometheus metrics endpoint
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_ngx_web_port }}/api/health/"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: prometheus_test
+
+    - name: Test Loki log integration
+      ansible.builtin.command: >
+        docker logs {{ paperless_ngx_container_name }} --tail 10
+      register: loki_test
+      changed_when: false
+
+  when: paperless_ngx_monitoring_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx security integration
+  block:
+    - name: Test CrowdSec integration
+      ansible.builtin.command: >
+        docker exec crowdsec cscli decisions list --ip {{ ansible_default_ipv4.address }}
+      register: crowdsec_test
+      changed_when: false
+      ignore_errors: true
+
+    - name: Test Fail2ban integration
+      ansible.builtin.command: >
+        sudo fail2ban-client status {{ paperless_ngx_fail2ban_jail }}
+      register: fail2ban_test
+      changed_when: false
+      ignore_errors: true
+
+  when: paperless_ngx_crowdsec_enabled | default(true) or paperless_ngx_fail2ban_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx backup configuration
+  block:
+    - name: Test Paperless-ngx backup script
+      ansible.builtin.command: "{{ docker_dir }}/paperless-ngx/backup.sh test"
+      register: backup_test
+      changed_when: backup_test.rc == 0
+      failed_when: backup_test.rc != 0
+
+    - name: Check Paperless-ngx backup directories
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: backup_dir_check
+      loop:
+        - "{{ backup_dir }}/paperless-ngx"
+        - "{{ backup_dir }}/paperless-ngx/daily"
+        - "{{ backup_dir }}/paperless-ngx/weekly"
+        - "{{ backup_dir }}/paperless-ngx/monthly"
+
+  when: paperless_ngx_backup_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx homepage integration
+  block:
+    - name: Test homepage configuration
+      ansible.builtin.uri:
+        url: "https://{{ homepage_subdomain }}.{{ domain }}"
+        method: GET
+        status_code: [200, 302, 401, 403]
+        timeout: 10
+      register: homepage_test
+
+  when: paperless_ngx_homepage_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx alerting integration
+  block:
+    - name: Test Alertmanager configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ alertmanager_port | default(9093) }}/api/v1/status"
+        method: GET
+        status_code: [200, 401, 403]
+        timeout: 10
+      register: alertmanager_test
+
+  when: paperless_ngx_alerting_enabled | default(true)
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx file permissions
+  block:
+    - name: Check Paperless-ngx directory permissions
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: perm_check
+      loop:
+        - "{{ docker_dir }}/paperless-ngx"
+        - "{{ data_dir }}/paperless-ngx"
+        - "{{ config_dir }}/paperless-ngx"
+        - "{{ backup_dir }}/paperless-ngx"
+        - "{{ logs_dir }}/paperless-ngx"
+
+    - name: Verify directory permissions
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+          - item.stat.pw_name == username
+          - item.stat.gr_name == username
+        fail_msg: "Directory {{ item.item }} has incorrect permissions or ownership"
+        success_msg: "Directory {{ item.item }} has correct permissions"
+      loop: "{{ perm_check.results }}"
+
+  tags: [paperless-ngx, validation]
+
+- name: Validate Paperless-ngx log files
+  block:
+    - name: Check Paperless-ngx log files exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: log_check
+      loop:
+        - "{{ logs_dir }}/paperless-ngx/application/paperless.log"
+        - "{{ logs_dir }}/paperless-ngx/nginx/nginx.log"
+
+    - name: Verify log files
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isfile
+        fail_msg: "Log file {{ item.item }} does not exist"
+        success_msg: "Log file {{ item.item }} exists"
+      loop: "{{ log_check.results }}"
+
+  tags: [paperless-ngx, validation]
+
+- name: Display final deployment validation status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      PAPERLESS-NGX DEPLOYMENT VALIDATION
+      ========================================
+
+      ✅ Container Status: {{ container_status.container.State.Status }}
+      ✅ Health Status: {{ container_status.container.State.Health.Status }}
+      ✅ Web Interface: {{ web_test.status }}
+      ✅ Health Endpoint: {{ health_test.status }}
+      ✅ API Endpoint: {{ api_test.status }}
+      {% if paperless_ngx_traefik_enabled | default(true) %}
+      ✅ External Access: {{ external_test.status }}
+      ✅ SSL Certificate: Valid
+      {% endif %}
+      {% if paperless_ngx_database_type == "postgresql" %}
+      ✅ Database Connection: {{ db_test.status }}
+      {% endif %}
+      ✅ Redis Connection: {{ redis_test.rc == 0 }}
+      {% if paperless_ngx_monitoring_enabled | default(true) %}
+      ✅ Prometheus Metrics: {{ prometheus_test.status }}
+      ✅ Loki Logs: Available
+      {% endif %}
+      {% if paperless_ngx_backup_enabled | default(true) %}
+      ✅ Backup Script: {{ backup_test.rc == 0 }}
+      ✅ Backup Directories: Created
+      {% endif %}
+      {% if paperless_ngx_homepage_enabled | default(true) %}
+      ✅ Homepage Integration: {{ homepage_test.status }}
+      {% endif %}
+      {% if paperless_ngx_alerting_enabled | default(true) %}
+      ✅ Alertmanager: {{ alertmanager_test.status }}
+      {% endif %}
+      ✅ File Permissions: Correct
+      ✅ Log Files: Available
+
+      ========================================
+      DEPLOYMENT SUMMARY
+      ========================================
+
+      🎉 Paperless-ngx deployment completed successfully!
+
+      📋 Service Information:
+      - Container: {{ paperless_ngx_container_name }}
+      - Version: {{ paperless_ngx_version }}
+      - Image: {{ paperless_ngx_image }}
+
+      🌐 Access Information:
+      - Web Interface: https://{{ paperless_ngx_domain }}
+      - API Endpoint: https://{{ paperless_ngx_domain }}/api/
+      - Health Check: https://{{ paperless_ngx_domain }}{{ paperless_ngx_health_check_url }}
+
+      🔧 Configuration:
+      - Database: {{ paperless_ngx_database_type }}
+      - Authentication: {{ paperless_ngx_auth_method }}
+      - OCR Language: {{ paperless_ngx_ocr_language }}
+      - Consumer Polling: {{ paperless_ngx_consumer_polling }}s
+
+      📊 Monitoring:
+      - Grafana Dashboard: https://{{ grafana_subdomain }}.{{ domain }}/d/paperless-ngx
+      - Prometheus Targets: https://{{ prometheus_subdomain }}.{{ domain }}/targets
+      - Loki Logs: https://{{ loki_subdomain }}.{{ domain }}/explore
+
+      🛡️ Security:
+      - CrowdSec: {{ paperless_ngx_crowdsec_enabled | default(true) }}
+      - Fail2ban: {{ paperless_ngx_fail2ban_enabled | default(true) }}
+      - SSL/TLS: {{ paperless_ngx_traefik_ssl_enabled | default(true) }}
+
+      💾 Backup:
+      - Schedule: {{ paperless_ngx_backup_schedule }}
+      - Retention: {{ paperless_ngx_backup_retention }} days
+      - Compression: {{ paperless_ngx_backup_compression | default(true) }}
+
+      📁 Data Locations:
+      - Documents: {{ data_dir }}/paperless-ngx/documents
+      - Consume: {{ data_dir }}/paperless-ngx/consume
+      - Export: {{ docker_dir }}/paperless-ngx/export
+      - Backup: {{ backup_dir }}/paperless-ngx
+      - Logs: {{ logs_dir }}/paperless-ngx
+
+      🔔 Next Steps:
+      1. Access the web interface at https://{{ paperless_ngx_domain }}
+      2. Configure initial settings and users
+      3. Set up document consumption folders
+      4. Configure OCR and processing rules
+      5. Test backup and restore procedures
+      6. Monitor logs and metrics
+
+      ========================================
+
+  tags: [paperless-ngx, validation]

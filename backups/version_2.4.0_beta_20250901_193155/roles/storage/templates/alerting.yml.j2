@@ -1,0 +1,47 @@
+groups:
+  - name: storage-alerts
+    rules:
+      - alert: HighDiskUsage
+        expr: node_filesystem_avail_bytes{mountpoint="/srv/data"} < 10*1024*1024*1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage is above 90% on /srv/data"
+          description: "Available space on /srv/data is less than 10GB."
+
+      - alert: SambaDown
+        expr: up{job="samba"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Samba service is down"
+          description: "Samba is not responding to health checks."
+
+      - alert: SyncthingDown
+        expr: up{job="syncthing"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Syncthing service is down"
+          description: "Syncthing is not responding to health checks."
+
+      - alert: NextcloudDown
+        expr: up{job="nextcloud"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nextcloud service is down"
+          description: "Nextcloud is not responding to health checks."
+
+      - alert: BackupFailure
+        expr: backup_last_success{job=~"samba|syncthing|nextcloud"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup failure detected"
+          description: "No successful backup detected for one or more storage services." 

@@ -1,0 +1,161 @@
+# Paperless-ngx Logging Configuration
+# Comprehensive logging setup for document management service
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions-paperless-ngx.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: "{{ inventory_hostname }}"
+    backoff_config:
+      min_period: 1s
+      max_period: 5s
+    timeout: 10s
+
+scrape_configs:
+  # Paperless-ngx application logs
+  - job_name: paperless_ngx_app
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: application
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+          version: "{{ paperless_ngx_version | default('latest') }}"
+        __path__:
+          - {{ docker_dir }}/paperless-ngx/logs/paperless.log
+          - {{ logs_dir }}/paperless-ngx/application/*.log
+
+  # Paperless-ngx nginx logs
+  - job_name: paperless_ngx_nginx
+    static_configs:
+      - targets:
+          - {{ ansible_default_ipv4.address }}
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: nginx
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ docker_dir }}/paperless-ngx/logs/nginx.log
+          - {{ logs_dir }}/paperless-ngx/nginx/*.log
+
+  # Paperless-ngx OCR logs
+  - job_name: paperless_ngx_ocr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: ocr
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/ocr/*.log
+
+  # Paperless-ngx backup logs
+  - job_name: paperless_ngx_backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: backup
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/backup/*.log
+
+  # Paperless-ngx consumer logs
+  - job_name: paperless_ngx_consumer
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: consumer
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/consumer/*.log
+
+  # Paperless-ngx API logs
+  - job_name: paperless_ngx_api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: api
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/api/*.log
+
+  # Paperless-ngx database logs
+  - job_name: paperless_ngx_database
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: database
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/database/*.log
+
+  # Paperless-ngx security logs
+  - job_name: paperless_ngx_security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: security
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/security/*.log
+
+  # Paperless-ngx performance logs
+  - job_name: paperless_ngx_performance
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: performance
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/performance/*.log
+
+  # Paperless-ngx error logs
+  - job_name: paperless_ngx_errors
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paperless_ngx
+          service: paperless_ngx
+          component: errors
+          host: {{ inventory_hostname }}
+          environment: {{ environment | default('production') }}
+        __path__:
+          - {{ logs_dir }}/paperless-ngx/errors/*.log 

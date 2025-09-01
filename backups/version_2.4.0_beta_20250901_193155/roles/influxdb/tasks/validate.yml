@@ -1,0 +1,89 @@
+---
+# Influxdb Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Influxdb vault variables
+  block:
+    - name: Check required Influxdb vault variables
+      assert:
+        that:
+          - vault_influxdb_admin_password is defined
+          - vault_influxdb_database_password is defined
+          - vault_influxdb_api_key is defined
+          - vault_influxdb_secret_key is defined
+          - vault_influxdb_encryption_key is defined
+          - vault_influxdb_jwt_secret is defined
+        fail_msg: "Required Influxdb vault variables are not defined"
+        success_msg: "All required Influxdb vault variables are defined"
+
+    - name: Validate Influxdb password complexity
+      assert:
+        that:
+          - vault_influxdb_admin_password | length >= 12
+          - vault_influxdb_database_password | length >= 12
+        fail_msg: "Influxdb passwords must be at least 12 characters long"
+        success_msg: "Influxdb password complexity requirements met"
+
+- name: Validate Influxdb network configuration
+  block:
+    - name: Check Influxdb port configuration
+      assert:
+        that:
+          - influxdb_port is defined
+          - influxdb_port | int >= 1024
+          - influxdb_port | int <= 65535
+        fail_msg: "Influxdb port must be between 1024 and 65535"
+        success_msg: "Influxdb port configuration is valid"
+
+    - name: Check Influxdb domain configuration
+      assert:
+        that:
+          - domain is defined
+          - influxdb_subdomain is defined
+        fail_msg: "Influxdb domain configuration is incomplete"
+        success_msg: "Influxdb domain configuration is valid"
+
+- name: Validate Influxdb security configuration
+  block:
+    - name: Check Influxdb SSL configuration
+      assert:
+        that:
+          - influxdb_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Influxdb SSL configuration is invalid"
+        success_msg: "Influxdb SSL configuration is valid"
+
+    - name: Check Influxdb authentication configuration
+      assert:
+        that:
+          - influxdb_auth_enabled | bool
+          - influxdb_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Influxdb authentication configuration is invalid"
+        success_msg: "Influxdb authentication configuration is valid"
+
+- name: Validate Influxdb storage configuration
+  block:
+    - name: Check Influxdb data directories
+      assert:
+        that:
+          - influxdb_data_dir is defined
+          - influxdb_config_dir is defined
+          - influxdb_backup_dir is defined
+        fail_msg: "Influxdb storage configuration is incomplete"
+        success_msg: "Influxdb storage configuration is valid"
+
+    - name: Create Influxdb directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ influxdb_data_dir }}"
+        - "{{ influxdb_config_dir }}"
+        - "{{ influxdb_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Influxdb validation completed successfully - all configurations are valid and secure"

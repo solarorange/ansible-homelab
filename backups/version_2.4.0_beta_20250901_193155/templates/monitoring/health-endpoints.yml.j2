@@ -1,0 +1,185 @@
+# Health Check Endpoints Configuration
+# Defines endpoints to monitor for service health
+
+health_checks:
+  # Infrastructure Services
+  infrastructure:
+    traefik:
+      url: "http://{{ traefik_host | default('{{ ansible_default_ipv4.address }}') }}:{{ traefik_port | default(8080) }}/api/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    authentik:
+      url: "http://{{ authentik_host | default('{{ ansible_default_ipv4.address }}') }}:{{ authentik_port | default(9000) }}/if/user/"
+      method: "GET"
+      expected_status: [200, 302]
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    portainer:
+      url: "http://{{ portainer_host | default('localhost') }}:{{ portainer_port | default(9000) }}/api/status"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 60
+      retries: 3
+
+  # Database Services
+  databases:
+    postgresql:
+      url: "{{ postgresql_host | default('localhost') }}:{{ postgresql_port | default(5432) }}"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+    
+    redis:
+      url: "{{ redis_host | default('localhost') }}:{{ redis_port | default(6379) }}"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+    
+    mariadb:
+      url: "{{ mariadb_host | default('localhost') }}:{{ mariadb_port | default(3306) }}"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 30
+      retries: 3
+
+  # Monitoring Services
+  monitoring:
+    prometheus:
+      url: "http://{{ prometheus_host | default('localhost') }}:{{ prometheus_port | default(9090) }}/-/healthy"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    grafana:
+      url: "http://{{ grafana_host | default('localhost') }}:{{ grafana_port | default(3000) }}/api/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    influxdb:
+      url: "http://{{ influxdb_host | default('localhost') }}:{{ influxdb_port | default(8086) }}/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+    
+    loki:
+      url: "http://{{ loki_host | default('localhost') }}:{{ loki_port | default(3100) }}/ready"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 30
+      retries: 3
+
+  # Media Services
+  media:
+    sonarr:
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    radarr:
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    jellyfin:
+      url: "http://{{ ansible_default_ipv4.address }}:/health"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    plex:
+      url: "http://{{ ansible_default_ipv4.address }}:/web/index.html"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+
+  # Storage Services
+  storage:
+    nextcloud:
+      url: "http://{{ ansible_default_ipv4.address }}:/status.php"
+      method: "GET"
+      expected_status: 200
+      timeout: 15
+      interval: 60
+      retries: 3
+    
+    samba:
+      url: "{{ ansible_default_ipv4.address }}:"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 60
+      retries: 3
+
+  # Security Services
+  security:
+    crowdsec:
+      url: "http://{{ ansible_default_ipv4.address }}:/v1/decisions"
+      method: "GET"
+      expected_status: 200
+      timeout: 10
+      interval: 60
+      retries: 3
+    
+    fail2ban:
+      url: "{{ ansible_default_ipv4.address }}:"
+      method: "TCP"
+      expected_status: "connected"
+      timeout: 5
+      interval: 60
+      retries: 3
+
+# Health Check Thresholds
+thresholds:
+  cpu_warning: 80
+  cpu_critical: 90
+  memory_warning: 85
+  memory_critical: 95
+  disk_warning: 80
+  disk_critical: 90
+  network_latency_warning: 100
+  network_latency_critical: 500
+
+# Self-Healing Configuration
+self_healing:
+  enabled: true
+  max_attempts: 3
+  cooldown_period: 300
+  restart_services:
+    - traefik
+    - authentik
+    - grafana
+    - prometheus
+    - sonarr
+    - radarr
+    - jellyfin
+    - nextcloud 

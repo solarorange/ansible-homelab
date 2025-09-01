@@ -1,0 +1,36 @@
+---
+# Ensure all prerequisites for automation stack are met
+
+- name: Ensure required directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_data_root }}/homeassistant"
+    - "{{ docker_data_root }}/homeassistant/config"
+    - "{{ docker_data_root }}/homeassistant/ssl"
+    - "{{ docker_data_root }}/zigbee2mqtt"
+    - "{{ docker_data_root }}/zigbee2mqtt/data"
+    - "{{ scripts_dir }}"
+    - "{{ backup_root }}/homeassistant"
+    - "{{ backup_root }}/zigbee2mqtt"
+    - "{{ logs_dir }}/automation"
+
+- name: Install required packages
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose
+      - curl
+      - jq
+      - cron
+    state: present
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true

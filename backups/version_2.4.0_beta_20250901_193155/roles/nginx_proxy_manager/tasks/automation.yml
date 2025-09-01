@@ -1,0 +1,274 @@
+---
+# Nginx Proxy Manager Automation Tasks
+# Comprehensive automation for service discovery, proxy rules, and SSL management
+
+- name: Create NPM automation configuration
+  ansible.builtin.template:
+    src: automation_config.yml.j2
+    dest: "{{ docker_dir }}/nginx-proxy-manager/scripts/automation_config.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  tags: [nginx_proxy_manager, automation, config]
+
+- name: Run NPM service discovery
+  ansible.builtin.command: >
+    python3 {{ docker_dir }}/nginx-proxy-manager/scripts/service_discovery.py
+    --config {{ docker_dir }}/nginx-proxy-manager/scripts/automation_config.yml
+    --discover-services
+    --create-proxy-hosts
+    --auto-ssl
+  args:
+    chdir: "{{ docker_dir }}/nginx-proxy-manager/scripts"
+  register: npm_service_discovery_result
+  when: nginx_proxy_manager_service_discovery_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, discovery]
+
+- name: Configure NPM proxy hosts for discovered services
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/nginx/proxy-hosts"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      domain_names: ["{{ item.subdomain }}.{{ domain }}"]
+      forward_scheme: "http"
+      forward_host: "{{ item.name }}"
+      forward_port: "{{ item.port }}"
+      ssl_force_redirect: "{{ item.ssl }}"
+      ssl_http2: true
+      ssl_hsts: true
+      ssl_hsts_subdomains: true
+      ssl_hsts_preload: true
+      ssl_hsts_max_age: 31536000
+      ssl_ocsp_stapling: true
+      ssl_ocsp_stapling_verify: true
+      ssl_session_cache: "shared:SSL:10m"
+      ssl_session_timeout: "10m"
+      ssl_protocols: "{{ nginx_proxy_manager_ssl_security.ssl_protocols }}"
+      ssl_ciphers: "{{ nginx_proxy_manager_ssl_security.ssl_ciphers }}"
+      ssl_prefer_server_ciphers: "{{ nginx_proxy_manager_ssl_security.ssl_prefer_server_ciphers }}"
+      # Conditional keys inserted via vars; build payload above instead for strict YAML.
+      # security section added only if enabled by the script that generates config
+      # performance section added only if enabled by the script that generates config
+    timeout: 30
+  loop: "{{ nginx_proxy_manager_discovery_services }}"
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_service_discovery_enabled | default(true)
+  register: npm_proxy_hosts_result
+  tags: [nginx_proxy_manager, automation, proxy_hosts]
+
+- name: Configure NPM SSL certificates for services
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/ssl"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      provider: "{{ nginx_proxy_manager_ssl_provider }}"
+      email: "{{ nginx_proxy_manager_ssl_email }}"
+      staging: "{{ nginx_proxy_manager_ssl_staging }}"
+      domains: ["{{ item.subdomain }}.{{ domain }}"]
+      force_renewal: false
+    timeout: 30
+  loop: "{{ nginx_proxy_manager_discovery_services }}"
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_auto_ssl_enabled | default(true)
+    - item.ssl | default(true)
+  register: npm_ssl_certificates_result
+  tags: [nginx_proxy_manager, automation, ssl]
+
+- name: Configure NPM access lists for authentication
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/nginx/access-lists"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      name: "Authentik Integration"
+      description: "Access list for Authentik integration"
+      type: "auth"
+      auth:
+        provider: "authentik"
+        auth_url: "https://{{ authentik_subdomain }}.{{ domain }}/outpost.goauthentik.io/auth/traefik"
+        auth_response_headers:
+          - "X-User"
+          - "X-Email"
+          - "X-Groups"
+          - "X-Name"
+    timeout: 30
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_automation_enabled | default(true)
+  register: npm_access_lists_result
+  tags: [nginx_proxy_manager, automation, auth]
+
+- name: Configure NPM rate limiting
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/nginx/rate-limit"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      name: "Default Rate Limiting"
+      description: "Default rate limiting for all services"
+      requests_per_second: "{{ nginx_proxy_manager_rate_limit.requests_per_second }}"
+      burst: "{{ nginx_proxy_manager_rate_limit.burst }}"
+      nodelay: "{{ nginx_proxy_manager_rate_limit.nodelay }}"
+    timeout: 30
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_rate_limiting_enabled | default(true)
+  register: npm_rate_limiting_result
+  tags: [nginx_proxy_manager, automation, rate_limiting]
+
+- name: Configure NPM WAF rules
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/nginx/waf"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      name: "Default WAF Rules"
+      description: "Default WAF rules for security"
+      rules: "{{ nginx_proxy_manager_waf_rules }}"
+      enabled: true
+    timeout: 30
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_waf_enabled | default(true)
+  register: npm_waf_result
+  tags: [nginx_proxy_manager, automation, waf]
+
+- name: Configure NPM monitoring integration
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/monitoring"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ vault_npm_api_token }}"
+    body_format: json
+    body:
+      enabled: "{{ nginx_proxy_manager_monitoring_enabled }}"
+      metrics_enabled: "{{ nginx_proxy_manager_metrics_enabled }}"
+      metrics_port: "{{ nginx_proxy_manager_metrics_port }}"
+      metrics_path: "{{ nginx_proxy_manager_metrics_path }}"
+      logging_enabled: "{{ nginx_proxy_manager_logging_enabled }}"
+      log_level: "{{ nginx_proxy_manager_log_level }}"
+    timeout: 30
+  when:
+    - vault_npm_api_token is defined
+    - nginx_proxy_manager_monitoring_enabled | default(true)
+  register: npm_monitoring_result
+  tags: [nginx_proxy_manager, automation, monitoring]
+
+- name: Configure NPM alerting
+  ansible.builtin.uri:
+    url: "{{ nginx_proxy_manager_api_url }}/api/alerts"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ npm_api_token }}"
+    body_format: json
+    body:
+      enabled: "{{ nginx_proxy_manager_alerting_enabled }}"
+      channels: "{{ nginx_proxy_manager_alert_channels }}"
+      thresholds: "{{ nginx_proxy_manager_alert_thresholds }}"
+    timeout: 30
+  when:
+    - npm_api_token is defined
+    - nginx_proxy_manager_alerting_enabled | default(true)
+  register: npm_alerting_result
+  tags: [nginx_proxy_manager, automation, alerting]
+
+- name: Create NPM automation cron job
+  ansible.builtin.cron:
+    name: "NPM Service Discovery"
+    minute: "*/{{ nginx_proxy_manager_discovery_interval // 60 }}"
+    job: >
+      cd {{ docker_dir }}/nginx-proxy-manager/scripts &&
+      python3 service_discovery.py --config automation_config.yml --discover-services --create-proxy-hosts --auto-ssl
+    user: "{{ vault_nginx_proxy_manager_user }}"
+    state: present
+  when: nginx_proxy_manager_service_discovery_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, cron]
+
+- name: Create NPM SSL renewal cron job
+  ansible.builtin.cron:
+    name: "NPM SSL Certificate Renewal"
+    minute: "0"
+    hour: "2"
+    job: >
+      cd {{ docker_dir }}/nginx-proxy-manager/scripts &&
+      python3 ssl_manager.py --config automation_config.yml --renew-certificates
+    user: "{{ vault_nginx_proxy_manager_user }}"
+    state: present
+  when: nginx_proxy_manager_auto_ssl_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, cron]
+
+- name: Create NPM health check cron job
+  ansible.builtin.cron:
+    name: "NPM Health Check"
+    minute: "*/5"
+    job: >
+      cd {{ docker_dir }}/nginx-proxy-manager/scripts &&
+      python3 health_check.py --config automation_config.yml --check-services --send-alerts
+    user: "{{ vault_nginx_proxy_manager_user }}"
+    state: present
+  when: nginx_proxy_manager_health_check_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, cron]
+
+- name: Create NPM backup cron job
+  ansible.builtin.cron:
+    name: "NPM Backup"
+    minute: "0"
+    hour: "2"
+    job: >
+      cd {{ docker_dir }}/nginx-proxy-manager/scripts &&
+      python3 backup_manager.py --config automation_config.yml --backup --encrypt
+    user: "{{ vault_nginx_proxy_manager_user }}"
+    state: present
+  when: nginx_proxy_manager_backup_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, cron]
+
+- name: Display NPM automation configuration
+  ansible.builtin.debug:
+    msg: |
+      Nginx Proxy Manager automation configured successfully!
+
+      Automation Features:
+      - Service Discovery: {{ nginx_proxy_manager_service_discovery_enabled }}
+      - Auto SSL: {{ nginx_proxy_manager_auto_ssl_enabled }}
+      - Rate Limiting: {{ nginx_proxy_manager_rate_limiting_enabled }}
+      - WAF: {{ nginx_proxy_manager_waf_enabled }}
+      - Monitoring: {{ nginx_proxy_manager_monitoring_enabled }}
+      - Alerting: {{ nginx_proxy_manager_alerting_enabled }}
+
+      Cron Jobs Created:
+      - Service Discovery: */{{ nginx_proxy_manager_discovery_interval // 60 }} minutes
+      - SSL Renewal: Daily at 2:00 AM
+      - Health Check: Every 5 minutes
+      - Backup: Daily at 2:00 AM
+
+      Services Configured:
+      {% for service in nginx_proxy_manager_discovery_services %}
+      - {{ service.name }}: {{ service.subdomain }}.{{ domain }}:{{ service.port }}
+      {% endfor %}
+
+      API Integration:
+      - API URL: {{ nginx_proxy_manager_api_url }}
+      - API Token: {{ npm_api_token | default('Not available') }}
+  when: nginx_proxy_manager_automation_enabled | default(true)
+  tags: [nginx_proxy_manager, automation, info]

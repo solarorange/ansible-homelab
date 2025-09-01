@@ -1,0 +1,38 @@
+{{ ersatztv_logs_dir }}/*.log {
+    daily
+    missingok
+    rotate {{ ersatztv_log_rotation_count | default(7) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ user_id | default(1000) }} {{ group_id | default(1000) }}
+    postrotate
+        docker exec {{ ersatztv_container_name }} kill -HUP 1
+    endscript
+}
+
+{{ ersatztv_logs_dir }}/access.log {
+    daily
+    missingok
+    rotate {{ ersatztv_access_log_rotation_count | default(30) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ user_id | default(1000) }} {{ group_id | default(1000) }}
+    postrotate
+        docker exec {{ ersatztv_container_name }} kill -HUP 1
+    endscript
+}
+
+{{ ersatztv_logs_dir }}/error.log {
+    daily
+    missingok
+    rotate {{ ersatztv_error_log_rotation_count | default(30) }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ user_id | default(1000) }} {{ group_id | default(1000) }}
+    postrotate
+        docker exec {{ ersatztv_container_name }} kill -HUP 1
+    endscript
+} 

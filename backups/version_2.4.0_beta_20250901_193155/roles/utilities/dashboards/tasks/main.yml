@@ -1,0 +1,125 @@
+---
+# Dashboards: Homepage and Tautulli
+
+- name: Create Homepage directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ homepage_dir }}"
+    - "{{ homepage_config_dir }}"
+    - "{{ homepage_icons_dir }}"
+
+- name: Deploy Homepage configuration files
+  ansible.builtin.template:
+    src: "homepage/{{ item.src }}"
+    dest: "{{ homepage_dir }}/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: 'config.yml.j2', dest: 'config/config.yml' }
+    - { src: 'services.yml.j2', dest: 'config/services.yml' }
+    - { src: 'bookmarks.yml.j2', dest: 'config/bookmarks.yml' }
+    - { src: 'docker-compose.yml.j2', dest: 'docker-compose.yml' }
+
+- name: Deploy Homepage icon setup script
+  ansible.builtin.template:
+    src: "setup_homepage_icons.sh.j2"
+    dest: "{{ homepage_dir }}/setup_icons.sh"
+    mode: '0755'
+
+- name: Setup Homepage icons
+  ansible.builtin.shell:
+    cmd: "{{ homepage_dir }}/setup_icons.sh"
+    chdir: "{{ homepage_dir }}"
+  become_user: "{{ vault_utilities_user }}"
+
+- name: Generate API keys for dashboard services
+  ansible.builtin.set_fact:
+    homepage_api_keys: "{{ homepage_api_keys | default({}) | combine({item: vault_homepage_api_key}) }}"
+  loop:
+    - portainer
+    - tdarr
+    - tautulli
+
+- name: Store API keys in vault
+  ansible.builtin.set_fact:
+    vault_homepage_api_keys: "{{ homepage_api_keys }}"
+  no_log: true
+
+- name: Deploy Homepage container safely with rollback
+  ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "homepage"
+    project_src: "{{ homepage_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 3000
+  register: homepage_deploy
+
+- name: Wait for Homepage to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:3000"
+    method: GET
+    status_code: 200
+  register: homepage_ready
+  until: homepage_ready.status == 200
+  retries: 30
+  delay: 10
+  when: homepage_deploy.changed
+
+# Tautulli deployment (simplified, can be expanded)
+- name: Create Tautulli directories
+  ansible.builtin.file:
+    path: "{{ tautulli_config_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Deploy Tautulli docker-compose configuration
+  ansible.builtin.template:
+    src: tautulli/docker-compose.yml.j2
+    dest: "{{ tautulli_config_dir }}/docker-compose.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Deploy Tautulli environment file
+  ansible.builtin.template:
+    src: tautulli/.env.j2
+    dest: "{{ tautulli_config_dir }}/.env"
+    mode: '0600'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Deploy Tautulli Traefik configuration
+  ansible.builtin.template:
+    src: tautulli/traefik.yml.j2
+    dest: "{{ tautulli_config_dir }}/traefik.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+
+- name: Start Tautulli container safely with rollback
+  ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "tautulli"
+    project_src: "{{ tautulli_config_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - 8181
+  register: tautulli_result
+
+- name: Wait for Tautulli to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: tautulli_status
+  until: tautulli_status.status == 200
+  retries: 30
+  delay: 10

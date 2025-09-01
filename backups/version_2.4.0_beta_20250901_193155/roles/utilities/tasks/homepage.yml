@@ -1,0 +1,47 @@
+---
+# Utilities Stack Homepage Integration
+
+- name: Configure utilities stack homepage integration
+  block:
+    - name: Create utilities stack homepage configuration
+      ansible.builtin.template:
+        src: utilities-homepage-config.yml.j2
+        dest: "{{ utilities_config_dir }}/utilities-homepage-config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+    - name: Configure homepage entries for utility services
+      ansible.builtin.template:
+        src: "{{ item }}-homepage.yml.j2"
+        dest: "{{ homepage_config_dir }}/services/{{ item }}.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop:
+        - portainer
+        - tdarr
+        - tautulli
+      when: utilities_homepage_enabled | default(true)
+
+    - name: Configure utilities stack homepage bookmarks
+      ansible.builtin.template:
+        src: utilities-homepage-bookmarks.yml.j2
+        dest: "{{ homepage_config_dir }}/bookmarks/utilities.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: utilities_homepage_enabled | default(true)
+
+    - name: Configure utilities stack homepage widgets
+      ansible.builtin.template:
+        src: utilities-homepage-widgets.yml.j2
+        dest: "{{ homepage_config_dir }}/widgets/utilities.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when:
+        - utilities_homepage_enabled | default(true)
+        - utilities_homepage_widget_enabled | default(true)
+
+  tags: [utilities, homepage]

@@ -1,0 +1,151 @@
+# Self-Healing Rules Configuration
+# Defines automated recovery procedures for service failures
+
+self_healing:
+  enabled: true
+  max_attempts: 3
+  cooldown_period: 300  # 5 minutes
+  notification_webhook: "{{ vault_slack_webhook | default('') }}"
+
+  # Service restart rules
+  restart_rules:
+    traefik:
+      failure_threshold: 2
+      restart_command: "docker restart traefik"
+      health_check: "http://{{ ansible_default_ipv4.address }}:8080/api/health"
+      timeout: 30
+    
+    authentik:
+      failure_threshold: 2
+      restart_command: "docker restart authentik_server"
+      health_check: "http://{{ ansible_default_ipv4.address }}:9000/if/user/"
+      timeout: 60
+    
+    grafana:
+      failure_threshold: 2
+      restart_command: "docker restart grafana"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/api/health"
+      timeout: 30
+    
+    prometheus:
+      failure_threshold: 2
+      restart_command: "docker restart prometheus"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/-/healthy"
+      timeout: 30
+    
+    sonarr:
+      failure_threshold: 2
+      restart_command: "docker restart sonarr"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
+      timeout: 60
+    
+    radarr:
+      failure_threshold: 2
+      restart_command: "docker restart radarr"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
+      timeout: 60
+    
+    jellyfin:
+      failure_threshold: 2
+      restart_command: "docker restart jellyfin"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/health"
+      timeout: 60
+    
+    nextcloud:
+      failure_threshold: 2
+      restart_command: "docker restart nextcloud"
+      health_check: "http://{{ ansible_default_ipv4.address }}:/status.php"
+      timeout: 60
+
+  # Resource cleanup rules
+  cleanup_rules:
+    high_cpu_usage:
+      threshold: 90
+      duration: 300  # 5 minutes
+      action: "restart_heavy_containers"
+      containers:
+        - "tdarr"
+        - "unmanic"
+        - "handbrake"
+    
+    high_memory_usage:
+      threshold: 95
+      duration: 120  # 2 minutes
+      action: "cleanup_memory"
+      commands:
+        - "sync"
+        - "echo 3 > /proc/sys/vm/drop_caches"
+    
+    high_disk_usage:
+      threshold: 90
+      duration: 60  # 1 minute
+      action: "cleanup_disk"
+      commands:
+        - "docker system prune -f"
+        - "find {{ logs_dir }} -name '*.log' -mtime +7 -delete"
+
+  # Network recovery rules
+  network_rules:
+    connectivity_loss:
+      check_command: "ping -c 3 8.8.8.8"
+      failure_threshold: 3
+      recovery_actions:
+        - "systemctl restart networking"
+        - "systemctl restart docker"
+      timeout: 60
+    
+    dns_failure:
+      check_command: "nslookup google.com"
+      failure_threshold: 2
+      recovery_actions:
+        - "systemctl restart systemd-resolved"
+      timeout: 30
+
+  # Database recovery rules
+  database_rules:
+    postgresql_connection_failure:
+      check_command: "pg_isready -h localhost -p 5432"
+      failure_threshold: 2
+      recovery_actions:
+        - "docker restart postgresql"
+      timeout: 60
+    
+    redis_connection_failure:
+      check_command: "redis-cli ping"
+      failure_threshold: 2
+      recovery_actions:
+        - "docker restart redis"
+      timeout: 30
+
+  # Security recovery rules
+  security_rules:
+    fail2ban_failure:
+      check_command: "systemctl is-active fail2ban"
+      failure_threshold: 1
+      recovery_actions:
+        - "systemctl restart fail2ban"
+      timeout: 30
+    
+    crowdsec_failure:
+      check_command: "curl -f http://{{ ansible_default_ipv4.address }}:/v1/decisions"
+      failure_threshold: 2
+      recovery_actions:
+        - "docker restart crowdsec"
+      timeout: 30
+
+  # Notification rules
+  notifications:
+    on_failure:
+      - type: "slack"
+        webhook: "{{ vault_slack_webhook | default('') }}"
+        message_template: "Service {{ service_name }} failed and was automatically restarted"
+    
+    on_success:
+      - type: "slack"
+        webhook: "{{ vault_slack_webhook | default('') }}"
+        message_template: "Service {{ service_name }} recovered successfully"
+    
+    on_max_attempts:
+      - type: "slack"
+        webhook: "{{ vault_slack_webhook | default('') }}"
+        message_template: "Service {{ service_name }} failed to recover after {{ max_attempts }} attempts - manual intervention required" 

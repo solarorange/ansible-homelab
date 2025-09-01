@@ -1,0 +1,74 @@
+#!/bin/bash
+# Tautulli Management Script
+
+TAUTULLI_CONTAINER="tautulli"
+TAUTULLI_CONFIG_DIR="{{ tautulli_config_dir }}"
+TAUTULLI_DATA_DIR="{{ tautulli_data_dir }}"
+BACKUP_DIR="${TAUTULLI_DATA_DIR}/backups"
+
+show_help() {
+  echo "Tautulli Management Script"
+  echo "Usage: $0 [command] [args]"
+  echo "Commands:"
+  echo "  status    - Show Tautulli status"
+  echo "  logs      - Show Tautulli logs"
+  echo "  restart   - Restart Tautulli"
+  echo "  backup    - Backup Tautulli config and database"
+  echo "  restore   - Restore Tautulli config and database from backup"
+  echo "  help      - Show this help"
+}
+
+backup_data() {
+  mkdir -p "$BACKUP_DIR"
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+  BACKUP_FILE="$BACKUP_DIR/tautulli_backup_$TIMESTAMP.tar.gz"
+  echo "Stopping Tautulli container..."
+  docker stop $TAUTULLI_CONTAINER
+  echo "Backing up $TAUTULLI_CONFIG_DIR and $TAUTULLI_DATA_DIR to $BACKUP_FILE..."
+  tar -czf "$BACKUP_FILE" -C "$TAUTULLI_CONFIG_DIR" . -C "$TAUTULLI_DATA_DIR" .
+  echo "Starting Tautulli container..."
+  docker start $TAUTULLI_CONTAINER
+  echo "Backup created: $BACKUP_FILE"
+}
+
+restore_data() {
+  if [ -z "$1" ]; then
+    echo "Please specify backup file"
+    exit 1
+  fi
+  BACKUP_FILE="$1"
+  if [ ! -f "$BACKUP_FILE" ]; then
+    echo "Backup file not found: $BACKUP_FILE"
+    exit 1
+  fi
+  echo "Stopping Tautulli container..."
+  docker stop $TAUTULLI_CONTAINER
+  echo "Restoring $TAUTULLI_CONFIG_DIR and $TAUTULLI_DATA_DIR from $BACKUP_FILE..."
+  rm -rf "$TAUTULLI_CONFIG_DIR"/* "$TAUTULLI_DATA_DIR"/*
+  tar -xzf "$BACKUP_FILE" -C "$TAUTULLI_CONFIG_DIR"
+  tar -xzf "$BACKUP_FILE" -C "$TAUTULLI_DATA_DIR"
+  echo "Starting Tautulli container..."
+  docker start $TAUTULLI_CONTAINER
+  echo "Backup restored from: $BACKUP_FILE"
+}
+
+case "$1" in
+  status)
+    docker ps -f name=$TAUTULLI_CONTAINER
+    ;;
+  logs)
+    docker logs $TAUTULLI_CONTAINER --tail 100 -f
+    ;;
+  restart)
+    docker restart $TAUTULLI_CONTAINER
+    ;;
+  backup)
+    backup_data
+    ;;
+  restore)
+    restore_data "$2"
+    ;;
+  help|*)
+    show_help
+    ;;
+esac 

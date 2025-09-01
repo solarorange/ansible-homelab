@@ -1,0 +1,50 @@
+---
+# Security Stack Backup
+# Configure backup procedures for all security services
+
+- name: Create security stack backup script
+  ansible.builtin.template:
+    src: security-backup.sh.j2
+    dest: "{{ config_dir }}/security-backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Schedule security stack backup
+  ansible.builtin.cron:
+    name: "Security stack backup"
+    job: "{{ config_dir }}/security-backup.sh"
+    cron_file: "ansible_security_backup"
+    user: "{{ vault_security_user }}"
+    hour: "{{ security_backup_schedule.split(' ')[1] }}"
+    minute: "{{ security_backup_schedule.split(' ')[0] }}"
+
+- name: Backup authentication configuration
+  import_role:
+    name: security/authentication
+    tasks_from: backup.yml
+  when: security_authentication_enabled | default(true)
+
+- name: Backup proxy configuration
+  import_role:
+    name: security/proxy
+    tasks_from: backup.yml
+  when: security_proxy_enabled | default(true)
+
+- name: Backup DNS configuration
+  import_role:
+    name: security/dns
+    tasks_from: backup.yml
+  when: security_dns_enabled | default(true)
+
+- name: Backup firewall configuration
+  import_role:
+    name: security/firewall
+    tasks_from: backup.yml
+  when: security_firewall_enabled | default(true)
+
+- name: Backup VPN configuration
+  import_role:
+    name: security/vpn
+    tasks_from: backup.yml
+  when: security_vpn_enabled | default(true)

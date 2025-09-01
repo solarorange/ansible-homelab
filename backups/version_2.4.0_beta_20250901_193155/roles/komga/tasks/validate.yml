@@ -1,0 +1,89 @@
+---
+# Komga Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Komga vault variables
+  block:
+    - name: Check required Komga vault variables
+      assert:
+        that:
+          - vault_komga_admin_password is defined
+          - vault_komga_database_password is defined
+          - vault_komga_api_key is defined
+          - vault_komga_secret_key is defined
+          - vault_komga_encryption_key is defined
+          - vault_komga_jwt_secret is defined
+        fail_msg: "Required Komga vault variables are not defined"
+        success_msg: "All required Komga vault variables are defined"
+
+    - name: Validate Komga password complexity
+      assert:
+        that:
+          - vault_komga_admin_password | length >= 12
+          - vault_komga_database_password | length >= 12
+        fail_msg: "Komga passwords must be at least 12 characters long"
+        success_msg: "Komga password complexity requirements met"
+
+- name: Validate Komga network configuration
+  block:
+    - name: Check Komga port configuration
+      assert:
+        that:
+          - komga_port is defined
+          - komga_port | int >= 1024
+          - komga_port | int <= 65535
+        fail_msg: "Komga port must be between 1024 and 65535"
+        success_msg: "Komga port configuration is valid"
+
+    - name: Check Komga domain configuration
+      assert:
+        that:
+          - domain is defined
+          - komga_subdomain is defined
+        fail_msg: "Komga domain configuration is incomplete"
+        success_msg: "Komga domain configuration is valid"
+
+- name: Validate Komga security configuration
+  block:
+    - name: Check Komga SSL configuration
+      assert:
+        that:
+          - komga_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Komga SSL configuration is invalid"
+        success_msg: "Komga SSL configuration is valid"
+
+    - name: Check Komga authentication configuration
+      assert:
+        that:
+          - komga_auth_enabled | bool
+          - komga_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Komga authentication configuration is invalid"
+        success_msg: "Komga authentication configuration is valid"
+
+- name: Validate Komga storage configuration
+  block:
+    - name: Check Komga data directories
+      assert:
+        that:
+          - komga_data_dir is defined
+          - komga_config_dir is defined
+          - komga_backup_dir is defined
+        fail_msg: "Komga storage configuration is incomplete"
+        success_msg: "Komga storage configuration is valid"
+
+    - name: Create Komga directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ komga_data_dir }}"
+        - "{{ komga_config_dir }}"
+        - "{{ komga_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Komga validation completed successfully - all configurations are valid and secure"

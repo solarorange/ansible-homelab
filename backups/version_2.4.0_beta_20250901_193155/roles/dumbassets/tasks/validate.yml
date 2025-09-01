@@ -1,0 +1,89 @@
+---
+# Dumbassets Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Dumbassets vault variables
+  block:
+    - name: Check required Dumbassets vault variables
+      assert:
+        that:
+          - vault_dumbassets_admin_password is defined
+          - vault_dumbassets_database_password is defined
+          - vault_dumbassets_api_key is defined
+          - vault_dumbassets_secret_key is defined
+          - vault_dumbassets_encryption_key is defined
+          - vault_dumbassets_jwt_secret is defined
+        fail_msg: "Required Dumbassets vault variables are not defined"
+        success_msg: "All required Dumbassets vault variables are defined"
+
+    - name: Validate Dumbassets password complexity
+      assert:
+        that:
+          - vault_dumbassets_admin_password | length >= 12
+          - vault_dumbassets_database_password | length >= 12
+        fail_msg: "Dumbassets passwords must be at least 12 characters long"
+        success_msg: "Dumbassets password complexity requirements met"
+
+- name: Validate Dumbassets network configuration
+  block:
+    - name: Check Dumbassets port configuration
+      assert:
+        that:
+          - dumbassets_port is defined
+          - dumbassets_port | int >= 1024
+          - dumbassets_port | int <= 65535
+        fail_msg: "Dumbassets port must be between 1024 and 65535"
+        success_msg: "Dumbassets port configuration is valid"
+
+    - name: Check Dumbassets domain configuration
+      assert:
+        that:
+          - domain is defined
+          - dumbassets_subdomain is defined
+        fail_msg: "Dumbassets domain configuration is incomplete"
+        success_msg: "Dumbassets domain configuration is valid"
+
+- name: Validate Dumbassets security configuration
+  block:
+    - name: Check Dumbassets SSL configuration
+      assert:
+        that:
+          - dumbassets_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Dumbassets SSL configuration is invalid"
+        success_msg: "Dumbassets SSL configuration is valid"
+
+    - name: Check Dumbassets authentication configuration
+      assert:
+        that:
+          - dumbassets_auth_enabled | bool
+          - dumbassets_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Dumbassets authentication configuration is invalid"
+        success_msg: "Dumbassets authentication configuration is valid"
+
+- name: Validate Dumbassets storage configuration
+  block:
+    - name: Check Dumbassets data directories
+      assert:
+        that:
+          - dumbassets_data_dir is defined
+          - dumbassets_config_dir is defined
+          - dumbassets_backup_dir is defined
+        fail_msg: "Dumbassets storage configuration is incomplete"
+        success_msg: "Dumbassets storage configuration is valid"
+
+    - name: Create Dumbassets directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ dumbassets_data_dir }}"
+        - "{{ dumbassets_config_dir }}"
+        - "{{ dumbassets_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Dumbassets validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+"""
+Grafana Dashboard Import Script
+Handles automated dashboard import from templates
+"""
+
+import os
+import sys
+import json
+import yaml
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('{{ logs_dir }}/monitoring/grafana/dashboard_import.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class DashboardTemplate:
+    """Dashboard template structure"""
+    name: str
+    title: str
+    uid: str
+    folder: str
+    refresh: str
+    timezone: str
+    template_path: str
+    enabled: bool
+
+class DashboardImporter:
+    """Grafana dashboard import automation"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.grafana_url = "http://{{ ansible_default_ipv4.address }}:{{ grafana_port }}"
+        self.admin_user = "{{ grafana_admin_user }}"
+        self.admin_password: "{{ vault_grafana_admin_password | password_hash("bcrypt") }}"{{ grafana_api_key | default('') }}"
+        self.session = self.create_session()
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def create_session(self) -> requests.Session:
+        """Create requests session with authentication"""
+        session = requests.Session()
+        session.verify = False
+        session.timeout = 30
+        
+        if self.api_key:
+            session.headers.update({
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json'
+            })
+        else:
+            session.auth = (self.admin_user, self.admin_password)
+            session.headers.update({'Content-Type': 'application/json'})
+        
+        return session
+    
+    def test_connection(self) -> bool:
+        """Test Grafana API connection"""
+        try:
+            response = self.session.get(f"{self.grafana_url}/api/health")
+            if response.status_code == 200:
+                logger.info("Grafana API connection successful")
+                return True
+            else:
+                logger.error(f"Grafana API connection failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error connecting to Grafana API: {e}")
+            return False
+    
+    def create_folders(self) -> Dict[str, int]:
+        """Create dashboard folders and return folder ID mapping"""
+        folders = {}
+        folders_config = self.config.get('dashboards', {}).get('folders', [])
+        
+        for folder_config in folders_config:
+            try:
+                # Check if folder already exists
+                response = self.session.get(f"{self.grafana_url}/api/folders/{folder_config['uid']}")
+                
+                if response.status_code == 200:
+                    folder_id = response.json()['id']
+                    folders[folder_config['name']] = folder_id
+                    logger.info(f"Folder already exists: {folder_config['name']} (ID: {folder_id})")
+                    continue
+                
+                # Create new folder
+                folder_data = {
+                    'title': folder_config['name'],
+                    'uid': folder_config['uid']
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_url}/api/folders",
+                    json=folder_data
+                )
+                
+                if response.status_code == 200:
+                    folder_id = response.json()['id']
+                    folders[folder_config['name']] = folder_id
+                    logger.info(f"Created folder: {folder_config['name']} (ID: {folder_id})")
+                else:
+                    logger.error(f"Failed to create folder {folder_config['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating folder {folder_config['name']}: {e}")
+        
+        return folders
+    
+    def load_dashboard_template(self, template_path: str) -> Optional[Dict[str, Any]]:
+        """Load dashboard JSON template"""
+        try:
+            # Try to load from templates directory
+            template_file = Path("{{ docker_dir }}/monitoring/grafana/templates") / template_path
+            if template_file.exists():
+                with open(template_file, 'r') as f:
+                    return json.load(f)
+            
+            # Try to load from dashboards directory
+            dashboard_file = Path("{{ docker_dir }}/monitoring/grafana/dashboards") / template_path
+            if dashboard_file.exists():
+                with open(dashboard_file, 'r') as f:
+                    return json.load(f)
+            
+            # Try to load from templates/dashboards directory
+            dashboard_file = Path("{{ docker_dir }}/monitoring/grafana/templates/dashboards") / template_path
+            if dashboard_file.exists():
+                with open(dashboard_file, 'r') as f:
+                    return json.load(f)
+            
+            logger.warning(f"Dashboard template not found: {template_path}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error loading dashboard template {template_path}: {e}")
+            return None
+    
+    def import_dashboard(self, dashboard_json: Dict[str, Any], folder_id: Optional[int] = None) -> bool:
+        """Import dashboard to Grafana"""
+        try:
+            # Update dashboard metadata
+            if folder_id:
+                dashboard_json['folderId'] = folder_id
+            
+            # Prepare import data
+            import_data = {
+                'dashboard': dashboard_json,
+                'overwrite': self.config.get('dashboards', {}).get('overwrite', False),
+                'folderId': folder_id
+            }
+            
+            # Import dashboard
+            response = self.session.post(
+                f"{self.grafana_url}/api/dashboards/import",
+                json=import_data
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Imported dashboard: {dashboard_json.get('title', 'Unknown')} (UID: {result.get('uid', 'Unknown')})")
+                return True
+            else:
+                logger.error(f"Failed to import dashboard {dashboard_json.get('title', 'Unknown')}: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error importing dashboard {dashboard_json.get('title', 'Unknown')}: {e}")
+            return False
+    
+    def import_dashboards(self) -> bool:
+        """Import all configured dashboards"""
+        logger.info("Starting dashboard import")
+        
+        # Test connection
+        if not self.test_connection():
+            logger.error("Cannot connect to Grafana API")
+            return False
+        
+        # Create folders
+        folders = self.create_folders()
+        
+        # Get dashboard templates
+        templates_config = self.config.get('dashboards', {}).get('dashboard_templates', {})
+        success_count = 0
+        total_count = 0
+        
+        for name, template_config in templates_config.items():
+            if not template_config.get('enabled', False):
+                continue
+                
+            total_count += 1
+            
+            try:
+                # Load dashboard template
+                template_path = template_config.get('template_path')
+                if not template_path:
+                    logger.warning(f"No template path specified for {name}")
+                    continue
+                
+                dashboard_json = self.load_dashboard_template(template_path)
+                if not dashboard_json:
+                    continue
+                
+                # Update dashboard metadata
+                dashboard_json['title'] = template_config['title']
+                dashboard_json['uid'] = template_config['uid']
+                dashboard_json['refresh'] = template_config['refresh']
+                dashboard_json['timezone'] = template_config['timezone']
+                
+                # Get folder ID
+                folder_name = template_config['folder']
+                folder_id = folders.get(folder_name)
+                
+                # Import dashboard
+                if self.import_dashboard(dashboard_json, folder_id):
+                    success_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing dashboard template {name}: {e}")
+        
+        logger.info(f"Dashboard import completed: {success_count}/{total_count} successful")
+        return success_count > 0
+    
+    def validate_dashboards(self) -> bool:
+        """Validate imported dashboards"""
+        try:
+            # Get all dashboards
+            response = self.session.get(f"{self.grafana_url}/api/search")
+            if response.status_code != 200:
+                logger.error(f"Failed to get dashboards: {response.status_code}")
+                return False
+            
+            dashboards = response.json()
+            logger.info(f"Found {len(dashboards)} dashboards in Grafana")
+            
+            # Check for expected dashboards
+            expected_dashboards = []
+            templates_config = self.config.get('dashboards', {}).get('dashboard_templates', {})
+            
+            for name, template_config in templates_config.items():
+                if template_config.get('enabled', False):
+                    expected_dashboards.append(template_config['uid'])
+            
+            found_dashboards = [d['uid'] for d in dashboards]
+            missing_dashboards = [uid for uid in expected_dashboards if uid not in found_dashboards]
+            
+            if missing_dashboards:
+                logger.warning(f"Missing dashboards: {missing_dashboards}")
+                return False
+            
+            logger.info("Dashboard validation successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Dashboard validation failed: {e}")
+            return False
+    
+    def run_import(self) -> bool:
+        """Run the complete dashboard import process"""
+        logger.info("Starting Grafana dashboard import")
+        
+        try:
+            # Import dashboards
+            if not self.import_dashboards():
+                logger.error("Dashboard import failed")
+                return False
+            
+            # Validate dashboards
+            if not self.validate_dashboards():
+                logger.warning("Dashboard validation failed")
+            
+            logger.info("Dashboard import completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Dashboard import failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Grafana Dashboard Import')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing dashboards')
+    
+    args = parser.parse_args()
+    
+    # Initialize importer
+    importer = DashboardImporter(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        if importer.test_connection():
+            print("Grafana API connection successful")
+            return 0
+        else:
+            print("Grafana API connection failed")
+            return 1
+    
+    elif args.validate:
+        logger.info("Validating existing dashboards")
+        success = importer.validate_dashboards()
+        return 0 if success else 1
+    
+    else:
+        # Run full import
+        success = importer.run_import()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

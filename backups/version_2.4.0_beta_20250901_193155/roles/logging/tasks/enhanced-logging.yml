@@ -1,0 +1,352 @@
+---
+# Enhanced Logging Infrastructure Deployment
+# Comprehensive logging setup for all homelab services
+
+- name: Create enhanced logging directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/monitoring/logging/service-configs"
+    - "{{ docker_dir }}/monitoring/logging/scripts"
+    - "{{ docker_dir }}/monitoring/logging/dashboards"
+    - "{{ docker_dir }}/monitoring/logging/alerting-rules"
+    - "{{ logs_dir }}/paperless-ngx/application"
+    - "{{ logs_dir }}/paperless-ngx/nginx"
+    - "{{ logs_dir }}/paperless-ngx/ocr"
+    - "{{ logs_dir }}/paperless-ngx/backup"
+    - "{{ logs_dir }}/paperless-ngx/consumer"
+    - "{{ logs_dir }}/paperless-ngx/api"
+    - "{{ logs_dir }}/paperless-ngx/database"
+    - "{{ logs_dir }}/paperless-ngx/security"
+    - "{{ logs_dir }}/paperless-ngx/performance"
+    - "{{ logs_dir }}/paperless-ngx/errors"
+    - "{{ logs_dir }}/fing/application"
+    - "{{ logs_dir }}/fing/network"
+    - "{{ logs_dir }}/fing/devices"
+    - "{{ logs_dir }}/fing/api"
+    - "{{ logs_dir }}/fing/database"
+    - "{{ logs_dir }}/fing/backup"
+    - "{{ logs_dir }}/fing/health"
+    - "{{ logs_dir }}/fing/security"
+    - "{{ logs_dir }}/fing/performance"
+    - "{{ logs_dir }}/fing/alerts"
+    - "{{ logs_dir }}/fing/errors"
+    - "{{ logs_dir }}/fing/maintenance"
+    - "{{ logs_dir }}/certificate_management/certbot"
+    - "{{ logs_dir }}/certificate_management/monitor"
+    - "{{ logs_dir }}/certificate_management/automation"
+    - "{{ logs_dir }}/certificate_management/validation"
+    - "{{ logs_dir }}/certificate_management/backup"
+    - "{{ logs_dir }}/certificate_management/security"
+    - "{{ logs_dir }}/certificate_management/api"
+    - "{{ logs_dir }}/certificate_management/webhooks"
+    - "{{ logs_dir }}/certificate_management/notifications"
+    - "{{ logs_dir }}/certificate_management/errors"
+    - "{{ logs_dir }}/certificate_management/performance"
+    - "{{ logs_dir }}/certificate_management/maintenance"
+    - "{{ logs_dir }}/automation/portainer"
+    - "{{ logs_dir }}/automation/watchtower"
+    - "{{ logs_dir }}/automation/homeassistant"
+    - "{{ logs_dir }}/automation/nodered"
+    - "{{ logs_dir }}/automation/mosquitto"
+    - "{{ logs_dir }}/automation/api"
+    - "{{ logs_dir }}/automation/webhooks"
+    - "{{ logs_dir }}/automation/notifications"
+    - "{{ logs_dir }}/automation/backup"
+    - "{{ logs_dir }}/automation/security"
+    - "{{ logs_dir }}/automation/performance"
+    - "{{ logs_dir }}/automation/errors"
+    - "{{ logs_dir }}/automation/maintenance"
+    - "{{ logs_dir }}/utilities/homepage"
+    - "{{ logs_dir }}/utilities/tdarr"
+    - "{{ logs_dir }}/utilities/grafana"
+    - "{{ logs_dir }}/utilities/prometheus"
+    - "{{ logs_dir }}/utilities/alertmanager"
+    - "{{ logs_dir }}/utilities/telegraf"
+    - "{{ logs_dir }}/utilities/influxdb"
+    - "{{ logs_dir }}/utilities/node-exporter"
+    - "{{ logs_dir }}/utilities/cadvisor"
+    - "{{ logs_dir }}/utilities/api"
+    - "{{ logs_dir }}/utilities/webhooks"
+    - "{{ logs_dir }}/utilities/notifications"
+    - "{{ logs_dir }}/utilities/backup"
+    - "{{ logs_dir }}/utilities/security"
+    - "{{ logs_dir }}/utilities/performance"
+    - "{{ logs_dir }}/utilities/errors"
+    - "{{ logs_dir }}/utilities/maintenance"
+    - "{{ logs_dir }}/ansible"
+    - "{{ logs_dir }}/backup"
+    - "{{ logs_dir }}/performance"
+    - "{{ logs_dir }}/errors"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced]
+
+- name: Deploy enhanced Promtail configuration
+  ansible.builtin.template:
+    src: promtail.yml.j2
+    dest: "{{ docker_dir }}/monitoring/promtail/config/promtail.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  notify: restart promtail
+  when: promtail_enabled | default(true)
+  tags: [logging, enhanced, promtail]
+
+- name: Deploy service-specific logging configurations
+  ansible.builtin.template:
+    src: "service-logging-configs/{{ item }}.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/logging/service-configs/{{ item }}.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+  loop:
+    - paperless-ngx
+    - fing
+    - certificate-management
+    - automation
+    - utilities
+    - media
+    - security
+    - databases
+    - monitoring
+    - storage
+  notify: restart promtail
+  when: promtail_enabled | default(true)
+  tags: [logging, enhanced, service-configs]
+
+- name: Deploy enhanced Grafana dashboards
+  ansible.builtin.template:
+    src: "grafana-dashboards/{{ item }}.json.j2"
+    dest: "{{ docker_dir }}/monitoring/grafana/provisioning/dashboards/{{ item }}.json"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  loop:
+    - logs-overview
+    - system-overview
+    - media-services
+    - security-services
+  notify: restart grafana
+  when: grafana_enabled | default(true)
+  tags: [logging, enhanced, dashboards]
+
+- name: Deploy enhanced alerting rules
+  ansible.builtin.template:
+    src: "alerting-rules/{{ item }}.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/prometheus/rules/{{ item }}.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  loop:
+    - log-based-alerts
+  notify: restart prometheus
+  when: prometheus_enabled | default(true)
+  tags: [logging, enhanced, alerting]
+
+- name: Deploy log analysis script
+  ansible.builtin.template:
+    src: scripts/log-analysis.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Deploy enhanced health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Deploy enhanced management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Configure log rotation for enhanced logging
+  ansible.builtin.template:
+    src: logrotate-enhanced.conf.j2
+    dest: /etc/logrotate.d/enhanced-logging
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart logrotate
+  when: logrotate_enabled | default(true)
+  tags: [logging, enhanced, logrotate]
+
+- name: Create log correlation ID generator
+  ansible.builtin.template:
+    src: scripts/correlation-id.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/correlation-id.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Create log performance monitoring script
+  ansible.builtin.template:
+    src: scripts/log-performance.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/log-performance.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Create log security monitoring script
+  ansible.builtin.template:
+    src: scripts/log-security.sh.j2
+    dest: "{{ docker_dir }}/monitoring/logging/scripts/log-security.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, scripts]
+
+- name: Configure systemd service for enhanced logging
+  ansible.builtin.template:
+    src: enhanced-logging.service.j2
+    dest: /etc/systemd/system/enhanced-logging.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, systemd]
+
+- name: Configure systemd timer for enhanced logging maintenance
+  ansible.builtin.template:
+    src: enhanced-logging.timer.j2
+    dest: /etc/systemd/system/enhanced-logging.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, systemd]
+
+- name: Enable and start enhanced logging timer
+  ansible.builtin.systemd:
+    name: enhanced-logging.timer
+    enabled: true
+    state: started
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, systemd]
+
+- name: Create enhanced logging documentation
+  ansible.builtin.template:
+    src: enhanced-logging-readme.md.j2
+    dest: "{{ docker_dir }}/monitoring/logging/README.md"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, documentation]
+
+- name: Verify enhanced logging configuration
+  block:
+    - name: Check Promtail configuration
+      ansible.builtin.command: docker exec promtail promtail --config.file=/etc/promtail/config.yml --check-config
+      register: promtail_check
+      changed_when: false
+
+    - name: Verify Promtail config is valid
+      ansible.builtin.assert:
+        that: promtail_check.rc == 0
+        fail_msg: "Promtail configuration is invalid"
+        success_msg: "Promtail configuration is valid"
+
+    - name: Check Loki connectivity
+      ansible.builtin.uri:
+        url: "http://loki:3100/ready"
+        method: GET
+        status_code: [200]
+        timeout: 10
+      register: loki_health
+
+    - name: Verify Loki is healthy
+      ansible.builtin.assert:
+        that: loki_health.status == 200
+        fail_msg: "Loki is not responding"
+        success_msg: "Loki is healthy"
+
+    - name: Check log collection
+      ansible.builtin.command: "{{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh"
+      register: log_health_check
+      changed_when: false
+
+    - name: Verify log collection is working
+      ansible.builtin.assert:
+        that: log_health_check.rc == 0
+        fail_msg: "Log collection is not working properly"
+        success_msg: "Log collection is working properly"
+
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, verification]
+
+- name: Display enhanced logging deployment status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      ENHANCED LOGGING INFRASTRUCTURE DEPLOYED
+      ========================================
+
+      ✅ Enhanced Promtail Configuration
+      ✅ Service-Specific Log Configurations
+      ✅ Enhanced Grafana Dashboards
+      ✅ Log-Based Alerting Rules
+      ✅ Log Analysis Tools
+      ✅ Performance Monitoring Scripts
+      ✅ Security Monitoring Scripts
+      ✅ Log Correlation System
+      ✅ Enhanced Health Checks
+      ✅ Automated Maintenance
+
+      Configuration Files:
+      - Main Promtail Config: {{ docker_dir }}/monitoring/promtail/config/promtail.yml
+      - Service Configs: {{ docker_dir }}/monitoring/logging/service-configs/
+      - Dashboards: {{ docker_dir }}/monitoring/grafana/provisioning/dashboards/
+      - Alert Rules: {{ docker_dir }}/monitoring/prometheus/rules/
+      - Scripts: {{ docker_dir }}/monitoring/logging/scripts/
+
+      Log Directories:
+      - Paperless-ngx: {{ logs_dir }}/paperless-ngx/
+      - Fing: {{ logs_dir }}/fing/
+      - Certificate Management: {{ logs_dir }}/certificate_management/
+      - Automation: {{ logs_dir }}/automation/
+      - Utilities: {{ logs_dir }}/utilities/
+
+      Available Tools:
+      - Log Analysis: {{ docker_dir }}/monitoring/logging/scripts/log-analysis.sh
+      - Health Check: {{ docker_dir }}/monitoring/logging/scripts/healthcheck.sh
+      - Performance Monitor: {{ docker_dir }}/monitoring/logging/scripts/log-performance.sh
+      - Security Monitor: {{ docker_dir }}/monitoring/logging/scripts/log-security.sh
+
+      Documentation:
+      - Enhanced Logging Guide: docs/ENHANCED_LOGGING_INFRASTRUCTURE.md
+      - Service README: {{ docker_dir }}/monitoring/logging/README.md
+
+      Next Steps:
+      1. Access Grafana dashboards for log visualization
+      2. Configure alert notifications in Alertmanager
+      3. Use log analysis tools for troubleshooting
+      4. Monitor log volume and performance
+      5. Review and adjust alert thresholds as needed
+
+  when: logging_enabled | default(true)
+  tags: [logging, enhanced, status]

@@ -1,0 +1,53 @@
+# n8n Fail2ban Configuration
+# Fail2ban configuration for n8n security monitoring
+
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = {{ n8n_fail2ban_max_retry | default(5) }}
+backend = auto
+usedns = warn
+logencoding = auto
+enabled = true
+mode = normal
+filter = %(__name__)s
+logpath = /var/log/n8n/access.log
+maxmatches = %(maxretry)s
+ignorecommand =
+failregex = ^<HOST> - .* "(GET|POST|PUT|DELETE) .*" (4\d\d|5\d\d) .*$
+ignoreregex =
+datepattern = {^LN-BEG}%%ExY(?P<_sep>[-/.])%%m(?P=_sep)%%d(?P=_sep)%%ExY %%H:%%M:%%S(?:[.,]%%f)?(?P<_\w>Z|[+-]%%H:?%%M)?(?:[+-]%%H:?%%M)?
+journalmatch =
+prefregex =
+md5filter =
+fail2ban_client = /usr/bin/fail2ban-client
+fail2ban_regex = /usr/bin/fail2ban-regex
+fail2ban_server = /usr/bin/fail2ban-server
+fail2ban_python = /usr/bin/python3
+syslog_target = /var/log/fail2ban.log
+syslog_facility = daemon
+syslog_priority = notice
+loglevel = INFO
+logtarget = SYSLOG
+syslogsocket = auto
+socket = /var/run/fail2ban/fail2ban.sock
+pidfile = /var/run/fail2ban/fail2ban.pid
+dbfile = /var/lib/fail2ban/fail2ban.sqlite3
+dbpurgeage = 86400
+
+[Definition]
+failregex = ^<HOST> - .* "(GET|POST|PUT|DELETE) .*" (4\d\d|5\d\d) .*$
+            ^<HOST> - .* "POST /api/v1/auth/login" 401 .*$
+            ^<HOST> - .* "POST /api/v1/auth/login" 403 .*$
+            ^<HOST> - .* "GET /api/v1/auth/.*" 401 .*$
+            ^<HOST> - .* "GET /api/v1/auth/.*" 403 .*$
+            ^<HOST> - .* "POST /api/v1/.*" 401 .*$
+            ^<HOST> - .* "POST /api/v1/.*" 403 .*$
+            ^<HOST> - .* "GET /api/v1/.*" 401 .*$
+            ^<HOST> - .* "GET /api/v1/.*" 403 .*$
+            ^<HOST> - .* "PUT /api/v1/.*" 401 .*$
+            ^<HOST> - .* "PUT /api/v1/.*" 403 .*$
+            ^<HOST> - .* "DELETE /api/v1/.*" 401 .*$
+            ^<HOST> - .* "DELETE /api/v1/.*" 403 .*$
+
+ignoreregex = 

@@ -1,0 +1,54 @@
+---
+# Container Management: Portainer
+
+- name: Create Portainer directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ portainer_data_dir }}"
+    - "{{ portainer_scripts_dir }}"
+    - "{{ portainer_logs_dir }}"
+
+- name: Deploy Portainer management script
+  ansible.builtin.template:
+    src: portainer/manage.sh.j2
+    dest: "{{ portainer_scripts_dir }}/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Portainer health check script
+  ansible.builtin.template:
+    src: portainer/healthcheck.sh.j2
+    dest: "{{ portainer_scripts_dir }}/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy Portainer logrotate configuration
+  ansible.builtin.template:
+    src: portainer/logrotate.conf.j2
+    dest: "{{ portainer_data_dir }}/logrotate.conf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Add Portainer log rotation cron job
+  ansible.builtin.cron:
+    name: "Rotate Portainer logs"
+    job: "logrotate {{ portainer_data_dir }}/logrotate.conf"
+    hour: "0"
+    minute: "0"
+    user: "{{ vault_utilities_user }}"
+
+- name: Add Portainer backup cron job
+  ansible.builtin.cron:
+    name: "Backup Portainer data"
+    job: "{{ portainer_scripts_dir }}/manage.sh backup"
+    hour: "3"
+    minute: "0"
+    user: "{{ vault_utilities_user }}"

@@ -1,0 +1,657 @@
+#!/usr/bin/env python3
+"""
+Grafana Automation Script
+Comprehensive automation for Grafana configuration, dashboard import, and alerting setup
+"""
+
+import os
+import sys
+import json
+import yaml
+import requests
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/var/log/grafana/automation.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class GrafanaConfig:
+    """Grafana configuration structure"""
+    base_url: str
+    admin_user: str
+    admin_password: str
+    api_key: str = None
+    timeout: int = 30
+    verify_ssl: bool = False
+
+class GrafanaAutomation:
+    """Grafana automation and configuration management"""
+    
+    def __init__(self, config_path: str = None):
+        self.config_path = config_path or "automation_config.yml"
+        self.config = self.load_config()
+        self.grafana_config = self.get_grafana_config()
+        self.session = self.create_session()
+        
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from YAML file"""
+        try:
+            with open(self.config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            logger.info(f"Loaded configuration from {self.config_path}")
+            return config
+        except FileNotFoundError:
+            logger.error(f"Configuration file {self.config_path} not found")
+            return {}
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing configuration file: {e}")
+            return {}
+    
+    def get_grafana_config(self) -> GrafanaConfig:
+        """Get Grafana API configuration"""
+        api_config = self.config.get('grafana_api', {})
+        return GrafanaConfig(
+            base_url=api_config.get('base_url', 'http://{{ ansible_default_ipv4.address }}:3000'),
+            admin_user=api_config.get('admin_user', 'admin'),
+            admin_password: "{{ vault_grafana_admin_password | password_hash("bcrypt") }}"api_key'),
+            timeout=api_config.get('timeout', 30),
+            verify_ssl=api_config.get('verify_ssl', False)
+        )
+    
+    def create_session(self) -> requests.Session:
+        """Create requests session with authentication"""
+        session = requests.Session()
+        session.verify = self.grafana_config.verify_ssl
+        session.timeout = self.grafana_config.timeout
+        
+        if self.grafana_config.api_key:
+            session.headers.update({
+                'Authorization': f'Bearer {self.grafana_config.api_key}',
+                'Content-Type': 'application/json'
+            })
+        else:
+            session.auth = (self.grafana_config.admin_user, self.grafana_config.admin_password)
+            session.headers.update({'Content-Type': 'application/json'})
+        
+        return session
+    
+    def test_connection(self) -> bool:
+        """Test Grafana API connection"""
+        try:
+            response = self.session.get(f"{self.grafana_config.base_url}/api/health")
+            if response.status_code == 200:
+                logger.info("Grafana API connection successful")
+                return True
+            else:
+                logger.error(f"Grafana API connection failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"Error connecting to Grafana API: {e}")
+            return False
+    
+    def configure_datasources(self) -> bool:
+        """Configure data sources"""
+        logger.info("Configuring data sources")
+        
+        datasources_config = self.config.get('datasources', {})
+        if not datasources_config.get('enabled', False):
+            logger.info("Data source configuration disabled")
+            return True
+        
+        sources = datasources_config.get('sources', {})
+        success_count = 0
+        
+        for name, source_config in sources.items():
+            if not source_config.get('enabled', False):
+                continue
+                
+            try:
+                # Check if datasource already exists
+                response = self.session.get(f"{self.grafana_config.base_url}/api/datasources/name/{source_config['name']}")
+                
+                if response.status_code == 200:
+                    # Update existing datasource
+                    datasource_id = response.json()['id']
+                    response = self.session.put(
+                        f"{self.grafana_config.base_url}/api/datasources/{datasource_id}",
+                        json=source_config
+                    )
+                    logger.info(f"Updated datasource: {source_config['name']}")
+                else:
+                    # Create new datasource
+                    response = self.session.post(
+                        f"{self.grafana_config.base_url}/api/datasources",
+                        json=source_config
+                    )
+                    logger.info(f"Created datasource: {source_config['name']}")
+                
+                if response.status_code in [200, 201]:
+                    success_count += 1
+                else:
+                    logger.error(f"Failed to configure datasource {source_config['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error configuring datasource {source_config['name']}: {e}")
+        
+        logger.info(f"Configured {success_count} data sources")
+        return success_count > 0
+    
+    def create_folders(self) -> bool:
+        """Create dashboard folders"""
+        logger.info("Creating dashboard folders")
+        
+        folders_config = self.config.get('dashboards', {}).get('folders', [])
+        success_count = 0
+        
+        for folder_config in folders_config:
+            try:
+                # Check if folder already exists
+                response = self.session.get(f"{self.grafana_config.base_url}/api/folders/{folder_config['uid']}")
+                
+                if response.status_code == 200:
+                    logger.info(f"Folder already exists: {folder_config['name']}")
+                    success_count += 1
+                    continue
+                
+                # Create new folder
+                folder_data = {
+                    'title': folder_config['name'],
+                    'uid': folder_config['uid']
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/folders",
+                    json=folder_data
+                )
+                
+                if response.status_code == 200:
+                    success_count += 1
+                    logger.info(f"Created folder: {folder_config['name']}")
+                    
+                    # Set folder permissions
+                    folder_id = response.json()['id']
+                    self.set_folder_permissions(folder_id, folder_config.get('permissions', []))
+                else:
+                    logger.error(f"Failed to create folder {folder_config['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating folder {folder_config['name']}: {e}")
+        
+        logger.info(f"Created {success_count} folders")
+        return success_count > 0
+    
+    def set_folder_permissions(self, folder_id: int, permissions: List[Dict[str, str]]):
+        """Set folder permissions"""
+        try:
+            for permission in permissions:
+                permission_data = {
+                    'role': permission['role'],
+                    'permission': permission['permission']
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/folders/{folder_id}/permissions",
+                    json=permission_data
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Set {permission['permission']} permission for {permission['role']}")
+                else:
+                    logger.warning(f"Failed to set permission: {response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"Error setting folder permissions: {e}")
+    
+    def import_dashboards(self) -> bool:
+        """Import dashboard templates"""
+        logger.info("Importing dashboard templates")
+        
+        dashboards_config = self.config.get('dashboards', {})
+        if not dashboards_config.get('enabled', False):
+            logger.info("Dashboard import disabled")
+            return True
+        
+        templates = dashboards_config.get('dashboard_templates', {})
+        success_count = 0
+        
+        for name, template_config in templates.items():
+            if not template_config.get('enabled', False):
+                continue
+                
+            try:
+                # Load dashboard JSON template
+                template_path = template_config.get('template_path')
+                if not template_path:
+                    logger.warning(f"No template path specified for {name}")
+                    continue
+                
+                dashboard_json = self.load_dashboard_template(template_path)
+                if not dashboard_json:
+                    continue
+                
+                # Update dashboard metadata
+                dashboard_json['title'] = template_config['title']
+                dashboard_json['uid'] = template_config['uid']
+                dashboard_json['refresh'] = template_config['refresh']
+                dashboard_json['timezone'] = template_config['timezone']
+                
+                # Set folder
+                folder_uid = template_config['folder']
+                folder_response = self.session.get(f"{self.grafana_config.base_url}/api/folders/{folder_uid}")
+                if folder_response.status_code == 200:
+                    dashboard_json['folderId'] = folder_response.json()['id']
+                
+                # Import dashboard
+                import_data = {
+                    'dashboard': dashboard_json,
+                    'overwrite': dashboards_config.get('overwrite', False),
+                    'folderId': dashboard_json.get('folderId')
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/dashboards/import",
+                    json=import_data
+                )
+                
+                if response.status_code == 200:
+                    success_count += 1
+                    logger.info(f"Imported dashboard: {template_config['title']}")
+                else:
+                    logger.error(f"Failed to import dashboard {template_config['title']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error importing dashboard {name}: {e}")
+        
+        logger.info(f"Imported {success_count} dashboards")
+        return success_count > 0
+    
+    def load_dashboard_template(self, template_path: str) -> Optional[Dict[str, Any]]:
+        """Load dashboard JSON template"""
+        try:
+            # Try to load from templates directory
+            template_file = Path("{{ docker_dir }}/monitoring/grafana/templates") / template_path
+            if template_file.exists():
+                with open(template_file, 'r') as f:
+                    return json.load(f)
+            
+            # Try to load from dashboards directory
+            dashboard_file = Path("{{ docker_dir }}/monitoring/grafana/dashboards") / template_path
+            if dashboard_file.exists():
+                with open(dashboard_file, 'r') as f:
+                    return json.load(f)
+            
+            logger.warning(f"Dashboard template not found: {template_path}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error loading dashboard template {template_path}: {e}")
+            return None
+    
+    def configure_alerting(self) -> bool:
+        """Configure alerting rules and notification channels"""
+        logger.info("Configuring alerting")
+        
+        alerting_config = self.config.get('alerting', {})
+        if not alerting_config.get('enabled', False):
+            logger.info("Alerting configuration disabled")
+            return True
+        
+        success = True
+        
+        # Configure notification channels
+        if not self.configure_notification_channels(alerting_config.get('notification_channels', [])):
+            success = False
+        
+        # Configure alert rules
+        if not self.configure_alert_rules(alerting_config.get('alert_rules', {})):
+            success = False
+        
+        return success
+    
+    def configure_notification_channels(self, channels: List[Dict[str, Any]]) -> bool:
+        """Configure notification channels"""
+        logger.info("Configuring notification channels")
+        
+        success_count = 0
+        for channel_config in channels:
+            if not channel_config.get('enabled', False):
+                continue
+                
+            try:
+                # Check if channel already exists
+                response = self.session.get(f"{self.grafana_config.base_url}/api/alert-notifications")
+                existing_channels = response.json()
+                
+                channel_exists = any(c['name'] == channel_config['name'] for c in existing_channels)
+                
+                if channel_exists:
+                    logger.info(f"Notification channel already exists: {channel_config['name']}")
+                    success_count += 1
+                    continue
+                
+                # Create new channel
+                channel_data = {
+                    'name': channel_config['name'],
+                    'type': channel_config['type'],
+                    'settings': channel_config['settings']
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/alert-notifications",
+                    json=channel_data
+                )
+                
+                if response.status_code == 200:
+                    success_count += 1
+                    logger.info(f"Created notification channel: {channel_config['name']}")
+                else:
+                    logger.error(f"Failed to create notification channel {channel_config['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error configuring notification channel {channel_config['name']}: {e}")
+        
+        logger.info(f"Configured {success_count} notification channels")
+        return success_count > 0
+    
+    def configure_alert_rules(self, rules_config: Dict[str, Any]) -> bool:
+        """Configure alert rules"""
+        logger.info("Configuring alert rules")
+        
+        success_count = 0
+        
+        for category, category_config in rules_config.items():
+            if not category_config.get('enabled', False):
+                continue
+                
+            folder_name = category_config.get('folder', 'General')
+            
+            # Create folder for alert rules
+            folder_response = self.session.post(
+                f"{self.grafana_config.base_url}/api/folders",
+                json={'title': folder_name, 'uid': f"alerts-{category.lower()}"}
+            )
+            
+            folder_id = None
+            if folder_response.status_code == 200:
+                folder_id = folder_response.json()['id']
+            
+            rules = category_config.get('rules', [])
+            for rule_config in rules:
+                try:
+                    # Create alert rule
+                    rule_data = {
+                        'folderUid': f"alerts-{category.lower()}" if folder_id else None,
+                        'ruleGroup': {
+                            'name': rule_config['name'],
+                            'interval': '1m',
+                            'rules': [{
+                                'grafana_alert': {
+                                    'title': rule_config['name'],
+                                    'condition': rule_config['condition'],
+                                    'data': [],
+                                    'noDataState': 'NoData',
+                                    'execErrState': 'Error'
+                                },
+                                'for': rule_config.get('for', '0s'),
+                                'annotations': rule_config.get('annotations', {}),
+                                'labels': rule_config.get('labels', {})
+                            }]
+                        }
+                    }
+                    
+                    response = self.session.post(
+                        f"{self.grafana_config.base_url}/api/ruler/grafana/api/v1/rules/{folder_name}",
+                        json=rule_data
+                    )
+                    
+                    if response.status_code == 202:
+                        success_count += 1
+                        logger.info(f"Created alert rule: {rule_config['name']}")
+                    else:
+                        logger.error(f"Failed to create alert rule {rule_config['name']}: {response.status_code}")
+                        
+                except Exception as e:
+                    logger.error(f"Error creating alert rule {rule_config['name']}: {e}")
+        
+        logger.info(f"Configured {success_count} alert rules")
+        return success_count > 0
+    
+    def configure_users(self) -> bool:
+        """Configure users and teams"""
+        logger.info("Configuring users and teams")
+        
+        user_config = self.config.get('user_management', {})
+        if not user_config.get('enabled', False):
+            logger.info("User management disabled")
+            return True
+        
+        success = True
+        
+        # Configure default users
+        if not self.configure_default_users(user_config.get('default_users', [])):
+            success = False
+        
+        # Configure teams
+        if not self.configure_teams(user_config.get('teams', [])):
+            success = False
+        
+        return success
+    
+    def configure_default_users(self, users: List[Dict[str, Any]]) -> bool:
+        """Configure default users"""
+        logger.info("Configuring default users")
+        
+        success_count = 0
+        for user_config in users:
+            try:
+                # Check if user already exists
+                response = self.session.get(f"{self.grafana_config.base_url}/api/admin/users")
+                existing_users = response.json()
+                
+                user_exists = any(u['login'] == user_config['username'] for u in existing_users)
+                
+                if user_exists:
+                    logger.info(f"User already exists: {user_config['username']}")
+                    success_count += 1
+                    continue
+                
+                # Create new user
+                user_data = {
+                    'login': user_config['username'],
+                    'email': user_config['email'],
+                    'password': user_config['password'],
+                    'OrgId': 1
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/admin/users",
+                    json=user_data
+                )
+                
+                if response.status_code == 200:
+                    success_count += 1
+                    logger.info(f"Created user: {user_config['username']}")
+                    
+                    # Set user role
+                    user_id = response.json()['id']
+                    role_data = {'role': user_config['role']}
+                    self.session.put(
+                        f"{self.grafana_config.base_url}/api/admin/users/{user_id}/permissions",
+                        json=role_data
+                    )
+                else:
+                    logger.error(f"Failed to create user {user_config['username']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating user {user_config['username']}: {e}")
+        
+        logger.info(f"Configured {success_count} users")
+        return success_count > 0
+    
+    def configure_teams(self, teams: List[Dict[str, Any]]) -> bool:
+        """Configure teams"""
+        logger.info("Configuring teams")
+        
+        success_count = 0
+        for team_config in teams:
+            try:
+                # Check if team already exists
+                response = self.session.get(f"{self.grafana_config.base_url}/api/teams/search")
+                existing_teams = response.json()['teams']
+                
+                team_exists = any(t['name'] == team_config['name'] for t in existing_teams)
+                
+                if team_exists:
+                    logger.info(f"Team already exists: {team_config['name']}")
+                    success_count += 1
+                    continue
+                
+                # Create new team
+                team_data = {
+                    'name': team_config['name'],
+                    'email': team_config.get('email', '')
+                }
+                
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/teams",
+                    json=team_data
+                )
+                
+                if response.status_code == 200:
+                    success_count += 1
+                    logger.info(f"Created team: {team_config['name']}")
+                    
+                    # Add team members
+                    team_id = response.json()['teamId']
+                    for member in team_config.get('members', []):
+                        self.add_team_member(team_id, member)
+                else:
+                    logger.error(f"Failed to create team {team_config['name']}: {response.status_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating team {team_config['name']}: {e}")
+        
+        logger.info(f"Configured {success_count} teams")
+        return success_count > 0
+    
+    def add_team_member(self, team_id: int, user_email: str):
+        """Add member to team"""
+        try:
+            # Find user by email
+            response = self.session.get(f"{self.grafana_config.base_url}/api/users/lookup?loginOrEmail={user_email}")
+            if response.status_code == 200:
+                user_id = response.json()['id']
+                
+                # Add user to team
+                member_data = {'userId': user_id}
+                response = self.session.post(
+                    f"{self.grafana_config.base_url}/api/teams/{team_id}/members",
+                    json=member_data
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Added {user_email} to team {team_id}")
+                else:
+                    logger.warning(f"Failed to add {user_email} to team {team_id}")
+                    
+        except Exception as e:
+            logger.error(f"Error adding team member {user_email}: {e}")
+    
+    def run_automation(self) -> bool:
+        """Run the complete automation process"""
+        logger.info("Starting Grafana automation")
+        
+        try:
+            # Test connection
+            if not self.test_connection():
+                logger.error("Failed to connect to Grafana API")
+                return False
+            
+            success = True
+            
+            # Configure data sources
+            if not self.configure_datasources():
+                logger.warning("Data source configuration failed")
+                success = False
+            
+            # Create folders
+            if not self.create_folders():
+                logger.warning("Folder creation failed")
+                success = False
+            
+            # Import dashboards
+            if not self.import_dashboards():
+                logger.warning("Dashboard import failed")
+                success = False
+            
+            # Configure alerting
+            if not self.configure_alerting():
+                logger.warning("Alerting configuration failed")
+                success = False
+            
+            # Configure users
+            if not self.configure_users():
+                logger.warning("User configuration failed")
+                success = False
+            
+            if success:
+                logger.info("Grafana automation completed successfully")
+            else:
+                logger.warning("Grafana automation completed with warnings")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Grafana automation failed: {e}")
+            return False
+
+def main():
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Grafana Automation')
+    parser.add_argument('--config', '-c', default='automation_config.yml',
+                       help='Configuration file path')
+    parser.add_argument('--test', action='store_true',
+                       help='Run in test mode')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate existing configuration')
+    
+    args = parser.parse_args()
+    
+    # Initialize automation
+    automation = GrafanaAutomation(args.config)
+    
+    if args.test:
+        logger.info("Running in test mode")
+        if automation.test_connection():
+            print("Grafana API connection successful")
+            return 0
+        else:
+            print("Grafana API connection failed")
+            return 1
+    
+    elif args.validate:
+        logger.info("Validating existing configuration")
+        # TODO: Implement validation logic
+        return 0
+    
+    else:
+        # Run full automation
+        success = automation.run_automation()
+        return 0 if success else 1
+
+if __name__ == '__main__':
+    sys.exit(main()) 

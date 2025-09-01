@@ -1,0 +1,89 @@
+---
+# Fing Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Fing vault variables
+  block:
+    - name: Check required Fing vault variables
+      assert:
+        that:
+          - vault_fing_admin_password is defined
+          - vault_fing_database_password is defined
+          - vault_fing_api_key is defined
+          - vault_fing_secret_key is defined
+          - vault_fing_encryption_key is defined
+          - vault_fing_jwt_secret is defined
+        fail_msg: "Required Fing vault variables are not defined"
+        success_msg: "All required Fing vault variables are defined"
+
+    - name: Validate Fing password complexity
+      assert:
+        that:
+          - vault_fing_admin_password | length >= 12
+          - vault_fing_database_password | length >= 12
+        fail_msg: "Fing passwords must be at least 12 characters long"
+        success_msg: "Fing password complexity requirements met"
+
+- name: Validate Fing network configuration
+  block:
+    - name: Check Fing port configuration
+      assert:
+        that:
+          - fing_port is defined
+          - fing_port | int >= 1024
+          - fing_port | int <= 65535
+        fail_msg: "Fing port must be between 1024 and 65535"
+        success_msg: "Fing port configuration is valid"
+
+    - name: Check Fing domain configuration
+      assert:
+        that:
+          - domain is defined
+          - fing_subdomain is defined
+        fail_msg: "Fing domain configuration is incomplete"
+        success_msg: "Fing domain configuration is valid"
+
+- name: Validate Fing security configuration
+  block:
+    - name: Check Fing SSL configuration
+      assert:
+        that:
+          - fing_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Fing SSL configuration is invalid"
+        success_msg: "Fing SSL configuration is valid"
+
+    - name: Check Fing authentication configuration
+      assert:
+        that:
+          - fing_auth_enabled | bool
+          - fing_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Fing authentication configuration is invalid"
+        success_msg: "Fing authentication configuration is valid"
+
+- name: Validate Fing storage configuration
+  block:
+    - name: Check Fing data directories
+      assert:
+        that:
+          - fing_data_dir is defined
+          - fing_config_dir is defined
+          - fing_backup_dir is defined
+        fail_msg: "Fing storage configuration is incomplete"
+        success_msg: "Fing storage configuration is valid"
+
+    - name: Create Fing directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ fing_data_dir }}"
+        - "{{ fing_config_dir }}"
+        - "{{ fing_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Fing validation completed successfully - all configurations are valid and secure"

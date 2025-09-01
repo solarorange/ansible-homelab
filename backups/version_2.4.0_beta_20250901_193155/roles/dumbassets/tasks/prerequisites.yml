@@ -1,0 +1,79 @@
+---
+# DumbAssets Prerequisites Tasks
+# Setup and preparation tasks for DumbAssets deployment
+
+- name: Create DumbAssets directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0755"
+  loop:
+    - "{{ dumbassets_docker_dir }}"
+    - "{{ dumbassets_config_dir }}"
+    - "{{ dumbassets_data_dir }}"
+    - "{{ dumbassets_backup_dir }}"
+    - "{{ dumbassets_logs_dir }}"
+    - "{{ dumbassets_docker_dir }}/scripts"
+  register: dumbassets_dir_creation
+  tags: [dumbassets, setup, directories]
+
+- name: Ensure Docker network exists
+  community.docker.docker_network:
+    name: "{{ dumbassets_network }}"
+    state: present
+  register: dumbassets_network_creation
+  tags: [dumbassets, setup, network]
+
+- name: Install required packages for DumbAssets
+  ansible.builtin.package:
+    name:
+      - curl
+      - jq
+      - docker.io
+      - docker-compose
+    state: present
+  register: dumbassets_package_installation
+  tags: [dumbassets, setup, packages]
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  register: dumbassets_docker_service
+  tags: [dumbassets, setup, services]
+
+- name: Create DumbAssets environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ dumbassets_docker_dir }}/.env"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0640"
+  register: dumbassets_env_creation
+  tags: [dumbassets, setup, config]
+
+- name: Set proper permissions on DumbAssets directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ username | default('homelab') }}"
+    group: "{{ username | default('homelab') }}"
+    mode: "0755"
+    recurse: true
+  loop:
+    - "{{ dumbassets_data_dir }}"
+    - "{{ dumbassets_config_dir }}"
+  register: dumbassets_permissions
+  tags: [dumbassets, setup, permissions]
+
+- name: Display DumbAssets prerequisites summary
+  ansible.builtin.debug:
+    msg: |
+      DumbAssets Prerequisites Summary:
+      - Directories created: {{ dumbassets_dir_creation.results | length }}
+      - Network status: {{ dumbassets_network_creation.state }}
+      - Docker service: {{ dumbassets_docker_service.state }}
+      - Environment file: {{ dumbassets_env_creation.changed }}
+  tags: [dumbassets, setup, summary]

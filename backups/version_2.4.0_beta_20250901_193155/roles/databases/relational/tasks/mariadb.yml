@@ -1,0 +1,106 @@
+---
+# MariaDB deployment, configuration, backup, validation, homepage integration
+
+- name: Ensure MariaDB directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ docker_dir }}/mariadb/data"
+    - "{{ docker_dir }}/mariadb/config"
+    - "{{ docker_dir }}/mariadb/scripts"
+    - "{{ docker_dir }}/mariadb/backup"
+    - "{{ logs_dir }}/mariadb"
+
+- name: Deploy mariadb.cnf
+  ansible.builtin.template:
+    src: mariadb.cnf.j2
+    dest: "{{ docker_dir }}/mariadb/config/my.cnf"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0640"
+
+- name: Deploy MariaDB backup script
+  ansible.builtin.template:
+    src: backup-mariadb.sh.j2
+    dest: "{{ docker_dir }}/mariadb/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy MariaDB restore script
+  ansible.builtin.template:
+    src: restore-mariadb.sh.j2
+    dest: "{{ docker_dir }}/mariadb/scripts/restore.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Deploy MariaDB management script
+  ansible.builtin.template:
+    src: manage-mariadb.sh.j2
+    dest: "{{ docker_dir }}/mariadb/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+
+- name: Write MariaDB root password secret file
+  ansible.builtin.copy:
+    dest: "{{ docker_dir }}/mariadb/secrets/mariadb_root_password"
+    content: "{{ mariadb_root_password }}\n"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0600"
+  notify: restart mariadb
+
+- name: Start MariaDB container
+  community.docker.docker_container:
+    name: "{{ mariadb_container_name }}"
+    image: "{{ mariadb_image }}"
+    restart_policy: "{{ mariadb_restart_policy }}"
+    networks:
+      - name: homelab
+    env:
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
+    volumes:
+      - "{{ docker_dir }}/mariadb/secrets/mariadb_root_password:/run/secrets/mariadb_root_password:ro"
+      - "{{ docker_dir }}/mariadb/data:/var/lib/mysql"
+      - "{{ docker_dir }}/mariadb/config:/etc/mysql/conf.d"
+      - "{{ docker_dir }}/mariadb/scripts:/docker-entrypoint-initdb.d"
+      - "{{ docker_dir }}/mariadb/backup:/backup"
+      - "{{ logs_dir }}/mariadb:/var/log/mysql"
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$(cat /run/secrets/mariadb_root_password)\" mysqladmin ping -uroot | grep -q 'mysqld is alive'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    state: started
+    restart: true
+  register: mariadb_container
+
+- name: Validate MariaDB is running
+  ansible.builtin.command: docker exec {{ mariadb_container_name }} mysqladmin ping -u root -p{{ mariadb_root_password }}
+  register: mariadb_ping_result
+  changed_when: false
+  failed_when: mariadb_ping_result.rc != 0
+
+- name: Schedule MariaDB backup cron job
+  ansible.builtin.cron:
+    name: "MariaDB Backup"
+    job: "{{ docker_dir }}/mariadb/scripts/backup.sh >> {{ logs_dir }}/mariadb/backup.log 2>&1"
+    minute: "30"
+    hour: "2"
+    user: "{{ vault_databases_user }}"
+    state: present
+
+- name: Integrate MariaDB with homepage
+  ansible.builtin.template:
+    src: homepage-mariadb.yml.j2
+    dest: "{{ homepage_config_dir }}/services/mariadb.yml"
+    mode: "0644"
+  when: mariadb_homepage_enabled | default(true)
+
+# Security and SSL tasks can be added here as needed

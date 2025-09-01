@@ -1,0 +1,406 @@
+groups:
+  - name: log-based-alerts
+    rules:
+      # =============================================================================
+      # LOGGING INFRASTRUCTURE ALERTS
+      # =============================================================================
+      
+      # Loki service down
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: logging
+        annotations:
+          summary: "Loki logging service is down"
+          description: "Loki has been down for more than 5 minutes. Log collection may be affected."
+
+      # Promtail service down
+      - alert: PromtailDown
+        expr: up{job="promtail"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: logging
+        annotations:
+          summary: "Promtail log collection agent is down"
+          description: "Promtail has been down for more than 5 minutes. Log collection is not working."
+
+      # High log ingestion rate
+      - alert: HighLogIngestionRate
+        expr: rate(loki_log_entries_total[5m]) > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: logging
+        annotations:
+          summary: "High log ingestion rate detected"
+          description: "Log ingestion rate is above 10k entries per second for 5 minutes."
+
+      # Log ingestion errors
+      - alert: LogIngestionErrors
+        expr: rate(loki_log_entries_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: logging
+        annotations:
+          summary: "Log ingestion errors occurring"
+          description: "Log ingestion errors are being reported."
+
+      # =============================================================================
+      # ERROR LOG ALERTS
+      # =============================================================================
+      
+      # Error-rate spikes across all services (relative to baseline)
+      - alert: LokiErrorRateSpike
+        expr: (
+          sum by(job) (rate(loki_log_entries_total{level="error"}[5m]))
+        ) > 3 * (
+          sum by(job) (rate(loki_log_entries_total{level="error"}[1h])) + 1
+        )
+        for: 5m
+        labels:
+          severity: warning
+          service: errors
+        annotations:
+          summary: "Error-rate spike for {{ $labels.job }}"
+          description: "Short-term error rate is >3x the 1h baseline"
+
+      # Service-specific error rates
+      - alert: LokiServiceErrorRateSpike
+        expr: (
+          sum by(service) (rate(loki_log_entries_total{level="error", service!=""}[5m]))
+        ) > 3 * (
+          sum by(service) (rate(loki_log_entries_total{level="error", service!=""}[1h])) + 1
+        )
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error-rate spike for service {{ $labels.service }}"
+          description: "Short-term error rate is >3x the 1h baseline"
+
+      # =============================================================================
+      # SECURITY LOG ALERTS
+      # =============================================================================
+      
+      # Security service errors
+      - alert: SecurityServiceErrors
+        expr: rate(loki_log_entries_total{service="security", level="error"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "Security service errors detected"
+          description: "Security services are reporting errors at high rate."
+
+      # Authentication failures
+      - alert: AuthenticationFailures
+        expr: rate(loki_log_entries_total{service=~"authentik|security", level="error"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Authentication failures detected"
+          description: "Multiple authentication failures are being reported."
+
+      # Failed login attempts
+      - alert: FailedLoginAttempts
+        expr: rate(loki_log_entries_total{service=~"authentik|security", level="warn"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Failed login attempts detected"
+          description: "Multiple failed login attempts are being reported."
+
+      # =============================================================================
+      # DATABASE LOG ALERTS
+      # =============================================================================
+      
+      # Database connection errors
+      - alert: DatabaseConnectionErrors
+        expr: rate(loki_log_entries_total{service=~"postgresql|mysql|redis|elasticsearch", level="error"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection errors detected"
+          description: "Database services are reporting connection errors."
+
+      # Database performance issues
+      - alert: DatabasePerformanceIssues
+        expr: rate(loki_log_entries_total{service=~"postgresql|mysql|redis|elasticsearch", level="warn"}[5m]) > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Database performance issues detected"
+          description: "Database services are reporting performance warnings."
+
+      # =============================================================================
+      # MEDIA SERVICE ALERTS
+      # =============================================================================
+      
+      # Media service errors
+      - alert: MediaServiceErrors
+        expr: rate(loki_log_entries_total{service=~"sonarr|radarr|lidarr|readarr|bazarr|jellyfin|emby", level="error"}[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          service: media
+        annotations:
+          summary: "Media service errors detected"
+          description: "Media services are reporting errors."
+
+      # Media download failures
+      - alert: MediaDownloadFailures
+        expr: rate(loki_log_entries_total{service=~"sabnzbd|qbittorrent", level="error"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: media
+        annotations:
+          summary: "Media download failures detected"
+          description: "Download services are reporting failures."
+
+      # =============================================================================
+      # MONITORING SERVICE ALERTS
+      # =============================================================================
+      
+      # Monitoring service errors
+      - alert: MonitoringServiceErrors
+        expr: rate(loki_log_entries_total{service=~"prometheus|grafana|alertmanager|telegraf", level="error"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: monitoring
+        annotations:
+          summary: "Monitoring service errors detected"
+          description: "Monitoring services are reporting errors."
+
+      # Grafana errors
+      - alert: GrafanaErrors
+        expr: rate(loki_log_entries_total{service="grafana", level="error"}[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "Grafana errors detected"
+          description: "Grafana is reporting errors."
+
+      # =============================================================================
+      # PAPERLESS-NGX ALERTS
+      # =============================================================================
+      
+      # Paperless-ngx errors
+      - alert: PaperlessErrors
+        expr: rate(loki_log_entries_total{service="paperless_ngx", level="error"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: paperless_ngx
+        annotations:
+          summary: "Paperless-ngx errors detected"
+          description: "Paperless-ngx is reporting errors."
+
+      # Paperless-ngx OCR failures
+      - alert: PaperlessOCRFailures
+        expr: rate(loki_log_entries_total{service="paperless_ngx", component="ocr", level="error"}[5m]) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: paperless_ngx
+        annotations:
+          summary: "Paperless-ngx OCR failures detected"
+          description: "Paperless-ngx OCR is reporting failures."
+
+      # =============================================================================
+      # FING ALERTS
+      # =============================================================================
+      
+      # Fing errors
+      - alert: FingErrors
+        expr: rate(loki_log_entries_total{service="fing", level="error"}[5m]) > 3
+        for: 3m
+        labels:
+          severity: warning
+          service: fing
+        annotations:
+          summary: "Fing errors detected"
+          description: "Fing network discovery service is reporting errors."
+
+      # Fing network discovery issues
+      - alert: FingNetworkIssues
+        expr: rate(loki_log_entries_total{service="fing", component="network", level="warn"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: fing
+        annotations:
+          summary: "Fing network discovery issues detected"
+          description: "Fing is reporting network discovery warnings."
+
+      # =============================================================================
+      # CERTIFICATE MANAGEMENT ALERTS
+      # =============================================================================
+      
+      # Certificate renewal failures
+      - alert: CertificateRenewalFailures
+        expr: rate(loki_log_entries_total{service="certificate_management", level="error"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: certificate_management
+        annotations:
+          summary: "Certificate renewal failures detected"
+          description: "Certificate renewal process is failing."
+
+      # Certificate expiration warnings
+      - alert: CertificateExpirationWarnings
+        expr: rate(loki_log_entries_total{service="certificate_management", level="warn"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: certificate_management
+        annotations:
+          summary: "Certificate expiration warnings detected"
+          description: "Certificates are approaching expiration."
+
+      # =============================================================================
+      # AUTOMATION SERVICE ALERTS
+      # =============================================================================
+      
+      # Automation service errors
+      - alert: AutomationServiceErrors
+        expr: rate(loki_log_entries_total{service=~"portainer|watchtower|homeassistant|nodered", level="error"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: automation
+        annotations:
+          summary: "Automation service errors detected"
+          description: "Automation services are reporting errors."
+
+      # Container update failures
+      - alert: ContainerUpdateFailures
+        expr: rate(loki_log_entries_total{service="watchtower", level="error"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: automation
+        annotations:
+          summary: "Container update failures detected"
+          description: "Watchtower is failing to update containers."
+
+      # =============================================================================
+      # UTILITIES SERVICE ALERTS
+      # =============================================================================
+      
+      # Utilities service errors
+      - alert: UtilitiesServiceErrors
+        expr: rate(loki_log_entries_total{service=~"homepage|tdarr", level="error"}[5m]) > 3
+        for: 3m
+        labels:
+          severity: warning
+          service: utilities
+        annotations:
+          summary: "Utilities service errors detected"
+          description: "Utility services are reporting errors."
+
+      # Media processing failures
+      - alert: MediaProcessingFailures
+        expr: rate(loki_log_entries_total{service="tdarr", level="error"}[5m]) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: utilities
+        annotations:
+          summary: "Media processing failures detected"
+          description: "Tdarr is reporting media processing failures."
+
+      # =============================================================================
+      # SYSTEM LOG ALERTS
+      # =============================================================================
+      
+      # System errors
+      - alert: SystemErrors
+        expr: rate(loki_log_entries_total{service="system", level="error"}[5m]) > 20
+        for: 2m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "System errors detected"
+          description: "System is reporting high number of errors."
+
+      # Docker errors
+      - alert: DockerErrors
+        expr: rate(loki_log_entries_total{service="docker", level="error"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Docker errors detected"
+          description: "Docker is reporting errors."
+
+      # =============================================================================
+      # PERFORMANCE ALERTS
+      # =============================================================================
+      
+      # High log volume
+      - alert: HighLogVolume
+        expr: rate(loki_log_entries_total[5m]) > 5000
+        for: 10m
+        labels:
+          severity: warning
+          service: performance
+        annotations:
+          summary: "High log volume detected"
+          description: "System is generating high volume of logs."
+
+      # Log processing delays
+      - alert: LogProcessingDelays
+        expr: histogram_quantile(0.95, rate(loki_log_entries_total[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: performance
+        annotations:
+          summary: "Log processing delays detected"
+          description: "Log processing is experiencing delays."
+
+      # =============================================================================
+      # BACKUP ALERTS
+      # =============================================================================
+      
+      # Backup failures
+      - alert: BackupFailures
+        expr: rate(loki_log_entries_total{service=~".*backup.*", level="error"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: critical
+          service: backup
+        annotations:
+          summary: "Backup failures detected"
+          description: "Backup processes are failing."
+
+      # Backup warnings
+      - alert: BackupWarnings
+        expr: rate(loki_log_entries_total{service=~".*backup.*", level="warn"}[5m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: backup
+        annotations:
+          summary: "Backup warnings detected"
+          description: "Backup processes are reporting warnings." 

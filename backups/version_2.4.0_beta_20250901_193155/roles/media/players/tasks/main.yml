@@ -1,0 +1,222 @@
+---
+# Media Players Sub-Role
+# Deploy and configure media players (Jellyfin, Immich)
+
+- name: Include media players deployment tasks
+  block:
+    - name: Deploy Jellyfin (Media Server) safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "jellyfin"
+        project_src: "{{ docker_dir }}/media"
+        compose_files:
+          - docker-compose.yml
+        services:
+          - jellyfin
+        wait_for_ports: "{{ [ media_players.jellyfin.port ] if (media_players.jellyfin.port is defined) else [] }}"
+      when: media_players.jellyfin.enabled | default(true)
+      register: jellyfin_deploy
+
+    - name: Deploy Immich components safely with rollback
+      ansible.builtin.include_tasks: "../../../automation/tasks/compose_deploy_with_rollback.yml"
+      vars:
+        service_name: "immich"
+        project_src: "{{ docker_dir }}/media"
+        compose_files:
+          - docker-compose.yml
+        services:
+          - immich-postgres
+          - immich-redis
+          - immich-server
+          - immich-web
+          - immich-machine-learning
+        wait_for_ports: "{{ media_immich_components | dict2items | selectattr('value.port', 'defined') | map(attribute='value.port') | list }}"
+      when: media_players.immich.enabled | default(true)
+      register: immich_deploy
+
+    - name: Wait for Jellyfin to be ready
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.jellyfin.port }}/health"
+        method: GET
+        status_code: 200
+      register: jellyfin_health
+      retries: 30
+      delay: 10
+      until: jellyfin_health.status == 200
+      when: media_players.jellyfin.enabled | default(true)
+
+    - name: Wait for Immich components to be ready
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}{{ item.value.healthcheck.test[2] }}"
+        method: GET
+        status_code: 200
+      register: immich_health
+      retries: 30
+      delay: 10
+      until: immich_health.status == 200
+      loop: "{{ media_immich_components | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - item.value.port is defined
+
+    - name: Configure Jellyfin libraries
+      ansible.builtin.template:
+        src: jellyfin-libraries.yml.j2
+        dest: "{{ config_dir }}/media/jellyfin-libraries.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_players.jellyfin.enabled | default(true)
+
+    - name: Configure Jellyfin transcoding
+      ansible.builtin.template:
+        src: jellyfin-transcoding.yml.j2
+        dest: "{{ config_dir }}/media/jellyfin-transcoding.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_players.jellyfin.enabled | default(true)
+
+    - name: Configure Jellyfin users
+      ansible.builtin.template:
+        src: jellyfin-users.yml.j2
+        dest: "{{ config_dir }}/media/jellyfin-users.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_players.jellyfin.enabled | default(true)
+
+    - name: Configure Immich settings
+      ansible.builtin.template:
+        src: immich-settings.yml.j2
+        dest: "{{ config_dir }}/media/immich-settings.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_players.immich.enabled | default(true)
+
+    - name: Configure Immich users
+      ansible.builtin.template:
+        src: immich-users.yml.j2
+        dest: "{{ config_dir }}/media/immich-users.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      when: media_players.immich.enabled | default(true)
+
+    - name: Create media player configuration files
+      ansible.builtin.template:
+        src: "{{ item.key }}-config.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-config.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure media player monitoring
+      ansible.builtin.template:
+        src: "{{ item.key }}-monitoring.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-monitoring.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_monitoring_enabled | default(true)
+
+    - name: Configure media player security
+      ansible.builtin.template:
+        src: "{{ item.key }}-security.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-security.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure media player backup
+      ansible.builtin.template:
+        src: "{{ item.key }}-backup.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-backup.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_backup_enabled | default(true)
+
+    - name: Configure media player homepage integration
+      ansible.builtin.template:
+        src: "{{ item.key }}-homepage.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-homepage.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_homepage_enabled | default(true)
+
+    - name: Configure media player alerts
+      ansible.builtin.template:
+        src: "{{ item.key }}-alerts.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-alerts.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - media_alerting_enabled | default(true)
+
+    - name: Configure Jellyfin API key
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.jellyfin.port }}/System/Info"
+        method: GET
+        status_code: 200
+      register: jellyfin_api_key
+      when: media_players.jellyfin.enabled | default(true)
+
+    - name: Configure Immich API key
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ media_players.immich.port }}/api/health"
+        method: GET
+        status_code: 200
+      register: immich_api_key
+      when: media_players.immich.enabled | default(true)
+
+    - name: Verify media player deployment
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ item.value.port }}/health"
+        method: GET
+        status_code: 200
+      loop: "{{ media_players | dict2items }}"
+      when: item.value.enabled | default(false)
+      register: player_verification
+
+    - name: Configure media player performance optimization
+      ansible.builtin.template:
+        src: "{{ item.key }}-performance.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-performance.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when: item.value.enabled | default(false)
+
+    - name: Configure media player transcoding settings
+      ansible.builtin.template:
+        src: "{{ item.key }}-transcoding.yml.j2"
+        dest: "{{ config_dir }}/media/{{ item.key }}-transcoding.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      loop: "{{ media_players | dict2items }}"
+      when:
+        - item.value.enabled | default(false)
+        - item.key == "jellyfin"
+
+  tags: [media, players, deploy]

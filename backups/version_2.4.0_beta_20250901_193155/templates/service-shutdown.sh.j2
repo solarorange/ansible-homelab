@@ -1,0 +1,66 @@
+#!/bin/bash
+# Service Shutdown Script
+# Gracefully shuts down services in dependency order
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${SCRIPT_DIR}/shutdown.log"
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   error_exit "This script must be run as root"
+fi
+
+log "Starting service shutdown sequence"
+
+# Stop services in reverse dependency order
+services=(
+    "applications"
+    "media"
+    "paperless"
+    "fing"
+    "utilities"
+    "automation"
+    "monitoring"
+    "databases"
+    "storage"
+    "security"
+)
+
+for service in "${services[@]}"; do
+    if docker ps --format "table {{.Names}}" | grep -q "${service}"; then
+        log "Stopping ${service} services..."
+        docker stop $(docker ps --format "table {{.Names}}" | grep "${service}") || true
+        log "${service} services stopped"
+    else
+        log "No ${service} services running"
+    fi
+done
+
+# Stop Traefik last (reverse proxy)
+if docker ps --format "table {{.Names}}" | grep -q "traefik"; then
+    log "Stopping Traefik..."
+    docker stop $(docker ps --format "table {{.Names}}" | grep "traefik") || true
+    log "Traefik stopped"
+fi
+
+# Stop Docker daemon if requested
+if [[ "${1}" == "--stop-docker" ]]; then
+    log "Stopping Docker daemon..."
+    systemctl stop docker || true
+    log "Docker daemon stopped"
+fi
+
+log "Service shutdown sequence completed" 

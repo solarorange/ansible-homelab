@@ -1,0 +1,194 @@
+#!/bin/bash
+# System Performance Monitoring Script
+# Monitors system performance and sends alerts
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="${SCRIPT_DIR}/system-performance.log"
+ALERT_FILE="${SCRIPT_DIR}/alerts.log"
+
+# Configuration
+CPU_WARNING_THRESHOLD=80
+CPU_CRITICAL_THRESHOLD=90
+MEMORY_WARNING_THRESHOLD=85
+MEMORY_CRITICAL_THRESHOLD=95
+DISK_WARNING_THRESHOLD=80
+DISK_CRITICAL_THRESHOLD=90
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Alert function
+alert() {
+    local level=$1
+    local message=$2
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [$level] $message" | tee -a "$ALERT_FILE"
+    
+    # Send notification if configured
+    if [[ -n "$NOTIFICATION_WEBHOOK" ]]; then
+        curl -X POST -H "Content-Type: application/json" \
+             -d "{\"text\":\"[$level] $message\"}" \
+             "$NOTIFICATION_WEBHOOK" || true
+    fi
+}
+
+# Get CPU usage
+get_cpu_usage() {
+    top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1
+}
+
+# Get memory usage
+get_memory_usage() {
+    free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}'
+}
+
+# Get disk usage
+get_disk_usage() {
+    df -h / | awk 'NR==2 {print $5}' | sed 's/%//'
+}
+
+# Get Docker container status
+get_docker_status() {
+    docker ps --format "table {{.Names}}\t{{.Status}}" | grep -v "NAMES"
+}
+
+# Get failed containers
+get_failed_containers() {
+    docker ps -a --filter "status=exited" --format "table {{.Names}}\t{{.Status}}"
+}
+
+# Check system resources
+check_system_resources() {
+    log "Checking system resources..."
+    
+    # CPU check
+    cpu_usage=$(get_cpu_usage)
+    if (( $(echo "$cpu_usage > $CPU_CRITICAL_THRESHOLD" | bc -l) )); then
+        alert "CRITICAL" "CPU usage is ${cpu_usage}% (threshold: ${CPU_CRITICAL_THRESHOLD}%)"
+    elif (( $(echo "$cpu_usage > $CPU_WARNING_THRESHOLD" | bc -l) )); then
+        alert "WARNING" "CPU usage is ${cpu_usage}% (threshold: ${CPU_WARNING_THRESHOLD}%)"
+    else
+        log "CPU usage: ${cpu_usage}% (OK)"
+    fi
+    
+    # Memory check
+    memory_usage=$(get_memory_usage)
+    if (( $(echo "$memory_usage > $MEMORY_CRITICAL_THRESHOLD" | bc -l) )); then
+        alert "CRITICAL" "Memory usage is ${memory_usage}% (threshold: ${MEMORY_CRITICAL_THRESHOLD}%)"
+    elif (( $(echo "$memory_usage > $MEMORY_WARNING_THRESHOLD" | bc -l) )); then
+        alert "WARNING" "Memory usage is ${memory_usage}% (threshold: ${MEMORY_WARNING_THRESHOLD}%)"
+    else
+        log "Memory usage: ${memory_usage}% (OK)"
+    fi
+    
+    # Disk check
+    disk_usage=$(get_disk_usage)
+    if (( disk_usage > DISK_CRITICAL_THRESHOLD )); then
+        alert "CRITICAL" "Disk usage is ${disk_usage}% (threshold: ${DISK_CRITICAL_THRESHOLD}%)"
+    elif (( disk_usage > DISK_WARNING_THRESHOLD )); then
+        alert "WARNING" "Disk usage is ${disk_usage}% (threshold: ${DISK_WARNING_THRESHOLD}%)"
+    else
+        log "Disk usage: ${disk_usage}% (OK)"
+    fi
+}
+
+# Check Docker containers
+check_docker_containers() {
+    log "Checking Docker containers..."
+    
+    # Check for failed containers
+    failed_containers=$(get_failed_containers)
+    if [[ -n "$failed_containers" ]]; then
+        alert "WARNING" "Failed containers detected: $failed_containers"
+    else
+        log "All containers are running (OK)"
+    fi
+    
+    # Check container count
+    container_count=$(docker ps -q | wc -l)
+    log "Running containers: $container_count"
+}
+
+# Check service endpoints
+check_service_endpoints() {
+    log "Checking service endpoints..."
+    
+    # Define service endpoints to check
+    declare -A services=(
+        ["traefik"]="http://{{ ansible_default_ipv4.address }}:8080/api/health"
+        ["grafana"]="http://{{ ansible_default_ipv4.address }}:3000/api/health"
+        ["prometheus"]="http://{{ ansible_default_ipv4.address }}:/-/healthy"
+        ["influxdb"]="http://{{ ansible_default_ipv4.address }}:/health"
+    )
+    
+    for service in "${!services[@]}"; do
+        if curl -f -s "${services[$service]}" >/dev/null 2>&1; then
+            log "$service: OK"
+        else
+            alert "WARNING" "Service $service is not responding"
+        fi
+    done
+}
+
+# Check network connectivity
+check_network() {
+    log "Checking network connectivity..."
+    
+    if ping -c 3 8.8.8.8 >/dev/null 2>&1; then
+        log "Network connectivity: OK"
+    else
+        alert "CRITICAL" "Network connectivity failed"
+    fi
+    
+    if nslookup google.com >/dev/null 2>&1; then
+        log "DNS resolution: OK"
+    else
+        alert "WARNING" "DNS resolution failed"
+    fi
+}
+
+# Generate performance report
+generate_report() {
+    log "Generating performance report..."
+    
+    cat > "${SCRIPT_DIR}/performance-report.txt" << EOF
+Performance Report - $(date)
+========================================
+
+System Resources:
+- CPU Usage: $(get_cpu_usage)%
+- Memory Usage: $(get_memory_usage)%
+- Disk Usage: $(get_disk_usage)%
+
+Docker Status:
+- Running Containers: $(docker ps -q | wc -l)
+- Failed Containers: $(docker ps -a --filter "status=exited" -q | wc -l)
+
+Network Status:
+- Connectivity: $(ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo "OK" || echo "FAILED")
+- DNS Resolution: $(nslookup google.com >/dev/null 2>&1 && echo "OK" || echo "FAILED")
+
+Recent Alerts:
+$(tail -10 "$ALERT_FILE" 2>/dev/null || echo "No alerts")
+
+EOF
+}
+
+# Main execution
+main() {
+    log "Starting system performance monitoring..."
+    
+    check_system_resources
+    check_docker_containers
+    check_service_endpoints
+    check_network
+    generate_report
+    
+    log "System performance monitoring completed"
+}
+
+# Run main function
+main "$@" 

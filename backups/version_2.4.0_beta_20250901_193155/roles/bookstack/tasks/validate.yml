@@ -1,0 +1,89 @@
+---
+# Bookstack Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Bookstack vault variables
+  block:
+    - name: Check required Bookstack vault variables
+      assert:
+        that:
+          - vault_bookstack_admin_password is defined
+          - vault_bookstack_database_password is defined
+          - vault_bookstack_api_key is defined
+          - vault_bookstack_secret_key is defined
+          - vault_bookstack_encryption_key is defined
+          - vault_bookstack_jwt_secret is defined
+        fail_msg: "Required Bookstack vault variables are not defined"
+        success_msg: "All required Bookstack vault variables are defined"
+
+    - name: Validate Bookstack password complexity
+      assert:
+        that:
+          - vault_bookstack_admin_password | length >= 12
+          - vault_bookstack_database_password | length >= 12
+        fail_msg: "Bookstack passwords must be at least 12 characters long"
+        success_msg: "Bookstack password complexity requirements met"
+
+- name: Validate Bookstack network configuration
+  block:
+    - name: Check Bookstack port configuration
+      assert:
+        that:
+          - bookstack_port is defined
+          - bookstack_port | int >= 1024
+          - bookstack_port | int <= 65535
+        fail_msg: "Bookstack port must be between 1024 and 65535"
+        success_msg: "Bookstack port configuration is valid"
+
+    - name: Check Bookstack domain configuration
+      assert:
+        that:
+          - domain is defined
+          - bookstack_subdomain is defined
+        fail_msg: "Bookstack domain configuration is incomplete"
+        success_msg: "Bookstack domain configuration is valid"
+
+- name: Validate Bookstack security configuration
+  block:
+    - name: Check Bookstack SSL configuration
+      assert:
+        that:
+          - bookstack_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Bookstack SSL configuration is invalid"
+        success_msg: "Bookstack SSL configuration is valid"
+
+    - name: Check Bookstack authentication configuration
+      assert:
+        that:
+          - bookstack_auth_enabled | bool
+          - bookstack_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Bookstack authentication configuration is invalid"
+        success_msg: "Bookstack authentication configuration is valid"
+
+- name: Validate Bookstack storage configuration
+  block:
+    - name: Check Bookstack data directories
+      assert:
+        that:
+          - bookstack_data_dir is defined
+          - bookstack_config_dir is defined
+          - bookstack_backup_dir is defined
+        fail_msg: "Bookstack storage configuration is incomplete"
+        success_msg: "Bookstack storage configuration is valid"
+
+    - name: Create Bookstack directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ bookstack_data_dir }}"
+        - "{{ bookstack_config_dir }}"
+        - "{{ bookstack_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Bookstack validation completed successfully - all configurations are valid and secure"

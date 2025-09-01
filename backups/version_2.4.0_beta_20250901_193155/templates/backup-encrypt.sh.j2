@@ -1,0 +1,22 @@
+#!/bin/bash
+# Backup Encryption Script
+# Encrypts backup files using GPG
+
+set -e
+
+BACKUP_DIR="${1:-{{ backup_dir }}}"
+GPG_KEY="${2:-{{ vault_backup_gpg_key_id }}}"
+
+if [[ -z "$GPG_KEY" ]]; then
+  echo "GPG key ID is required."
+  exit 1
+fi
+
+find "$BACKUP_DIR" -type f -name '*.tar.gz' | while read -r file; do
+  if [[ ! -f "$file.gpg" ]]; then
+    echo "Encrypting $file..."
+    gpg --yes --batch --recipient "$GPG_KEY" --encrypt "$file"
+  fi
+done
+
+echo "Backup encryption complete." 

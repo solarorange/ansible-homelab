@@ -1,0 +1,71 @@
+---
+# Automation Stack Monitoring Integration
+
+- name: Configure Prometheus for automation stack
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ config_dir }}/prometheus/rules/automation.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+  when: automation_prometheus_enabled | default(true)
+
+- name: Configure Grafana dashboard for automation stack
+  ansible.builtin.template:
+    src: grafana-dashboard.json.j2
+    dest: "{{ config_dir }}/grafana/provisioning/dashboards/automation.json"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+  when: automation_grafana_enabled | default(true)
+
+- name: Configure Loki for automation logs
+  ansible.builtin.template:
+    src: monitoring.yml.j2
+    dest: "{{ config_dir }}/loki/conf.d/automation.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+  when: automation_loki_enabled | default(true)
+
+- name: Configure Alertmanager for automation alerts
+  ansible.builtin.template:
+    src: alerting.yml.j2
+    dest: "{{ config_dir }}/alertmanager/conf.d/automation.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+  when: automation_alerting_enabled | default(true)
+
+- name: Create automation stack health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ scripts_dir }}/health_check_automation.sh"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0755"
+
+- name: Schedule automation stack health check
+  ansible.builtin.cron:
+    name: "Automation stack health check"
+    job: "{{ scripts_dir }}/health_check_automation.sh"
+    minute: "*/5"
+    user: "{{ vault_automation_user }}"
+
+- name: Validate Prometheus and Grafana endpoints
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:9090/api/v1/status/config"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: prometheus_config_test
+  when: automation_prometheus_enabled | default(true)
+
+- name: Validate Grafana health endpoint
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:3000/api/health"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: grafana_config_test
+  when: automation_grafana_enabled | default(true)

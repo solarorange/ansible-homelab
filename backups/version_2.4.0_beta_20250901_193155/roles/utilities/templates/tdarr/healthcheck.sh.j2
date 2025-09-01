@@ -1,0 +1,20 @@
+#!/bin/bash
+# Tdarr Health Check Script
+
+TDARR_CONTAINER="tdarr"
+TDARR_PORT={{ tdarr_port }}
+
+# Check if Tdarr container is running
+if ! docker ps -f name=$TDARR_CONTAINER -f status=running | grep -q $TDARR_CONTAINER; then
+  echo "Tdarr container is not running"
+  exit 1
+fi
+
+# Check if Tdarr API is responsive
+if ! curl -s -f http://{{ ansible_default_ipv4.address }}:$TDARR_PORT/api/v2/status > /dev/null; then
+  echo "Tdarr API is not responding on port $TDARR_PORT"
+  exit 1
+fi
+
+echo "Tdarr is healthy."
+exit 0 

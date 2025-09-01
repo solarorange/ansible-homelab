@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# Service Health Check Script
+# This script performs health checks on all configured services
+
+LOG_FILE="/var/log/service_health.log"
+MAX_RETRIES=3
+RETRY_DELAY=5
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+check_docker_service() {
+    local service=$1
+    local container_id=$(docker ps -qf "name=$service")
+    
+    if [ -z "$container_id" ]; then
+        log "ERROR: Container for service $service not found"
+        return 1
+    fi
+    
+    # Check container health
+    local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_id")
+    if [ "$health_status" != "healthy" ]; then
+        log "ERROR: Service $service is not healthy (Status: $health_status)"
+        return 1
+    fi
+    
+    # Check service-specific health endpoints
+    case $service in
+        "traefik")
+            curl -s -f http://{{ ansible_default_ipv4.address }}:8080/api/rawdata > /dev/null || return 1
+            ;;
+        "prometheus")
+            curl -s -f http://{{ ansible_default_ipv4.address }}:9090/-/healthy > /dev/null || return 1
+            ;;
+        "grafana")
+            curl -s -f http://{{ ansible_default_ipv4.address }}:/api/health > /dev/null || return 1
+            ;;
+        *)
+            # Generic health check for other services
+            docker exec "$container_id" ps aux | grep -v grep | grep -q "$service" || return 1
+            ;;
+    esac
+    
+    log "INFO: Service $service is healthy"
+    return 0
+}
+
+check_system_service() {
+    local service=$1
+    systemctl is-active --quiet "$service"
+    if [ $? -ne 0 ]; then
+        log "ERROR: System service $service is not running"
+        return 1
+    fi
+    
+    # Check service-specific health
+    case $service in
+        "docker")
+            docker info > /dev/null 2>&1 || return 1
+            ;;
+        "fail2ban")
+            fail2ban-client status > /dev/null 2>&1 || return 1
+            ;;
+    esac
+    
+    log "INFO: System service $service is healthy"
+    return 0
+}
+
+perform_health_check() {
+    local service=$1
+    local retry_count=0
+    
+    while [ $retry_count -lt $MAX_RETRIES ]; do
+        if [[ "$service" == *"docker"* ]]; then
+            check_docker_service "$service"
+        else
+            check_system_service "$service"
+        fi
+        
+        if [ $? -eq 0 ]; then
+            return 0
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -lt $MAX_RETRIES ]; then
+            log "WARNING: Retrying health check for $service (Attempt $retry_count/$MAX_RETRIES)"
+            sleep $RETRY_DELAY
+        fi
+    done
+    
+    log "ERROR: Health check failed for $service after $MAX_RETRIES attempts"
+    return 1
+}
+
+# Main execution
+main() {
+    # Create log file if it doesn't exist
+    touch "$LOG_FILE"
+    
+    # Get list of services from Ansible
+    services=$(cat /etc/ansible/service_management/services.txt 2>/dev/null)
+    
+    if [ -z "$services" ]; then
+        log "ERROR: No services configured for health checks"
+        exit 1
+    fi
+    
+    local failed_services=()
+    
+    for service in $services; do
+        perform_health_check "$service"
+        if [ $? -ne 0 ]; then
+            failed_services+=("$service")
+        fi
+    done
+    
+    if [ ${#failed_services[@]} -gt 0 ]; then
+        log "ERROR: The following services failed health checks: ${failed_services[*]}"
+        exit 1
+    fi
+    
+    log "INFO: All services passed health checks"
+    exit 0
+}
+
+main 

@@ -1,0 +1,80 @@
+---
+# Handlers for Storage Role
+
+# Systemd handlers (for host-installed services)
+- name: restart samba
+  ansible.builtin.systemd:
+    name: samba
+    state: restarted
+  when: samba_host_installed | default(false)
+
+- name: restart syncthing
+  ansible.builtin.systemd:
+    name: syncthing
+    state: restarted
+  when: syncthing_host_installed | default(false)
+
+- name: restart nextcloud
+  ansible.builtin.systemd:
+    name: nextcloud
+    state: restarted
+  when: nextcloud_host_installed | default(false)
+
+- name: restart smartd
+  ansible.builtin.systemd:
+    name: smartd
+    state: restarted
+  when: smartd_enabled | default(false)
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when: docker_enabled | default(true)
+
+# Docker Compose handlers (for containerized services)
+- name: Restart Samba container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/samba"
+    restarted: true
+  when: samba_enabled | default(false)
+
+- name: Restart Syncthing container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/syncthing"
+    restarted: true
+  when: syncthing_enabled | default(false)
+
+- name: Restart Nextcloud container
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/nextcloud"
+    restarted: true
+  when: nextcloud_enabled | default(false)
+
+# Health check handlers
+- name: Check Samba health
+  ansible.builtin.command: smbclient -L //{{ ansible_default_ipv4.address }}
+  register: samba_health
+  changed_when: false
+  failed_when: samba_health.rc != 0
+  when: samba_enabled | default(false)
+
+- name: Check Syncthing health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:8384/rest/system/status"
+    method: GET
+    status_code: [200]
+  register: syncthing_health
+  when: syncthing_enabled | default(false)
+
+- name: Check Nextcloud health
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:/status.php"
+    method: GET
+    status_code: [200]
+  register: nextcloud_health
+  when: nextcloud_enabled | default(false)

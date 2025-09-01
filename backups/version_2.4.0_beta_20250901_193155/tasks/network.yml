@@ -1,0 +1,473 @@
+---
+# Network Configuration for Enhanced Homelab
+# Production-ready networking with security and performance optimization
+
+- name: Install network utilities
+  ansible.builtin.package:
+    name:
+      - net-tools
+      - dnsutils
+      - traceroute
+      - tcpdump
+      - iftop
+      - nethogs
+      - nmap
+      - curl
+      - wget
+      - bridge-utils
+      - iptables-persistent
+    state: present
+
+- name: Configure network interface optimization
+  ansible.builtin.blockinfile:
+    path: /etc/sysctl.conf
+    block: |
+      # Network performance optimization for homelab
+
+      # TCP settings
+      net.core.rmem_default = 262144
+      net.core.rmem_max = 16777216
+      net.core.wmem_default = 262144
+      net.core.wmem_max = 16777216
+      net.ipv4.tcp_rmem = 4096 65536 16777216
+      net.ipv4.tcp_wmem = 4096 65536 16777216
+
+      # TCP congestion control
+      net.ipv4.tcp_congestion_control = bbr
+      net.core.default_qdisc = fq
+
+      # Network security
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv4.conf.default.accept_source_route = 0
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.conf.all.secure_redirects = 0
+      net.ipv4.conf.default.secure_redirects = 0
+      net.ipv4.conf.all.send_redirects = 0
+      net.ipv4.conf.default.send_redirects = 0
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+      # IPv6 settings (disable if not needed)
+      net.ipv6.conf.all.disable_ipv6 = 0
+      net.ipv6.conf.default.disable_ipv6 = 0
+      net.ipv6.conf.lo.disable_ipv6 = 0
+
+      # Connection tracking
+      net.netfilter.nf_conntrack_max = 262144
+      net.netfilter.nf_conntrack_tcp_timeout_established = 7200
+
+      # Buffer sizes
+      net.core.netdev_max_backlog = 5000
+      net.core.netdev_budget = 600
+
+      # File handle limits
+      fs.file-max = 2097152
+    marker: "# {mark} HOMELAB NETWORK OPTIMIZATION"
+    backup: true
+  notify: reload sysctl
+
+- name: Apply sysctl settings immediately
+  ansible.builtin.command: sysctl -p
+  changed_when: false
+
+- name: Configure UFW firewall
+  when: not (firewall.centralized | default(false))
+  block:
+    - name: Install UFW
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Reset UFW to defaults
+      community.general.ufw:
+        state: reset
+      register: ufw_reset
+      ignore_errors: true
+
+    - name: Handle UFW reset errors
+      ansible.builtin.debug:
+        msg: "UFW reset completed with warnings: {{ ufw_reset.stderr | default('None') }}"
+      when: ufw_reset is failed
+
+    - name: Set UFW default policies
+      community.general.ufw:
+        user: "{{ vault_service_user }}"
+        direction: "{{ item.direction }}"
+      loop:
+        - { direction: incoming, default: deny }
+        - { direction: outgoing, default: allow }
+        - { direction: routed, default: deny }
+
+    - name: Allow SSH access
+      community.general.ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+        comment: 'SSH access'
+
+    - name: Allow HTTP/HTTPS through Traefik
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+        comment: 'Web traffic via Traefik'
+      loop:
+        - '80'
+        - '443'
+
+    - name: Allow WireGuard VPN
+      community.general.ufw:
+        rule: allow
+        port: '51820'
+        proto: udp
+        comment: 'WireGuard VPN'
+
+    - name: Allow internal Docker network communication
+      community.general.ufw:
+        rule: allow
+        from: "{{ item }}"
+        comment: 'Docker internal networks'
+      loop:
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/16"
+        - "{{ ansible_default_ipv4.address }}/14"
+
+    - name: Allow local network access
+      community.general.ufw:
+        rule: allow
+        from: "{{ ansible_default_ipv4.network }}/{{ ansible_default_ipv4.netmask }}"
+        comment: 'Local network access'
+
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+        logging: 'on'
+
+- name: Configure DNS settings
+  block:
+    - name: Backup original resolv.conf
+      ansible.builtin.copy:
+        src: /etc/resolv.conf
+        dest: /etc/resolv.conf.backup
+        remote_src: true
+        backup: true
+
+    - name: Configure systemd-resolved
+      ansible.builtin.copy:
+        content: |
+          [Resolve]
+          DNS=1.1.1.1 8.8.8.8 1.0.0.1 8.8.4.4
+          FallbackDNS=9.9.9.9 149.112.112.112
+          Domains=~.
+          DNSSEC=yes
+          DNSOverTLS=yes
+          Cache=yes
+          DNSStubListener=yes
+          ReadEtcHosts=yes
+        dest: /etc/systemd/resolved.conf
+        backup: true
+      notify: restart systemd-resolved
+
+    - name: Enable and start systemd-resolved
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        enabled: true
+        state: started
+
+- name: Configure network monitoring
+  block:
+    - name: Create network monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Network monitoring script for homelab
+
+          echo "Network Status Report - $(date)"
+          echo "================================="
+
+          echo -e "\nNetwork Interfaces:"
+          ip addr show | grep -E "^[0-9]+:|inet "
+
+          echo -e "\nRouting Table:"
+          ip route show
+
+          echo -e "\nDNS Configuration:"
+          systemd-resolve --status | grep -A5 "DNS Servers"
+
+          echo -e "\nActive Connections:"
+          ss -tuln | head -20
+
+          echo -e "\nFirewall Status:"
+          ufw status verbose
+
+          echo -e "\nDocker Networks:"
+          docker network ls
+          docker network inspect homelab | jq '.[0].IPAM.Config'
+
+          echo -e "\nConnectivity Tests:"
+          ping -c 3 1.1.1.1 >/dev/null 2>&1 && echo "✓ Internet: OK" || echo "✗ Internet: FAIL"
+          ping -c 3 {{ domain }} >/dev/null 2>&1 && echo "✓ Domain: OK" || echo "✗ Domain: FAIL"
+
+          echo -e "\nPort Scanning (External):"
+          nmap -sT -O {{ ansible_default_ipv4.address }} | grep -E "^[0-9]+|^Host"
+        dest: "{{ config_dir }}/network-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Create network troubleshooting script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Network troubleshooting script
+
+          echo "Network Troubleshooting Tool"
+          echo "============================"
+
+          if [ "$1" = "" ]; then
+              echo "Usage: $0 <target>"
+              echo "Example: $0 google.com"
+              exit 1
+          fi
+
+          TARGET="$1"
+
+          echo "Testing connectivity to: $TARGET"
+          echo "--------------------------------"
+
+          echo -e "\n1. DNS Resolution:"
+          nslookup "$TARGET"
+
+          echo -e "\n2. Ping Test:"
+          ping -c 4 "$TARGET"
+
+          echo -e "\n3. Traceroute:"
+          traceroute "$TARGET" | head -10
+
+          echo -e "\n4. Port Scan (common ports):"
+          nmap -F "$TARGET"
+
+          echo -e "\n5. Local Network Info:"
+          echo "Default Gateway: $(ip route | grep default | awk '{print $3}')"
+          echo "DNS Servers: $(systemd-resolve --status | grep "DNS Servers" | awk '{print $3}')"
+          echo "Network Interface: $(ip route | grep default | awk '{print $5}')"
+        dest: "{{ config_dir }}/network-troubleshoot.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+- name: Configure bandwidth monitoring
+  block:
+    - name: Install vnstat for bandwidth monitoring
+      ansible.builtin.package:
+        name: vnstat
+        state: present
+
+    - name: Initialize vnstat database
+      ansible.builtin.command: vnstat -i {{ ansible_default_ipv4.interface }} --create
+      args:
+        creates: /var/lib/vnstat/{{ ansible_default_ipv4.interface }}
+
+    - name: Enable vnstat service
+      ansible.builtin.systemd:
+        name: vnstat
+        enabled: true
+        state: started
+
+    - name: Create bandwidth report script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Bandwidth usage report
+
+          echo "Bandwidth Usage Report - $(date)"
+          echo "================================"
+
+          echo -e "\nDaily Usage:"
+          vnstat -d
+
+          echo -e "\nHourly Usage (Today):"
+          vnstat -h
+
+          echo -e "\nMonthly Usage:"
+          vnstat -m
+
+          echo -e "\nReal-time Monitor (10 seconds):"
+          vnstat -l -i {{ ansible_default_ipv4.interface }} &
+          VNSTAT_PID=$!
+
+          # Wait for real-time monitoring with proper timeout
+          timeout=10
+          counter=0
+          while [ $counter -lt $timeout ]; do
+              sleep 1
+              counter=$((counter + 1))
+          done
+
+          kill $VNSTAT_PID 2>/dev/null
+        dest: "{{ config_dir }}/bandwidth-report.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+- name: Configure network security monitoring
+  block:
+    - name: Create connection monitoring script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Monitor network connections for security
+
+          LOG_FILE="{{ logs_dir }}/network-security.log"
+
+          echo "$(date): Starting network security monitoring" >> "$LOG_FILE"
+
+          # Monitor unusual connections
+          netstat -tuln | awk 'NR>2 {print $1, $4}' | sort | uniq -c | sort -nr > /tmp/current_connections
+
+          # Check for suspicious patterns
+          if [ -f /tmp/previous_connections ]; then
+              diff /tmp/previous_connections /tmp/current_connections | grep "^>" >> "$LOG_FILE"
+          fi
+
+          mv /tmp/current_connections /tmp/previous_connections
+
+          # Monitor failed SSH attempts
+          journalctl -u ssh --since "1 hour ago" | grep "Failed password" >> "$LOG_FILE"
+
+          # Monitor UFW blocks
+          journalctl -k --since "1 hour ago" | grep "UFW BLOCK" >> "$LOG_FILE"
+
+          # Alert on high connection counts
+          CONN_COUNT=$(ss -tn | wc -l)
+          if [ "$CONN_COUNT" -gt 100 ]; then
+              echo "$(date): HIGH CONNECTION COUNT: $CONN_COUNT" >> "$LOG_FILE"
+          fi
+        dest: "{{ config_dir }}/security-monitor.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule security monitoring
+      ansible.builtin.cron:
+        name: "Network security monitoring"
+        minute: "*/15"
+        job: "{{ config_dir }}/security-monitor.sh"
+        user: "{{ vault_service_user }}"
+
+- name: Configure network quality monitoring
+  block:
+    - name: Install network quality tools
+      ansible.builtin.package:
+        name:
+          - mtr
+          - iperf3
+          - speedtest-cli
+        state: present
+
+    - name: Create network quality test script
+      ansible.builtin.copy:
+        content: |
+          #!/bin/bash
+          # Network quality testing script
+
+          REPORT_FILE="{{ logs_dir }}/network-quality-$(date +%Y%m%d).log"
+
+          echo "Network Quality Report - $(date)" >> "$REPORT_FILE"
+          echo "=================================" >> "$REPORT_FILE"
+
+          # Latency test to major DNS servers
+          echo -e "\nLatency Tests:" >> "$REPORT_FILE"
+          for dns in 1.1.1.1 8.8.8.8 9.9.9.9; do
+              latency=$(ping -c 5 "$dns" | tail -1 | awk -F'/' '{print $5}')
+              echo "$dns: ${latency}ms" >> "$REPORT_FILE"
+          done
+
+          # MTR to Google DNS
+          echo -e "\nMTR Report to 8.8.8.8:" >> "$REPORT_FILE"
+          mtr -r -c 5 8.8.8.8 >> "$REPORT_FILE"
+
+          # Speed test (if enabled)
+          if [ "$1" = "--speedtest" ]; then
+              echo -e "\nSpeed Test:" >> "$REPORT_FILE"
+              speedtest-cli --simple >> "$REPORT_FILE" 2>&1
+          fi
+
+          # DNS resolution test
+          echo -e "\nDNS Resolution Tests:" >> "$REPORT_FILE"
+          for domain in google.com cloudflare.com github.com; do
+              time_taken=$(time -p nslookup "$domain" 2>&1 | grep real | awk '{print $2}')
+              echo "$domain: ${time_taken}s" >> "$REPORT_FILE"
+          done
+        dest: "{{ config_dir }}/quality-test.sh"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+
+    - name: Schedule daily network quality tests
+      ansible.builtin.cron:
+        name: "Daily network quality test"
+        hour: "6"
+        minute: "0"
+        job: "{{ config_dir }}/quality-test.sh"
+        user: "{{ vault_service_user }}"
+
+- name: Configure container network isolation
+  block:
+    - name: Create container network rules
+      ansible.builtin.copy:
+        content: |
+          # Container network isolation rules
+          # These rules are automatically applied by Docker/UFW integration
+
+          # Allow containers to communicate within their networks
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+
+          # Block container to container communication across different networks
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j DROP
+
+          # Allow monitoring network to access other networks
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+          -A DOCKER-USER -s {{ ansible_default_ipv4.address }}/16 -d {{ ansible_default_ipv4.address }}/16 -j ACCEPT
+
+          # Default policy for container isolation
+          -A DOCKER-USER -j RETURN
+        dest: "{{ config_dir }}/container-network-rules.conf"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+
+- name: Display network configuration summary
+  ansible.builtin.debug:
+    msg: |
+      Network Configuration Complete:
+
+      Firewall Status: UFW enabled with secure defaults
+      DNS Servers: 1.1.1.1, 8.8.8.8 (DoT enabled)
+
+      Network Scripts:
+      - Monitor: {{ config_dir }}/network-monitor.sh
+      - Troubleshoot: {{ config_dir }}/network-troubleshoot.sh
+      - Bandwidth: {{ config_dir }}/bandwidth-report.sh
+      - Security: {{ config_dir }}/security-monitor.sh
+      - Quality: {{ config_dir }}/quality-test.sh
+
+      Security Features:
+      - UFW firewall with Docker integration
+      - Network performance optimization
+      - Bandwidth monitoring (vnstat)
+      - Connection security monitoring
+      - Container network isolation
+
+      Usage Examples:
+      - ./network-monitor.sh
+      - ./network-troubleshoot.sh google.com
+      - ./quality-test.sh --speedtest

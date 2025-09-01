@@ -1,0 +1,89 @@
+---
+# Blackbox_Exporter Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Blackbox_Exporter vault variables
+  block:
+    - name: Check required Blackbox_Exporter vault variables
+      assert:
+        that:
+          - vault_blackbox_exporter_admin_password is defined
+          - vault_blackbox_exporter_database_password is defined
+          - vault_blackbox_exporter_api_key is defined
+          - vault_blackbox_exporter_secret_key is defined
+          - vault_blackbox_exporter_encryption_key is defined
+          - vault_blackbox_exporter_jwt_secret is defined
+        fail_msg: "Required Blackbox_Exporter vault variables are not defined"
+        success_msg: "All required Blackbox_Exporter vault variables are defined"
+
+    - name: Validate Blackbox_Exporter password complexity
+      assert:
+        that:
+          - vault_blackbox_exporter_admin_password | length >= 12
+          - vault_blackbox_exporter_database_password | length >= 12
+        fail_msg: "Blackbox_Exporter passwords must be at least 12 characters long"
+        success_msg: "Blackbox_Exporter password complexity requirements met"
+
+- name: Validate Blackbox_Exporter network configuration
+  block:
+    - name: Check Blackbox_Exporter port configuration
+      assert:
+        that:
+          - blackbox_exporter_port is defined
+          - blackbox_exporter_port | int >= 1024
+          - blackbox_exporter_port | int <= 65535
+        fail_msg: "Blackbox_Exporter port must be between 1024 and 65535"
+        success_msg: "Blackbox_Exporter port configuration is valid"
+
+    - name: Check Blackbox_Exporter domain configuration
+      assert:
+        that:
+          - domain is defined
+          - blackbox_exporter_subdomain is defined
+        fail_msg: "Blackbox_Exporter domain configuration is incomplete"
+        success_msg: "Blackbox_Exporter domain configuration is valid"
+
+- name: Validate Blackbox_Exporter security configuration
+  block:
+    - name: Check Blackbox_Exporter SSL configuration
+      assert:
+        that:
+          - blackbox_exporter_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Blackbox_Exporter SSL configuration is invalid"
+        success_msg: "Blackbox_Exporter SSL configuration is valid"
+
+    - name: Check Blackbox_Exporter authentication configuration
+      assert:
+        that:
+          - blackbox_exporter_auth_enabled | bool
+          - blackbox_exporter_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Blackbox_Exporter authentication configuration is invalid"
+        success_msg: "Blackbox_Exporter authentication configuration is valid"
+
+- name: Validate Blackbox_Exporter storage configuration
+  block:
+    - name: Check Blackbox_Exporter data directories
+      assert:
+        that:
+          - blackbox_exporter_data_dir is defined
+          - blackbox_exporter_config_dir is defined
+          - blackbox_exporter_backup_dir is defined
+        fail_msg: "Blackbox_Exporter storage configuration is incomplete"
+        success_msg: "Blackbox_Exporter storage configuration is valid"
+
+    - name: Create Blackbox_Exporter directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ blackbox_exporter_data_dir }}"
+        - "{{ blackbox_exporter_config_dir }}"
+        - "{{ blackbox_exporter_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Blackbox_Exporter validation completed successfully - all configurations are valid and secure"

@@ -1,0 +1,304 @@
+#!/bin/bash
+
+# Comprehensive Log Analysis Script
+# Provides advanced log analysis capabilities for the homelab environment
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Configuration
+LOKI_URL="http://loki:3100"
+PROMETHEUS_URL="http://prometheus:9090"
+LOG_DIR="{{ logs_dir }}"
+DOCKER_DIR="{{ docker_dir }}"
+
+# Function to show help
+show_help() {
+    echo -e "${CYAN}Log Analysis Script${NC}"
+    echo "Usage: $0 [command] [options]"
+    echo ""
+    echo "Commands:"
+    echo "  errors [service]     - Show error logs for a specific service or all services"
+    echo "  warnings [service]   - Show warning logs for a specific service or all services"
+    echo "  performance [service] - Show performance-related logs"
+    echo "  security [service]   - Show security-related logs"
+    echo "  volume [service]     - Show log volume statistics"
+    echo "  top-errors          - Show top error patterns"
+    echo "  service-health      - Show service health based on logs"
+    echo "  correlation [id]    - Show logs with correlation ID"
+    echo "  search [query]      - Search logs with custom query"
+    echo "  export [service]    - Export logs for a service"
+    echo "  cleanup             - Clean up old log files"
+    echo "  help                - Show this help"
+    echo ""
+    echo "Examples:"
+    echo "  $0 errors paperless_ngx"
+    echo "  $0 warnings"
+    echo "  $0 performance grafana"
+    echo "  $0 search 'authentication failure'"
+    echo "  $0 correlation abc123"
+}
+
+# Function to query Loki
+query_loki() {
+    local query="$1"
+    local start_time="${2:-1h}"
+    
+    curl -s -G "$LOKI_URL/loki/api/v1/query_range" \
+        --data-urlencode "query=$query" \
+        --data-urlencode "start=$(date -d "$start_time ago" -u +%s)000000000" \
+        --data-urlencode "end=$(date -u +%s)000000000" \
+        --data-urlencode "step=1s" | jq -r '.data.result[0].values[]? | "\(.[0]) \(.[1])"' 2>/dev/null
+}
+
+# Function to show error logs
+show_errors() {
+    local service="${1:-}"
+    local query="{level=\"error\""
+    
+    if [[ -n "$service" ]]; then
+        query="$query,service=\"$service\""
+    fi
+    query="$query}"
+    
+    echo -e "${RED}Error Logs${NC}"
+    echo "Query: $query"
+    echo "----------------------------------------"
+    
+    query_loki "$query" "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${RED}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show warning logs
+show_warnings() {
+    local service="${1:-}"
+    local query="{level=\"warn\""
+    
+    if [[ -n "$service" ]]; then
+        query="$query,service=\"$service\""
+    fi
+    query="$query}"
+    
+    echo -e "${YELLOW}Warning Logs${NC}"
+    echo "Query: $query"
+    echo "----------------------------------------"
+    
+    query_loki "$query" "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${YELLOW}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show performance logs
+show_performance() {
+    local service="${1:-}"
+    local query="{component=\"performance\""
+    
+    if [[ -n "$service" ]]; then
+        query="$query,service=\"$service\""
+    fi
+    query="$query}"
+    
+    echo -e "${BLUE}Performance Logs${NC}"
+    echo "Query: $query"
+    echo "----------------------------------------"
+    
+    query_loki "$query" "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${BLUE}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show security logs
+show_security() {
+    local service="${1:-}"
+    local query="{component=\"security\""
+    
+    if [[ -n "$service" ]]; then
+        query="$query,service=\"$service\""
+    fi
+    query="$query}"
+    
+    echo -e "${PURPLE}Security Logs${NC}"
+    echo "Query: $query"
+    echo "----------------------------------------"
+    
+    query_loki "$query" "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${PURPLE}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to show log volume statistics
+show_volume() {
+    local service="${1:-}"
+    
+    echo -e "${CYAN}Log Volume Statistics${NC}"
+    echo "----------------------------------------"
+    
+    # Get log volume from Prometheus
+    local query="rate(loki_log_entries_total[5m])"
+    if [[ -n "$service" ]]; then
+        query="rate(loki_log_entries_total{service=\"$service\"}[5m])"
+    fi
+    
+    curl -s -G "$PROMETHEUS_URL/api/v1/query" \
+        --data-urlencode "query=$query" | jq -r '.data.result[] | "\(.metric.service // .metric.job): \(.value[1]) logs/sec"' 2>/dev/null
+}
+
+# Function to show top error patterns
+show_top_errors() {
+    echo -e "${RED}Top Error Patterns${NC}"
+    echo "----------------------------------------"
+    
+    # Query for error patterns
+    query_loki '{level="error"}' "1h" | \
+        awk '{print $2}' | \
+        sed 's/.*error.*/error/gi' | \
+        sed 's/.*failed.*/failed/gi' | \
+        sed 's/.*exception.*/exception/gi' | \
+        sort | uniq -c | sort -nr | head -10
+}
+
+# Function to show service health
+show_service_health() {
+    echo -e "${GREEN}Service Health Based on Logs${NC}"
+    echo "----------------------------------------"
+    
+    # Check each service for errors in the last hour
+    local services=("system" "docker" "web" "database" "monitoring" "media" "security" "network" "storage" "application" "paperless_ngx" "fing" "certificate_management" "automation" "utilities")
+    
+    for service in "${services[@]}"; do
+        local error_count=$(query_loki "{service=\"$service\",level=\"error\"}" "1h" | wc -l)
+        local warning_count=$(query_loki "{service=\"$service\",level=\"warn\"}" "1h" | wc -l)
+        
+        if [[ $error_count -eq 0 && $warning_count -eq 0 ]]; then
+            echo -e "${GREEN}✓${NC} $service: Healthy"
+        elif [[ $error_count -lt 5 ]]; then
+            echo -e "${YELLOW}⚠${NC} $service: $error_count errors, $warning_count warnings"
+        else
+            echo -e "${RED}✗${NC} $service: $error_count errors, $warning_count warnings"
+        fi
+    done
+}
+
+# Function to show logs with correlation ID
+show_correlation() {
+    local correlation_id="$1"
+    
+    if [[ -z "$correlation_id" ]]; then
+        echo "Please provide a correlation ID"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Logs with Correlation ID: $correlation_id${NC}"
+    echo "----------------------------------------"
+    
+    query_loki "{correlation_id=\"$correlation_id\"}" "24h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${CYAN}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to search logs
+search_logs() {
+    local query="$1"
+    
+    if [[ -z "$query" ]]; then
+        echo "Please provide a search query"
+        return 1
+    fi
+    
+    echo -e "${CYAN}Search Results for: $query${NC}"
+    echo "----------------------------------------"
+    
+    query_loki "$query" "1h" | while read -r timestamp log; do
+        if [[ -n "$log" ]]; then
+            echo -e "${CYAN}[$(date -d @$((timestamp/1000000000)))]${NC} $log"
+        fi
+    done
+}
+
+# Function to export logs
+export_logs() {
+    local service="$1"
+    local output_file="${service:-all}_logs_$(date +%Y%m%d_%H%M%S).json"
+    
+    if [[ -z "$service" ]]; then
+        echo "Exporting all logs to $output_file"
+        query_loki "{}" "24h" > "$output_file"
+    else
+        echo "Exporting $service logs to $output_file"
+        query_loki "{service=\"$service\"}" "24h" > "$output_file"
+    fi
+    
+    echo -e "${GREEN}Logs exported to $output_file${NC}"
+}
+
+# Function to clean up old log files
+cleanup_logs() {
+    echo -e "${YELLOW}Cleaning up old log files...${NC}"
+    
+    # Clean up old log files (older than 30 days)
+    find "$LOG_DIR" -name "*.log" -mtime +30 -delete 2>/dev/null
+    find "$DOCKER_DIR" -name "*.log" -mtime +30 -delete 2>/dev/null
+    
+    # Clean up old compressed log files (older than 90 days)
+    find "$LOG_DIR" -name "*.log.*" -mtime +90 -delete 2>/dev/null
+    find "$DOCKER_DIR" -name "*.log.*" -mtime +90 -delete 2>/dev/null
+    
+    echo -e "${GREEN}Cleanup completed${NC}"
+}
+
+# Main script logic
+case "${1:-help}" in
+    errors)
+        show_errors "$2"
+        ;;
+    warnings)
+        show_warnings "$2"
+        ;;
+    performance)
+        show_performance "$2"
+        ;;
+    security)
+        show_security "$2"
+        ;;
+    volume)
+        show_volume "$2"
+        ;;
+    top-errors)
+        show_top_errors
+        ;;
+    service-health)
+        show_service_health
+        ;;
+    correlation)
+        show_correlation "$2"
+        ;;
+    search)
+        search_logs "$2"
+        ;;
+    export)
+        export_logs "$2"
+        ;;
+    cleanup)
+        cleanup_logs
+        ;;
+    help|*)
+        show_help
+        ;;
+esac 

@@ -1,0 +1,341 @@
+---
+# Notification Testing
+# Tests all configured notification channels
+
+- name: Test notification channels
+  block:
+    - name: Test email notifications
+      ansible.builtin.uri:
+        url: "{{ notifications.email.smtp_url | default('smtp://{{ ansible_default_ipv4.address }}:587') }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "to": "{{ notifications.email.admin_email }}",
+            "subject": "Homelab Notification Test",
+            "body": "This is a test notification from your homelab deployment.\n\nDeployment ID: {{ ansible_date_time.epoch }}\nTimestamp: {{ ansible_date_time.iso8601 }}\nHost: {{ inventory_hostname }}"
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: email_test
+      when:
+        - notifications.email.enabled | default(false)
+        - notifications.email.smtp_url is defined
+      tags: [notifications, email, test]
+
+    - name: Test Slack notifications
+      ansible.builtin.uri:
+        url: "{{ vault_slack_webhook }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "🔔 Homelab Notification Test\n\nDeployment ID: {{ ansible_date_time.epoch }}\nTimestamp: {{ ansible_date_time.iso8601 }}\nHost: {{ inventory_hostname }}\nStatus: ✅ All systems operational"
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: slack_test
+      when:
+        - notifications.slack.enabled | default(false)
+        - vault_slack_webhook is defined
+      tags: [notifications, slack, test]
+
+    - name: Test Discord notifications
+      ansible.builtin.uri:
+        url: "{{ vault_discord_webhook }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "embeds": [
+              {
+                "title": "🔔 Homelab Notification Test",
+                "description": "This is a test notification from your homelab deployment.",
+                "color": 3066993,
+                "fields": [
+                  {
+                    "name": "Deployment ID",
+                    "value": "{{ ansible_date_time.epoch }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Timestamp",
+                    "value": "{{ ansible_date_time.iso8601 }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Host",
+                    "value": "{{ inventory_hostname }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Status",
+                    "value": "✅ All systems operational",
+                    "inline": true
+                  }
+                ]
+              }
+            ]
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: discord_test
+      when:
+        - notifications.discord.enabled | default(false)
+        - vault_discord_webhook is defined
+      tags: [notifications, discord, test]
+
+    - name: Test Telegram notifications
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ vault_telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "chat_id": "{{ vault_telegram_chat_id }}",
+            "text": "🔔 Homelab Notification Test\n\nDeployment ID: {{ ansible_date_time.epoch }}\nTimestamp: {{ ansible_date_time.iso8601 }}\nHost: {{ inventory_hostname }}\nStatus: ✅ All systems operational",
+            "parse_mode": "HTML"
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: telegram_test
+      when:
+        - notifications.telegram.enabled | default(false)
+        - vault_telegram_bot_token is defined
+        - vault_telegram_chat_id is defined
+      tags: [notifications, telegram, test]
+
+    - name: Test PagerDuty notifications
+      ansible.builtin.uri:
+        url: "{{ notifications.pagerduty.webhook_url }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "routing_key": "{{ vault_pagerduty_routing_key }}",
+            "event_action": "trigger",
+            "payload": {
+              "summary": "Homelab Notification Test",
+              "severity": "info",
+              "source": "{{ inventory_hostname }}",
+              "custom_details": {
+                "deployment_id": "{{ ansible_date_time.epoch }}",
+                "timestamp": "{{ ansible_date_time.iso8601 }}",
+                "status": "All systems operational"
+              }
+            }
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: pagerduty_test
+      when:
+        - notifications.pagerduty.enabled | default(false)
+        - notifications.pagerduty.webhook_url is defined
+        - vault_pagerduty_routing_key is defined
+      tags: [notifications, pagerduty, test]
+
+    - name: Test webhook notifications
+      ansible.builtin.uri:
+        url: "{{ notifications.webhook.url }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "event": "test_notification",
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "deployment_id": "{{ ansible_date_time.epoch }}",
+            "host": "{{ inventory_hostname }}",
+            "status": "success",
+            "message": "Homelab notification test completed successfully"
+          }
+        status_code: [200, 201, 202]
+        timeout: 30
+      register: webhook_test
+      when:
+        - notifications.webhook.enabled | default(false)
+        - notifications.webhook.url is defined
+      tags: [notifications, webhook, test]
+
+  when: notifications.enabled | default(false)
+  tags: [notifications, test]
+
+- name: Display notification test results
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      NOTIFICATION TEST RESULTS
+      ========================================
+
+      Email Notifications: {{ 'SUCCESS' if email_test is defined and email_test.status == 200 else 'SKIPPED' if notifications.email.enabled | default(false) else 'DISABLED' }}
+      Slack Notifications: {{ 'SUCCESS' if slack_test is defined and slack_test.status == 200 else 'SKIPPED' if notifications.slack.enabled | default(false) else 'DISABLED' }}
+      Discord Notifications: {{ 'SUCCESS' if discord_test is defined and discord_test.status == 200 else 'SKIPPED' if notifications.discord.enabled | default(false) else 'DISABLED' }}
+      Telegram Notifications: {{ 'SUCCESS' if telegram_test is defined and telegram_test.status == 200 else 'SKIPPED' if notifications.telegram.enabled | default(false) else 'DISABLED' }}
+      PagerDuty Notifications: {{ 'SUCCESS' if pagerduty_test is defined and pagerduty_test.status == 200 else 'SKIPPED' if notifications.pagerduty.enabled | default(false) else 'DISABLED' }}
+      Webhook Notifications: {{ 'SUCCESS' if webhook_test is defined and webhook_test.status == 200 else 'SKIPPED' if notifications.webhook.enabled | default(false) else 'DISABLED' }}
+
+      Test Timestamp: {{ ansible_date_time.iso8601 }}
+      Deployment ID: {{ ansible_date_time.epoch }}
+
+      ========================================
+  tags: [notifications, summary]
+
+- name: Test AlertManager configuration
+  hosts: monitoring
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check AlertManager status
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:9093/api/v1/status"
+        method: GET
+      register: alertmanager_status
+      failed_when: false
+
+    - name: AlertManager status
+      debug:
+        msg: "AlertManager is {{ 'running' if alertmanager_status.status == 200 else 'not responding' }}"
+
+    - name: Test AlertManager configuration
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/alerts"
+        method: POST
+        headers:
+          Content-Type: application/json
+        body_format: json
+        body:
+          - labels:
+              alertname: "TestAlert"
+              severity: "info"
+              service: "test"
+              instance: "{{ inventory_hostname }}"
+            annotations:
+              description: "Test alert from Ansible deployment"
+              dashboard: "https://grafana.{{ domain }}"
+            startsAt: "{{ ansible_date_time.iso8601 }}"
+      register: alertmanager_test
+      failed_when: false
+
+    - name: AlertManager test result
+      debug:
+        msg: "AlertManager test {{ 'succeeded' if alertmanager_test.status == 200 else 'failed' }}"
+
+- name: Test Prometheus alerting rules
+  hosts: monitoring
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check Prometheus status
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status/config"
+        method: GET
+      register: prometheus_status
+      failed_when: false
+
+    - name: Prometheus status
+      debug:
+        msg: "Prometheus is {{ 'running' if prometheus_status.status == 200 else 'not responding' }}"
+
+    - name: Check alerting rules
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/rules"
+        method: GET
+      register: prometheus_rules
+      failed_when: false
+
+    - name: Alerting rules status
+      debug:
+        msg: "Found {{ prometheus_rules.json.data.groups | length }} alerting rule groups"
+      when: prometheus_rules.status == 200
+
+    - name: List active alerts
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/alerts"
+        method: GET
+      register: active_alerts
+      failed_when: false
+
+    - name: Active alerts count
+      debug:
+        msg: "Currently {{ active_alerts.json.data | length }} active alerts"
+      when: active_alerts.status == 200
+
+- name: Test notification templates
+  hosts: all
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Test email template rendering
+      template:
+        src: "templates/notifications/email_test.j2"
+        dest: "/tmp/email_test.html"
+      vars:
+        alert:
+          labels:
+            service: "test-service"
+            instance: "{{ inventory_hostname }}"
+            severity: "info"
+          annotations:
+            description: "Test alert description"
+            dashboard: "https://grafana.{{ domain }}"
+            runbook: "https://docs.{{ domain }}"
+          startsAt: "{{ ansible_date_time.iso8601 }}"
+      delegate_to: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+    - name: Test Slack template rendering
+      template:
+        src: "templates/notifications/slack_test.j2"
+        dest: "/tmp/slack_test.json"
+      vars:
+        alert:
+          labels:
+            service: "test-service"
+            instance: "{{ inventory_hostname }}"
+            severity: "info"
+          annotations:
+            description: "Test alert description"
+            dashboard: "https://grafana.{{ domain }}"
+          startsAt: "{{ ansible_date_time.iso8601 }}"
+      delegate_to: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+    - name: Test Discord template rendering
+      template:
+        src: "templates/notifications/discord_test.j2"
+        dest: "/tmp/discord_test.json"
+      vars:
+        alert:
+          labels:
+            service: "test-service"
+            instance: "{{ inventory_hostname }}"
+            severity: "info"
+          annotations:
+            description: "Test alert description"
+            dashboard: "https://grafana.{{ domain }}"
+          startsAt: "{{ ansible_date_time.iso8601 }}"
+      delegate_to: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+    - name: Template test results
+      debug:
+        msg: |
+          Template Test Results:
+          - Email template: {{ '✓' if (lookup('file', '/tmp/email_test.html') | length) > 0 else '✗' }}
+          - Slack template: {{ '✓' if (lookup('file', '/tmp/slack_test.json') | length) > 0 else '✗' }}
+          - Discord template: {{ '✓' if (lookup('file', '/tmp/discord_test.json') | length) > 0 else '✗' }}
+      delegate_to: "{{ ansible_default_ipv4.address }}"
+      run_once: true
+
+    - name: Cleanup test files
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/tmp/email_test.html"
+        - "/tmp/slack_test.json"
+        - "/tmp/discord_test.json"
+      delegate_to: "{{ ansible_default_ipv4.address }}"
+      run_once: true

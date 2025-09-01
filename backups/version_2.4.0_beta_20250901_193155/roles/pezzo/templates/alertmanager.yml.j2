@@ -1,0 +1,103 @@
+# Pezzo AlertManager Configuration
+# Alert routing and notification management for Pezzo services
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: '{{ pezzo_slack_webhook_url | default("") }}'
+  smtp_smarthost: '{{ pezzo_smtp_host | default("{{ ansible_default_ipv4.address }}:587") }}'
+  smtp_from: '{{ pezzo_smtp_from | default("alertmanager@' + domain + '") }}'
+  smtp_auth_username: '{{ pezzo_smtp_username | default("") }}'
+  smtp_auth_password: '{{ pezzo_smtp_password | default("") }}'
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'pezzo-alerts'
+  routes:
+    - match:
+        service: pezzo-server
+      receiver: 'pezzo-critical'
+      continue: true
+    - match:
+        service: pezzo-console
+      receiver: 'pezzo-critical'
+      continue: true
+    - match:
+        service: pezzo-postgres
+      receiver: 'pezzo-database'
+      continue: true
+    - match:
+        severity: critical
+      receiver: 'pezzo-critical'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'pezzo-warning'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+receivers:
+  - name: 'pezzo-alerts'
+    email_configs:
+      - to: '{{ pezzo_admin_email | default("admin@' + domain + '") }}'
+        send_resolved: true
+    webhook_configs:
+      - url: '{{ pezzo_alerting_webhook | default("") }}'
+        send_resolved: true
+    slack_configs:
+      - channel: '#pezzo-alerts'
+        title: 'Pezzo Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+  - name: 'pezzo-critical'
+    email_configs:
+      - to: '{{ pezzo_admin_email | default("admin@' + domain + '") }}'
+        send_resolved: true
+        headers:
+          subject: 'CRITICAL: Pezzo Service Alert'
+    webhook_configs:
+      - url: '{{ pezzo_alerting_webhook | default("") }}'
+        send_resolved: true
+    slack_configs:
+      - channel: '#pezzo-critical'
+        title: '🚨 CRITICAL: Pezzo Service Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+  - name: 'pezzo-warning'
+    email_configs:
+      - to: '{{ pezzo_admin_email | default("admin@' + domain + '") }}'
+        send_resolved: true
+        headers:
+          subject: 'WARNING: Pezzo Service Alert'
+    webhook_configs:
+      - url: '{{ pezzo_alerting_webhook | default("") }}'
+        send_resolved: true
+    slack_configs:
+      - channel: '#pezzo-warnings'
+        title: '⚠️ WARNING: Pezzo Service Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+  - name: 'pezzo-database'
+    email_configs:
+      - to: '{{ pezzo_admin_email | default("admin@' + domain + '") }}'
+        send_resolved: true
+        headers:
+          subject: 'DATABASE: Pezzo Database Alert'
+    webhook_configs:
+      - url: '{{ pezzo_alerting_webhook | default("") }}'
+        send_resolved: true
+    slack_configs:
+      - channel: '#pezzo-database'
+        title: '🗄️ DATABASE: Pezzo Database Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true 

@@ -1,0 +1,237 @@
+# Homepage Authentication Integration Configuration
+# Configures OAuth/OpenID Connect integration with Authentik
+
+# =============================================================================
+# AUTHENTICATION PROVIDER CONFIGURATION
+# =============================================================================
+
+authentication:
+  enabled: true
+  provider: "authentik"
+  
+  # Authentik OAuth/OpenID Connect Configuration
+  authentik:
+    enabled: true
+    url: "https://{{ authentik_subdomain }}.{{ domain }}"
+    client_id: "{{ authentik_client_id | default('homepage') }}"
+    client_secret: "{{ authentik_client_secret | default('') }}"
+    redirect_uri: "https://{{ homepage_subdomain }}.{{ domain }}/oauth/callback"
+    scope: "openid profile email"
+    
+    # OAuth Configuration
+    oauth:
+      enabled: true
+      authorization_endpoint: "https://{{ authentik_subdomain }}.{{ domain }}/application/o/authorize/"
+      token_endpoint: "https://{{ authentik_subdomain }}.{{ domain }}/application/o/token/"
+      userinfo_endpoint: "https://{{ authentik_subdomain }}.{{ domain }}/application/o/userinfo/"
+      jwks_endpoint: "https://{{ authentik_subdomain }}.{{ domain }}/application/o/jwks/"
+      
+    # OpenID Connect Configuration
+    oidc:
+      enabled: true
+      issuer: "https://{{ authentik_subdomain }}.{{ domain }}"
+      discovery_url: "https://{{ authentik_subdomain }}.{{ domain }}/.well-known/openid_configuration"
+      
+    # Token Configuration
+    tokens:
+      access_token_lifetime: 3600
+      refresh_token_lifetime: 86400
+      id_token_lifetime: 3600
+      
+    # Security Configuration
+    security:
+      verify_ssl: true
+      allow_insecure_redirects: false
+      strict_ssl: true
+      
+# =============================================================================
+# USER MANAGEMENT
+# =============================================================================
+
+user_management:
+  enabled: true
+  
+  # User Creation
+  auto_create_users: true
+  default_role: "viewer"
+  
+  # Admin Users
+  admin_users:
+    - "admin@{{ domain }}"
+    - "{{ username }}@{{ domain }}"
+    
+  # Allowed Domains
+  allowed_domains:
+    - "{{ domain }}"
+    
+  # User Synchronization
+  sync:
+    enabled: true
+    interval: 300  # seconds
+    sync_groups: true
+    sync_attributes: true
+    
+  # User Attributes Mapping
+  attributes:
+    username: "preferred_username"
+    email: "email"
+    name: "name"
+    groups: "groups"
+    
+# =============================================================================
+# ROLE-BASED ACCESS CONTROL
+# =============================================================================
+
+rbac:
+  enabled: true
+  
+  # Default Roles
+  roles:
+    admin:
+      description: "Full administrative access"
+      permissions:
+        - "read"
+        - "write"
+        - "admin"
+        - "configure"
+        
+    editor:
+      description: "Editor access with configuration capabilities"
+      permissions:
+        - "read"
+        - "write"
+        - "configure"
+        
+    viewer:
+      description: "Read-only access"
+      permissions:
+        - "read"
+        
+  # Group to Role Mapping
+  group_mapping:
+    "authentik-admin":
+      role: "admin"
+    "authentik-editor":
+      role: "editor"
+    "authentik-viewer":
+      role: "viewer"
+      
+  # Default Role Assignment
+  default_role: "viewer"
+  
+# =============================================================================
+# SESSION MANAGEMENT
+# =============================================================================
+
+session:
+  enabled: true
+  
+  # Session Configuration
+  session_timeout: 3600  # seconds
+  session_extension: true
+  max_sessions: 10
+  
+  # Session Storage
+  storage:
+    type: "memory"  # memory, redis, database
+    redis_url: "redis://redis:6379"
+    database_url: "postgresql://homepage:homepage@postgresql:5432/homepage"
+    
+  # Session Security
+  security:
+    secure_cookies: true
+    http_only_cookies: true
+    same_site: "strict"
+    csrf_protection: true
+    
+# =============================================================================
+# LOGOUT CONFIGURATION
+# =============================================================================
+
+logout:
+  enabled: true
+  
+  # Logout Endpoints
+  endpoints:
+    local: "/logout"
+    remote: "https://{{ authentik_subdomain }}.{{ domain }}/application/o/logout/"
+    
+  # Logout Behavior
+  behavior:
+    redirect_after_logout: true
+    redirect_url: "https://{{ homepage_subdomain }}.{{ domain }}"
+    clear_session: true
+    clear_cookies: true
+    
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+
+error_handling:
+  enabled: true
+  
+  # Error Pages
+  error_pages:
+    unauthorized: "/unauthorized"
+    forbidden: "/forbidden"
+    not_found: "/not-found"
+    server_error: "/server-error"
+    
+  # Error Logging
+  logging:
+    enabled: true
+    level: "warning"
+    log_auth_failures: true
+    log_auth_successes: false
+    
+# =============================================================================
+# MONITORING AND METRICS
+# =============================================================================
+
+monitoring:
+  enabled: true
+  
+  # Authentication Metrics
+  metrics:
+    enabled: true
+    collect_login_attempts: true
+    collect_logout_events: true
+    collect_session_events: true
+    collect_error_events: true
+    
+  # Health Checks
+  health_checks:
+    enabled: true
+    check_auth_provider: true
+    check_user_sync: true
+    check_session_storage: true
+    interval: 60  # seconds
+    
+# =============================================================================
+# INTEGRATION SETTINGS
+# =============================================================================
+
+integration:
+  # Traefik Integration
+  traefik:
+    enabled: true
+    forward_auth: true
+    forward_auth_url: "https://{{ authentik_subdomain }}.{{ domain }}/outpost.goauthentik.io/auth/traefik"
+    forward_auth_headers:
+      - "X-User"
+      - "X-Email"
+      - "X-Groups"
+      
+  # Monitoring Integration
+  monitoring:
+    enabled: true
+    prometheus_metrics: true
+    loki_logging: true
+    alertmanager_alerts: true
+    
+  # Backup Integration
+  backup:
+    enabled: true
+    include_auth_config: true
+    include_user_data: false
+    include_sessions: false 

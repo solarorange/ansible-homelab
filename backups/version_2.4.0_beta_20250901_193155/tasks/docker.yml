@@ -1,0 +1,362 @@
+---
+# Enhanced Docker Installation and Configuration
+# Production-ready Docker setup with Compose v2 and optimization
+
+- name: Deploy Docker
+  block:
+    - name: Set architecture variables
+      ansible.builtin.set_fact:
+        docker_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+        rh_distribution: "{{ 'rhel' if ansible_distribution == 'RedHat' else ansible_distribution | lower }}"
+
+    - name: Backup existing Docker configuration
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ ansible_backup_dir }}/docker/{{ ansible_date_time.date }}/{{ item | basename }}"
+        remote_src: true
+      loop:
+        - /etc/docker/daemon.json
+        - /etc/systemd/system/docker.service.d/override.conf
+      when: item is file
+      register: docker_config_backup
+
+    - name: Remove old Docker installations
+      ansible.builtin.package:
+        name:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+          - docker-compose
+        state: absent
+      register: docker_removal
+      ignore_errors: true
+
+    - name: Handle Docker removal errors
+      ansible.builtin.debug:
+        msg: "Docker removal completed with warnings: {{ docker_removal.stderr | default('None') }}"
+      when: docker_removal is failed
+
+    - name: Install Docker dependencies (Debian/Ubuntu)
+      ansible.builtin.package:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+      register: debian_deps
+
+    - name: Add Docker GPG key (Debian/Ubuntu)
+      ansible.builtin.apt_key:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        state: present
+        keyring: /etc/apt/keyrings/docker.gpg
+      when: ansible_os_family == "Debian"
+      register: docker_gpg
+
+    - name: Add Docker repository (Debian/Ubuntu)
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+      register: docker_repo
+
+    - name: Install Docker dependencies (RedHat/CentOS)
+      ansible.builtin.package:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+        state: present
+      when: ansible_os_family == "RedHat"
+      register: redhat_deps
+
+    - name: Add Docker repository (RedHat/CentOS)
+      ansible.builtin.yum_repository:
+        name: docker-ce
+        description: Docker CE Repository
+        baseurl: "https://download.docker.com/linux/{{ rh_distribution }}/$releasever/$basearch/stable"
+        enabled: true
+        gpgcheck: true
+        gpgkey: "https://download.docker.com/linux/{{ rh_distribution }}/gpg"
+      when: ansible_os_family == "RedHat"
+      register: redhat_repo
+
+    - name: Install Docker packages
+      ansible.builtin.package:
+        name: "{{ docker_packages }}"
+        state: present
+        update_cache: true
+      register: docker_install_result
+      retries: 3
+      delay: 10
+
+    - name: Create Docker group
+      ansible.builtin.group:
+        name: docker
+        state: present
+      register: docker_group
+
+    - name: Add user to Docker group
+      ansible.builtin.user:
+        name: "{{ username }}"
+        groups: docker
+        append: true
+      register: user_docker_group
+      notify: restart docker
+
+    - name: Create Docker configuration directory
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        mode: "0755"
+      register: docker_config_dir
+
+    - name: Configure Docker daemon
+      ansible.builtin.copy:
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "50m",
+              "max-file": "5"
+            },
+            "storage-driver": "overlay2",
+            "data-root": "{{ docker_dir }}/docker-data",
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "live-restore": true,
+            "userland-proxy": false,
+            "experimental": false,
+            "metrics-addr": "{{ ansible_default_ipv4.address }}:9323",
+            "default-address-pools": [
+              {
+                "base": "{{ ansible_default_ipv4.address }}/16",
+                "size": 24
+              },
+              {
+                "base": "{{ ansible_default_ipv4.address }}/16",
+                "size": 24
+              },
+              {
+                "base": "{{ ansible_default_ipv4.address }}/16",
+                "size": 24
+              },
+              {
+                "base": "{{ ansible_default_ipv4.address }}/14",
+                "size": 24
+              }
+            ],
+            "dns": ["1.1.1.1", "8.8.8.8"],
+            "bip": "{{ ansible_default_ipv4.address }}/16",
+            "fixed-cidr": "{{ ansible_default_ipv4.address }}/16"
+          }
+        dest: /etc/docker/daemon.json
+        mode: "0644"
+        backup: true
+      register: docker_daemon_config
+      notify: restart docker
+
+    - name: Create Docker data directory
+      ansible.builtin.file:
+        path: "{{ docker_dir }}/docker-data"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      register: docker_data_dir
+
+    - name: Configure Docker systemd service
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        daemon_reload: true
+        state: started
+      register: docker_service
+
+    - name: Wait for Docker to be ready
+      ansible.builtin.wait_for:
+        port: 2375
+        host: "{{ ansible_default_ipv4.address }}"
+        timeout: 60
+      register: docker_ready
+      retries: 3
+      delay: 10
+      until: docker_ready is success
+
+    - name: Verify Docker installation
+      ansible.builtin.command: docker --version
+      register: docker_version_result
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: docker_version_result.rc == 0
+
+    - name: Verify Docker Compose installation
+      ansible.builtin.command: docker compose version
+      register: docker_compose_version_result
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: docker_compose_version_result.rc == 0
+
+    - name: Install Docker Compose completion
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/docker/compose/main/contrib/completion/bash/docker-compose"
+        dest: "/etc/bash_completion.d/docker-compose"
+        mode: "0644"
+      register: docker_compose_completion
+      ignore_errors: true
+
+    - name: Create custom Docker networks
+      community.docker.docker_network:
+        name: "{{ item.name }}"
+        driver: "{{ item.driver }}"
+        ipam_config: "{{ item.ipam_config | default(omit) }}"
+        internal: "{{ item.internal | default(false) }}"
+        state: present
+      loop: "{{ docker_networks }}"
+      register: network_creation_result
+
+    - name: Create Docker Compose override directory
+      ansible.builtin.file:
+        path: "{{ docker_dir }}/compose-overrides"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0755"
+      register: compose_overrides_dir
+
+    - name: Create global Docker Compose file
+      ansible.builtin.copy:
+        content: |
+          version: '3.8'
+
+          # Global Docker Compose configuration for homelab
+          # This file contains shared services and networks
+
+          networks:
+            homelab:
+              name: homelab
+              external: true
+            monitoring:
+              name: monitoring
+              external: true
+            media:
+              name: media
+              external: true
+
+          # Shared volume definitions
+          volumes:
+            portainer_data:
+              name: portainer_data
+            grafana_data:
+              name: grafana_data
+            prometheus_data:
+              name: prometheus_data
+            influxdb_data:
+              name: influxdb_data
+            postgres_data:
+              name: postgres_data
+            redis_data:
+              name: redis_data
+
+          # Global service defaults
+          x-common-variables: &common-variables
+            TZ: ${TZ:-UTC}
+            PUID: ${PUID:-1000}
+            PGID: ${PGID:-1000}
+
+          x-security-labels: &security-labels
+            - "traefik.enable=true"
+            - "traefik.docker.network=homelab"
+
+          x-restart-policy: &restart-policy
+            restart: unless-stopped
+
+          x-logging: &logging
+            logging:
+              driver: "json-file"
+              options:
+                max-size: "50m"
+                max-file: "5"
+
+          # Services will be added by individual task files
+          services: {}
+        dest: "{{ docker_dir }}/docker-compose.yml"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: "0644"
+      register: global_compose_file
+
+    - name: Verify Docker functionality
+      ansible.builtin.command: docker info
+      register: docker_info
+      changed_when: false
+      retries: 3
+      delay: 5
+      until: docker_info.rc == 0
+
+  rescue:
+    - name: Log Docker deployment failure
+      ansible.builtin.debug:
+        msg: |
+          Docker deployment failed:
+          - Config backup: {{ docker_config_backup | default('N/A') }}
+          - Package removal: {{ docker_removal | default('N/A') }}
+          - Dependencies (Debian): {{ debian_deps | default('N/A') }}
+          - Dependencies (RedHat): {{ redhat_deps | default('N/A') }}
+          - GPG key: {{ docker_gpg | default('N/A') }}
+          - Repository: {{ docker_repo | default('N/A') }}
+          - Installation: {{ docker_install_result | default('N/A') }}
+          - Group creation: {{ docker_group | default('N/A') }}
+          - User group: {{ user_docker_group | default('N/A') }}
+          - Config directory: {{ docker_config_dir | default('N/A') }}
+          - Daemon config: {{ docker_daemon_config | default('N/A') }}
+          - Data directory: {{ docker_data_dir | default('N/A') }}
+          - Service: {{ docker_service | default('N/A') }}
+          - Ready check: {{ docker_ready | default('N/A') }}
+          - Version check: {{ docker_version_result | default('N/A') }}
+          - Compose version: {{ docker_compose_version_result | default('N/A') }}
+          - Compose completion: {{ docker_compose_completion | default('N/A') }}
+          - Networks: {{ network_creation_result | default('N/A') }}
+          - Overrides directory: {{ compose_overrides_dir | default('N/A') }}
+          - Global compose: {{ global_compose_file | default('N/A') }}
+          - Info check: {{ docker_info | default('N/A') }}
+
+    - name: Attempt Docker recovery
+      ansible.builtin.include_tasks: handlers/error_handling/recovery.yml
+      vars:
+        failed_config_files:
+          - /etc/docker/daemon.json
+          - /etc/systemd/system/docker.service.d/override.conf
+        config_verification_commands:
+          - docker --version
+          - docker compose version
+          - docker info
+        critical_services:
+          - docker
+
+    - name: Rollback if recovery failed
+      ansible.builtin.include_tasks: handlers/error_handling/rollback.yml
+      when: recovery_complete | default(false) | bool == false
+      vars:
+        affected_services:
+          - docker
+        config_files:
+          - /etc/docker/daemon.json
+          - /etc/systemd/system/docker.service.d/override.conf
+
+  always:
+    - name: Cleanup temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ temp_dirs | default([]) }}"
+      when: temp_dirs is defined

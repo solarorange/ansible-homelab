@@ -1,0 +1,55 @@
+---
+# Security Stack Deployment Tasks
+
+- name: Prepare Security secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "security"
+    secret_dir_root: "{{ docker_dir }}/security"
+    secret_files: "{{ security_secret_files if security_manage_secret_files else [] }}"
+  when: security_manage_secret_files | bool
+
+- name: Validate required Security secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/security/secrets/{{ item }}"
+  register: security_secret_stats
+  loop: "{{ security_required_secrets | default([]) }}"
+  when: security_manage_secret_files | bool and (security_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Security secret files are missing
+  ansible.builtin.assert:
+    that: "{{ security_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/security/secrets.
+      Missing: {{ (security_required_secrets | default([])) | reject('in', (security_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: security_manage_secret_files | bool and (security_required_secrets | default([]) | length > 0)
+
+- name: Deploy authentication services
+  import_role:
+    name: security/authentication
+    tasks_from: deploy.yml
+  when: security_authentication_enabled | default(true)
+
+- name: Deploy reverse proxy
+  import_role:
+    name: security/proxy
+    tasks_from: deploy.yml
+  when: security_proxy_enabled | default(true)
+
+- name: Deploy DNS services
+  import_role:
+    name: security/dns
+    tasks_from: deploy.yml
+  when: security_dns_enabled | default(true)
+
+- name: Deploy firewall services
+  import_role:
+    name: security/firewall
+    tasks_from: deploy.yml
+  when: security_firewall_enabled | default(true)
+
+- name: Deploy VPN services
+  import_role:
+    name: security/vpn
+    tasks_from: deploy.yml
+  when: security_vpn_enabled | default(true)

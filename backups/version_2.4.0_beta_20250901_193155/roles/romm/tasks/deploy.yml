@@ -1,0 +1,127 @@
+---
+# Romm Deployment Tasks
+
+- name: Create Romm directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - "{{ docker_data_root }}/romm"
+    - "{{ docker_config_root }}/romm"
+    - "{{ docker_logs_root }}/romm"
+    - "{{ docker_backup_root }}/romm"
+  tags: [romm, deploy]
+
+- name: Generate Romm environment file
+  template:
+    src: env.j2
+    dest: "{{ docker_config_root }}/romm/.env"
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: restart romm
+  tags: [romm, deploy]
+
+- name: Deploy Romm Docker Compose
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/romm/docker-compose.yml"
+    mode: '0644'
+  notify: restart romm
+  tags: [romm, deploy]
+
+- name: Prepare Romm secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "romm"
+    secret_dir_root: "{{ docker_dir }}/romm"
+    secret_files: "{{ romm_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ romm_environment | default({}) }}"
+  when: romm_manage_secret_files | default(true) | bool
+  tags: [romm, deploy, setup]
+
+- name: Validate required Romm secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/romm/secrets/{{ item }}"
+  register: romm_secret_stats
+  loop: "{{ romm_required_secrets | default([]) }}"
+  when: romm_manage_secret_files | default(true) | bool and (romm_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Romm secret files are missing
+  ansible.builtin.assert:
+    that: "{{ romm_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/romm/secrets.
+      Missing: {{ (romm_required_secrets | default([])) | reject('in', (romm_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: romm_manage_secret_files | default(true) | bool and (romm_required_secrets | default([]) | length > 0)
+
+- name: Start Romm services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "romm"
+    project_src: "{{ docker_dir }}/romm"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ romm_external_port }}"
+  tags: [romm, deploy, rollback]
+
+- name: Wait for Romm to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ romm_external_port }}"
+    status_code: [200, 302, 401, 403]
+  register: result
+  until: result.status in [200, 302, 401, 403]
+  retries: 30
+  delay: 10
+  tags: [romm, deploy]
+  when: romm_direct_expose_enabled | default(false)
+
+- name: Verify Romm via Traefik route
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://{{ romm_domain }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  tags: [romm, deploy]
+  when: not (romm_direct_expose_enabled | default(false))
+
+- name: Configure Romm authentication
+  block:
+    - name: Create Romm admin user
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ romm_external_port }}/api/v1/auth/register"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          email: "{{ romm_admin_email }}"
+          password: "{{ vault_romm_password }}"
+          name: "Admin"
+        status_code: [200, 201, 409]  # 409 if user already exists
+      when: romm_auth_enabled | default(true)
+      tags: [romm, deploy, auth]
+
+    - name: Configure Romm API key
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ romm_external_port }}/api/v1/auth/api-key"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Bearer {{ vault_romm_api_key }}"
+        body_format: json
+        body:
+          name: "Ansible Generated"
+          key: "{{ vault_romm_api_key }}"
+        status_code: [200, 201, 409]  # 409 if key already exists
+      when: romm_api_enabled | default(true)
+      tags: [romm, deploy, auth]
+  when: romm_enabled | default(true)
+  tags: [romm, deploy, auth]

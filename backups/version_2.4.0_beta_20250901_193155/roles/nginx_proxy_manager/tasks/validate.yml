@@ -1,0 +1,89 @@
+---
+# Nginx_Proxy_Manager Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Nginx_Proxy_Manager vault variables
+  block:
+    - name: Check required Nginx_Proxy_Manager vault variables
+      assert:
+        that:
+          - vault_nginx_proxy_manager_admin_password is defined
+          - vault_nginx_proxy_manager_database_password is defined
+          - vault_nginx_proxy_manager_api_key is defined
+          - vault_nginx_proxy_manager_secret_key is defined
+          - vault_nginx_proxy_manager_encryption_key is defined
+          - vault_nginx_proxy_manager_jwt_secret is defined
+        fail_msg: "Required Nginx_Proxy_Manager vault variables are not defined"
+        success_msg: "All required Nginx_Proxy_Manager vault variables are defined"
+
+    - name: Validate Nginx_Proxy_Manager password complexity
+      assert:
+        that:
+          - vault_nginx_proxy_manager_admin_password | length >= 12
+          - vault_nginx_proxy_manager_database_password | length >= 12
+        fail_msg: "Nginx_Proxy_Manager passwords must be at least 12 characters long"
+        success_msg: "Nginx_Proxy_Manager password complexity requirements met"
+
+- name: Validate Nginx_Proxy_Manager network configuration
+  block:
+    - name: Check Nginx_Proxy_Manager port configuration
+      assert:
+        that:
+          - nginx_proxy_manager_port is defined
+          - nginx_proxy_manager_port | int >= 1024
+          - nginx_proxy_manager_port | int <= 65535
+        fail_msg: "Nginx_Proxy_Manager port must be between 1024 and 65535"
+        success_msg: "Nginx_Proxy_Manager port configuration is valid"
+
+    - name: Check Nginx_Proxy_Manager domain configuration
+      assert:
+        that:
+          - domain is defined
+          - nginx_proxy_manager_subdomain is defined
+        fail_msg: "Nginx_Proxy_Manager domain configuration is incomplete"
+        success_msg: "Nginx_Proxy_Manager domain configuration is valid"
+
+- name: Validate Nginx_Proxy_Manager security configuration
+  block:
+    - name: Check Nginx_Proxy_Manager SSL configuration
+      assert:
+        that:
+          - nginx_proxy_manager_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Nginx_Proxy_Manager SSL configuration is invalid"
+        success_msg: "Nginx_Proxy_Manager SSL configuration is valid"
+
+    - name: Check Nginx_Proxy_Manager authentication configuration
+      assert:
+        that:
+          - nginx_proxy_manager_auth_enabled | bool
+          - nginx_proxy_manager_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Nginx_Proxy_Manager authentication configuration is invalid"
+        success_msg: "Nginx_Proxy_Manager authentication configuration is valid"
+
+- name: Validate Nginx_Proxy_Manager storage configuration
+  block:
+    - name: Check Nginx_Proxy_Manager data directories
+      assert:
+        that:
+          - nginx_proxy_manager_data_dir is defined
+          - nginx_proxy_manager_config_dir is defined
+          - nginx_proxy_manager_backup_dir is defined
+        fail_msg: "Nginx_Proxy_Manager storage configuration is incomplete"
+        success_msg: "Nginx_Proxy_Manager storage configuration is valid"
+
+    - name: Create Nginx_Proxy_Manager directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ nginx_proxy_manager_data_dir }}"
+        - "{{ nginx_proxy_manager_config_dir }}"
+        - "{{ nginx_proxy_manager_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Nginx_Proxy_Manager validation completed successfully - all configurations are valid and secure"

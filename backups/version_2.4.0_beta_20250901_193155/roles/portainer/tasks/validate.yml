@@ -1,0 +1,89 @@
+---
+# Portainer Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Portainer vault variables
+  block:
+    - name: Check required Portainer vault variables
+      assert:
+        that:
+          - vault_portainer_admin_password is defined
+          - vault_portainer_database_password is defined
+          - vault_portainer_api_key is defined
+          - vault_portainer_secret_key is defined
+          - vault_portainer_encryption_key is defined
+          - vault_portainer_jwt_secret is defined
+        fail_msg: "Required Portainer vault variables are not defined"
+        success_msg: "All required Portainer vault variables are defined"
+
+    - name: Validate Portainer password complexity
+      assert:
+        that:
+          - vault_portainer_admin_password | length >= 12
+          - vault_portainer_database_password | length >= 12
+        fail_msg: "Portainer passwords must be at least 12 characters long"
+        success_msg: "Portainer password complexity requirements met"
+
+- name: Validate Portainer network configuration
+  block:
+    - name: Check Portainer port configuration
+      assert:
+        that:
+          - portainer_port is defined
+          - portainer_port | int >= 1024
+          - portainer_port | int <= 65535
+        fail_msg: "Portainer port must be between 1024 and 65535"
+        success_msg: "Portainer port configuration is valid"
+
+    - name: Check Portainer domain configuration
+      assert:
+        that:
+          - domain is defined
+          - portainer_subdomain is defined
+        fail_msg: "Portainer domain configuration is incomplete"
+        success_msg: "Portainer domain configuration is valid"
+
+- name: Validate Portainer security configuration
+  block:
+    - name: Check Portainer SSL configuration
+      assert:
+        that:
+          - portainer_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Portainer SSL configuration is invalid"
+        success_msg: "Portainer SSL configuration is valid"
+
+    - name: Check Portainer authentication configuration
+      assert:
+        that:
+          - portainer_auth_enabled | bool
+          - portainer_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Portainer authentication configuration is invalid"
+        success_msg: "Portainer authentication configuration is valid"
+
+- name: Validate Portainer storage configuration
+  block:
+    - name: Check Portainer data directories
+      assert:
+        that:
+          - portainer_data_dir is defined
+          - portainer_config_dir is defined
+          - portainer_backup_dir is defined
+        fail_msg: "Portainer storage configuration is incomplete"
+        success_msg: "Portainer storage configuration is valid"
+
+    - name: Create Portainer directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ portainer_data_dir }}"
+        - "{{ portainer_config_dir }}"
+        - "{{ portainer_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Portainer validation completed successfully - all configurations are valid and secure"

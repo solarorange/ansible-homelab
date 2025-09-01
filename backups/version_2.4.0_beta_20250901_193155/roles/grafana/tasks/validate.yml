@@ -1,0 +1,89 @@
+---
+# Grafana Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Grafana vault variables
+  block:
+    - name: Check required Grafana vault variables
+      assert:
+        that:
+          - vault_grafana_admin_password is defined
+          - vault_grafana_database_password is defined
+          - vault_grafana_api_key is defined
+          - vault_grafana_secret_key is defined
+          - vault_grafana_encryption_key is defined
+          - vault_grafana_jwt_secret is defined
+        fail_msg: "Required Grafana vault variables are not defined"
+        success_msg: "All required Grafana vault variables are defined"
+
+    - name: Validate Grafana password complexity
+      assert:
+        that:
+          - vault_grafana_admin_password | length >= 12
+          - vault_grafana_database_password | length >= 12
+        fail_msg: "Grafana passwords must be at least 12 characters long"
+        success_msg: "Grafana password complexity requirements met"
+
+- name: Validate Grafana network configuration
+  block:
+    - name: Check Grafana port configuration
+      assert:
+        that:
+          - grafana_port is defined
+          - grafana_port | int >= 1024
+          - grafana_port | int <= 65535
+        fail_msg: "Grafana port must be between 1024 and 65535"
+        success_msg: "Grafana port configuration is valid"
+
+    - name: Check Grafana domain configuration
+      assert:
+        that:
+          - domain is defined
+          - grafana_subdomain is defined
+        fail_msg: "Grafana domain configuration is incomplete"
+        success_msg: "Grafana domain configuration is valid"
+
+- name: Validate Grafana security configuration
+  block:
+    - name: Check Grafana SSL configuration
+      assert:
+        that:
+          - grafana_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Grafana SSL configuration is invalid"
+        success_msg: "Grafana SSL configuration is valid"
+
+    - name: Check Grafana authentication configuration
+      assert:
+        that:
+          - grafana_auth_enabled | bool
+          - grafana_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Grafana authentication configuration is invalid"
+        success_msg: "Grafana authentication configuration is valid"
+
+- name: Validate Grafana storage configuration
+  block:
+    - name: Check Grafana data directories
+      assert:
+        that:
+          - grafana_data_dir is defined
+          - grafana_config_dir is defined
+          - grafana_backup_dir is defined
+        fail_msg: "Grafana storage configuration is incomplete"
+        success_msg: "Grafana storage configuration is valid"
+
+    - name: Create Grafana directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ grafana_data_dir }}"
+        - "{{ grafana_config_dir }}"
+        - "{{ grafana_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Grafana validation completed successfully - all configurations are valid and secure"

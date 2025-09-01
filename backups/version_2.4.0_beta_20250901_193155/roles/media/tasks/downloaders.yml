@@ -1,0 +1,39 @@
+---
+# Media Stack Downloaders
+# Deploy download clients (SABnzbd, qBittorrent)
+
+- name: Deploy SABnzbd downloader
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    services:
+      - sabnzbd
+  when: media_downloaders.sabnzbd.enabled | default(true)
+
+- name: Deploy qBittorrent downloader
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/media"
+    services:
+      - qbittorrent
+  when: media_downloaders.qbittorrent.enabled | default(true)
+
+- name: Wait for SABnzbd to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_ports.sabnzbd }}/api?mode=version"
+    method: GET
+    status_code: 200
+  register: sabnzbd_health
+  retries: 30
+  delay: 10
+  until: sabnzbd_health.status == 200
+  when: media_downloaders.sabnzbd.enabled | default(true)
+
+- name: Wait for qBittorrent to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ media_ports.qbittorrent }}/api/v2/app/version"
+    method: GET
+    status_code: 200
+  register: qbittorrent_health
+  retries: 30
+  delay: 10
+  until: qbittorrent_health.status == 200
+  when: media_downloaders.qbittorrent.enabled | default(true)

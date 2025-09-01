@@ -1,0 +1,58 @@
+# n8n Backup Configuration
+# Configuration file for n8n backup automation
+
+backup:
+  enabled: {{ n8n_backup_enabled | default(true) }}
+  schedule: "{{ n8n_backup_schedule | default('0 3 * * *') }}"
+  retention_days: {{ n8n_backup_retention_days | default(7) }}
+  compression: {{ n8n_backup_compression | default(true) }}
+  notifications: {{ n8n_backup_notifications_enabled | default(true) }}
+  
+  components:
+    workflows: {{ n8n_backup_include_config | default(true) }}
+    database: {{ n8n_backup_include_database | default(true) }}
+    configuration: {{ n8n_backup_include_config | default(true) }}
+  
+  directories:
+    backup_dir: "{{ n8n_backup_dir }}"
+    config_dir: "{{ n8n_config_dir }}"
+    logs_dir: "{{ logs_dir }}/n8n"
+  
+  database:
+    host: "{{ n8n_database_host }}"
+    port: "{{ n8n_database_port }}"
+    name: "{{ n8n_database_name }}"
+    user: "{{ n8n_database_user }}"
+    password: "{{ vault_n8n_postgres_password }}"
+  
+  notifications:
+    email:
+      enabled: {{ 'true' if n8n_smtp_host | default('') != '' else 'false' }}
+      smtp_host: "{{ n8n_smtp_host | default('') }}"
+      smtp_port: {{ n8n_smtp_port | default(587) }}
+      smtp_user: "{{ n8n_smtp_user | default('') }}"
+      smtp_pass: "{{ n8n_smtp_pass | default('') }}"
+      from_email: "{{ n8n_smtp_sender | default('') }}"
+      to_email: "{{ n8n_admin_email }}"
+    
+    webhook:
+      enabled: {{ 'true' if n8n_webhook_url | default('') != '' else 'false' }}
+      url: "{{ n8n_webhook_url | default('') }}"
+    
+    slack:
+      enabled: {{ 'true' if vault_slack_webhook | default('') != '' else 'false' }}
+      webhook_url: "{{ vault_slack_webhook | default('') }}"
+    
+    discord:
+      enabled: {{ 'true' if vault_discord_webhook | default('') != '' else 'false' }}
+      webhook_url: "{{ vault_discord_webhook | default('') }}"
+  
+  monitoring:
+    health_check: {{ n8n_health_check_enabled | default(true) }}
+    health_check_interval: {{ n8n_health_check_interval | default(30) }}
+    health_check_timeout: {{ n8n_health_check_timeout | default(30) }}
+  
+  logging:
+    log_file: "{{ n8n_backup_log_file }}"
+    max_log_size: "{{ n8n_backup_max_log_size | default('10M') }}"
+    retention_days: {{ n8n_health_check_retention_days | default(7) }} 

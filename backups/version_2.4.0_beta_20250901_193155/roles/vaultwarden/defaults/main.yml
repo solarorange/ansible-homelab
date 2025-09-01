@@ -1,0 +1,278 @@
+---
+# Vaultwarden Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# VAULTWARDEN SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+vaultwarden_service_name: "vaultwarden"
+vaultwarden_container_name: "{{ vaultwarden_service_name }}"
+vaultwarden_image: "vaultwarden/server:latest"
+vaultwarden_version: "latest"
+
+# Network Configuration
+vaultwarden_port: 8086
+vaultwarden_external_port: "{{ vaultwarden_port }}"
+vaultwarden_protocol: "http"
+vaultwarden_host: "{{ ansible_default_ipv4.address }}"
+vaultwarden_url: "{{ vaultwarden_protocol }}://{{ vaultwarden_host }}:{{ vaultwarden_port }}"
+
+# Domain Configuration
+vaultwarden_subdomain: "vaultwarden"
+vaultwarden_domain: "{{ vaultwarden_subdomain }}.{{ domain }}"
+vaultwarden_external_url: "https://{{ vaultwarden_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+vaultwarden_auth_enabled: true
+vaultwarden_auth_method: "authentik"  # Options: basic, authentik, none
+vaultwarden_admin_username: "admin"
+vaultwarden_admin_password: "{{ vault_vaultwarden_admin_password }}"
+
+# API Configuration
+vaultwarden_api_key: "{{ vault_vaultwarden_api_key }}"
+vaultwarden_api_token: "{{ vault_vaultwarden_api_token }}"
+
+# Encryption & Security
+vaultwarden_secret_key: "{{ vault_vaultwarden_secret_key }}"
+vaultwarden_encryption_key: "{{ vault_vaultwarden_encryption_key }}"
+vaultwarden_jwt_secret: "{{ vault_vaultwarden_jwt_secret }}"
+
+# SSL/TLS Configuration
+vaultwarden_ssl_enabled: true
+vaultwarden_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+vaultwarden_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+vaultwarden_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+vaultwarden_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+vaultwarden_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+vaultwarden_database_port: "{{ databases_postgresql_port | default(5432) }}"
+vaultwarden_database_name: "vaultwarden"
+vaultwarden_database_username: "vaultwarden"
+vaultwarden_database_password: "{{ vault_vaultwarden_database_password }}"
+
+# Redis Configuration (if using)
+vaultwarden_redis_enabled: false
+vaultwarden_redis_host: "{{ redis_host | default('redis') }}"
+vaultwarden_redis_port: "{{ redis_port | default(6379) }}"
+vaultwarden_redis_password: "{{ vault_vaultwarden_redis_password }}"
+vaultwarden_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+vaultwarden_data_dir: "{{ homelab_data_dir }}/vaultwarden"
+vaultwarden_config_dir: "{{ vaultwarden_data_dir }}/config"
+vaultwarden_backup_dir: "{{ vaultwarden_data_dir }}/backups"
+
+# Volume Mappings
+vaultwarden_volumes:
+  - "{{ vaultwarden_config_dir }}:/config"
+  - "{{ vaultwarden_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+vaultwarden_health_check_enabled: true
+vaultwarden_health_check_path: "/health"
+vaultwarden_health_check_interval: 30
+vaultwarden_health_check_timeout: 10
+vaultwarden_health_check_retries: 3
+
+# Monitoring Integration
+vaultwarden_monitoring_enabled: true
+vaultwarden_prometheus_enabled: true
+vaultwarden_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+vaultwarden_backup_enabled: true
+vaultwarden_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+vaultwarden_backup_retention_days: 30
+vaultwarden_backup_encryption_enabled: true
+vaultwarden_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+vaultwarden_smtp_enabled: false
+vaultwarden_smtp_host: "{{ smtp_host | default('') }}"
+vaultwarden_smtp_port: "{{ smtp_port | default(587) }}"
+vaultwarden_smtp_username: "{{ vault_smtp_username }}"
+vaultwarden_smtp_password: "{{ vault_vaultwarden_smtp_password }}"
+vaultwarden_smtp_from: "{{ vaultwarden_admin_email | default('admin@' + domain) }}"
+vaultwarden_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+vaultwarden_webhook_enabled: false
+vaultwarden_webhook_url: "{{ vault_webhook_url | default('') }}"
+vaultwarden_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+vaultwarden_discovery_enabled: true
+vaultwarden_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+vaultwarden_cpu_limit: "1.0"
+vaultwarden_memory_limit: "1g"
+vaultwarden_memory_reservation: "512m"
+
+# Performance Settings
+vaultwarden_scan_interval: 10
+vaultwarden_parallel_downloads: 3
+vaultwarden_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+vaultwarden_log_level: "info"  # Options: trace, debug, info, warn, error
+vaultwarden_log_rotation_enabled: true
+vaultwarden_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+vaultwarden_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+vaultwarden_rate_limit_enabled: true
+vaultwarden_rate_limit_requests: 100
+vaultwarden_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+vaultwarden_deploy_enabled: true
+vaultwarden_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+vaultwarden_restart_policy: "unless-stopped"
+vaultwarden_auto_update_enabled: true
+
+# Environment Variables
+vaultwarden_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  VAULTWARDEN_API_KEY: "{{ vaultwarden_api_key }}"
+  VAULTWARDEN_SECRET_KEY: "{{ vaultwarden_secret_key }}"
+  VAULTWARDEN_ENCRYPTION_KEY: "{{ vaultwarden_encryption_key }}"
+  VAULTWARDEN_JWT_SECRET: "{{ vaultwarden_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+vaultwarden_validation_enabled: true
+vaultwarden_validation_timeout: 300
+vaultwarden_validation_retries: 3
+
+# Testing Configuration
+vaultwarden_test_enabled: false
+vaultwarden_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+vaultwarden_compliance_enabled: true
+vaultwarden_audit_logging_enabled: true
+vaultwarden_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+vaultwarden_automation_enabled: true
+vaultwarden_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+vaultwarden_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+vaultwarden_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+vaultwarden_fallback_enabled: true
+vaultwarden_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+vaultwarden_manage_secret_files: true
+
+vaultwarden_secret_files:
+  - { name: "ADMIN_TOKEN", value: "{{ vault_vaultwarden_admin_token | default('') }}" }
+  - { name: "DATABASE_PASSWORD", value: "{{ vault_vaultwarden_database_password }}" }
+  - { name: "SMTP_PASSWORD", value: "{{ vault_vaultwarden_smtp_password }}" }
+
+vaultwarden_required_secrets:
+  - ADMIN_TOKEN
+  - DATABASE_PASSWORD
+
+# Prefer Traefik ingress; gate direct host port exposure
+vaultwarden_direct_expose_enabled: false

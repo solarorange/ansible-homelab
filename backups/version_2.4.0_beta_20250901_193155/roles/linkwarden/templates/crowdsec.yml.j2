@@ -1,0 +1,15 @@
+# Linkwarden CrowdSec Configuration
+# Threat detection configuration for Linkwarden
+
+name: linkwarden
+description: "Linkwarden bookmark management service"
+enabled: true
+filter: "evt.Meta.service == 'linkwarden'"
+groupby: "evt.Meta.source_ip"
+decisions:
+  - type: ban
+    duration: 3600s
+    scope: ip
+    reason: "Linkwarden brute force attack"
+on_success: break
+on_failure: continue 

@@ -1,0 +1,89 @@
+---
+# Automation Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Automation vault variables
+  block:
+    - name: Check required Automation vault variables
+      assert:
+        that:
+          - vault_automation_admin_password is defined
+          - vault_automation_database_password is defined
+          - vault_automation_api_key is defined
+          - vault_automation_secret_key is defined
+          - vault_automation_encryption_key is defined
+          - vault_automation_jwt_secret is defined
+        fail_msg: "Required Automation vault variables are not defined"
+        success_msg: "All required Automation vault variables are defined"
+
+    - name: Validate Automation password complexity
+      assert:
+        that:
+          - vault_automation_admin_password | length >= 12
+          - vault_automation_database_password | length >= 12
+        fail_msg: "Automation passwords must be at least 12 characters long"
+        success_msg: "Automation password complexity requirements met"
+
+- name: Validate Automation network configuration
+  block:
+    - name: Check Automation port configuration
+      assert:
+        that:
+          - automation_port is defined
+          - automation_port | int >= 1024
+          - automation_port | int <= 65535
+        fail_msg: "Automation port must be between 1024 and 65535"
+        success_msg: "Automation port configuration is valid"
+
+    - name: Check Automation domain configuration
+      assert:
+        that:
+          - domain is defined
+          - automation_subdomain is defined
+        fail_msg: "Automation domain configuration is incomplete"
+        success_msg: "Automation domain configuration is valid"
+
+- name: Validate Automation security configuration
+  block:
+    - name: Check Automation SSL configuration
+      assert:
+        that:
+          - automation_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Automation SSL configuration is invalid"
+        success_msg: "Automation SSL configuration is valid"
+
+    - name: Check Automation authentication configuration
+      assert:
+        that:
+          - automation_auth_enabled | bool
+          - automation_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Automation authentication configuration is invalid"
+        success_msg: "Automation authentication configuration is valid"
+
+- name: Validate Automation storage configuration
+  block:
+    - name: Check Automation data directories
+      assert:
+        that:
+          - automation_data_dir is defined
+          - automation_config_dir is defined
+          - automation_backup_dir is defined
+        fail_msg: "Automation storage configuration is incomplete"
+        success_msg: "Automation storage configuration is valid"
+
+    - name: Create Automation directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ automation_data_dir }}"
+        - "{{ automation_config_dir }}"
+        - "{{ automation_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Automation validation completed successfully - all configurations are valid and secure"

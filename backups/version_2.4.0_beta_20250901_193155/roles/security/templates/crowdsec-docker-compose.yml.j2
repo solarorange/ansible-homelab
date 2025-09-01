@@ -1,0 +1,22 @@
+version: '3.8'
+
+networks:
+  homelab:
+    name: homelab
+    external: true
+
+services:
+  crowdsec:
+    image: "{{ security_crowdsec.image }}"
+    container_name: "{{ security_crowdsec.container_name }}"
+    restart: unless-stopped
+    environment:
+      - GID={{ group_id }}
+    volumes:
+      - "{{ docker_dir }}/traefik/logs:/var/log/traefik:ro"
+      - "{{ docker_dir }}/crowdsec/config:/etc/crowdsec:rw"
+      - "{{ docker_dir }}/crowdsec/data:/var/lib/crowdsec/data:rw"
+    networks:
+      - homelab
+    depends_on:
+      - traefik 

@@ -1,0 +1,102 @@
+---
+# Setup Immich Prerequisites
+# Production-ready prerequisite tasks for Immich deployment
+
+- name: Setup Immich prerequisites
+  block:
+    - name: Create Immich directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - "{{ immich_config_dir }}"
+        - "{{ immich_server_config_dir }}"
+        - "{{ immich_web_config_dir }}"
+        - "{{ immich_postgres_config_dir }}"
+        - "{{ immich_redis_config_dir }}"
+        - "{{ immich_ml_config_dir }}"
+        - "{{ data_dir }}/media/photos"
+        - "{{ logs_dir }}/immich"
+        - "{{ logs_dir }}/immich/server"
+        - "{{ logs_dir }}/immich/web"
+        - "{{ logs_dir }}/immich/postgres"
+        - "{{ logs_dir }}/immich/redis"
+        - "{{ logs_dir }}/immich/ml"
+        - "{{ logs_dir }}/immich/backup"
+        - "{{ logs_dir }}/immich/health"
+        - "{{ backup_dir }}/immich"
+      tags: [immich, setup]
+
+    - name: Create Immich log rotation configuration
+      ansible.builtin.template:
+        src: logrotate.conf.j2
+        dest: /etc/logrotate.d/immich
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, setup]
+
+    - name: Ensure Docker network exists
+      community.docker.docker_network:
+        name: "{{ immich_network_name }}"
+        state: present
+        external: "{{ immich_network_external }}"
+      tags: [immich, setup]
+
+    - name: Check if Docker is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+      tags: [immich, setup]
+
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - curl
+          - jq
+          - postgresql-client
+        state: present
+      tags: [immich, setup]
+
+    - name: Set proper permissions on Immich directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+        recurse: yes
+      loop:
+        - "{{ immich_config_dir }}"
+        - "{{ data_dir }}/media/photos"
+        - "{{ logs_dir }}/immich"
+        - "{{ backup_dir }}/immich"
+      tags: [immich, setup]
+
+    - name: Create Immich systemd service directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/immich.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [immich, setup]
+
+    - name: Configure Immich systemd service
+      ansible.builtin.template:
+        src: immich.service.j2
+        dest: /etc/systemd/system/immich.service
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [immich, setup]
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+      tags: [immich, setup]
+
+  tags: [immich, setup, always]

@@ -1,0 +1,231 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Homelab Performance Dashboard",
+    "tags": ["homelab", "performance", "monitoring"],
+    "style": "dark",
+    "timezone": "{{ timezone }}",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "System Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Disk Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100",
+            "legendFormat": "Disk Usage %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Network Traffic",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "Network Receive"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "Network Transmit"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Docker Container Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(container_cpu_usage_seconds_total)",
+            "legendFormat": "Total Containers"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Service Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "Healthy Services"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "PostgreSQL Connections"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 8,
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
+            "legendFormat": "Redis Memory Usage %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 9,
+        "title": "Performance Log Stream (Real-time)",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{level=~\"error|warn|info\", service=~\"$service\", host=~\"$host\"}",
+            "queryType": "range"
+          }
+        ],
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 28},
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": true,
+          "showLabels": true,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": true,
+          "syntaxHighlight": true
+        }
+      },
+      {
+        "id": 10,
+        "title": "Performance Log Activity Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum by (service, level) (rate(loki_log_entries_total{category=\"performance\"}[1m]))",
+            "legendFormat": "{{service}} - {{level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "options": {"color": {"mode": "palette-classic"}, "heatmap": true}
+      },
+      {
+        "id": 11,
+        "title": "Performance Error/Warning Trends",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum by (service) (rate(loki_log_entries_total{level=~\"error|warn\",category=\"performance\"}[5m]))",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38}
+      },
+      {
+        "id": 12,
+        "title": "Slow Queries & Errors Table",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "{category=\"performance\", level=~\"error|warn\", service=~\"$service\", host=~\"$host\"}",
+            "queryType": "range"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 46},
+        "options": {"showHeader": true, "sortable": true, "filterable": true}
+      },
+      {
+        "id": 13,
+        "title": "Performance Log Level Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (level) (rate(loki_log_entries_total{category=\"performance\"}[5m]))",
+            "legendFormat": "{{level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 54},
+        "options": {"pieType": "pie", "legend": {"displayMode": "table", "placement": "right"}}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, service)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Service"
+        },
+        {
+          "name": "host",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, host)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Host"
+        },
+        {
+          "name": "level",
+          "type": "query",
+          "query": "label_values(loki_log_entries_total, level)",
+          "multi": true,
+          "includeAll": true,
+          "label": "Log Level"
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    }
+  }
+} 

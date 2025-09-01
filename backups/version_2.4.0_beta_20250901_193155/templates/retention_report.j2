@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Retention Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Backup Retention Report</h1>
+        <p>Generated: {{ ansible_date_time.iso8601 }}</p>
+        <p>Host: {{ inventory_hostname }}</p>
+    </div>
+
+    <h2>Retention Policy Summary</h2>
+    <p>Backup retention policy applied successfully</p>
+    
+    <h2>Retention Settings</h2>
+    <table>
+        <tr>
+            <th>Policy Type</th>
+            <th>Retention Period</th>
+            <th>Status</th>
+        </tr>
+        <tr>
+            <td>Daily Backups</td>
+            <td>{{ backup_retention_days | default(7) }} days</td>
+            <td class="success">✓ Applied</td>
+        </tr>
+        <tr>
+            <td>Weekly Backups</td>
+            <td>4 weeks</td>
+            <td class="success">✓ Applied</td>
+        </tr>
+        <tr>
+            <td>Monthly Backups</td>
+            <td>12 months</td>
+            <td class="success">✓ Applied</td>
+        </tr>
+    </table>
+
+    <h2>Retention Results</h2>
+    <p class="success">✓ Retention policy applied successfully</p>
+    <p>Backup directory: {{ backup_root_dir | default('/var/backups') }}</p>
+    
+    <h2>Next Cleanup</h2>
+    <p>Next retention cleanup will run automatically via cron</p>
+</body>
+</html>

@@ -1,0 +1,260 @@
+---
+# Unmanic Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# UNMANIC SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+unmanic_service_name: "unmanic"
+unmanic_container_name: "{{ unmanic_service_name }}"
+unmanic_image: "jamesread/unmanic:latest"
+unmanic_version: "latest"
+
+# Network Configuration
+unmanic_port: 8091
+unmanic_external_port: "{{ unmanic_port }}"
+unmanic_protocol: "http"
+unmanic_host: "{{ ansible_default_ipv4.address }}"
+unmanic_url: "{{ unmanic_protocol }}://{{ unmanic_host }}:{{ unmanic_port }}"
+
+# Domain Configuration
+unmanic_subdomain: "unmanic"
+unmanic_domain: "{{ unmanic_subdomain }}.{{ domain }}"
+unmanic_external_url: "https://{{ unmanic_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+unmanic_auth_enabled: true
+unmanic_auth_method: "authentik"  # Options: basic, authentik, none
+unmanic_admin_username: "admin"
+unmanic_admin_password: "{{ vault_unmanic_admin_password }}"
+
+# API Configuration
+unmanic_api_key: "{{ vault_unmanic_api_key }}"
+unmanic_api_token: "{{ vault_unmanic_api_token }}"
+
+# Encryption & Security
+unmanic_secret_key: "{{ vault_unmanic_secret_key }}"
+unmanic_encryption_key: "{{ vault_unmanic_encryption_key }}"
+unmanic_jwt_secret: "{{ vault_unmanic_jwt_secret }}"
+
+# SSL/TLS Configuration
+unmanic_ssl_enabled: true
+unmanic_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+unmanic_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+unmanic_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+unmanic_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+unmanic_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+unmanic_database_port: "{{ databases_postgresql_port | default(5432) }}"
+unmanic_database_name: "unmanic"
+unmanic_database_username: "unmanic"
+unmanic_database_password: "{{ vault_unmanic_database_password }}"
+
+# Redis Configuration (if using)
+unmanic_redis_enabled: false
+unmanic_redis_host: "{{ redis_host | default('redis') }}"
+unmanic_redis_port: "{{ redis_port | default(6379) }}"
+unmanic_redis_password: "{{ vault_unmanic_redis_password }}"
+unmanic_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+unmanic_data_dir: "{{ homelab_data_dir }}/unmanic"
+unmanic_config_dir: "{{ unmanic_data_dir }}/config"
+unmanic_backup_dir: "{{ unmanic_data_dir }}/backups"
+
+# Volume Mappings
+unmanic_volumes:
+  - "{{ unmanic_config_dir }}:/config"
+  - "{{ unmanic_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+unmanic_health_check_enabled: true
+unmanic_health_check_path: "/health"
+unmanic_health_check_interval: 30
+unmanic_health_check_timeout: 10
+unmanic_health_check_retries: 3
+
+# Monitoring Integration
+unmanic_monitoring_enabled: true
+unmanic_prometheus_enabled: true
+unmanic_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+unmanic_backup_enabled: true
+unmanic_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+unmanic_backup_retention_days: 30
+unmanic_backup_encryption_enabled: true
+unmanic_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+unmanic_smtp_enabled: false
+unmanic_smtp_host: "{{ smtp_host | default('') }}"
+unmanic_smtp_port: "{{ smtp_port | default(587) }}"
+unmanic_smtp_username: "{{ vault_smtp_username }}"
+unmanic_smtp_password: "{{ vault_unmanic_smtp_password }}"
+unmanic_smtp_from: "{{ unmanic_admin_email | default('admin@' + domain) }}"
+unmanic_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+unmanic_webhook_enabled: false
+unmanic_webhook_url: "{{ vault_webhook_url | default('') }}"
+unmanic_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+unmanic_discovery_enabled: true
+unmanic_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+unmanic_cpu_limit: "1.0"
+unmanic_memory_limit: "1g"
+unmanic_memory_reservation: "512m"
+
+# Performance Settings
+unmanic_scan_interval: 10
+unmanic_parallel_downloads: 3
+unmanic_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+unmanic_log_level: "info"  # Options: trace, debug, info, warn, error
+unmanic_log_rotation_enabled: true
+unmanic_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+unmanic_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+unmanic_rate_limit_enabled: true
+unmanic_rate_limit_requests: 100
+unmanic_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+unmanic_deploy_enabled: true
+unmanic_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+unmanic_restart_policy: "unless-stopped"
+unmanic_auto_update_enabled: true
+
+# Environment Variables
+unmanic_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  UNMANIC_API_KEY: "{{ unmanic_api_key }}"
+  UNMANIC_SECRET_KEY: "{{ unmanic_secret_key }}"
+  UNMANIC_ENCRYPTION_KEY: "{{ unmanic_encryption_key }}"
+  UNMANIC_JWT_SECRET: "{{ unmanic_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+unmanic_validation_enabled: true
+unmanic_validation_timeout: 300
+unmanic_validation_retries: 3
+
+# Testing Configuration
+unmanic_test_enabled: false
+unmanic_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+unmanic_compliance_enabled: true
+unmanic_audit_logging_enabled: true
+unmanic_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+unmanic_automation_enabled: true
+unmanic_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+unmanic_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+unmanic_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+unmanic_fallback_enabled: true
+unmanic_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"

@@ -1,0 +1,60 @@
+---
+# Backup Verification Tasks
+
+- name: Verify backup file integrity
+  ansible.builtin.shell: |
+    if [ -f "{{ item }}" ]; then
+      if [[ "{{ item }}" == *.gz ]]; then
+        gunzip -t "{{ item }}" && echo "{{ item }} is valid" || exit 1
+      elif [[ "{{ item }}" == *.tar ]]; then
+        tar -tf "{{ item }}" > /dev/null && echo "{{ item }} is valid" || exit 1
+      fi
+    fi
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
+  register: integrity_check
+  changed_when: false
+  tags: [backup, verification]
+
+- name: Check backup file permissions
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
+  register: permission_check
+  tags: [backup, verification]
+
+- name: Verify backup file sizes
+  ansible.builtin.shell: |
+    if [ -f "{{ item }}" ]; then
+      size=$(stat -f %z "{{ item }}")
+      if [ $size -eq 0 ]; then
+        echo "Warning: {{ item }} is empty"
+        exit 1
+      fi
+    fi
+  loop: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') }}"
+  register: size_check
+  changed_when: false
+  tags: [backup, verification]
+
+- name: Generate backup verification report
+  ansible.builtin.template:
+    src: templates/verification_report.j2
+    dest: "{{ backup_root_dir | default('/var/backups') }}/verification/verification-report-{{ ansible_date_time.iso8601_basic_short }}.html"
+    mode: '0640'
+    owner: "{{ backup_user | default(ansible_user) }}"
+    group: "{{ backup_group | default(ansible_user) }}"
+  vars:
+    integrity_results: "{{ integrity_check.results }}"
+    permission_results: "{{ permission_check.results }}"
+    size_results: "{{ size_check.results }}"
+    backup_files: "{{ lookup('fileglob', backup_root_dir | default('/var/backups') + '/**/*') | map('basename') | list }}"
+  tags: [backup, verification, reporting]
+
+- name: Alert on backup verification failures
+  ansible.builtin.fail:
+    msg: "Backup verification failed. Check the verification report for details."
+  when: >
+    (integrity_check.failed is defined and integrity_check.failed) or
+    (size_check.failed is defined and size_check.failed) or
+    (permission_check.results is defined and permission_check.results | selectattr('stat.exists', 'equalto', false) | list | length > 0)
+  tags: [backup, verification, alert]

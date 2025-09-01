@@ -1,0 +1,324 @@
+---
+# Integration Tests
+# Comprehensive testing of service interactions and dependencies
+
+- name: Setup test environment
+  block:
+    - name: Create test directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ test_dir }}"
+        - "{{ test_dir }}/results"
+        - "{{ test_dir }}/logs"
+      tags: [integration, setup]
+
+    - name: Install test dependencies
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - jq
+        - netcat
+        - python3-requests
+      tags: [integration, setup]
+
+  tags: [integration, setup]
+
+- name: Test service dependencies
+  block:
+    - name: Test database connectivity from applications
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:8989/api/v3/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: sonarr_db_test
+      tags: [integration, dependencies]
+
+    - name: Test Redis connectivity from applications
+      ansible.builtin.shell: |
+        wget -qO- http://127.0.0.1:6767/api/v1/health || exit 1
+      register: bazarr_redis_test
+      changed_when: false
+      tags: [integration, dependencies]
+
+    - name: Test monitoring integration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/targets"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: prometheus_targets
+      tags: [integration, monitoring]
+
+    - name: Verify monitoring targets
+      ansible.builtin.assert:
+        that:
+          - prometheus_targets.json.targets | length > 0
+          - prometheus_targets.json.targets | selectattr('health', 'equalto', 'up') | list | length > 0
+        fail_msg: "No healthy monitoring targets found"
+      tags: [integration, monitoring]
+
+  tags: [integration, dependencies]
+
+- name: Test service communication
+  block:
+    - name: Test Traefik routing
+      ansible.builtin.uri:
+        url: "https://{{ domain }}/ping"
+        method: GET
+        status_code: [200, 404]
+        timeout: 10
+        validate_certs: false
+      register: traefik_routing_test
+      tags: [integration, routing]
+
+    - name: Test service discovery
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: traefik_services
+      tags: [integration, discovery]
+
+    - name: Verify service discovery
+      ansible.builtin.assert:
+        that:
+          - traefik_services.json | length > 0
+        fail_msg: "No services discovered by Traefik"
+      tags: [integration, discovery]
+
+    - name: Test inter-service communication
+      ansible.builtin.shell: |
+        docker exec sonarr curl -f http://postgresql:5432
+      register: sonarr_postgres_test
+      changed_when: false
+      tags: [integration, communication]
+
+  tags: [integration, communication]
+
+- name: Test authentication flow
+  block:
+    - name: Test Authentik authentication
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/if/user/"
+        method: GET
+        status_code: [200, 302]
+        timeout: 10
+      register: authentik_auth_test
+      tags: [integration, auth]
+
+    - name: Test Traefik forward auth
+      ansible.builtin.uri:
+        url: "https://grafana.{{ domain }}"
+        method: GET
+        status_code: [200, 302, 401]
+        timeout: 10
+        validate_certs: false
+      register: forward_auth_test
+      tags: [integration, auth]
+
+    - name: Verify authentication flow
+      ansible.builtin.assert:
+        that:
+          - authentik_auth_test.status in [200, 302]
+          - forward_auth_test.status in [200, 302, 401]
+        fail_msg: "Authentication flow test failed"
+      tags: [integration, auth]
+
+  when: "'authentik' in enabled_services"
+  tags: [integration, auth]
+
+- name: Test backup and restore
+  block:
+    - name: Create test data
+      ansible.builtin.shell: |
+        echo "test data" > {{ test_dir }}/test_file.txt
+        docker exec postgresql psql -U {{ vault_postgresql_user }} -d homelab -c "CREATE TABLE test_table (id serial PRIMARY KEY, data text); INSERT INTO test_table (data) VALUES ('test');"
+      register: test_data_creation
+      changed_when: false
+      tags: [integration, backup]
+
+    - name: Run backup test
+      ansible.builtin.shell: "{{ docker_dir }}/backup/backup.sh --test"
+      register: backup_integration_test
+      changed_when: false
+      tags: [integration, backup]
+
+    - name: Verify backup creation
+      ansible.builtin.assert:
+        that:
+          - backup_integration_test.rc == 0
+        fail_msg: "Backup integration test failed"
+      tags: [integration, backup]
+
+    - name: Test backup restoration
+      ansible.builtin.shell: "{{ docker_dir }}/backup/restore.sh --test"
+      register: restore_integration_test
+      changed_when: false
+      tags: [integration, backup]
+
+    - name: Verify backup restoration
+      ansible.builtin.assert:
+        that:
+          - restore_integration_test.rc == 0
+        fail_msg: "Backup restoration test failed"
+      tags: [integration, backup]
+
+  when: backup_enabled | default(false)
+  tags: [integration, backup]
+
+- name: Test monitoring alerts
+  block:
+    - name: Test AlertManager configuration
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/status"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: alertmanager_test
+      tags: [integration, alerts]
+
+    - name: Test Prometheus rule evaluation
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/v1/rules"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: prometheus_rules
+      tags: [integration, alerts]
+
+    - name: Verify alerting configuration
+      ansible.builtin.assert:
+        that:
+          - alertmanager_test.status == 200
+          - prometheus_rules.json.data.groups | length > 0
+        fail_msg: "Alerting configuration test failed"
+      tags: [integration, alerts]
+
+    - name: Test notification delivery
+      ansible.builtin.shell: |
+        curl -X POST http://{{ ansible_default_ipv4.address }}:/api/v1/alerts \
+          -H "Content-Type: application/json" \
+          -d '[{"labels":{"alertname":"test_alert"},"annotations":{"description":"Test alert"}}]'
+      register: test_alert
+      changed_when: false
+      tags: [integration, alerts]
+
+  when: "'alertmanager' in enabled_services"
+  tags: [integration, alerts]
+
+- name: Test load balancing
+  block:
+    - name: Test Traefik load balancing
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}:/api/http/services"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: load_balancer_services
+      tags: [integration, loadbalancing]
+
+    - name: Verify load balancer configuration
+      ansible.builtin.assert:
+        that:
+          - load_balancer_services.json | selectattr('type', 'equalto', 'loadbalancer') | list | length > 0
+        fail_msg: "No load balancer services configured"
+      tags: [integration, loadbalancing]
+
+    - name: Test service health checks
+      ansible.builtin.shell: |
+        docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(healthy|starting)"
+      register: service_health_status
+      changed_when: false
+      tags: [integration, loadbalancing]
+
+  tags: [integration, loadbalancing]
+
+- name: Test security features
+  block:
+    - name: Test SSL/TLS configuration
+      ansible.builtin.uri:
+        url: "https://{{ domain }}"
+        method: GET
+        status_code: [200, 404]
+        timeout: 10
+        validate_certs: true
+      register: ssl_test
+      tags: [integration, security]
+
+    - name: Check UFW is enabled (no changes)
+      community.general.ufw:
+        state: enabled
+      check_mode: true
+      register: firewall_rules
+      changed_when: false
+      tags: [integration, security]
+
+    - name: Test fail2ban configuration
+      ansible.builtin.shell: "fail2ban-client status"
+      register: fail2ban_status
+      changed_when: false
+      tags: [integration, security]
+
+    - name: Verify security configuration
+      ansible.builtin.assert:
+        that:
+          - ssl_test.status in [200, 404]
+          - not firewall_rules.changed
+          - fail2ban_status.rc == 0
+        fail_msg: "Security configuration test failed"
+      tags: [integration, security]
+  when: not (firewall.centralized | default(false))
+
+  tags: [integration, security]
+
+- name: Generate integration test report
+  block:
+    - name: Collect test results
+      ansible.builtin.set_fact:
+        integration_results:
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          host: "{{ ansible_hostname }}"
+          dependencies: "{{ 'PASS' if sonarr_db_test.status == 200 and bazarr_redis_test.rc == 0 else 'FAIL' }}"
+          communication: "{{ 'PASS' if traefik_routing_test.status in [200, 404] and sonarr_postgres_test.rc == 0 else 'FAIL' }}"
+          authentication: "{{ 'PASS' if authentik_auth_test.status in [200, 302] and forward_auth_test.status in [200, 302, 401] else 'FAIL' }}"
+          backup: "{{ 'PASS' if backup_integration_test.rc == 0 and restore_integration_test.rc == 0 else 'FAIL' }}"
+          monitoring: "{{ 'PASS' if prometheus_targets.status == 200 and alertmanager_test.status == 200 else 'FAIL' }}"
+          loadbalancing: "{{ 'PASS' if load_balancer_services.status == 200 else 'FAIL' }}"
+          security: "{{ 'PASS' if ssl_test.status in [200, 404] and firewall_rules.stdout is search('Status: active') else 'FAIL' }}"
+
+    - name: Display integration test summary
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          INTEGRATION TEST SUMMARY
+          ========================================
+
+          Timestamp: {{ integration_results.timestamp }}
+          Host: {{ integration_results.host }}
+
+          Test Results:
+          - Dependencies: {{ integration_results.dependencies }}
+          - Communication: {{ integration_results.communication }}
+          - Authentication: {{ integration_results.authentication }}
+          - Backup: {{ integration_results.backup }}
+          - Monitoring: {{ integration_results.monitoring }}
+          - Load Balancing: {{ integration_results.loadbalancing }}
+          - Security: {{ integration_results.security }}
+
+          ========================================
+      tags: [integration, summary]
+
+    - name: Save integration test report
+      ansible.builtin.template:
+        src: templates/integration_report.yml.j2
+        dest: "{{ test_dir }}/results/integration_report_{{ ansible_date_time.epoch }}.yml"
+      tags: [integration, report]
+
+  tags: [integration, summary]

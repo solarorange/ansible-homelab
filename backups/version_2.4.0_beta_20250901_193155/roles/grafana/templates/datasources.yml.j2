@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+{% for name, config in grafana_datasources.items() %}
+{% if config.enabled | default(false) %}
+  - name: {{ config.name }}
+    type: {{ config.type }}
+    url: {{ config.url }}
+    access: {{ config.access }}
+    isDefault: {{ config.is_default | default(false) }}
+    editable: {{ config.editable | default(true) }}
+    jsonData:
+{% for key, value in config.json_data.items() %}
+      {{ key }}: {{ value | to_json }}
+{% endfor %}
+    secureJsonData:
+{% for key, value in config.secure_json_data.items() %}
+      {{ key }}: {{ value | to_json }}
+{% endfor %}
+{% endif %}
+{% endfor %} 

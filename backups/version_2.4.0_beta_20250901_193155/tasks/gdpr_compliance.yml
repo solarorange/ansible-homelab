@@ -1,0 +1,29 @@
+---
+# GDPR Compliance
+# Ensures GDPR data protection and privacy controls are in place
+
+- name: Ensure GDPR mapping file exists
+  ansible.builtin.template:
+    src: templates/gdpr-mapping.yml.j2
+    dest: "{{ config_dir }}/security/gdpr-mapping.yml"
+    mode: '0644'
+  tags: [compliance, gdpr, security]
+
+- name: Check GDPR control implementation status
+  ansible.builtin.shell: |
+    grep 'status:' {{ config_dir }}/security/gdpr-mapping.yml
+  register: gdpr_status
+  changed_when: false
+  tags: [compliance, gdpr, security]
+
+- name: Save GDPR compliance report
+  ansible.builtin.copy:
+    content: "{{ gdpr_status.stdout }}"
+    dest: "{{ logs_dir }}/gdpr-compliance.log"
+    mode: '0644'
+  tags: [compliance, gdpr, security]
+
+- name: Notify on GDPR compliance gaps
+  ansible.builtin.debug:
+    msg: "GDPR compliance check completed. Review {{ logs_dir }}/gdpr-compliance.log for gaps."
+  tags: [compliance, gdpr, security]

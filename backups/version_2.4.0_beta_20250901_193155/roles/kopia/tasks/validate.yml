@@ -1,0 +1,89 @@
+---
+# Kopia Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Kopia vault variables
+  block:
+    - name: Check required Kopia vault variables
+      assert:
+        that:
+          - vault_kopia_admin_password is defined
+          - vault_kopia_database_password is defined
+          - vault_kopia_api_key is defined
+          - vault_kopia_secret_key is defined
+          - vault_kopia_encryption_key is defined
+          - vault_kopia_jwt_secret is defined
+        fail_msg: "Required Kopia vault variables are not defined"
+        success_msg: "All required Kopia vault variables are defined"
+
+    - name: Validate Kopia password complexity
+      assert:
+        that:
+          - vault_kopia_admin_password | length >= 12
+          - vault_kopia_database_password | length >= 12
+        fail_msg: "Kopia passwords must be at least 12 characters long"
+        success_msg: "Kopia password complexity requirements met"
+
+- name: Validate Kopia network configuration
+  block:
+    - name: Check Kopia port configuration
+      assert:
+        that:
+          - kopia_port is defined
+          - kopia_port | int >= 1024
+          - kopia_port | int <= 65535
+        fail_msg: "Kopia port must be between 1024 and 65535"
+        success_msg: "Kopia port configuration is valid"
+
+    - name: Check Kopia domain configuration
+      assert:
+        that:
+          - domain is defined
+          - kopia_subdomain is defined
+        fail_msg: "Kopia domain configuration is incomplete"
+        success_msg: "Kopia domain configuration is valid"
+
+- name: Validate Kopia security configuration
+  block:
+    - name: Check Kopia SSL configuration
+      assert:
+        that:
+          - kopia_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Kopia SSL configuration is invalid"
+        success_msg: "Kopia SSL configuration is valid"
+
+    - name: Check Kopia authentication configuration
+      assert:
+        that:
+          - kopia_auth_enabled | bool
+          - kopia_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Kopia authentication configuration is invalid"
+        success_msg: "Kopia authentication configuration is valid"
+
+- name: Validate Kopia storage configuration
+  block:
+    - name: Check Kopia data directories
+      assert:
+        that:
+          - kopia_data_dir is defined
+          - kopia_config_dir is defined
+          - kopia_backup_dir is defined
+        fail_msg: "Kopia storage configuration is incomplete"
+        success_msg: "Kopia storage configuration is valid"
+
+    - name: Create Kopia directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ kopia_data_dir }}"
+        - "{{ kopia_config_dir }}"
+        - "{{ kopia_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Kopia validation completed successfully - all configurations are valid and secure"

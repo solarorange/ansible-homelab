@@ -1,0 +1,180 @@
+---
+# Vaultwarden Deployment Tasks
+# Handles Docker deployment, directory creation, and basic configuration
+
+- name: Create Vaultwarden directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  loop:
+    - "{{ vaultwarden_config_dir }}"
+    - "{{ vaultwarden_data_dir }}"
+    - "{{ vaultwarden_backup_dir }}"
+    - "{{ logs_dir }}/vaultwarden"
+    - "{{ logs_dir }}/vaultwarden/backup"
+    - "{{ logs_dir }}/vaultwarden/health"
+    - "{{ vaultwarden_config_dir }}/scripts"
+  register: vaultwarden_dir_creation
+  tags: [vaultwarden, vaultwarden-deploy, directories]
+
+- name: Backup existing Vaultwarden configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_backup_dir }}/vaultwarden/{{ ansible_date_time.date }}/{{ item | basename }}"
+    remote_src: true
+  loop:
+    - "{{ vaultwarden_data_dir }}/config.json"
+    - "{{ vaultwarden_config_dir }}/docker-compose.yml"
+  when: item is file
+  register: vaultwarden_config_backup
+  tags: [vaultwarden, vaultwarden-deploy, backup]
+
+- name: Create Vaultwarden Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ vaultwarden_config_dir }}/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+  register: vaultwarden_docker_compose_creation
+  tags: [vaultwarden, vaultwarden-deploy, config]
+
+- name: Prepare Vaultwarden secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "vaultwarden"
+    secret_dir_root: "{{ vaultwarden_config_dir }}"
+    secret_files: "{{ vaultwarden_secret_files | default([]) }}"
+    secret_env_maps:
+      - "{{ vaultwarden_components.app.environment | default({}) }}"
+      - "{{ vaultwarden_components.postgres.environment | default({}) }}"
+  when: vaultwarden_manage_secret_files | default(true) | bool
+  tags: [vaultwarden, vaultwarden-deploy, setup]
+
+- name: Validate Vaultwarden env maps use *_FILE for secrets
+  ansible.builtin.import_tasks: "../../automation/tasks/validate_secret_env_maps.yml"
+  vars:
+    env_map_input: "{{ vaultwarden_environment | default({}) }}"
+  when: vaultwarden_manage_secret_files | default(true) | bool
+  tags: [vaultwarden, deploy, validate]
+
+- name: Validate required Vaultwarden secret files exist
+  ansible.builtin.stat:
+    path: "{{ vaultwarden_config_dir }}/secrets/{{ item }}"
+  register: vaultwarden_secret_stats
+  loop: "{{ vaultwarden_required_secrets | default([]) }}"
+  when: vaultwarden_manage_secret_files | default(true) | bool and (vaultwarden_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Vaultwarden secret files are missing
+  ansible.builtin.assert:
+    that: "{{ vaultwarden_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ vaultwarden_config_dir }}/secrets.
+      Missing: {{ (vaultwarden_required_secrets | default([])) | reject('in', (vaultwarden_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: vaultwarden_manage_secret_files | default(true) | bool and (vaultwarden_required_secrets | default([]) | length > 0)
+
+- name: Create Vaultwarden configuration script
+  ansible.builtin.template:
+    src: setup_vaultwarden.py.j2
+    dest: "{{ vaultwarden_config_dir }}/scripts/setup_vaultwarden.py"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+  register: vaultwarden_script_creation
+  tags: [vaultwarden, vaultwarden-deploy, scripts]
+
+- name: Create Vaultwarden backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ vaultwarden_config_dir }}/scripts/backup.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: vaultwarden_backup_script_creation
+  tags: [vaultwarden, vaultwarden-deploy, scripts]
+
+- name: Create Vaultwarden management script
+  ansible.builtin.template:
+    src: manage.sh.j2
+    dest: "{{ vaultwarden_config_dir }}/scripts/manage.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: vaultwarden_management_script_creation
+  tags: [vaultwarden, vaultwarden-deploy, scripts]
+
+- name: Create Vaultwarden health check script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ vaultwarden_config_dir }}/scripts/healthcheck.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0750"
+  register: vaultwarden_healthcheck_script_creation
+  tags: [vaultwarden, vaultwarden-deploy, scripts]
+
+- name: Start Vaultwarden services safely with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "vaultwarden"
+    project_src: "{{ vaultwarden_config_dir }}"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports:
+      - "{{ vaultwarden_port }}"
+  tags: [vaultwarden, vaultwarden-deploy, docker, rollback]
+
+- name: Wait for Vaultwarden to be ready
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}/alive"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: vaultwarden_health_check
+  retries: 30
+  delay: 10
+  until: vaultwarden_health_check.status in [200, 302, 401]
+  tags: [vaultwarden, vaultwarden-deploy, wait]
+  when: vaultwarden_direct_expose_enabled | default(false)
+
+- name: Verify Vaultwarden deployment
+  ansible.builtin.uri:
+    url: "https://{{ vaultwarden_subdomain }}.{{ domain }}"
+    method: GET
+    status_code: [200, 302, 401]
+    timeout: 30
+  register: vaultwarden_verification
+  retries: 10
+  delay: 10
+  until: vaultwarden_verification.status in [200, 302, 401]
+  tags: [vaultwarden, vaultwarden-deploy, verify]
+  when: not (vaultwarden_direct_expose_enabled | default(false))
+
+- name: Display Vaultwarden deployment status
+  ansible.builtin.debug:
+    msg: |
+      ========================================
+      VAULTWARDEN DEPLOYMENT STATUS
+      ========================================
+
+      Status: {{ 'SUCCESS' if vaultwarden_verification.status == 200 or vaultwarden_verification.status == 302 else 'FAILED' }}
+      URL: https://{{ vaultwarden_subdomain }}.{{ domain }}
+      Local URL: http://{{ ansible_default_ipv4.address }}:{{ vaultwarden_port }}
+
+      Configuration:
+      - Database Type: {{ vaultwarden_database_type }}
+      - Signups Allowed: false
+      - WebSocket Enabled: true
+      - Admin Token: {{ 'SET' if vault_vaultwarden_admin_token else 'NOT SET' }}
+
+      Directories:
+      - Config: {{ vaultwarden_config_dir }}
+      - Data: {{ vaultwarden_data_dir }}
+      - Backup: {{ vaultwarden_backup_dir }}
+      - Logs: {{ logs_dir }}/vaultwarden
+
+      ========================================
+  tags: [vaultwarden, vaultwarden-deploy, summary]

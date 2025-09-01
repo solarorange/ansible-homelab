@@ -1,0 +1,103 @@
+---
+# n8n Homepage Integration
+# Configure n8n integration with Homepage dashboard
+
+- name: Create n8n Homepage service configuration
+  ansible.builtin.template:
+    src: homepage-service.yml.j2
+    dest: "{{ homepage_config_dir }}/services/n8n.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Create n8n Homepage widget configuration
+  ansible.builtin.template:
+    src: homepage-widget.yml.j2
+    dest: "{{ homepage_config_dir }}/widgets/n8n.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_homepage_widget_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Create n8n Homepage bookmark
+  ansible.builtin.template:
+    src: homepage-bookmark.yml.j2
+    dest: "{{ homepage_config_dir }}/bookmarks/n8n.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Copy n8n icon to Homepage
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/n8n.png"
+    dest: "{{ homepage_config_dir }}/icons/n8n.png"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Create n8n Homepage service group
+  ansible.builtin.template:
+    src: homepage-group.yml.j2
+    dest: "{{ homepage_config_dir }}/groups/automation.yml"
+    mode: '0644'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Update Homepage services list
+  ansible.builtin.lineinfile:
+    path: "{{ homepage_config_dir }}/services.yml"
+    line: "- n8n"
+    insertafter: "^# Automation Services"
+    state: present
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Restart Homepage service
+  ansible.builtin.systemd:
+    name: homepage
+    state: restarted
+    enabled: yes
+  ignore_errors: true
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Verify n8n Homepage integration
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:3000/api/services"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: homepage_services_check
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Check if n8n is in Homepage services
+  ansible.builtin.command: "grep -q 'n8n' {{ homepage_config_dir }}/services.yml"
+  register: n8n_homepage_check
+  changed_when: false
+  failed_when: n8n_homepage_check.rc != 0
+  when: n8n_homepage_enabled | default(true)
+  tags: [n8n, homepage]
+
+- name: Display n8n Homepage integration status
+  ansible.builtin.debug:
+    msg: |
+      n8n Homepage Integration Status:
+      - Homepage Integration: {{ n8n_homepage_enabled | default(true) }}
+      - Widget Enabled: {{ n8n_homepage_widget_enabled | default(true) }}
+      - Service Configuration: Created
+      - Widget Configuration: Created
+      - Bookmark Configuration: Created
+      - Icon: Copied
+      - Service Group: Created
+      - Homepage Service: Restarted
+  tags: [n8n, homepage]

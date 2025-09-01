@@ -1,0 +1,88 @@
+#!/bin/bash
+# Pezzo Homepage Integration Script
+# Manages integration between Pezzo and Homepage dashboard
+
+set -e
+
+# Configuration
+PEZZO_CONFIG_DIR="{{ pezzo_config_dir }}"
+HOMEPAGE_CONFIG_DIR="{{ homepage_config_dir | default('/opt/docker/homepage/config') }}"
+LOGS_DIR="{{ logs_dir }}/pezzo/homepage"
+DOMAIN="{{ domain }}"
+PEZZO_SUBDOMAIN="{{ pezzo_subdomain }}"
+
+# Create log directory
+mkdir -p "$LOGS_DIR"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOGS_DIR/integration.log"
+}
+
+# Function to check if Pezzo is running
+check_pezzo_status() {
+    if curl -f -s "https://$PEZZO_SUBDOMAIN.$DOMAIN/api/healthz" > /dev/null 2>&1; then
+        echo "online"
+    else
+        echo "offline"
+    fi
+}
+
+# Function to update Homepage configuration
+update_homepage_config() {
+    log "Updating Homepage configuration for Pezzo"
+    
+    # Copy service configuration
+    if [ -f "$PEZZO_CONFIG_DIR/homepage/service.yml" ]; then
+        cp "$PEZZO_CONFIG_DIR/homepage/service.yml" "$HOMEPAGE_CONFIG_DIR/services/pezzo.yml"
+        log "Service configuration updated"
+    fi
+    
+    # Copy widget configuration
+    if [ -f "$PEZZO_CONFIG_DIR/homepage/widget.yml" ]; then
+        cp "$PEZZO_CONFIG_DIR/homepage/widget.yml" "$HOMEPAGE_CONFIG_DIR/widgets/pezzo.yml"
+        log "Widget configuration updated"
+    fi
+    
+    # Copy bookmarks
+    if [ -f "$PEZZO_CONFIG_DIR/homepage/bookmarks.yml" ]; then
+        cp "$PEZZO_CONFIG_DIR/homepage/bookmarks.yml" "$HOMEPAGE_CONFIG_DIR/bookmarks/pezzo.yml"
+        log "Bookmarks updated"
+    fi
+    
+    # Copy icon
+    if [ -f "$PEZZO_CONFIG_DIR/homepage/pezzo.png" ]; then
+        cp "$PEZZO_CONFIG_DIR/homepage/pezzo.png" "$HOMEPAGE_CONFIG_DIR/icons/pezzo.png"
+        log "Icon updated"
+    fi
+}
+
+# Function to restart Homepage if needed
+restart_homepage() {
+    if [ "$1" = "restart" ]; then
+        log "Restarting Homepage container"
+        docker restart homepage 2>/dev/null || log "Warning: Could not restart Homepage container"
+    fi
+}
+
+# Main execution
+main() {
+    log "Starting Pezzo Homepage integration"
+    
+    # Check Pezzo status
+    status=$(check_pezzo_status)
+    log "Pezzo status: $status"
+    
+    # Update Homepage configuration
+    update_homepage_config
+    
+    # Restart Homepage if requested
+    if [ "$1" = "restart" ]; then
+        restart_homepage restart
+    fi
+    
+    log "Pezzo Homepage integration completed"
+}
+
+# Execute main function with arguments
+main "$@" 

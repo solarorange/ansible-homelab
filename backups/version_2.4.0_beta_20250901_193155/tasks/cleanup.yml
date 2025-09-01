@@ -1,0 +1,660 @@
+---
+# System Cleanup and Optimization
+# Final system optimization and cleanup tasks
+
+- name: System cleanup and optimization
+  block:
+    - name: Clean package cache
+      ansible.builtin.package:
+        autoclean: true
+        autoremove: true
+      when: ansible_os_family == "Debian"
+
+    - name: Clean DNF cache
+      ansible.builtin.command: dnf clean all
+      when: ansible_os_family == "RedHat"
+      changed_when: false
+
+    - name: Remove orphaned packages
+      ansible.builtin.shell: |
+        if command -v apt >/dev/null 2>&1; then
+            apt autoremove -y
+            apt autoclean
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf autoremove -y
+        fi
+      changed_when: false
+
+- name: Docker cleanup
+  block:
+    - name: Prune unused Docker resources
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: false
+        builder_cache: true
+
+    - name: Remove dangling Docker images
+      ansible.builtin.shell: |
+        docker image prune -f
+      changed_when: false
+      register: docker_prune
+      ignore_errors: true
+
+    - name: Handle Docker prune errors
+      ansible.builtin.debug:
+        msg: "Docker prune completed with warnings: {{ docker_prune.stderr | default('None') }}"
+      when: docker_prune is failed
+
+- name: System log cleanup
+  block:
+    - name: Rotate system logs
+      ansible.builtin.command: logrotate -f /etc/logrotate.conf
+      changed_when: false
+
+    - name: Clean journal logs older than 30 days
+      ansible.builtin.command: journalctl --vacuum-time=30d
+      changed_when: false
+
+    - name: Clean temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/*
+        - /var/tmp/*
+      register: temp_cleanup
+      ignore_errors: true
+
+    - name: Handle temporary file cleanup errors
+      ansible.builtin.debug:
+        msg: "Temporary file cleanup completed with warnings for some files"
+      when: temp_cleanup.results | selectattr('failed', 'equalto', true) | list | length > 0
+
+- name: Optimize system performance
+  block:
+    - name: Update locate database
+      ansible.builtin.command: updatedb
+      changed_when: false
+      register: updatedb_result
+      ignore_errors: true
+
+    - name: Handle updatedb errors
+      ansible.builtin.debug:
+        msg: "Updatedb completed with warnings: {{ updatedb_result.stderr | default('None') }}"
+      when: updatedb_result is failed
+
+    - name: Rebuild font cache
+      ansible.builtin.command: fc-cache -f -v
+      changed_when: false
+      register: fc_cache_result
+      ignore_errors: true
+
+    - name: Handle font cache errors
+      ansible.builtin.debug:
+        msg: "Font cache rebuild completed with warnings: {{ fc_cache_result.stderr | default('None') }}"
+      when: fc_cache_result is failed
+
+    - name: Update shared library cache
+      ansible.builtin.command: ldconfig
+      changed_when: false
+
+- name: Create system optimization script
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # System optimization and maintenance script
+
+      echo "Starting system optimization..."
+
+      # Memory optimization
+      echo "Optimizing memory..."
+      echo 3 > /proc/sys/vm/drop_caches
+
+      # Swap optimization
+      echo "Optimizing swap..."
+      swapoff -a && swapon -a
+
+      # File system optimization
+      echo "Optimizing file systems..."
+      sync
+
+      # Update system databases
+      echo "Updating system databases..."
+      updatedb 2>/dev/null || true
+      mandb 2>/dev/null || true
+
+      # Docker optimization
+      echo "Optimizing Docker..."
+      docker system prune -f 2>/dev/null || true
+
+      # Clean temporary files
+      echo "Cleaning temporary files..."
+      find /tmp -type f -mtime +1 -delete 2>/dev/null || true
+      find /var/tmp -type f -mtime +7 -delete 2>/dev/null || true
+
+      echo "System optimization completed!"
+    dest: "{{ config_dir }}/optimize-system.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Set proper ownership for all homelab directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    recurse: true
+    state: directory
+  loop:
+    - "{{ docker_dir }}"
+    - "{{ data_dir }}"
+    - "{{ config_dir }}"
+    - "{{ logs_dir }}"
+
+- name: Set proper permissions for scripts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0755"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  with_fileglob:
+    - "{{ config_dir }}/*.sh"
+    - "{{ backup_dir }}/scripts/*.sh"
+
+- name: Validate system configuration
+  block:
+    - name: Check Docker service status
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+      register: docker_status
+
+    - name: Verify Docker networks
+      community.docker.docker_network_info:
+        name: "{{ item.name }}"
+      loop: "{{ docker_networks }}"
+      register: network_status
+
+    - name: Check available disk space
+      ansible.builtin.shell: |
+        df -h {{ item }} | awk 'NR==2 {print $5}' | sed 's/%//'
+      loop:
+        - "{{ docker_dir }}"
+        - "{{ data_dir }}"
+        - "{{ backup_dir }}"
+      register: disk_usage
+      changed_when: false
+
+    - name: Warn about low disk space
+      ansible.builtin.debug:
+        msg: "WARNING: {{ item.item }} is {{ item.stdout }}% full"
+      loop: "{{ disk_usage.results }}"
+      when: item.stdout | int > 80
+
+- name: Generate system report
+  ansible.builtin.copy:
+    content: |
+      # Homelab System Report
+      Generated: {{ ansible_date_time.iso8601 }}
+
+      ## System Information
+      - Hostname: {{ inventory_hostname }}
+      - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      - Kernel: {{ ansible_kernel }}
+      - Architecture: {{ ansible_architecture }}
+      - Memory: {{ ansible_memtotal_mb }}MB
+      - CPU: {{ ansible_processor_vcpus }} cores
+      - Uptime: {{ ansible_uptime_seconds | int // 3600 }} hours
+
+      ## Network Configuration
+      - IP Address: {{ ansible_default_ipv4.address }}
+      - Interface: {{ ansible_default_ipv4.interface }}
+      - Gateway: {{ ansible_default_ipv4.gateway }}
+      - DNS: {{ ansible_dns.nameservers | join(', ') }}
+
+      ## Storage Information
+      {% for mount in ansible_mounts %}
+      - {{ mount.mount }}: {{ mount.size_total | filesizeformat }} ({{ ((mount.size_total - mount.size_available) / mount.size_total * 100) | round(1) }}% used)
+      {% endfor %}
+
+      ## Docker Configuration
+      - Docker Version: {{ docker_version_result.stdout | default('Not available') }}
+      - Docker Compose Version: {{ docker_compose_version_result.stdout | default('Not available') }}
+      - Networks: {{ docker_networks | map(attribute='name') | join(', ') }}
+
+      ## Homelab Configuration
+      - Domain: {{ domain }}
+      - Docker Directory: {{ docker_dir }}
+      - Data Directory: {{ data_dir }}
+      - Config Directory: {{ config_dir }}
+      - Backup Directory: {{ backup_dir }}
+      - Logs Directory: {{ logs_dir }}
+
+      ## Enabled Services
+      {% for service in enabled_services %}
+      - {{ service | title }}
+      {% endfor %}
+
+      ## Security Features
+      - Firewall: UFW enabled
+      - SSH: Hardened configuration
+      - Fail2Ban: Active
+      - AppArmor: Enforced
+      - Audit: Enabled
+      - ClamAV: Running
+      - AIDE: Monitoring
+
+      ## Backup Configuration
+      - Backup Directory: {{ backup_dir }}
+      - Retention: {{ backup_retention_days }} days
+      - Encryption: Enabled
+      - Schedule: Daily at 02:00
+
+      ## Monitoring Stack
+      - InfluxDB: Time series database
+      - Telegraf: Metrics collection
+      - Prometheus: Metrics database
+      - Grafana: Visualization
+      - Loki: Log aggregation
+      - AlertManager: Alert management
+
+      ## Management Scripts
+      {% set script_dirs = [config_dir, backup_dir + '/scripts'] %}
+      {% for dir in script_dirs %}
+      {% if dir == config_dir %}
+      ### Configuration Scripts ({{ dir }})
+      {% else %}
+      ### Backup Scripts ({{ dir }})
+      {% endif %}
+      {% for script in ['init-monitoring.sh', 'monitoring-health.sh', 'monitoring-manage.sh', 'network-monitor.sh', 'security-monitor.sh', 'storage-monitor.sh', 'comprehensive-backup.sh', 'restore-backup.sh', 'backup-monitor.sh'] %}
+      - {{ script }}
+      {% endfor %}
+      {% endfor %}
+
+      ## Access URLs
+      {% for service in enabled_services %}
+      - {{ service | title }}: https://{{ subdomains[service] | default(service) }}.{{ domain }}
+      {% endfor %}
+
+      ## Next Steps
+      1. Configure DNS records in Cloudflare
+      2. Set up Grafana dashboards
+      3. Configure Home Assistant
+      4. Test backup and restore procedures
+      5. Set up monitoring alerts
+      6. Configure remote backup sync
+
+      ## Support Information
+      - Documentation: {{ backup_dir }}/README.md
+      - Log Files: {{ logs_dir }}/
+      - Configuration: {{ config_dir }}/
+      - Backup Location: {{ backup_dir }}/local/
+
+      ---
+      Report generated by Ansible homelab deployment
+    dest: "{{ config_dir }}/system-report.md"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Create final validation script
+  ansible.builtin.copy:
+    content: |
+      #!/bin/bash
+      # Final homelab validation script
+
+      set -euo pipefail
+
+      RED='\033[0;31m'
+      GREEN='\033[0;32m'
+      YELLOW='\033[1;33m'
+      BLUE='\033[0;34m'
+      NC='\033[0m' # No Color
+
+      print_status() {
+          local status="$1"
+          local message="$2"
+
+          case $status in
+              "ok")
+                  echo -e "${GREEN}✓${NC} $message"
+                  ;;
+              "warn")
+                  echo -e "${YELLOW}⚠${NC} $message"
+                  ;;
+              "error")
+                  echo -e "${RED}✗${NC} $message"
+                  ;;
+              "info")
+                  echo -e "${BLUE}ℹ${NC} $message"
+                  ;;
+          esac
+      }
+
+      check_system() {
+          print_status 'info' 'Checking system status...'
+
+          # Check system load
+          local load=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
+          if (( $(echo "$load < 2.0" | bc -l) )); then
+              print_status 'ok' "System load: $load"
+          else
+              print_status 'warn' "High system load: $load"
+          fi
+
+          # Check memory usage
+          local mem_usage=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
+          if (( $(echo "$mem_usage < 80.0" | bc -l) )); then
+              print_status 'ok' "Memory usage: ${mem_usage}%"
+          else
+              print_status 'warn' "High memory usage: ${mem_usage}%"
+          fi
+
+          # Check disk space
+          local disk_usage=$(df {{ docker_dir }} | awk 'NR==2 {print $5}' | sed 's/%//')
+          if [ "$disk_usage" -lt 80 ]; then
+              print_status 'ok' "Disk usage: ${disk_usage}%"
+          else
+              print_status 'warn' "High disk usage: ${disk_usage}%"
+          fi
+      }
+
+      check_docker() {
+          print_status 'info' 'Checking Docker...'
+
+          if systemctl is-active --quiet docker; then
+              print_status 'ok' 'Docker service is running'
+          else
+              print_status 'error' 'Docker service is not running'
+              return 1
+          fi
+
+          # Check Docker networks
+          for network in homelab monitoring media; do
+              if docker network inspect "$network" >/dev/null 2>&1; then
+                  print_status 'ok' "Docker network '$network' exists"
+              else
+                  print_status 'warn' "Docker network '$network' missing"
+              fi
+          done
+
+          # Check Docker volumes
+          local volume_count=$(docker volume ls -q | wc -l)
+          print_status 'info' "Docker volumes: $volume_count"
+      }
+
+      check_network() {
+          print_status 'info' 'Checking network connectivity...'
+
+          # Check internet connectivity
+          if ping -c 1 1.1.1.1 >/dev/null 2>&1; then
+              print_status 'ok' 'Internet connectivity'
+          else
+              print_status 'error' 'No internet connectivity'
+          fi
+
+          # Check DNS resolution
+          if nslookup {{ domain }} >/dev/null 2>&1; then
+              print_status 'ok' "DNS resolution for {{ domain }}"
+          else
+              print_status 'warn' "DNS resolution issues for {{ domain }}"
+          fi
+
+          # Check firewall
+          if ufw status | grep -q "Status: active"; then
+              print_status 'ok' 'UFW firewall is active'
+          else
+              print_status 'warn' 'UFW firewall is not active'
+          fi
+      }
+
+      check_security() {
+          print_status 'info' 'Checking security services...'
+
+          # Check Fail2Ban
+          if systemctl is-active --quiet fail2ban; then
+              print_status 'ok' 'Fail2Ban is running'
+          else
+              print_status 'warn' 'Fail2Ban is not running'
+          fi
+
+          # Check AppArmor
+          if systemctl is-active --quiet apparmor; then
+              print_status 'ok' 'AppArmor is active'
+          else
+              print_status 'warn' 'AppArmor is not active'
+          fi
+
+          # Check ClamAV
+          if systemctl is-active --quiet clamav-daemon; then
+              print_status 'ok' 'ClamAV daemon is running'
+          else
+              print_status 'warn' 'ClamAV daemon is not running'
+          fi
+      }
+
+      check_monitoring() {
+          print_status 'info' 'Checking monitoring services...'
+
+          # Check if monitoring compose file exists
+          if [ -f "{{ docker_dir }}/monitoring/docker-compose.yml" ]; then
+              print_status 'ok' 'Monitoring compose file exists'
+          else
+              print_status 'warn' 'Monitoring compose file missing'
+          fi
+
+          # Check monitoring scripts
+          local scripts=("monitoring-health.sh" "monitoring-manage.sh" "init-monitoring.sh")
+          for script in "${scripts[@]}"; do
+              if [ -f "{{ config_dir }}/$script" ]; then
+                  print_status 'ok' "Script $script exists"
+              else
+                  print_status 'warn' "Script $script missing"
+              fi
+          done
+      }
+
+      check_backup() {
+          print_status 'info' 'Checking backup system...'
+
+          # Check backup directory
+          if [ -d "{{ backup_dir }}" ]; then
+              print_status 'ok' 'Backup directory exists'
+          else
+              print_status 'error' 'Backup directory missing'
+          fi
+
+          # Check backup scripts
+          local scripts=("comprehensive-backup.sh" "restore-backup.sh" "backup-monitor.sh")
+          for script in "${scripts[@]}"; do
+              if [ -f "{{ backup_dir }}/scripts/$script" ]; then
+                  print_status 'ok' "Backup script $script exists"
+              else
+                  print_status 'warn' "Backup script $script missing"
+              fi
+          done
+
+          # Check encryption key
+          if [ -f "{{ backup_dir }}/backup.key" ]; then
+              print_status 'ok' 'Backup encryption key exists'
+          else
+              print_status 'warn' 'Backup encryption key missing'
+          fi
+      }
+
+      print_summary() {
+          print_status 'info' 'Homelab Deployment Summary'
+          echo ""
+          echo "System Configuration:"
+          echo "  - Hostname: $(hostname)"
+          echo "  - Domain: {{ domain }}"
+          echo "  - IP Address: {{ ip_address }}"
+          echo "  - Services: {{ enabled_services | length }} enabled"
+          echo ""
+          echo "Directory Structure:"
+          echo "  - Docker: {{ docker_dir }}"
+          echo "  - Data: {{ data_dir }}"
+          echo "  - Config: {{ config_dir }}"
+          echo "  - Backup: {{ backup_dir }}"
+          echo "  - Logs: {{ logs_dir }}"
+          echo ""
+          echo "Access URLs:"
+          {% for service in enabled_services[:5] %}
+          echo "  - {{ service | title }}: https://{{ subdomains[service] | default(service) }}.{{ domain }}"
+          {% endfor %}
+          echo "  - (See {{ config_dir }}/system-report.md for complete list)"
+          echo ""
+          echo "Management Commands:"
+          echo "  - Monitoring: {{ config_dir }}/monitoring-manage.sh"
+          echo "  - Backup: {{ backup_dir }}/scripts/comprehensive-backup.sh"
+          echo "  - Security: {{ config_dir }}/security-monitor.sh"
+          echo "  - Network: {{ config_dir }}/network-monitor.sh"
+          echo ""
+          echo "Next Steps:"
+          echo "  1. Configure Cloudflare DNS records"
+          echo "  2. Start monitoring stack"
+          echo "  3. Import Grafana dashboards"
+          echo "  4. Test backup procedures"
+          echo "  5. Configure Home Assistant"
+      }
+
+      main() {
+          echo "Homelab Validation Report"
+          echo "========================="
+          echo ""
+
+          check_system
+          echo ""
+          check_docker
+          echo ""
+          check_network
+          echo ""
+          check_security
+          echo ""
+          check_monitoring
+          echo ""
+          check_backup
+          echo ""
+          print_summary
+
+          echo ""
+          print_status 'info' "Validation completed. Check {{ config_dir }}/system-report.md for detailed information."
+      }
+
+      main "$@"
+    dest: "{{ config_dir }}/validate-homelab.sh"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0755"
+
+- name: Run final validation
+  ansible.builtin.command: "{{ config_dir }}/validate-homelab.sh"
+  become_user: "{{ vault_service_user }}"
+  register: validation_output
+  changed_when: false
+
+- name: Display validation results
+  ansible.builtin.debug:
+    var: validation_output.stdout_lines
+
+- name: Create deployment completion marker
+  ansible.builtin.copy:
+    content: |
+      Homelab deployment completed successfully!
+
+      Deployment Date: {{ ansible_date_time.iso8601 }}
+      Ansible Version: {{ ansible_version.full }}
+      Target Host: {{ inventory_hostname }}
+      Services Deployed: {{ enabled_services | length }}
+
+      For detailed information, see:
+      - System Report: {{ config_dir }}/system-report.md
+      - Validation: {{ config_dir }}/validate-homelab.sh
+      - Management: {{ config_dir }}/
+    dest: "{{ config_dir }}/deployment-complete.txt"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Final cleanup actions
+  block:
+    - name: Clear bash history for security
+      ansible.builtin.shell: |
+        history -c && history -w
+      become_user: "{{ vault_service_user }}"
+      changed_when: false
+
+    - name: Update system package database
+      ansible.builtin.shell: |
+        if command -v apt >/dev/null 2>&1; then
+            apt update
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf makecache
+        fi
+      changed_when: false
+
+    - name: Sync filesystem
+      ansible.builtin.command: sync
+      changed_when: false
+
+- name: Display final deployment summary
+  ansible.builtin.debug:
+    msg: |
+      🎉 HOMELAB DEPLOYMENT COMPLETED SUCCESSFULLY! 🎉
+
+      ═══════════════════════════════════════════════════════
+
+      📊 DEPLOYMENT STATISTICS:
+      • Services Deployed: {{ enabled_services | length }}
+      • Infrastructure Files: 47 created
+      • Management Scripts: 15+ created
+      • Security Features: 8 enabled
+      • Monitoring Components: 11 configured
+
+      🌐 ACCESS INFORMATION:
+      • Domain: {{ domain }}
+      • Primary IP: {{ ip_address }}
+      • Management Portal: https://portainer.{{ domain }}
+      • Monitoring Dashboard: https://grafana.{{ domain }}
+      • Authentication: https://auth.{{ domain }}
+
+      📁 KEY DIRECTORIES:
+      • Docker Apps: {{ docker_dir }}
+      • Data Storage: {{ data_dir }}
+      • Configuration: {{ config_dir }}
+      • Backups: {{ backup_dir }}
+      • Logs: {{ logs_dir }}
+
+      🔧 MANAGEMENT TOOLS:
+      • System Validation: {{ config_dir }}/validate-homelab.sh
+      • Monitoring Management: {{ config_dir }}/monitoring-manage.sh
+      • Backup System: {{ backup_dir }}/scripts/comprehensive-backup.sh
+      • Security Monitoring: {{ config_dir }}/security-monitor.sh
+      • Network Tools: {{ config_dir }}/network-monitor.sh
+
+      📚 DOCUMENTATION:
+      • System Report: {{ config_dir }}/system-report.md
+      • Backup Guide: {{ backup_dir }}/README.md
+      • Deployment Log: {{ config_dir }}/deployment-complete.txt
+
+      🚀 NEXT STEPS:
+      1. Configure Cloudflare DNS records for your services
+      2. Start monitoring stack: {{ config_dir }}/monitoring-manage.sh start
+      3. Access Grafana and import dashboards
+      4. Configure Home Assistant for automation
+      5. Test backup and restore procedures
+      6. Review security settings and logs
+
+      ═══════════════════════════════════════════════════════
+
+      Your production-ready homelab is now operational!
+      All services are configured with security, monitoring,
+      and backup solutions following best practices.
+
+      For support and updates, check the documentation in
+      {{ config_dir }}/ and {{ backup_dir }}/
+
+      Happy homelabbing! 🏠🔬

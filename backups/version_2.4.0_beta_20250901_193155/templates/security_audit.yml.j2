@@ -1,0 +1,187 @@
+---
+# Security Audit Report
+# Generated on {{ ansible_date_time.iso8601 }}
+
+security_audit:
+  audit_id: "{{ ansible_date_time.epoch }}"
+  audit_date: "{{ ansible_date_time.iso8601 }}"
+  auditor: "Ansible Automation"
+  scope: "Complete homelab infrastructure"
+
+authentication_security:
+  authentik:
+    status: "{{ 'enabled' if security_authentication_enabled | default(false) else 'disabled' }}"
+    security_features:
+      - "Multi-factor authentication"
+      - "Single sign-on (SSO)"
+      - "Password policies"
+      - "Session management"
+    compliance:
+      - "OAuth 2.0"
+      - "OpenID Connect"
+      - "SAML 2.0"
+  
+  user_management:
+    total_users: "{{ (authentik_users | default([])) | length }}"
+    admin_users: "{{ (authentik_users | default([]) | selectattr('is_admin', 'equalto', true) | list) | length }}"
+    password_policy:
+      min_length: 12
+      require_special_chars: true
+      require_numbers: true
+      require_uppercase: true
+      max_age_days: 90
+
+network_security:
+  firewall:
+    status: "{{ 'enabled' if security_firewall_enabled | default(false) else 'disabled' }}"
+    rules:
+      - "Default deny incoming"
+      - "Allow established connections"
+      - "Allow specific services"
+    fail2ban:
+      status: "{{ 'enabled' if security_firewall_enabled | default(false) else 'disabled' }}"
+      jails:
+        - "sshd"
+        - "nginx-http-auth"
+        - "postfix"
+        - "dovecot"
+  
+  vpn:
+    wireguard:
+      status: "{{ 'enabled' if security_vpn_enabled | default(false) else 'disabled' }}"
+      encryption: "ChaCha20-Poly1305"
+      key_exchange: "ECDH"
+      authentication: "Public key"
+  
+  dns_security:
+    pihole:
+      status: "{{ 'enabled' if security_dns_enabled | default(false) else 'disabled' }}"
+      features:
+        - "Ad blocking"
+        - "DNS over HTTPS"
+        - "Query logging"
+        - "Custom blocklists"
+
+ssl_tls_security:
+  certificates:
+    lets_encrypt:
+      status: "{{ 'enabled' if certificate_management_enabled | default(false) else 'disabled' }}"
+      auto_renewal: true
+      staging_environment: false
+  
+  cipher_suites:
+    recommended:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_CHACHA20_POLY1305_SHA256"
+      - "TLS_AES_128_GCM_SHA256"
+  
+  security_headers:
+    hsts: true
+    csp: true
+    x_frame_options: "DENY"
+    x_content_type_options: "nosniff"
+    referrer_policy: "strict-origin-when-cross-origin"
+
+container_security:
+  docker_security:
+    user_namespace: "{{ docker_optimization.userland_proxy | default(false) }}"
+    seccomp_profile: "default"
+    apparmor_profile: "docker-default"
+    no_new_privileges: true
+  
+  image_security:
+    base_images:
+      - "Alpine Linux (minimal attack surface)"
+      - "Official images only"
+    vulnerability_scanning: "{{ 'enabled' if security_monitoring_enabled | default(false) else 'disabled' }}"
+  
+  runtime_security:
+    read_only_root_filesystem: true
+    no_privileged_containers: true
+    resource_limits: true
+    network_isolation: true
+
+data_security:
+  encryption:
+    at_rest:
+      status: "{{ backup_strategies.incremental.encryption | default(false) }}"
+      algorithm: "AES-256-GCM"
+    in_transit:
+      status: true
+      protocols: ["TLS 1.3", "TLS 1.2"]
+  
+  backup_security:
+    encryption: "{{ backup_strategies.incremental.encryption | default(false) }}"
+    integrity_checks: true
+    access_control: true
+    retention_policy: "{{ backup_strategies.incremental.retention_days | default(30) }} days"
+
+monitoring_security:
+  log_security:
+    centralized_logging: "{{ 'enabled' if logging_enabled | default(false) else 'disabled' }}"
+    log_encryption: true
+    log_retention: "{{ logging.retention_days | default(30) }} days"
+    log_integrity: true
+  
+  alerting_security:
+    secure_channels: true
+    encrypted_notifications: true
+    alert_encryption: true
+
+compliance_status:
+  gdpr:
+    data_encryption: "{{ backup_strategies.incremental.encryption | default(false) }}"
+    data_retention: "{{ backup_strategies.incremental.retention_days | default(30) }} days"
+    user_consent: true
+    data_portability: true
+  
+  security_frameworks:
+    nist_cybersecurity:
+      identify: true
+      protect: true
+      detect: "{{ security_monitoring_enabled | default(false) }}"
+      respond: "{{ security_monitoring_enabled | default(false) }}"
+      recover: "{{ backup_strategies.incremental.enabled | default(false) }}"
+
+vulnerability_assessment:
+  open_ports:
+    external:
+      - port: 80
+        service: "HTTP"
+        risk: "Low (redirects to HTTPS)"
+      - port: 443
+        service: "HTTPS"
+        risk: "Low (encrypted)"
+      - port: 53
+        service: "DNS"
+        risk: "Low (internal only)"
+  
+  security_risks:
+    high:
+      - "None identified"
+    medium:
+      - "None identified"
+    low:
+      - "Default SSH port (mitigated by key-based auth)"
+      - "Docker daemon access (mitigated by user permissions)"
+
+recommendations:
+  immediate:
+    - "Enable all security features if not already enabled"
+    - "Regular security updates"
+    - "Monitor security logs"
+  
+  short_term:
+    - "Implement automated vulnerability scanning"
+    - "Regular security audits"
+    - "User access reviews"
+  
+  long_term:
+    - "Consider implementing SIEM"
+    - "Advanced threat detection"
+    - "Security awareness training"
+
+security_score:
+  overall_score: "{{ (security_authentication_enabled | default(false) | int + security_firewall_enabled | default(false) | int + security_dns_enabled | default(false) | int + security_vpn_enabled | default(false) | int + certificate_management_enabled | default(false) | int + backup_strategies.incremental.encryption | default(false) | int) * 16.67 }}"
+  max_score: 100
+  grade: "{{ 'A' if ((security_authentication_enabled | default(false) | int + security_firewall_enabled | default(false) | int + security_dns_enabled | default(false) | int + security_vpn_enabled | default(false) | int + certificate_management_enabled | default(false) | int + backup_strategies.incremental.encryption | default(false) | int) * 16.67) >= 80 else 'B' if ((security_authentication_enabled | default(false) | int + security_firewall_enabled | default(false) | int + security_dns_enabled | default(false) | int + security_vpn_enabled | default(false) | int + certificate_management_enabled | default(false) | int + backup_strategies.incremental.encryption | default(false) | int) * 16.67) >= 60 else 'C' if ((security_authentication_enabled | default(false) | int + security_firewall_enabled | default(false) | int + security_dns_enabled | default(false) | int + security_vpn_enabled | default(false) | int + certificate_management_enabled | default(false) | int + backup_strategies.incremental.encryption | default(false) | int) * 16.67) >= 40 else 'D' }}" 

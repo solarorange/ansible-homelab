@@ -1,0 +1,70 @@
+[Unit]
+Description=Enhanced Logging Infrastructure Service
+Documentation=https://github.com/your-repo/ansible_homelab
+After=network.target docker.service
+Wants=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User={{ username }}
+Group={{ username }}
+WorkingDirectory={{ docker_dir }}/monitoring/logging
+
+# Environment variables
+Environment=LOKI_URL=http://loki:3100
+Environment=PROMETHEUS_URL=http://prometheus:9090
+Environment=LOG_DIR={{ logs_dir }}
+Environment=DOCKER_DIR={{ docker_dir }}
+
+# ExecStart - Initialize enhanced logging
+ExecStart=/bin/bash -c '
+    echo "Starting Enhanced Logging Infrastructure..."
+    
+    # Create necessary directories
+    mkdir -p {{ docker_dir }}/monitoring/logging/{scripts,service-configs,dashboards,alerting-rules}
+    mkdir -p {{ logs_dir }}/{paperless-ngx,fing,certificate_management,automation,utilities}/{application,nginx,backup,health,security,performance,errors,maintenance}
+    
+    # Set proper permissions
+    chown -R {{ username }}:{{ username }} {{ docker_dir }}/monitoring/logging
+    chown -R {{ username }}:{{ username }} {{ logs_dir }}
+    
+    # Initialize correlation ID system
+    touch {{ docker_dir }}/monitoring/logging/correlation-ids.txt
+    chown {{ username }}:{{ username }} {{ docker_dir }}/monitoring/logging/correlation-ids.txt
+    
+    # Verify Loki connectivity
+    timeout 30 bash -c "until curl -s http://loki:3100/ready; do sleep 2; done"
+    
+    # Verify Prometheus connectivity
+    timeout 30 bash -c "until curl -s http://prometheus:9090/-/healthy; do sleep 2; done"
+    
+    echo "Enhanced Logging Infrastructure started successfully"
+'
+
+# ExecStop - Cleanup enhanced logging
+ExecStop=/bin/bash -c '
+    echo "Stopping Enhanced Logging Infrastructure..."
+    
+    # Backup correlation IDs
+    if [ -f {{ docker_dir }}/monitoring/logging/correlation-ids.txt ]; then
+        cp {{ docker_dir }}/monitoring/logging/correlation-ids.txt {{ docker_dir }}/monitoring/logging/correlation-ids.txt.backup
+    fi
+    
+    echo "Enhanced Logging Infrastructure stopped"
+'
+
+# Restart policy
+Restart=on-failure
+RestartSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ docker_dir }}/monitoring/logging {{ logs_dir }}
+
+[Install]
+WantedBy=multi-user.target 

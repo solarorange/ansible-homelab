@@ -1,0 +1,42 @@
+---
+# Automation Stack Deployment
+
+- name: Create docker-compose for automation stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/automation/docker-compose.yml"
+    owner: "{{ automation_username }}"
+    group: "{{ automation_username }}"
+    mode: "0644"
+
+- name: Prepare Automation secret files
+  ansible.builtin.import_tasks: "../../automation/tasks/secrets.yml"
+  vars:
+    service_name: "automation"
+    secret_dir_root: "{{ docker_dir }}/automation"
+    secret_files: "{{ automation_secret_files if automation_manage_secret_files else [] }}"
+  when: automation_manage_secret_files | bool
+
+- name: Validate required Automation secret files exist
+  ansible.builtin.stat:
+    path: "{{ docker_dir }}/automation/secrets/{{ item }}"
+  register: automation_secret_stats
+  loop: "{{ automation_required_secrets | default([]) }}"
+  when: automation_manage_secret_files | bool and (automation_required_secrets | default([]) | length > 0)
+
+- name: Fail if required Automation secret files are missing
+  ansible.builtin.assert:
+    that: "{{ automation_secret_stats.results | map(attribute='stat.exists') | list | min }}"
+    fail_msg: >-
+      One or more required secret files are missing under {{ docker_dir }}/automation/secrets.
+      Missing: {{ (automation_required_secrets | default([])) | reject('in', (automation_secret_stats.results | selectattr('stat.exists') | map(attribute='item') | list)) | list }}
+  when: automation_manage_secret_files | bool and (automation_required_secrets | default([]) | length > 0)
+
+- name: Deploy automation stack safely with rollback
+  ansible.builtin.include_tasks: "compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "automation"
+    project_src: "{{ docker_dir }}/automation"
+    compose_files:
+      - docker-compose.yml
+  tags: [automation, deploy, rollback]

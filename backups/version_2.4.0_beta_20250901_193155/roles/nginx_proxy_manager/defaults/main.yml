@@ -1,0 +1,293 @@
+---
+# Nginx_Proxy_Manager Role Configuration
+# Enhanced with comprehensive security, automation, and vault integration
+
+# =============================================================================
+# NGINX_PROXY_MANAGER SERVICE CONFIGURATION
+# =============================================================================
+
+# Service Information
+nginx_proxy_manager_service_name: "nginx_proxy_manager"
+nginx_proxy_manager_container_name: "{{ nginx_proxy_manager_service_name }}"
+nginx_proxy_manager_image: "jc21/nginx-proxy-manager:latest"
+nginx_proxy_manager_version: "latest"
+
+# Network Configuration
+nginx_proxy_manager_port: 81
+nginx_proxy_manager_external_port: "{{ nginx_proxy_manager_port }}"
+nginx_proxy_manager_protocol: "http"
+nginx_proxy_manager_host: "{{ ansible_default_ipv4.address }}"
+nginx_proxy_manager_url: "{{ nginx_proxy_manager_protocol }}://{{ nginx_proxy_manager_host }}:{{ nginx_proxy_manager_port }}"
+
+# Domain Configuration
+nginx_proxy_manager_subdomain: "nginx_proxy_manager"
+nginx_proxy_manager_domain: "{{ nginx_proxy_manager_subdomain }}.{{ domain }}"
+nginx_proxy_manager_external_url: "https://{{ nginx_proxy_manager_domain }}"
+
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# Authentication
+nginx_proxy_manager_auth_enabled: true
+nginx_proxy_manager_auth_method: "authentik"  # Options: basic, authentik, none
+nginx_proxy_manager_admin_username: "admin"
+nginx_proxy_manager_admin_password: "{{ vault_nginx_proxy_manager_admin_password }}"
+
+# API Configuration
+nginx_proxy_manager_api_key: "{{ vault_nginx_proxy_manager_api_key }}"
+nginx_proxy_manager_api_token: "{{ vault_nginx_proxy_manager_api_token }}"
+
+# Encryption & Security
+nginx_proxy_manager_secret_key: "{{ vault_nginx_proxy_manager_secret_key }}"
+nginx_proxy_manager_encryption_key: "{{ vault_nginx_proxy_manager_encryption_key }}"
+nginx_proxy_manager_jwt_secret: "{{ vault_nginx_proxy_manager_jwt_secret }}"
+
+# SSL/TLS Configuration
+nginx_proxy_manager_ssl_enabled: true
+nginx_proxy_manager_ssl_cert: "{{ vault_ssl_certificate | default('') }}"
+nginx_proxy_manager_ssl_key: "{{ vault_ssl_private_key | default('') }}"
+nginx_proxy_manager_ssl_email: "{{ vault_ssl_email | default('admin@' + domain) }}"
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+# Database Settings
+nginx_proxy_manager_database_type: "postgresql"  # Options: sqlite, postgresql, mysql
+nginx_proxy_manager_database_host: "{{ databases_postgresql_host | default('postgresql') }}"
+nginx_proxy_manager_database_port: "{{ databases_postgresql_port | default(5432) }}"
+nginx_proxy_manager_database_name: "nginx_proxy_manager"
+nginx_proxy_manager_database_username: "nginx_proxy_manager"
+nginx_proxy_manager_database_password: "{{ vault_nginx_proxy_manager_database_password }}"
+
+# Redis Configuration (if using)
+nginx_proxy_manager_redis_enabled: false
+nginx_proxy_manager_redis_host: "{{ redis_host | default('redis') }}"
+nginx_proxy_manager_redis_port: "{{ redis_port | default(6379) }}"
+nginx_proxy_manager_redis_password: "{{ vault_nginx_proxy_manager_redis_password }}"
+nginx_proxy_manager_redis_database: 0
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# Data Directories
+nginx_proxy_manager_data_dir: "{{ homelab_data_dir }}/nginx_proxy_manager"
+nginx_proxy_manager_config_dir: "{{ nginx_proxy_manager_data_dir }}/config"
+nginx_proxy_manager_backup_dir: "{{ nginx_proxy_manager_data_dir }}/backups"
+
+# Volume Mappings
+nginx_proxy_manager_volumes:
+  - "{{ nginx_proxy_manager_config_dir }}:/config"
+  - "{{ nginx_proxy_manager_backup_dir }}:/backups"
+  - "/etc/localtime:/etc/localtime:ro"
+
+# =============================================================================
+# MONITORING & HEALTH CHECKS
+# =============================================================================
+
+# Health Check Configuration
+nginx_proxy_manager_health_check_enabled: true
+nginx_proxy_manager_health_check_path: "/health"
+nginx_proxy_manager_health_check_interval: 30
+nginx_proxy_manager_health_check_timeout: 10
+nginx_proxy_manager_health_check_retries: 3
+
+# Monitoring Integration
+nginx_proxy_manager_monitoring_enabled: true
+nginx_proxy_manager_prometheus_enabled: true
+nginx_proxy_manager_grafana_enabled: true
+
+# =============================================================================
+# BACKUP & RECOVERY
+# =============================================================================
+
+# Backup Configuration
+nginx_proxy_manager_backup_enabled: true
+nginx_proxy_manager_backup_schedule: "0 2 * * *"  # Daily at 2 AM
+nginx_proxy_manager_backup_retention_days: 30
+nginx_proxy_manager_backup_encryption_enabled: true
+nginx_proxy_manager_backup_encryption_key: "{{ vault_backup_encryption_key }}"
+
+# =============================================================================
+# NOTIFICATION CONFIGURATION
+# =============================================================================
+
+# Email Notifications
+nginx_proxy_manager_smtp_enabled: false
+nginx_proxy_manager_smtp_host: "{{ smtp_host | default('') }}"
+nginx_proxy_manager_smtp_port: "{{ smtp_port | default(587) }}"
+nginx_proxy_manager_smtp_username: "{{ vault_smtp_username }}"
+nginx_proxy_manager_smtp_password: "{{ vault_nginx_proxy_manager_smtp_password }}"
+nginx_proxy_manager_smtp_from: "{{ nginx_proxy_manager_admin_email | default('admin@' + domain) }}"
+nginx_proxy_manager_smtp_to: "{{ admin_email | default('admin@' + domain) }}"
+
+# Webhook Notifications
+nginx_proxy_manager_webhook_enabled: false
+nginx_proxy_manager_webhook_url: "{{ vault_webhook_url | default('') }}"
+nginx_proxy_manager_webhook_secret: "{{ vault_webhook_secret | default('') }}"
+
+# =============================================================================
+# INTEGRATION CONFIGURATION
+# =============================================================================
+
+# Service Discovery
+nginx_proxy_manager_discovery_enabled: true
+nginx_proxy_manager_discovery_services:
+  - name: "grafana"
+    url: "{{ grafana_external_url | default('') }}"
+    api_key: "{{ vault_grafana_api_key }}"
+  - name: "prometheus"
+    url: "{{ prometheus_external_url | default('') }}"
+    api_key: "{{ vault_prometheus_api_key }}"
+
+# =============================================================================
+# PERFORMANCE & OPTIMIZATION
+# =============================================================================
+
+# Resource Limits
+nginx_proxy_manager_cpu_limit: "1.0"
+nginx_proxy_manager_memory_limit: "1g"
+nginx_proxy_manager_memory_reservation: "512m"
+
+# Performance Settings
+nginx_proxy_manager_scan_interval: 10
+nginx_proxy_manager_parallel_downloads: 3
+nginx_proxy_manager_auto_download_enabled: true
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Log Settings
+nginx_proxy_manager_log_level: "info"  # Options: trace, debug, info, warn, error
+nginx_proxy_manager_log_rotation_enabled: true
+nginx_proxy_manager_log_retention_days: 30
+
+# =============================================================================
+# SECURITY HEADERS & WAF
+# =============================================================================
+
+# Security Headers
+nginx_proxy_manager_security_headers:
+  X-Frame-Options: "SAMEORIGIN"
+  X-Content-Type-Options: "nosniff"
+  X-XSS-Protection: "1; mode=block"
+  Referrer-Policy: "strict-origin-when-cross-origin"
+  Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+  Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+  Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+# Rate Limiting
+nginx_proxy_manager_rate_limit_enabled: true
+nginx_proxy_manager_rate_limit_requests: 100
+nginx_proxy_manager_rate_limit_window: 60
+
+# =============================================================================
+# DEPLOYMENT CONFIGURATION
+# =============================================================================
+
+# Deployment Settings
+nginx_proxy_manager_deploy_enabled: true
+nginx_proxy_manager_deploy_method: "docker"  # Options: docker, docker-compose, kubernetes
+nginx_proxy_manager_restart_policy: "unless-stopped"
+nginx_proxy_manager_auto_update_enabled: true
+
+# Environment Variables
+nginx_proxy_manager_environment:
+  PUID: "{{ ansible_user_id | default(1000) }}"
+  PGID: "{{ ansible_group_id | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  NGINX_PROXY_MANAGER_API_KEY: "{{ nginx_proxy_manager_api_key }}"
+  NGINX_PROXY_MANAGER_SECRET_KEY: "{{ nginx_proxy_manager_secret_key }}"
+  NGINX_PROXY_MANAGER_ENCRYPTION_KEY: "{{ nginx_proxy_manager_encryption_key }}"
+  NGINX_PROXY_MANAGER_JWT_SECRET: "{{ nginx_proxy_manager_jwt_secret }}"
+
+# =============================================================================
+# VALIDATION & TESTING
+# =============================================================================
+
+# Validation Settings
+nginx_proxy_manager_validation_enabled: true
+nginx_proxy_manager_validation_timeout: 300
+nginx_proxy_manager_validation_retries: 3
+
+# Testing Configuration
+nginx_proxy_manager_test_enabled: false
+nginx_proxy_manager_test_items: 3
+
+# =============================================================================
+# COMPLIANCE & GOVERNANCE
+# =============================================================================
+
+# Compliance Settings
+nginx_proxy_manager_compliance_enabled: true
+nginx_proxy_manager_audit_logging_enabled: true
+nginx_proxy_manager_access_logging_enabled: true
+
+# =============================================================================
+# AUTOMATION CONFIGURATION
+# =============================================================================
+
+# Automation Scripts
+nginx_proxy_manager_automation_enabled: true
+nginx_proxy_manager_automation_scripts:
+  - name: "health_check"
+    script: "health_check.py"
+    schedule: "*/5 * * * *"
+  - name: "backup"
+    script: "backup.py"
+    schedule: "0 2 * * *"
+  - name: "cleanup"
+    script: "cleanup.py"
+    schedule: "0 3 * * *"
+
+# =============================================================================
+# DEFAULTS & FALLBACKS
+# =============================================================================
+
+# Default Values
+nginx_proxy_manager_admin_email: "{{ admin_email | default('admin@' + domain) }}"
+nginx_proxy_manager_monitoring_email: "{{ monitoring_email | default('monitoring@' + domain) }}"
+
+# Fallback Configuration
+nginx_proxy_manager_fallback_enabled: true
+nginx_proxy_manager_fallback_services:
+  - name: "grafana"
+    url: "{{ grafana_url | default('') }}"
+  - name: "prometheus"
+    url: "{{ prometheus_url | default('') }}"
+
+# =============================================================================
+# SECRETS MANAGEMENT (FILES MOUNTED AT /run/secrets)
+# =============================================================================
+
+nginx_proxy_manager_manage_secret_files: true
+
+nginx_proxy_manager_secret_files:
+  # MySQL root password used in DB healthcheck
+  - name: "MYSQL_ROOT_PASSWORD"
+    value: "{{ vault_npm_db_root_password }}"
+  # App DB password
+  - name: "MYSQL_PASSWORD"
+    value: "{{ nginx_proxy_manager_database_password | default(nginx_proxy_manager_db_env.MYSQL_PASSWORD | default('')) }}"
+  # Automation token
+  - name: "NPM_API_TOKEN"
+    value: "{{ npm_api_token | default(vault_nginx_proxy_manager_api_token | default('')) }}"
+  # Core app secrets
+  - { name: "NPM_ADMIN_PASSWORD", value: "{{ nginx_proxy_manager_admin_password | default('') }}" }
+  - { name: "NPM_API_KEY", value: "{{ nginx_proxy_manager_api_key | default('') }}" }
+  - { name: "NPM_SECRET_KEY", value: "{{ nginx_proxy_manager_secret_key | default('') }}" }
+  - { name: "NPM_ENCRYPTION_KEY", value: "{{ nginx_proxy_manager_encryption_key | default('') }}" }
+  - { name: "NPM_JWT_SECRET", value: "{{ nginx_proxy_manager_jwt_secret | default('') }}" }
+  - { name: "NPM_SMTP_PASSWORD", value: "{{ nginx_proxy_manager_smtp_password | default('') }}" }
+
+nginx_proxy_manager_required_secrets:
+  - NPM_ADMIN_PASSWORD
+  - NPM_SECRET_KEY
+  - NPM_ENCRYPTION_KEY
+  - NPM_JWT_SECRET
+
+# Prefer Traefik ingress; gate direct host port exposure
+nginx_proxy_manager_direct_expose_enabled: false

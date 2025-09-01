@@ -1,0 +1,45 @@
+---
+# Prometheus Deployment Tasks
+
+- name: Render Prometheus docker-compose
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/monitoring/prometheus-docker-compose.yml.j2"
+    dest: "{{ docker_dir }}/monitoring/prometheus/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: "0644"
+
+- name: Deploy Prometheus with rollback
+  ansible.builtin.include_tasks: "../../automation/tasks/compose_deploy_with_rollback.yml"
+  vars:
+    service_name: "prometheus"
+    project_src: "{{ docker_dir }}/monitoring/prometheus"
+    compose_files:
+      - docker-compose.yml
+    wait_for_ports: "{{ [prometheus_port | default(9090)] if (prometheus_direct_expose_enabled | default(false)) else [] }}"
+  tags: [prometheus, deploy, rollback]
+
+- name: Wait for Prometheus local port (only if directly exposed)
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ prometheus_port | default(9090) }}/-/healthy"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: prometheus_health_local
+  retries: 5
+  delay: 10
+  until: prometheus_health_local.status == 200
+  when: prometheus_direct_expose_enabled | default(false)
+  tags: [prometheus, deploy, health]
+
+- name: Wait for Prometheus via Traefik route (default)
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "https://prometheus.{{ domain }}/-/healthy"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  when: not (prometheus_direct_expose_enabled | default(false))
+  tags: [prometheus, deploy, health]
+

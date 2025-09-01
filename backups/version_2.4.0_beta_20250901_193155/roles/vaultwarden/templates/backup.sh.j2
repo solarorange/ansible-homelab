@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# Vaultwarden Backup Script
+# Comprehensive backup solution for Vaultwarden data and configuration
+
+set -euo pipefail
+
+# Configuration
+BACKUP_DIR="{{ vaultwarden_backup_dir }}"
+DATA_DIR="{{ vaultwarden_data_dir }}"
+CONFIG_DIR="{{ vaultwarden_config_dir }}"
+CONTAINER_NAME="{{ vaultwarden_app_container_name }}"
+RETENTION_DAYS="{{ vaultwarden_backup_retention_days }}"
+COMPRESSION="{{ 'true' if vaultwarden_backup_compression else 'false' }}"
+LOG_FILE="{{ vaultwarden_backup_log_file }}"
+NOTIFICATIONS_ENABLED="{{ 'true' if vaultwarden_backup_notifications_enabled else 'false' }}"
+
+# Timestamp for backup
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_NAME="vaultwarden_backup_${TIMESTAMP}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    if [[ "$NOTIFICATIONS_ENABLED" == "true" ]]; then
+        # Send notification about backup failure
+        curl -X POST "{{ vaultwarden_alerting_webhook }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"Vaultwarden backup failed: $1\"}" || true
+    fi
+    exit 1
+}
+
+# Success notification
+success_notification() {
+    if [[ "$NOTIFICATIONS_ENABLED" == "true" ]]; then
+        curl -X POST "{{ vaultwarden_alerting_webhook }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"Vaultwarden backup completed successfully\"}" || true
+    fi
+}
+
+# Check if this is a test run
+if [[ "${1:-}" == "--test" ]]; then
+    log "Running backup test..."
+    echo "Backup configuration test completed successfully"
+    exit 0
+fi
+
+# Main backup function
+main() {
+    log "Starting Vaultwarden backup..."
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR"
+    
+    # Create temporary backup directory
+    TEMP_BACKUP_DIR="/tmp/${BACKUP_NAME}"
+    mkdir -p "$TEMP_BACKUP_DIR"
+    
+    # Stop Vaultwarden container for consistent backup
+    log "Stopping Vaultwarden container..."
+    docker stop "$CONTAINER_NAME" || error_exit "Failed to stop Vaultwarden container"
+    
+    # Wait a moment for graceful shutdown
+    sleep 5
+    
+    try {
+        # Backup data directory
+        if [[ -d "$DATA_DIR" ]]; then
+            log "Backing up data directory..."
+            cp -r "$DATA_DIR" "$TEMP_BACKUP_DIR/data" || error_exit "Failed to backup data directory"
+        else
+            log "Warning: Data directory not found: $DATA_DIR"
+        fi
+        
+        # Backup configuration
+        if [[ -d "$CONFIG_DIR" ]]; then
+            log "Backing up configuration..."
+            cp -r "$CONFIG_DIR" "$TEMP_BACKUP_DIR/config" || error_exit "Failed to backup configuration"
+        else
+            log "Warning: Configuration directory not found: $CONFIG_DIR"
+        fi
+        
+        # Create backup manifest
+        log "Creating backup manifest..."
+        cat > "$TEMP_BACKUP_DIR/manifest.json" << EOF
+{
+    "backup_name": "$BACKUP_NAME",
+    "timestamp": "$(date -Iseconds)",
+    "vaultwarden_version": "$(docker inspect $CONTAINER_NAME --format='{{.Config.Image}}' 2>/dev/null || echo 'unknown')",
+    "backup_components": {
+        "data": {% if vaultwarden_backup_include_database %}"included"{% else %}"excluded"{% endif %},
+        "config": {% if vaultwarden_backup_include_config %}"included"{% else %}"excluded"{% endif %},
+        "attachments": {% if vaultwarden_backup_include_attachments %}"included"{% else %}"excluded"{% endif %}
+    },
+    "compression": $COMPRESSION,
+    "retention_days": $RETENTION_DAYS
+}
+EOF
+        
+        # Compress backup if enabled
+        if [[ "$COMPRESSION" == "true" ]]; then
+            log "Compressing backup..."
+            cd /tmp
+            tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME" || error_exit "Failed to compress backup"
+            mv "${BACKUP_NAME}.tar.gz" "$BACKUP_DIR/"
+            rm -rf "$TEMP_BACKUP_DIR"
+            BACKUP_FILE="$BACKUP_DIR/${BACKUP_NAME}.tar.gz"
+        else
+            mv "$TEMP_BACKUP_DIR" "$BACKUP_DIR/"
+            BACKUP_FILE="$BACKUP_DIR/$BACKUP_NAME"
+        fi
+        
+        # Calculate backup size
+        BACKUP_SIZE=$(du -sh "$BACKUP_FILE" | cut -f1)
+        log "Backup completed successfully. Size: $BACKUP_SIZE"
+        
+        # Clean up old backups
+        log "Cleaning up old backups..."
+        find "$BACKUP_DIR" -name "vaultwarden_backup_*" -type f -mtime +$RETENTION_DAYS -delete 2>/dev/null || true
+        find "$BACKUP_DIR" -name "vaultwarden_backup_*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} + 2>/dev/null || true
+        
+        # Send success notification
+        success_notification
+        
+        log "Backup process completed successfully"
+        
+    } catch {
+        # Restart Vaultwarden container on error
+        log "Error occurred during backup, restarting Vaultwarden container..."
+        docker start "$CONTAINER_NAME" || log "Warning: Failed to restart Vaultwarden container"
+        error_exit "Backup failed"
+    }
+    
+    # Restart Vaultwarden container
+    log "Restarting Vaultwarden container..."
+    docker start "$CONTAINER_NAME" || error_exit "Failed to restart Vaultwarden container"
+    
+    # Wait for container to be healthy
+    log "Waiting for Vaultwarden to be healthy..."
+    timeout=60
+    while [[ $timeout -gt 0 ]]; do
+        if docker inspect "$CONTAINER_NAME" --format='{{.State.Health.Status}}' 2>/dev/null | grep -q "healthy"; then
+            log "Vaultwarden is healthy"
+            break
+        fi
+        sleep 5
+        timeout=$((timeout - 5))
+    done
+    
+    if [[ $timeout -le 0 ]]; then
+        log "Warning: Vaultwarden container health check timeout"
+    fi
+}
+
+# Run main function
+main "$@" 

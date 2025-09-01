@@ -1,0 +1,176 @@
+---
+# Pezzo Deployment Tasks
+# Deploy Pezzo services using Docker Compose
+
+- name: Stop existing Pezzo containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ pezzo_config_dir }}"
+    state: absent
+  tags: [pezzo, deploy]
+
+- name: Pull latest Pezzo Docker images
+  community.docker.docker_image:
+    name: "{{ item }}"
+    source: pull
+    force_source: yes
+  loop:
+    - "{{ pezzo_components.server.image }}"
+    - "{{ pezzo_components.console.image }}"
+    - "{{ pezzo_components.proxy.image }}"
+    - "{{ pezzo_components.postgres.image }}"
+    - "{{ pezzo_components.redis.image }}"
+    - "{{ pezzo_components.clickhouse.image }}"
+    - "{{ pezzo_components.supertokens.image }}"
+    - "{{ pezzo_components.local-kms.image }}"
+  tags: [pezzo, deploy]
+
+- name: Deploy Pezzo services with Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ pezzo_config_dir }}"
+    state: present
+    build: no
+    pull: yes
+    remove_orphans: yes
+  tags: [pezzo, deploy]
+
+- name: Wait for Pezzo services to start
+  ansible.builtin.wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ item }}"
+    delay: 10
+    timeout: 300
+  loop:
+    - "{{ pezzo_server_port }}"
+    - "{{ pezzo_console_port }}"
+    - "{{ pezzo_proxy_port }}"
+  tags: [pezzo, deploy]
+
+- name: Check Pezzo container status
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  register: container_status
+  loop:
+    - "{{ pezzo_server_container_name }}"
+    - "{{ pezzo_console_container_name }}"
+    - "{{ pezzo_proxy_container_name }}"
+    - "{{ pezzo_postgres_container_name }}"
+    - "{{ pezzo_redis_container_name }}"
+    - "{{ pezzo_clickhouse_container_name }}"
+    - "{{ pezzo_supertokens_container_name }}"
+    - "{{ pezzo_local_kms_container_name }}"
+  tags: [pezzo, deploy]
+
+- name: Display Pezzo container status
+  ansible.builtin.debug:
+    msg: "Container {{ item.container.Name }} is {{ item.container.State.Status }}"
+  loop: "{{ container_status.results }}"
+  tags: [pezzo, deploy]
+
+- name: Verify Pezzo health endpoints
+  ansible.builtin.uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ item.port }}{{ item.path }}"
+    method: GET
+    status_code: 200
+    timeout: 30
+  register: health_check
+  loop:
+    - { port: "{{ pezzo_server_port }}", path: "/api/healthz" }
+    - { port: "{{ pezzo_console_port }}", path: "/health" }
+    - { port: "{{ pezzo_proxy_port }}", path: "/health" }
+  tags: [pezzo, deploy]
+  when: pezzo_direct_expose_enabled | default(false)
+
+- name: Verify Pezzo route health (Traefik)
+  ansible.builtin.include_tasks: ../../automation/tasks/route_health_check.yml
+  vars:
+    route_health_check_url: "{{ item.url }}"
+    route_health_check_status_codes: [200, 302, 401]
+    route_health_check_timeout: 30
+    route_health_check_retries: 10
+    route_health_check_delay: 10
+  loop:
+    - { url: "https://api.{{ pezzo_subdomain }}.{{ domain }}/api/healthz" }
+    - { url: "https://{{ pezzo_subdomain }}.{{ domain }}/health" }
+    - { url: "https://proxy.{{ pezzo_subdomain }}.{{ domain }}/health" }
+  loop_control:
+    loop_var: item
+  tags: [pezzo, deploy]
+  when: not (pezzo_direct_expose_enabled | default(false))
+
+- name: Display Pezzo health check results
+  ansible.builtin.debug:
+    msg: "Health check for {{ item.url }} returned status {{ item.status }}"
+  loop: "{{ health_check.results }}"
+  tags: [pezzo, deploy]
+
+- name: Start Pezzo systemd service
+  ansible.builtin.systemd:
+    name: pezzo
+    state: started
+    enabled: yes
+  tags: [pezzo, deploy]
+
+- name: Wait for Pezzo systemd service to be active
+  ansible.builtin.wait_for:
+    path: /run/systemd/system/pezzo.service
+    timeout: 60
+  tags: [pezzo, deploy]
+
+- name: Check Pezzo systemd service status
+  ansible.builtin.systemd:
+    name: pezzo
+  register: pezzo_service_status
+  tags: [pezzo, deploy]
+
+- name: Display Pezzo service status
+  ansible.builtin.debug:
+    msg: "Pezzo systemd service is {{ pezzo_service_status.status.ActiveState }}"
+  tags: [pezzo, deploy]
+
+- name: Create Pezzo service verification script
+  ansible.builtin.template:
+    src: verify_service.sh.j2
+    dest: "{{ pezzo_config_dir }}/verify_service.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, deploy]
+
+- name: Run Pezzo service verification
+  ansible.builtin.command: "{{ pezzo_config_dir }}/verify_service.sh"
+  register: verification_result
+  changed_when: false
+  tags: [pezzo, deploy]
+
+- name: Display Pezzo verification results
+  ansible.builtin.debug:
+    msg: "{{ verification_result.stdout_lines }}"
+  tags: [pezzo, deploy]
+
+- name: Create Pezzo service management script
+  ansible.builtin.template:
+    src: manage_service.sh.j2
+    dest: "{{ pezzo_config_dir }}/manage_service.sh"
+    mode: '0755'
+    owner: "{{ username }}"
+    group: "{{ username }}"
+  tags: [pezzo, deploy]
+
+- name: Display Pezzo deployment summary
+  ansible.builtin.debug:
+    msg: |
+      Pezzo Deployment Complete:
+      - Server: http://{{ pezzo_subdomain }}.{{ domain }}:{{ pezzo_server_port }}
+      - Console: http://console.{{ pezzo_subdomain }}.{{ domain }}:{{ pezzo_console_port }}
+      - Proxy: http://proxy.{{ pezzo_subdomain }}.{{ domain }}:{{ pezzo_proxy_port }}
+      - Database: {{ pezzo_database_host }}:{{ pezzo_database_port }}
+      - Redis: {{ pezzo_redis_host }}:{{ pezzo_redis_port }}
+      - ClickHouse: {{ pezzo_clickhouse_host }}:{{ pezzo_clickhouse_port }}
+      - SuperTokens: {{ pezzo_supertokens_container_name }}:3567
+      - Local KMS: {{ pezzo_local_kms_container_name }}:9981
+      - Configuration: {{ pezzo_config_dir }}
+      - Logs: {{ logs_dir }}/pezzo
+      - Backup: {{ pezzo_backup_dir }}
+      - Management Script: {{ pezzo_config_dir }}/manage_service.sh
+      - Verification Script: {{ pezzo_config_dir }}/verify_service.sh
+  tags: [pezzo, deploy]

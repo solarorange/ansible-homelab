@@ -1,0 +1,89 @@
+---
+# Telegraf Validation Tasks
+# Comprehensive validation for security, configuration, and deployment readiness
+
+- name: Validate Telegraf vault variables
+  block:
+    - name: Check required Telegraf vault variables
+      assert:
+        that:
+          - vault_telegraf_admin_password is defined
+          - vault_telegraf_database_password is defined
+          - vault_telegraf_api_key is defined
+          - vault_telegraf_secret_key is defined
+          - vault_telegraf_encryption_key is defined
+          - vault_telegraf_jwt_secret is defined
+        fail_msg: "Required Telegraf vault variables are not defined"
+        success_msg: "All required Telegraf vault variables are defined"
+
+    - name: Validate Telegraf password complexity
+      assert:
+        that:
+          - vault_telegraf_admin_password | length >= 12
+          - vault_telegraf_database_password | length >= 12
+        fail_msg: "Telegraf passwords must be at least 12 characters long"
+        success_msg: "Telegraf password complexity requirements met"
+
+- name: Validate Telegraf network configuration
+  block:
+    - name: Check Telegraf port configuration
+      assert:
+        that:
+          - telegraf_port is defined
+          - telegraf_port | int >= 1024
+          - telegraf_port | int <= 65535
+        fail_msg: "Telegraf port must be between 1024 and 65535"
+        success_msg: "Telegraf port configuration is valid"
+
+    - name: Check Telegraf domain configuration
+      assert:
+        that:
+          - domain is defined
+          - telegraf_subdomain is defined
+        fail_msg: "Telegraf domain configuration is incomplete"
+        success_msg: "Telegraf domain configuration is valid"
+
+- name: Validate Telegraf security configuration
+  block:
+    - name: Check Telegraf SSL configuration
+      assert:
+        that:
+          - telegraf_ssl_enabled | bool
+          - vault_ssl_email is defined or vault_ssl_email | default('') != ''
+        fail_msg: "Telegraf SSL configuration is invalid"
+        success_msg: "Telegraf SSL configuration is valid"
+
+    - name: Check Telegraf authentication configuration
+      assert:
+        that:
+          - telegraf_auth_enabled | bool
+          - telegraf_auth_method in ['basic', 'authentik', 'none']
+        fail_msg: "Telegraf authentication configuration is invalid"
+        success_msg: "Telegraf authentication configuration is valid"
+
+- name: Validate Telegraf storage configuration
+  block:
+    - name: Check Telegraf data directories
+      assert:
+        that:
+          - telegraf_data_dir is defined
+          - telegraf_config_dir is defined
+          - telegraf_backup_dir is defined
+        fail_msg: "Telegraf storage configuration is incomplete"
+        success_msg: "Telegraf storage configuration is valid"
+
+    - name: Create Telegraf directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id | default(1000) }}"
+        group: "{{ ansible_group_id | default(1000) }}"
+      loop:
+        - "{{ telegraf_data_dir }}"
+        - "{{ telegraf_config_dir }}"
+        - "{{ telegraf_backup_dir }}"
+
+- name: Final validation summary
+  debug:
+    msg: "Telegraf validation completed successfully - all configurations are valid and secure"
