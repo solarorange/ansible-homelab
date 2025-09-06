@@ -23,8 +23,9 @@ services:
       - "{{ media_dir }}/tv:/tv"
       - "{{ downloads_dir }}:/downloads"
       - "{{ logs_dir }}/sonarr:/var/log/sonarr"
-    ports:
-      - "8989:8989"
+    # NETWORK: Prefer Traefik ingress; avoid direct host port exposure.
+    # ports:
+    #   - "8989:8989"
     networks:
       - homelab
       - monitoring
@@ -73,8 +74,9 @@ services:
       - EXPORTER__CONFIG_PATH=/config/exporter.yml
     volumes:
       - "{{ config_dir }}/sonarr-exporter:/config"
-    ports:
-      - "9705:9705"
+    # NETWORK: Exporter should be scraped internally; avoid host mapping.
+    # ports:
+    #   - "9705:9705"
     networks:
       - monitoring
     labels:

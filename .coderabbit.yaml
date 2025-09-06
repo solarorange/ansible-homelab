@@ -1,123 +1,200 @@
 # CodeRabbit Configuration for Ansible Homelab
-# Focus: Functionality, reliability, and production readiness
+# CodeRabbit AI-Enhanced: Production-ready with comprehensive quality gates
+# Focus: Functionality, reliability, security, and production readiness
 
-# Global settings
-global:
-  # Focus on code quality and functionality over new features
-  focus: "functionality,reliability,production-readiness"
-  
-  # Language-specific settings
+# Main reviews configuration block
+reviews:
+  # Global review settings
+  global:
+    # Focus on code quality and functionality over new features
+    focus: "functionality,reliability,production-readiness,security,performance"
+    
+    # Review priority - focus on critical issues that affect functionality and security
+    priority: "critical,high,security"
+    
+    # Review scope - comprehensive coverage
+    scope:
+      - "ansible playbooks and roles"
+      - "docker compose templates"
+      - "security configurations"
+      - "automation scripts"
+      - "deployment workflows"
+      - "jinja templates"
+      - "python modules"
+      - "shell scripts"
+      - "css styling"
+      - "documentation"
+    
+    # Exclude non-functional changes
+    exclude:
+      - "documentation only changes"
+      - "cosmetic formatting"
+      - "test files"
+      - "backup files"
+      - "log files"
+      - "temporary files"
+
+  # Tool-specific configurations
+  tools:
+    # Ansible-specific rules
+    ansible:
+      # Validate playbook syntax and structure
+      syntax_check: true
+      
+      # Check for common Ansible best practices
+      best_practices: true
+      
+      # Validate variable usage and vault integration
+      variable_validation: true
+      
+      # Check for security issues
+      security_scan: true
+      
+      # Validate privilege escalation
+      privilege_escalation: true
+      
+      # Check for hardcoded secrets
+      secret_detection: true
+      
+      # Validate error handling
+      error_handling: true
+
+    # Docker-specific rules
+    docker:
+      # Validate compose file syntax
+      compose_validation: true
+      
+      # Check for security best practices
+      security_scan: true
+      
+      # Validate environment variable usage
+      env_validation: true
+      
+      # Check for resource limits
+      resource_limits: true
+      
+      # Validate health checks
+      health_check_validation: true
+
+    # Jinja template rules
+    jinja:
+      # Template syntax validation
+      syntax_validation: true
+      
+      # Security vulnerability scanning
+      security_scanning: true
+      
+      # Template injection prevention
+      template_injection: true
+      
+      # XSS prevention
+      xss_prevention: true
+      
+      # Input validation
+      input_validation: true
+      
+      # Variable scoping
+      variable_scoping: true
+      
+      # Performance optimization
+      performance_optimization: true
+
+    # Python rules
+    python:
+      # Code quality and style
+      pep8_compliance: true
+      type_hints: true
+      docstrings: true
+      
+      # Security scanning
+      security_scan: true
+      dependency_audit: true
+      
+      # Performance analysis
+      performance_analysis: true
+      complexity_analysis: true
+      
+      # Testing requirements
+      test_coverage: true
+      unit_tests: true
+
+    # Shell script rules
+    shell:
+      # Security validation
+      security_scan: true
+      injection_prevention: true
+      
+      # Best practices
+      best_practices: true
+      portability: true
+      
+      # Error handling
+      error_handling: true
+      exit_codes: true
+      
+      # Input validation
+      input_validation: true
+      path_handling: true
+
+    # CSS rules
+    css:
+      # Accessibility compliance
+      accessibility: true
+      wcag_compliance: true
+      
+      # Performance optimization
+      performance: true
+      optimization: true
+      
+      # Maintainability
+      maintainability: true
+      architecture: true
+      
+      # Cross-browser compatibility
+      compatibility: true
+
+  # Language-specific settings with enhanced quality gates
   languages:
     yaml:
       # Ansible-specific linting and validation
       linting: true
       formatting: true
       security: true
+      complexity_analysis: true
     python:
       linting: true
       formatting: true
       security: true
+      type_checking: true
+      complexity_analysis: true
+      test_coverage: true
     shell:
       linting: true
       security: true
+      portability: true
+      complexity_analysis: true
+    jinja:
+      syntax_validation: true
+      security_scanning: true
+      template_injection: true
+      xss_prevention: true
+    css:
+      formatting: true
+      accessibility: true
+      performance: true
+      maintainability: true
     markdown:
       formatting: true
+      link_validation: true
 
-# Review settings
-review:
-  # Focus on critical issues that affect functionality
-  priority: "critical,high"
-  
-  # Review scope - focus on core functionality
-  scope:
-    - "ansible playbooks and roles"
-    - "docker compose templates"
-    - "security configurations"
-    - "automation scripts"
-    - "deployment workflows"
-  
-  # Exclude non-functional changes
-  exclude:
-    - "documentation only changes"
-    - "cosmetic formatting"
-    - "test files"
-    - "backup files"
-    - "log files"
-
-# Ansible-specific rules
-ansible:
-  # Validate playbook syntax and structure
-  syntax_check: true
-  
-  # Check for common Ansible best practices
-  best_practices: true
-  
-  # Validate variable usage and vault integration
-  variable_validation: true
-  
-  # Check for security issues
-  security_scan: true
-
-# Docker-specific rules
-docker:
-  # Validate compose file syntax
-  compose_validation: true
-  
-  # Check for security best practices
-  security_scan: true
-  
-  # Validate environment variable usage
-  env_validation: true
-
-# Security focus
-security:
-  # Scan for hardcoded secrets
-  secret_detection: true
-  
-  # Check for privilege escalation issues
-  privilege_escalation: true
-  
-  # Validate SSL/TLS configurations
-  ssl_validation: true
-  
-  # Check firewall and network security
-  network_security: true
-
-# Performance and reliability
-reliability:
-  # Check for resource usage optimization
-  resource_optimization: true
-  
-  # Validate error handling
-  error_handling: true
-  
-  # Check for proper logging
-  logging_validation: true
-  
-  # Validate backup and recovery procedures
-  backup_validation: true
-
-# Comment templates
-comments:
-  # Focus on actionable feedback
-  style: "constructive,actionable"
-  
-  # Include code examples when helpful
-  include_examples: true
-  
-  # Suggest specific improvements
-  suggest_improvements: true
-  
-  # Link to relevant documentation
-  include_documentation: true
-
-# File patterns to focus on
-files:
-  include:
+  # Path-based filtering rules
+  path_filters:
     - "**/*.yml"
     - "**/*.yaml"
     - "**/*.py"
     - "**/*.sh"
+    - "**/*.j2"
+    - "**/*.css"
     - "**/docker-compose*.yml"
     - "**/main.yml"
     - "**/site.yml"
@@ -125,17 +202,146 @@ files:
     - "**/tasks/**/*.yml"
     - "**/handlers/**/*.yml"
     - "**/templates/**/*.j2"
-  
-  exclude:
-    - "**/*.log"
-    - "**/*.backup"
-    - "**/backups/**"
-    - "**/logs/**"
-    - "**/.git/**"
-    - "**/node_modules/**"
-    - "**/__pycache__/**"
-    - "**/*.pyc"
-    - "**/*.pyo"
-    - "**/*.pyd"
-    - "**/.DS_Store"
-    - "**/Thumbs.db"
+    - "**/scripts/**/*.py"
+    - "**/scripts/**/*.sh"
+    - "**/homepage/**/*.css"
+    - "!**/*.log"
+    - "!**/*.backup"
+    - "!**/backups/**"
+    - "!**/logs/**"
+    - "!**/.git/**"
+    - "!**/node_modules/**"
+    - "!**/__pycache__/**"
+    - "!**/*.pyc"
+    - "!**/*.pyo"
+    - "!**/*.pyd"
+    - "!**/.DS_Store"
+    - "!**/Thumbs.db"
+    - "!**/credentials_backup*"
+    - "!**/.vault_password"
+
+  # Quality gates with production standards
+  quality_gates:
+    # Overall quality score threshold
+    overall_score: 8.0
+    
+    # Technical debt threshold
+    technical_debt: 5.0
+    
+    # Security score threshold
+    security_score: 8.5
+    
+    # Maintainability threshold
+    maintainability_score: 80
+    
+    # Test coverage threshold
+    test_coverage: 80
+    
+    # Performance score threshold
+    performance_score: 8.0
+
+  # Comment templates with actionable feedback
+  comments:
+    # Focus on actionable feedback
+    style: "constructive,actionable,production-focused"
+    
+    # Include code examples when helpful
+    include_examples: true
+    
+    # Suggest specific improvements
+    suggest_improvements: true
+    
+    # Link to relevant documentation
+    include_documentation: true
+    
+    # Include security best practices
+    security_guidance: true
+    
+    # Performance optimization tips
+    performance_tips: true
+
+  # Security focus with production standards
+  security:
+    # Scan for hardcoded secrets
+    secret_detection: true
+    
+    # Check for privilege escalation issues
+    privilege_escalation: true
+    
+    # Validate SSL/TLS configurations
+    ssl_validation: true
+    
+    # Check firewall and network security
+    network_security: true
+    
+    # Validate authentication mechanisms
+    authentication: true
+    
+    # Check for injection vulnerabilities
+    injection_prevention: true
+    
+    # Validate input sanitization
+    input_sanitization: true
+    
+    # Check for XSS vulnerabilities
+    xss_prevention: true
+
+  # Performance and reliability
+  reliability:
+    # Check for resource usage optimization
+    resource_optimization: true
+    
+    # Validate error handling
+    error_handling: true
+    
+    # Check for proper logging
+    logging_validation: true
+    
+    # Validate backup and recovery procedures
+    backup_validation: true
+    
+    # Check for monitoring and alerting
+    monitoring_validation: true
+    
+    # Validate health checks
+    health_check_validation: true
+
+  # Automation and CI/CD integration
+  automation:
+    # Automated quality checks
+    quality_checks: true
+    
+    # Automated security scanning
+    security_scanning: true
+    
+    # Automated performance testing
+    performance_testing: true
+    
+    # Automated dependency updates
+    dependency_updates: true
+    
+    # Automated test execution
+    test_execution: true
+    
+    # Automated documentation generation
+    documentation_generation: true
+
+  # Reporting and metrics
+  reporting:
+    # Quality metrics dashboard
+    quality_dashboard: true
+    
+    # Security vulnerability report
+    security_report: true
+    
+    # Performance analysis report
+    performance_report: true
+    
+    # Technical debt analysis
+    technical_debt_report: true
+    
+    # Code coverage report
+    coverage_report: true
+    
+    # Maintainability index
+    maintainability_index: true

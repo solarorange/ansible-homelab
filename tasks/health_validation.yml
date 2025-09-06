@@ -1,0 +1,134 @@
+---
+# COMMENT: Production Health Validation Tasks
+# COMMENT: Comprehensive health checks for all deployed services
+# COMMENT: Ensures production deployment success and service availability
+
+- name: "Validate Docker service health"
+  block:
+    - name: "Check Docker daemon status"
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      register: docker_status
+      failed_when: docker_status.status.ActiveState != "active"
+      tags: [health_check, docker, critical]
+
+    - name: "Verify Docker containers are running"
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      loop:
+        - traefik
+        - nginx-proxy-manager
+        - portainer
+      register: container_status
+      failed_when: item.State.Status != "running"
+      tags: [health_check, docker, critical]
+
+- name: "Validate network connectivity"
+  block:
+    - name: "Check localhost connectivity"
+      ansible.builtin.wait_for:
+        port: 80
+        host: "127.0.0.1"
+        timeout: 30
+        delay: 5
+      tags: [health_check, network, critical]
+
+    - name: "Check HTTPS connectivity"
+      ansible.builtin.wait_for:
+        port: 443
+        host: "127.0.0.1"
+        timeout: 30
+        delay: 5
+      tags: [health_check, network, critical]
+
+    - name: "Check Traefik dashboard"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8080"
+        method: GET
+        timeout: 30
+        status_code: [200, 401, 403]
+      register: traefik_health
+      failed_when: traefik_health.status not in [200, 401, 403]
+      tags: [health_check, traefik, critical]
+
+- name: "Validate SSL certificate deployment"
+  block:
+    - name: "Check SSL certificate validity"
+      ansible.builtin.uri:
+        url: "https://{{ domain }}"
+        method: GET
+        timeout: 30
+        validate_certs: true
+        status_code: [200, 301, 302, 404]
+      register: ssl_validation
+      failed_when: ssl_validation.status not in [200, 301, 302, 404]
+      tags: [health_check, ssl, critical]
+
+    - name: "Verify SSL certificate expiration"
+      ansible.builtin.command: "openssl x509 -in /etc/ssl/certs/{{ domain }}.crt -noout -dates"
+      register: cert_dates
+      failed_when: false
+      tags: [health_check, ssl, critical]
+
+- name: "Validate critical service endpoints"
+  block:
+    - name: "Check homepage dashboard"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ homepage_port | default(3000) }}"
+        method: GET
+        timeout: 30
+        status_code: [200, 401, 403]
+      register: homepage_health
+      failed_when: homepage_health.status not in [200, 401, 403]
+      tags: [health_check, homepage, critical]
+
+    - name: "Check monitoring infrastructure"
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port | default(3001) }}"
+        method: GET
+        timeout: 30
+        status_code: [200, 401, 403]
+      register: grafana_health
+      failed_when: grafana_health.status not in [200, 401, 403]
+      tags: [health_check, monitoring, critical]
+
+- name: "Validate system resources"
+  block:
+    - name: "Check available disk space"
+      ansible.builtin.command: "df -BG --output=avail /"
+      register: disk_space
+      changed_when: false
+      tags: [health_check, system, critical]
+
+    - name: "Verify sufficient disk space"
+      ansible.builtin.assert:
+        that:
+          - (disk_space.stdout_lines[-1] | regex_replace('[^0-9]', '')) | int >= 20
+        fail_msg: "Insufficient disk space. At least 20GB required."
+      tags: [health_check, system, critical]
+
+    - name: "Check memory usage"
+      ansible.builtin.command: "free -m"
+      register: memory_usage
+      changed_when: false
+      tags: [health_check, system, critical]
+
+    - name: "Verify sufficient memory"
+      ansible.builtin.assert:
+        that:
+          - (memory_usage.stdout_lines[1].split()[1] | int) >= 2048
+        fail_msg: "Insufficient memory. At least 2GB required."
+      tags: [health_check, system, critical]
+
+- name: "Log health validation results"
+  ansible.builtin.lineinfile:
+    path: "/var/log/ansible-health-checks.log"
+    line: "{{ ansible_date_time.iso8601 }} - Health validation completed successfully on {{ inventory_hostname }}"
+    create: yes
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  delegate_to: localhost
+  run_once: yes
+  tags: [health_check, logging]

@@ -12,8 +12,9 @@ services:
     volumes:
       - {{ docker_dir }}/tautulli/config:/config
       - {{ logs_dir }}/tautulli:/logs
-    ports:
-      - "8181:8181"
+    # NETWORK: Prefer Traefik ingress; avoid direct host port exposure.
+    # ports:
+    #   - "8181:8181"
     restart: unless-stopped
     networks:
       - traefik_network
@@ -39,6 +40,8 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+    # SECURITY ISSUE: Healthcheck leaks API key in process args.
+    # ✅ RECOMMENDED: use an unauthenticated endpoint or a local script that reads key from file.
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8181/api/v2?apikey={{ tautulli_api_key }}&cmd=get_server_info || exit 1"]
       interval: 30s

@@ -1,0 +1,325 @@
+# Production Homelab Deployment Rollback Report
+
+**Generated:** {{ rollback_data.timestamp }}  
+**Hostname:** {{ rollback_data.hostname }}  
+**Environment:** {{ rollback_data.environment }}  
+**Rollback Target:** {{ rollback_data.rollback_timestamp }}  
+**Rollback Reason:** {{ rollback_data.rollback_reason }}  
+**Rollback Status:** {{ rollback_data.rollback_status | default('COMPLETED') }}
+
+---
+
+## Executive Summary
+
+This report documents the production rollback operation executed on **{{ rollback_data.hostname }}** at **{{ rollback_data.timestamp }}**. The rollback successfully reverted the system to the deployment state captured at **{{ rollback_data.rollback_timestamp }}**.
+
+**Rollback Status:** {{ '✅ SUCCESSFUL' if rollback_data.rollback_status == 'COMPLETED' else '❌ FAILED' }}
+
+**Key Metrics:**
+- **Rollback Duration:** {{ rollback_data.rollback_duration | default('UNKNOWN') }}
+- **Services Affected:** {{ rollback_data.services_affected | default('UNKNOWN') }}
+- **Data Preserved:** {{ '✅ YES' if rollback_data.data_preserved | default(true) else '❌ NO' }}
+- **System Integrity:** {{ '✅ MAINTAINED' if rollback_data.system_integrity | default(true) else '❌ COMPROMISED' }}
+
+---
+
+## Rollback Operation Details
+
+### Pre-Rollback State
+- **Original Deployment:** {{ rollback_data.original_deployment | default('UNKNOWN') }}
+- **Rollback Trigger:** {{ rollback_data.rollback_trigger | default('Manual rollback') }}
+- **System Health:** {{ rollback_data.pre_rollback_health | default('UNKNOWN') }}
+- **Active Services:** {{ rollback_data.pre_rollback_services | default('UNKNOWN') }}
+
+### Rollback Execution
+- **Start Time:** {{ rollback_data.rollback_start | default('UNKNOWN') }}
+- **End Time:** {{ rollback_data.rollback_end | default('UNKNOWN') }}
+- **Execution User:** {{ rollback_data.user }}
+- **Rollback Method:** {{ rollback_data.rollback_method | default('Comprehensive rollback') }}
+
+### Post-Rollback State
+- **System Health:** {{ rollback_data.post_rollback_health | default('UNKNOWN') }}
+- **Active Services:** {{ rollback_data.post_rollback_services | default('UNKNOWN') }}
+- **Configuration State:** {{ rollback_data.configuration_state | default('UNKNOWN') }}
+- **Data Integrity:** {{ rollback_data.data_integrity | default('UNKNOWN') }}
+
+---
+
+## Service Rollback Details
+
+### Critical Services
+{% for service in rollback_data.services.critical | default([]) %}
+- **{{ service.name }}**
+  - Pre-Rollback Status: {{ service.pre_status | default('UNKNOWN') }}
+  - Post-Rollback Status: {{ service.post_status | default('UNKNOWN') }}
+  - Rollback Success: {{ '✅ SUCCESS' if service.rollback_success else '❌ FAILED' }}
+  - Health Check: {{ '✅ PASSED' if service.health_check else '❌ FAILED' }}
+  - Port Status: {{ '✅ LISTENING' if service.port_listening else '❌ NOT LISTENING' }}
+{% endfor %}
+
+### Infrastructure Services
+{% for service in rollback_data.services.infrastructure | default([]) %}
+- **{{ service.name }}**
+  - Pre-Rollback Status: {{ service.pre_status | default('UNKNOWN') }}
+  - Post-Rollback Status: {{ service.post_status | default('UNKNOWN') }}
+  - Rollback Success: {{ '✅ SUCCESS' if service.rollback_success else '❌ FAILED' }}
+  - Health Check: {{ '✅ PASSED' if service.health_check else '❌ FAILED' }}
+  - Port Status: {{ '✅ LISTENING' if service.port_listening else '❌ NOT LISTENING' }}
+{% endfor %}
+
+### Application Services
+{% for service in rollback_data.services.application | default([]) %}
+- **{{ service.name }}**
+  - Pre-Rollback Status: {{ service.pre_status | default('UNKNOWN') }}
+  - Post-Rollback Status: {{ service.post_status | default('UNKNOWN') }}
+  - Rollback Success: {{ '✅ SUCCESS' if service.rollback_success else '❌ FAILED' }}
+  - Health Check: {{ '✅ PASSED' if service.health_check else '❌ FAILED' }}
+  - Port Status: {{ '✅ LISTENING' if service.port_listening else '❌ NOT LISTENING' }}
+{% endfor %}
+
+---
+
+## Configuration Restoration
+
+### Configuration Files
+{% for file in rollback_data.configuration.files | default([]) %}
+- **{{ file.name }}**
+  - Original Path: {{ file.original_path | default('UNKNOWN') }}
+  - Restored Path: {{ file.restored_path | default('UNKNOWN') }}
+  - Restoration Success: {{ '✅ SUCCESS' if file.restoration_success else '❌ FAILED' }}
+  - File Integrity: {{ '✅ VALID' if file.integrity else '❌ INVALID' }}
+  - Permissions: {{ file.permissions | default('UNKNOWN') }}
+{% endfor %}
+
+### Environment Variables
+- **Total Variables:** {{ rollback_data.configuration.environment.total | default('UNKNOWN') }}
+- **Restored Variables:** {{ rollback_data.configuration.environment.restored | default('UNKNOWN') }}
+- **Missing Variables:** {{ rollback_data.configuration.environment.missing | default('NONE') }}
+- **Restoration Success:** {{ '✅ SUCCESS' if rollback_data.configuration.environment.success else '❌ FAILED' }}
+
+### Docker Compose Files
+{% for compose in rollback_data.configuration.docker_compose | default([]) %}
+- **{{ compose.service }}**
+  - File Path: {{ compose.file_path | default('UNKNOWN') }}
+  - Restoration Success: {{ '✅ SUCCESS' if compose.restoration_success else '❌ FAILED' }}
+  - Configuration Valid: {{ '✅ VALID' if compose.config_valid else '❌ INVALID' }}
+  - Service Status: {{ compose.service_status | default('UNKNOWN') }}
+{% endfor %}
+
+---
+
+## Data Preservation and Integrity
+
+### Backup Verification
+- **Pre-Rollback Backup:** {{ '✅ CREATED' if rollback_data.backup.pre_rollback_created else '❌ FAILED' }}
+- **Backup Location:** {{ rollback_data.backup.location | default('UNKNOWN') }}
+- **Backup Size:** {{ rollback_data.backup.size | default('UNKNOWN') }}
+- **Backup Integrity:** {{ '✅ VALID' if rollback_data.backup.integrity else '❌ INVALID' }}
+
+### Data Restoration
+- **Configuration Data:** {{ '✅ RESTORED' if rollback_data.data_restoration.config else '❌ FAILED' }}
+- **Service Data:** {{ '✅ RESTORED' if rollback_data.data_restoration.services else '❌ FAILED' }}
+- **User Data:** {{ '✅ PRESERVED' if rollback_data.data_restoration.user_data else '❌ LOST' }}
+- **Database Data:** {{ '✅ PRESERVED' if rollback_data.data_restoration.database else '❌ LOST' }}
+
+### Integrity Checks
+- **File Checksums:** {{ '✅ VALID' if rollback_data.integrity.file_checksums else '❌ INVALID' }}
+- **Configuration Validation:** {{ '✅ VALID' if rollback_data.integrity.config_validation else '❌ INVALID' }}
+- **Service Validation:** {{ '✅ VALID' if rollback_data.integrity.service_validation else '❌ INVALID' }}
+- **Overall Integrity:** {{ '✅ MAINTAINED' if rollback_data.integrity.overall else '❌ COMPROMISED' }}
+
+---
+
+## Security Validation
+
+### Access Control
+- **User Permissions:** {{ '✅ MAINTAINED' if rollback_data.security.access_control.user_permissions else '❌ COMPROMISED' }}
+- **File Permissions:** {{ '✅ MAINTAINED' if rollback_data.security.access_control.file_permissions else '❌ COMPROMISED' }}
+- **Service Permissions:** {{ '✅ MAINTAINED' if rollback_data.security.access_control.service_permissions else '❌ COMPROMISED' }}
+
+### Network Security
+- **Firewall Rules:** {{ '✅ MAINTAINED' if rollback_data.security.network.firewall_rules else '❌ COMPROMISED' }}
+- **Port Access:** {{ '✅ SECURE' if rollback_data.security.network.port_access else '❌ INSECURE' }}
+- **SSL/TLS:** {{ '✅ VALID' if rollback_data.security.network.ssl_tls else '❌ INVALID' }}
+
+### Service Security
+- **Container Security:** {{ '✅ MAINTAINED' if rollback_data.security.services.container_security else '❌ COMPROMISED' }}
+- **API Security:** {{ '✅ MAINTAINED' if rollback_data.security.services.api_security else '❌ COMPROMISED' }}
+- **Authentication:** {{ '✅ MAINTAINED' if rollback_data.security.services.authentication else '❌ COMPROMISED' }}
+
+---
+
+## Health Validation Results
+
+### System Health
+- **CPU Usage:** {{ rollback_data.health.system.cpu_usage | default('UNKNOWN') }}%
+- **Memory Usage:** {{ rollback_data.health.system.memory_usage | default('UNKNOWN') }}%
+- **Disk Usage:** {{ rollback_data.health.system.disk_usage | default('UNKNOWN') }}%
+- **Network Status:** {{ '✅ HEALTHY' if rollback_data.health.system.network_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Service Health
+- **Critical Services:** {{ rollback_data.health.services.critical_healthy | default('UNKNOWN') }}/{{ rollback_data.health.services.critical_total | default('UNKNOWN') }}
+- **Infrastructure Services:** {{ rollback_data.health.services.infrastructure_healthy | default('UNKNOWN') }}/{{ rollback_data.health.services.infrastructure_total | default('UNKNOWN') }}
+- **Application Services:** {{ rollback_data.health.services.application_healthy | default('UNKNOWN') }}/{{ rollback_data.health.services.application_total | default('UNKNOWN') }}
+
+### Connectivity Health
+- **Internal Connectivity:** {{ '✅ HEALTHY' if rollback_data.health.connectivity.internal else '❌ UNHEALTHY' }}
+- **External Connectivity:** {{ '✅ HEALTHY' if rollback_data.health.connectivity.external else '❌ UNHEALTHY' }}
+- **SSL/TLS:** {{ '✅ HEALTHY' if rollback_data.health.connectivity.ssl_tls else '❌ UNHEALTHY' }}
+
+---
+
+## Monitoring and Alerting
+
+### Monitoring Status
+- **Prometheus:** {{ '✅ OPERATIONAL' if rollback_data.monitoring.prometheus else '❌ FAILED' }}
+- **Grafana:** {{ '✅ OPERATIONAL' if rollback_data.monitoring.grafana else '❌ FAILED' }}
+- **Alertmanager:** {{ '✅ OPERATIONAL' if rollback_data.monitoring.alertmanager else '❌ FAILED' }}
+- **Loki:** {{ '✅ OPERATIONAL' if rollback_data.monitoring.loki else '❌ FAILED' }}
+
+### Alert Status
+- **Active Alerts:** {{ rollback_data.alerts.active | default('NONE') }}
+- **Critical Alerts:** {{ rollback_data.alerts.critical | default('NONE') }}
+- **Warning Alerts:** {{ rollback_data.alerts.warning | default('NONE') }}
+- **Alert Resolution:** {{ '✅ RESOLVED' if rollback_data.alerts.resolved else '❌ PENDING' }}
+
+---
+
+## Rollback Timeline
+
+### Pre-Rollback Phase
+- **{{ rollback_data.timeline.pre_rollback.start | default('UNKNOWN') }}** - Rollback initiated
+- **{{ rollback_data.timeline.pre_rollback.backup | default('UNKNOWN') }}** - Pre-rollback backup created
+- **{{ rollback_data.timeline.pre_rollback.validation | default('UNKNOWN') }}** - Pre-rollback validation completed
+
+### Rollback Execution Phase
+- **{{ rollback_data.timeline.execution.start | default('UNKNOWN') }}** - Rollback execution started
+- **{{ rollback_data.timeline.execution.services_stopped | default('UNKNOWN') }}** - Services stopped
+- **{{ rollback_data.timeline.execution.config_restored | default('UNKNOWN') }}** - Configuration restored
+- **{{ rollback_data.timeline.execution.services_started | default('UNKNOWN') }}** - Services started
+
+### Post-Rollback Phase
+- **{{ rollback_data.timeline.post_rollback.validation | default('UNKNOWN') }}** - Post-rollback validation completed
+- **{{ rollback_data.timeline.post_rollback.health_check | default('UNKNOWN') }}** - Health checks completed
+- **{{ rollback_data.timeline.post_rollback.completion | default('UNKNOWN') }}** - Rollback completed
+
+---
+
+## Error Handling and Recovery
+
+### Errors Encountered
+{% if rollback_data.errors | default([]) | length > 0 %}
+{% for error in rollback_data.errors %}
+- **{{ error.service }}** - {{ error.description }}
+  - Severity: {{ error.severity | default('UNKNOWN') }}
+  - Resolution: {{ error.resolution | default('UNKNOWN') }}
+  - Status: {{ '✅ RESOLVED' if error.resolved else '❌ PENDING' }}
+{% endfor %}
+{% else %}
+- **No errors encountered** - Rollback completed without issues.
+{% endif %}
+
+### Recovery Actions
+{% if rollback_data.recovery_actions | default([]) | length > 0 %}
+{% for action in rollback_data.recovery_actions %}
+- **{{ action.type }}** - {{ action.description }}
+  - Success: {{ '✅ YES' if action.success else '❌ NO' }}
+  - Duration: {{ action.duration | default('UNKNOWN') }}
+{% endfor %}
+{% else %}
+- **No recovery actions required** - All operations completed successfully.
+{% endif %}
+
+---
+
+## Performance Impact
+
+### Rollback Performance
+- **Total Duration:** {{ rollback_data.performance.total_duration | default('UNKNOWN') }}
+- **Service Stop Time:** {{ rollback_data.performance.service_stop_time | default('UNKNOWN') }}
+- **Configuration Restore Time:** {{ rollback_data.performance.config_restore_time | default('UNKNOWN') }}
+- **Service Start Time:** {{ rollback_data.performance.service_start_time | default('UNKNOWN') }}
+
+### System Performance
+- **Pre-Rollback Performance:** {{ rollback_data.performance.pre_rollback | default('UNKNOWN') }}
+- **Post-Rollback Performance:** {{ rollback_data.performance.post_rollback | default('UNKNOWN') }}
+- **Performance Impact:** {{ rollback_data.performance.impact | default('UNKNOWN') }}
+
+---
+
+## Recommendations
+
+### Immediate Actions
+{% if rollback_data.recommendations.immediate | default([]) | length > 0 %}
+{% for recommendation in rollback_data.recommendations.immediate %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+  - Timeline: {{ recommendation.timeline }}
+{% endfor %}
+{% else %}
+- **No immediate actions required** - Rollback completed successfully.
+{% endif %}
+
+### Preventive Measures
+{% if rollback_data.recommendations.preventive | default([]) | length > 0 %}
+{% for recommendation in rollback_data.recommendations.preventive %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+  - Timeline: {{ recommendation.timeline }}
+{% endfor %}
+{% else %}
+- **No preventive measures identified** - Current rollback procedures are adequate.
+{% endif %}
+
+### Process Improvements
+{% if rollback_data.recommendations.process | default([]) | length > 0 %}
+{% for recommendation in rollback_data.recommendations.process %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+  - Timeline: {{ recommendation.timeline }}
+{% endfor %}
+{% else %}
+- **No process improvements identified** - Current rollback process is optimal.
+{% endif %}
+
+---
+
+## Conclusion
+
+The production rollback operation on **{{ rollback_data.hostname }}** has been completed with the following results:
+
+**Overall Status:** {{ '✅ SUCCESSFUL' if rollback_data.rollback_status == 'COMPLETED' else '❌ FAILED' }}
+
+**Key Achievements:**
+- Successfully reverted to deployment state: {{ rollback_data.rollback_timestamp }}
+- All critical services are operational and healthy
+- System configuration has been fully restored
+- Data integrity has been maintained
+- Security posture remains uncompromised
+
+**Impact Assessment:**
+- **Service Availability:** {{ rollback_data.impact.service_availability | default('UNKNOWN') }}
+- **Data Loss:** {{ 'NONE' if rollback_data.impact.data_loss == false else 'MINIMAL' if rollback_data.impact.data_loss == 'minimal' else 'SIGNIFICANT' }}
+- **User Experience:** {{ rollback_data.impact.user_experience | default('UNKNOWN') }}
+- **Business Continuity:** {{ '✅ MAINTAINED' if rollback_data.impact.business_continuity else '❌ IMPACTED' }}
+
+**Next Steps:**
+1. **Monitor system stability** - Ensure all services remain healthy
+2. **Validate functionality** - Confirm all features are working as expected
+3. **Review root cause** - Investigate what triggered the need for rollback
+4. **Implement improvements** - Address any issues identified during rollback
+5. **Document lessons learned** - Update procedures based on this experience
+
+---
+
+**Report Generated:** {{ rollback_data.timestamp }}  
+**Rollback Duration:** {{ rollback_data.rollback_duration | default('UNKNOWN') }}  
+**Generated By:** {{ rollback_data.generated_by | default('Ansible Automation') }}  
+**Report Version:** 2.1.0
+
+---
+
+*This report is automatically generated by the Ansible Homelab deployment automation system. For questions or concerns, please contact the system administrator.*

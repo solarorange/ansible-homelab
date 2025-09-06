@@ -1,5 +1,24 @@
 ---
 # Rollback tasks for failed deployments
+- name: Log rollback initiation with error context
+  ansible.builtin.debug:
+    msg: |
+      ROLLBACK INITIATED:
+      - Timestamp: {{ rollback_timestamp | default('Unknown') }}
+      - Reason: {{ rollback_reason | default('Unknown') }}
+      - Failed Task: {{ rollback_error.task_name | default('Unknown') if rollback_error is defined else 'Unknown' }}
+      - Error: {{ rollback_error.error_message | default('Unknown error') if rollback_error is defined else 'Unknown error' }}
+      - Stage: {{ rollback_error.failed_stage | default('Unknown') if rollback_error is defined else 'Unknown' }}
+      - Host: {{ rollback_error.host | default(inventory_hostname) if rollback_error is defined else inventory_hostname }}
+
+- name: Create rollback log entry
+  ansible.builtin.lineinfile:
+    path: "/var/log/ansible-rollbacks.log"
+    line: |
+      {{ rollback_timestamp | default('Unknown') }} - ROLLBACK: {{ rollback_reason | default('Unknown') }} | Task: {{ rollback_error.task_name | default('Unknown') if rollback_error is defined else 'Unknown' }} | Error: {{ rollback_error.error_message | default('Unknown error') if rollback_error is defined else 'Unknown error' }} | Host: {{ rollback_error.host | default(inventory_hostname) if rollback_error is defined else inventory_hostname }}
+    create: yes
+    mode: '0644'
+
 - name: Identify failed services
   ansible.builtin.set_fact:
     failed_services: "{{ failed_services | default([]) + [item] }}"
@@ -46,4 +65,15 @@
       - Failed Services: {{ failed_services | join(', ') }}
       - Backup Restored: {{ 'Yes' if backup_timestamp is defined else 'No' }}
       - Services Restarted: {{ failed_services | length }}
+      - Original Failure: {{ rollback_error.task_name | default('Unknown') if rollback_error is defined else 'Unknown' }}
+      - Error Context: {{ rollback_error.error_message | default('Unknown error') if rollback_error is defined else 'Unknown error' }}
+      - Failed Stage: {{ rollback_error.failed_stage | default('Unknown') if rollback_error is defined else 'Unknown' }}
   when: failed_services | length > 0
+
+- name: Log rollback completion
+  ansible.builtin.lineinfile:
+    path: "/var/log/ansible-rollbacks.log"
+    line: |
+      {{ rollback_timestamp | default('Unknown') }} - ROLLBACK COMPLETED: Services restored: {{ failed_services | length }} | Original failure: {{ rollback_error.task_name | default('Unknown') if rollback_error is defined else 'Unknown' }}
+    create: yes
+    mode: '0644'

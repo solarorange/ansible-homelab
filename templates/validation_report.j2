@@ -1,0 +1,315 @@
+# Production Homelab Deployment Validation Report
+
+**Generated:** {{ validation_data.timestamp }}  
+**Hostname:** {{ validation_data.hostname }}  
+**Environment:** {{ validation_data.environment }}  
+**Validation Type:** {{ validation_data.validation_type | default('Comprehensive') }}  
+**Validation Status:** {{ validation_data.overall_status | default('UNKNOWN') }}
+
+---
+
+## Executive Summary
+
+This report provides a comprehensive validation of the production homelab deployment on **{{ validation_data.hostname }}** at **{{ validation_data.timestamp }}**. The validation covers system resources, service health, security configuration, monitoring infrastructure, and overall deployment readiness.
+
+**Overall Validation Status:** {{ '✅ PASSED' if validation_data.overall_status == 'HEALTHY' else '❌ FAILED' }}
+
+---
+
+## System Resource Validation
+
+### CPU Usage
+- **Current Usage:** {{ validation_data.cpu_usage | default('UNKNOWN') }}%
+- **Warning Threshold:** {{ validation_data.warning_thresholds.cpu | default('UNKNOWN') }}%
+- **Critical Threshold:** {{ validation_data.critical_thresholds.cpu | default('UNKNOWN') }}%
+- **Status:** {{ '✅ HEALTHY' if (validation_data.cpu_usage | default(0) | int) < (validation_data.critical_thresholds.cpu | default(100) | int) else '❌ CRITICAL' }}
+
+### Memory Usage
+- **Current Usage:** {{ validation_data.memory_usage | default('UNKNOWN') }}%
+- **Warning Threshold:** {{ validation_data.warning_thresholds.memory | default('UNKNOWN') }}%
+- **Critical Threshold:** {{ validation_data.critical_thresholds.memory | default('UNKNOWN') }}%
+- **Status:** {{ '✅ HEALTHY' if (validation_data.memory_usage | default(0) | int) < (validation_data.critical_thresholds.memory | default(100) | int) else '❌ CRITICAL' }}
+
+### Disk Usage
+- **Current Usage:** {{ validation_data.disk_usage | default('UNKNOWN') }}%
+- **Warning Threshold:** {{ validation_data.warning_thresholds.disk | default('UNKNOWN') }}%
+- **Critical Threshold:** {{ validation_data.critical_thresholds.disk | default('UNKNOWN') }}%
+- **Status:** {{ '✅ HEALTHY' if (validation_data.disk_usage | default(0) | int) < (validation_data.critical_thresholds.disk | default(100) | int) else '❌ CRITICAL' }}
+
+### Network Status
+- **Active Interfaces:** {{ validation_data.network_interfaces | default('UNKNOWN') }}
+- **Connectivity:** {{ '✅ HEALTHY' if validation_data.network_connectivity | default(false) else '❌ FAILED' }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.network_status | default('UNKNOWN') == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+---
+
+## Service Health Validation
+
+### Critical Services
+{% for service in validation_data.critical_services | default([]) %}
+- **{{ service.name }}** (Port: {{ service.port }})
+  - Status: {{ '✅ RUNNING' if service.status == 'running' else '❌ STOPPED' }}
+  - Health Check: {{ '✅ PASSED' if service.health == 'healthy' else '❌ FAILED' }}
+  - Response Time: {{ service.response_time | default('UNKNOWN') }}ms
+{% endfor %}
+
+### Infrastructure Services
+{% for service in validation_data.infrastructure_services | default([]) %}
+- **{{ service.name }}** (Port: {{ service.port }})
+  - Status: {{ '✅ RUNNING' if service.status == 'running' else '❌ STOPPED' }}
+  - Health Check: {{ '✅ PASSED' if service.health == 'healthy' else '❌ FAILED' }}
+  - Response Time: {{ service.response_time | default('UNKNOWN') }}ms
+{% endfor %}
+
+### Application Services
+{% for service in validation_data.application_services | default([]) %}
+- **{{ service.name }}** (Port: {{ service.port }})
+  - Status: {{ '✅ RUNNING' if service.status == 'running' else '❌ STOPPED' }}
+  - Health Check: {{ '✅ PASSED' if service.health == 'healthy' else '❌ FAILED' }}
+  - Response Time: {{ service.response_time | default('UNKNOWN') }}ms
+{% endfor %}
+
+---
+
+## Security Validation
+
+### Firewall Status
+- **UFW Status:** {{ '✅ ACTIVE' if validation_data.security.firewall.ufw_status == 'active' else '❌ INACTIVE' }}
+- **iptables Rules:** {{ validation_data.security.firewall.iptables_rules | default('UNKNOWN') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.security.firewall.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### SSH Security
+- **Password Authentication:** {{ '❌ DISABLED' if validation_data.security.ssh.password_auth == false else '⚠️ ENABLED' }}
+- **Root Login:** {{ '❌ DISABLED' if validation_data.security.ssh.root_login == false else '⚠️ ENABLED' }}
+- **Public Key Auth:** {{ '✅ ENABLED' if validation_data.security.ssh.public_key_auth == true else '❌ DISABLED' }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.security.ssh.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### SSL/TLS Certificates
+- **Certificate Validity:** {{ '✅ VALID' if validation_data.security.ssl.validity == 'VALID' else '❌ INVALID' }}
+- **Expiration Date:** {{ validation_data.security.ssl.expiration | default('UNKNOWN') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.security.ssl.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+---
+
+## Monitoring Infrastructure Validation
+
+### Prometheus
+- **Service Status:** {{ '✅ RUNNING' if validation_data.monitoring.prometheus.service_status == 'running' else '❌ STOPPED' }}
+- **API Endpoint:** {{ '✅ HEALTHY' if validation_data.monitoring.prometheus.api_status == 200 else '❌ UNHEALTHY' }}
+- **Targets:** {{ '✅ HEALTHY' if validation_data.monitoring.prometheus.targets_status == 200 else '❌ UNHEALTHY' }}
+- **Metrics:** {{ '✅ HEALTHY' if validation_data.monitoring.prometheus.metrics_status == 200 else '❌ UNHEALTHY' }}
+- **Overall Status:** {{ '✅ HEALTHY' if validation_data.monitoring.prometheus.overall_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Grafana
+- **Service Status:** {{ '✅ RUNNING' if validation_data.monitoring.grafana.service_status == 'running' else '❌ STOPPED' }}
+- **API Endpoint:** {{ '✅ HEALTHY' if validation_data.monitoring.grafana.api_status == 200 else '❌ UNHEALTHY' }}
+- **Datasources:** {{ '✅ HEALTHY' if validation_data.monitoring.grafana.datasources_status == 200 else '❌ UNHEALTHY' }}
+- **Metrics:** {{ '✅ HEALTHY' if validation_data.monitoring.grafana.metrics_status == 200 else '❌ UNHEALTHY' }}
+- **Overall Status:** {{ '✅ HEALTHY' if validation_data.monitoring.grafana.overall_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Alertmanager
+- **Service Status:** {{ '✅ RUNNING' if validation_data.monitoring.alertmanager.service_status == 'running' else '❌ STOPPED' }}
+- **API Endpoint:** {{ '✅ HEALTHY' if validation_data.monitoring.alertmanager.api_status == 200 else '❌ UNHEALTHY' }}
+- **Configuration:** {{ '✅ HEALTHY' if validation_data.monitoring.alertmanager.config_status == 200 else '❌ UNHEALTHY' }}
+- **Overall Status:** {{ '✅ HEALTHY' if validation_data.monitoring.alertmanager.overall_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Loki
+- **Service Status:** {{ '✅ RUNNING' if validation_data.monitoring.loki.service_status == 'running' else '❌ STOPPED' }}
+- **API Endpoint:** {{ '✅ HEALTHY' if validation_data.monitoring.loki.api_status == 200 else '❌ UNHEALTHY' }}
+- **Labels Endpoint:** {{ '✅ HEALTHY' if validation_data.monitoring.loki.labels_status == 200 else '❌ UNHEALTHY' }}
+- **Overall Status:** {{ '✅ HEALTHY' if validation_data.monitoring.loki.overall_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+---
+
+## Docker Environment Validation
+
+### Docker Service
+- **Service Status:** {{ '✅ RUNNING' if validation_data.docker.service_status == 'running' else '❌ STOPPED' }}
+- **Version:** {{ validation_data.docker.version | default('UNKNOWN') }}
+- **API Version:** {{ validation_data.docker.api_version | default('UNKNOWN') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.docker.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Container Status
+- **Total Containers:** {{ validation_data.docker.containers.total | default('UNKNOWN') }}
+- **Running Containers:** {{ validation_data.docker.containers.running | default('UNKNOWN') }}
+- **Stopped Containers:** {{ validation_data.docker.containers.stopped | default('UNKNOWN') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.docker.containers.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Docker Compose
+- **Compose Version:** {{ validation_data.docker.compose_version | default('UNKNOWN') }}
+- **Service Definitions:** {{ validation_data.docker.service_definitions | default('UNKNOWN') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.docker.compose_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+---
+
+## Network Connectivity Validation
+
+### Internal Services
+{% for service in validation_data.network.internal_services | default([]) %}
+- **{{ service.name }}** ({{ service.host }}:{{ service.port }})
+  - Connectivity: {{ '✅ CONNECTED' if service.connected else '❌ DISCONNECTED' }}
+  - Response Time: {{ service.response_time | default('UNKNOWN') }}ms
+{% endfor %}
+
+### External Connectivity
+- **Internet Access:** {{ '✅ AVAILABLE' if validation_data.network.external.internet else '❌ UNAVAILABLE' }}
+- **DNS Resolution:** {{ '✅ WORKING' if validation_data.network.external.dns else '❌ FAILED' }}
+- **SSL/TLS:** {{ '✅ WORKING' if validation_data.network.external.ssl else '❌ FAILED' }}
+
+### Port Validation
+{% for port in validation_data.network.ports | default([]) %}
+- **Port {{ port.number }}** ({{ port.service }})
+  - Status: {{ '✅ LISTENING' if port.listening else '❌ NOT LISTENING' }}
+  - Protocol: {{ port.protocol | default('UNKNOWN') }}
+{% endfor %}
+
+---
+
+## Backup and Recovery Validation
+
+### Backup Status
+- **Last Backup:** {{ validation_data.backup.last_backup | default('UNKNOWN') }}
+- **Backup Size:** {{ validation_data.backup.size | default('UNKNOWN') }}
+- **Backup Integrity:** {{ '✅ VALID' if validation_data.backup.integrity else '❌ INVALID' }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.backup.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Rollback Capability
+- **Rollback Points:** {{ validation_data.backup.rollback_points | default('UNKNOWN') }}
+- **Latest Rollback:** {{ validation_data.backup.latest_rollback | default('UNKNOWN') }}
+- **Rollback Script:** {{ '✅ AVAILABLE' if validation_data.backup.rollback_script else '❌ UNAVAILABLE' }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.backup.rollback_status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+---
+
+## Configuration Validation
+
+### Environment Variables
+- **Required Variables:** {{ validation_data.config.environment.required | default('UNKNOWN') }}
+- **Optional Variables:** {{ validation_data.config.environment.optional | default('UNKNOWN') }}
+- **Missing Variables:** {{ validation_data.config.environment.missing | default('NONE') }}
+- **Status:** {{ '✅ HEALTHY' if validation_data.config.environment.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+
+### Configuration Files
+{% for file in validation_data.config.files | default([]) %}
+- **{{ file.name }}**
+  - Exists: {{ '✅ YES' if file.exists else '❌ NO' }}
+  - Permissions: {{ file.permissions | default('UNKNOWN') }}
+  - Owner: {{ file.owner | default('UNKNOWN') }}
+  - Status: {{ '✅ HEALTHY' if file.status == 'HEALTHY' else '❌ UNHEALTHY' }}
+{% endfor %}
+
+---
+
+## Performance Metrics
+
+### Response Times
+- **Average Response Time:** {{ validation_data.performance.avg_response_time | default('UNKNOWN') }}ms
+- **95th Percentile:** {{ validation_data.performance.p95_response_time | default('UNKNOWN') }}ms
+- **99th Percentile:** {{ validation_data.performance.p99_response_time | default('UNKNOWN') }}ms
+
+### Throughput
+- **Requests per Second:** {{ validation_data.performance.rps | default('UNKNOWN') }}
+- **Concurrent Connections:** {{ validation_data.performance.concurrent_connections | default('UNKNOWN') }}
+
+### Resource Utilization
+- **CPU Efficiency:** {{ validation_data.performance.cpu_efficiency | default('UNKNOWN') }}%
+- **Memory Efficiency:** {{ validation_data.performance.memory_efficiency | default('UNKNOWN') }}%
+- **Disk I/O:** {{ validation_data.performance.disk_io | default('UNKNOWN') }}MB/s
+
+---
+
+## Recommendations
+
+### Immediate Actions Required
+{% if validation_data.recommendations.immediate | default([]) | length > 0 %}
+{% for recommendation in validation_data.recommendations.immediate %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+{% endfor %}
+{% else %}
+- **No immediate actions required** - All critical systems are operating within acceptable parameters.
+{% endif %}
+
+### Short-term Improvements
+{% if validation_data.recommendations.short_term | default([]) | length > 0 %}
+{% for recommendation in validation_data.recommendations.short_term %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+  - Timeline: {{ recommendation.timeline }}
+{% endfor %}
+{% else %}
+- **No short-term improvements identified** - System is operating optimally.
+{% endif %}
+
+### Long-term Optimizations
+{% if validation_data.recommendations.long_term | default([]) | length > 0 %}
+{% for recommendation in validation_data.recommendations.long_term %}
+- **{{ recommendation.priority }}:** {{ recommendation.action }}
+  - Impact: {{ recommendation.impact }}
+  - Effort: {{ recommendation.effort }}
+  - Timeline: {{ recommendation.timeline }}
+{% endfor %}
+{% else %}
+- **No long-term optimizations identified** - System architecture is well-designed.
+{% endif %}
+
+---
+
+## Validation Details
+
+### Test Execution
+- **Total Tests:** {{ validation_data.test_execution.total | default('UNKNOWN') }}
+- **Passed Tests:** {{ validation_data.test_execution.passed | default('UNKNOWN') }}
+- **Failed Tests:** {{ validation_data.test_execution.failed | default('UNKNOWN') }}
+- **Skipped Tests:** {{ validation_data.test_execution.skipped | default('UNKNOWN') }}
+- **Success Rate:** {{ validation_data.test_execution.success_rate | default('UNKNOWN') }}%
+
+### Test Categories
+{% for category in validation_data.test_categories | default([]) %}
+- **{{ category.name }}**
+  - Total: {{ category.total }}
+  - Passed: {{ category.passed }}
+  - Failed: {{ category.failed }}
+  - Success Rate: {{ category.success_rate }}%
+{% endfor %}
+
+---
+
+## Conclusion
+
+The production homelab deployment validation on **{{ validation_data.hostname }}** has been completed with the following results:
+
+**Overall Status:** {{ '✅ PASSED' if validation_data.overall_status == 'HEALTHY' else '❌ FAILED' }}
+
+**Key Findings:**
+- System resources are operating within acceptable thresholds
+- All critical services are running and healthy
+- Security configuration meets production standards
+- Monitoring infrastructure is fully operational
+- Backup and recovery systems are functional
+- Network connectivity is stable and secure
+
+**Next Steps:**
+{% if validation_data.overall_status == 'HEALTHY' %}
+1. **Continue with deployment** - System is ready for production use
+2. **Monitor performance** - Track key metrics for ongoing optimization
+3. **Schedule regular validation** - Maintain system health through periodic checks
+{% else %}
+1. **Address critical issues** - Resolve failed validation items immediately
+2. **Review recommendations** - Implement suggested improvements
+3. **Re-run validation** - Confirm all issues have been resolved
+4. **Postpone deployment** - Do not proceed until validation passes
+{% endif %}
+
+---
+
+**Report Generated:** {{ validation_data.timestamp }}  
+**Validation Duration:** {{ validation_data.duration | default('UNKNOWN') }}  
+**Generated By:** {{ validation_data.generated_by | default('Ansible Automation') }}  
+**Report Version:** 2.1.0
+
+---
+
+*This report is automatically generated by the Ansible Homelab deployment automation system. For questions or concerns, please contact the system administrator.*

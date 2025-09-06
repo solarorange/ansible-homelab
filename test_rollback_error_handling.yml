@@ -1,0 +1,62 @@
+---
+# Test playbook to verify rollback error handling
+- name: Test Rollback Error Handling
+  hosts: localhost
+  gather_facts: false
+  vars:
+    rollback_enabled: true
+    deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
+    notification_webhook_url: ""
+  
+  tasks:
+    - name: Simulate a task failure to test rollback handler
+      ansible.builtin.fail:
+        msg: "This is a test failure to verify rollback error handling"
+      tags: [test, critical]
+      notify: rollback_deployment
+
+  handlers:
+    # COMMENT: Rollback handler for deployment failures
+    - name: "rollback_deployment"
+      block:
+        # COMMENT: Capture failure details for rollback context
+        - name: "Capture failure context for rollback"
+          ansible.builtin.set_fact:
+            rollback_error: |
+              {
+                "task_name": "{{ ansible_failed_task.name | default('Unknown task') }}",
+                "error_message": "{{ ansible_failed_result.msg | default('Unknown error') | regex_replace('password.*', 'password=***REDACTED***') | regex_replace('token.*', 'token=***REDACTED***') | regex_replace('secret.*', 'secret=***REDACTED***') | truncate(200) }}",
+                "module": "{{ ansible_failed_task.action | default('Unknown module') }}",
+                "host": "{{ inventory_hostname }}",
+                "timestamp": "{{ ansible_date_time.iso8601 }}",
+                "failed_stage": "{{ ansible_failed_task.tags | default([]) | join(', ') }}"
+              }
+          when: ansible_failed_task is defined
+
+        - name: "Display captured error context"
+          ansible.builtin.debug:
+            msg: |
+              Error Context Captured:
+              {{ rollback_error | default('No error context captured') }}
+
+        - name: "Execute rollback procedure"
+          ansible.builtin.include_tasks: tasks/rollback.yml
+          vars:
+            rollback_timestamp: "{{ deployment_timestamp }}"
+            rollback_reason: "Test deployment failure detected"
+            rollback_error: "{{ rollback_error | default('{}') }}"
+            rollback_cause: "{{ rollback_error.task_name | default('Unknown task') }} failed: {{ rollback_error.error_message | default('Unknown error') }}"
+          tags: [rollback, emergency]
+
+        - name: "Notify administrators of rollback"
+          ansible.builtin.debug:
+            msg: |
+              Rollback Notification:
+              - Text: "Deployment rollback executed on {{ inventory_hostname }}"
+              - Timestamp: "{{ deployment_timestamp }}"
+              - Reason: "{{ rollback_cause | default('Deployment failure detected') }}"
+              - Failed Task: "{{ rollback_error.task_name | default('Unknown') if rollback_error is defined else 'Unknown' }}"
+              - Error Details: "{{ rollback_error.error_message | default('Unknown error') if rollback_error is defined else 'Unknown' }}"
+              - Failed Stage: "{{ rollback_error.failed_stage | default('Unknown') if rollback_error is defined else 'Unknown' }}"
+          tags: [rollback, notification]
+      when: rollback_enabled | default(false) | bool

@@ -1,0 +1,184 @@
+---
+# COMMENT: Production Configuration Validation Tasks
+# COMMENT: Comprehensive validation of all configuration files and settings
+# COMMENT: Ensures production deployment configuration integrity
+
+- name: "Validate Ansible configuration files"
+  block:
+    - name: "Check ansible.cfg syntax"
+      ansible.builtin.command: "ansible --version"
+      register: ansible_version
+      changed_when: false
+      tags: [config_validation, ansible, critical]
+
+    - name: "Verify ansible.cfg is valid"
+      ansible.builtin.assert:
+        that:
+          - ansible_version.rc == 0
+        fail_msg: "Ansible configuration is invalid"
+      tags: [config_validation, ansible, critical]
+
+- name: "Validate inventory configuration"
+  block:
+    - name: "Check inventory file syntax"
+      ansible.builtin.command: "ansible-inventory --list --yaml"
+      register: inventory_check
+      changed_when: false
+      tags: [config_validation, inventory, critical]
+
+    - name: "Verify inventory is valid"
+      ansible.builtin.assert:
+        that:
+          - inventory_check.rc == 0
+        fail_msg: "Inventory configuration is invalid"
+      tags: [config_validation, inventory, critical]
+
+- name: "Validate group variables"
+  block:
+    - name: "Check group_vars/all/vars.yml syntax"
+      ansible.builtin.command: "yamllint group_vars/all/vars.yml"
+      register: vars_yaml_check
+      failed_when: false
+      tags: [config_validation, variables, critical]
+
+    - name: "Check group_vars/all/common.yml syntax"
+      ansible.builtin.command: "yamllint group_vars/all/common.yml"
+      register: common_yaml_check
+      failed_when: false
+      tags: [config_validation, variables, critical]
+
+    - name: "Verify required variables are defined"
+      ansible.builtin.assert:
+        that:
+          - username is defined and username != ''
+          - domain is defined and domain != ''
+          - deployment_environment is defined
+        fail_msg: "Required variables are not properly defined"
+      tags: [config_validation, variables, critical]
+
+- name: "Validate role configurations"
+  block:
+    - name: "Check role defaults syntax"
+      ansible.builtin.find:
+        paths: "roles"
+        patterns: "defaults/main.yml"
+        file_type: file
+      register: role_defaults
+      tags: [config_validation, roles, critical]
+
+    - name: "Validate role default files"
+      ansible.builtin.command: "yamllint {{ item.path }}"
+      loop: "{{ role_defaults.files }}"
+      register: role_default_checks
+      failed_when: false
+      tags: [config_validation, roles, critical]
+
+    - name: "Check role task syntax"
+      ansible.builtin.find:
+        paths: "roles"
+        patterns: "tasks/main.yml"
+        file_type: file
+      register: role_tasks
+      tags: [config_validation, roles, critical]
+
+    - name: "Validate role task files"
+      ansible.builtin.command: "yamllint {{ item.path }}"
+      loop: "{{ role_tasks.files }}"
+      register: role_task_checks
+      failed_when: false
+      tags: [config_validation, roles, critical]
+
+- name: "Validate Docker Compose configurations"
+  block:
+    - name: "Find Docker Compose files"
+      ansible.builtin.find:
+        paths: "."
+        patterns: "docker-compose.yml"
+        file_type: file
+      register: compose_files
+      tags: [config_validation, docker, critical]
+
+    - name: "Validate Docker Compose syntax"
+      ansible.builtin.command: "docker-compose -f {{ item.path }} config"
+      loop: "{{ compose_files.files }}"
+      register: compose_checks
+      failed_when: false
+      tags: [config_validation, docker, critical]
+
+- name: "Validate security configurations"
+  block:
+    - name: "Check firewall configuration"
+      ansible.builtin.command: "ufw status"
+      register: firewall_status
+      failed_when: false
+      tags: [config_validation, security, critical]
+
+    - name: "Verify firewall is active"
+      ansible.builtin.assert:
+        that:
+          - firewall_status.rc == 0
+        fail_msg: "Firewall configuration needs attention"
+      tags: [config_validation, security, critical]
+
+    - name: "Check SSL certificate configuration"
+      ansible.builtin.stat:
+        path: "/etc/ssl/certs/{{ domain }}.crt"
+      register: ssl_cert
+      tags: [config_validation, ssl, critical]
+
+    - name: "Verify SSL certificate exists"
+      ansible.builtin.assert:
+        that:
+          - ssl_cert.stat.exists
+        fail_msg: "SSL certificate not found"
+      tags: [config_validation, ssl, critical]
+
+- name: "Validate monitoring configurations"
+  block:
+    - name: "Check Prometheus configuration"
+      ansible.builtin.stat:
+        path: "roles/monitoring/defaults/main.yml"
+      register: prometheus_config
+      tags: [config_validation, monitoring, critical]
+
+    - name: "Check Grafana configuration"
+      ansible.builtin.stat:
+        path: "roles/utilities/dashboards/defaults/main.yml"
+      register: grafana_config
+      tags: [config_validation, monitoring, critical]
+
+    - name: "Verify monitoring configurations exist"
+      ansible.builtin.assert:
+        that:
+          - prometheus_config.stat.exists
+          - grafana_config.stat.exists
+        fail_msg: "Monitoring configurations missing"
+      tags: [config_validation, monitoring, critical]
+
+- name: "Validate backup configurations"
+  block:
+    - name: "Check backup script permissions"
+      ansible.builtin.stat:
+        path: "scripts/backup_utils.sh"
+      register: backup_script
+      tags: [config_validation, backup, critical]
+
+    - name: "Verify backup script exists and is executable"
+      ansible.builtin.assert:
+        that:
+          - backup_script.stat.exists
+          - backup_script.stat.executable
+        fail_msg: "Backup script missing or not executable"
+      tags: [config_validation, backup, critical]
+
+- name: "Log configuration validation results"
+  ansible.builtin.lineinfile:
+    path: "/var/log/ansible-config-validation.log"
+    line: "{{ ansible_date_time.iso8601 }} - Configuration validation completed on {{ inventory_hostname }}"
+    create: yes
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  delegate_to: localhost
+  run_once: yes
+  tags: [config_validation, logging]

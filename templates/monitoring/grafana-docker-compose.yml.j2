@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER={{ vault_grafana_admin_user | default('admin') }}
+      # ✅ Use Docker secrets via __FILE to keep credentials out of env history
       - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/GF_SECURITY_ADMIN_PASSWORD
       - GF_SECURITY_SECRET_KEY__FILE=/run/secrets/GF_SECURITY_SECRET_KEY
       - GF_SERVER_ROOT_URL=https://grafana.{{ domain }}
@@ -28,6 +29,7 @@ services:
       - GF_SMTP_HOST={{ notifications.email.smtp_host | default('') }}
       - GF_SMTP_PORT={{ notifications.email.smtp_port | default(587) }}
       - GF_SMTP_USER={{ vault_smtp_username | default('') }}
+      # ✅ Store SMTP credentials as secrets
       - GF_SMTP_PASSWORD__FILE=/run/secrets/GF_SMTP_PASSWORD
       - GF_SMTP_FROM_ADDRESS={{ notifications.email.from_address | default('grafana@' + domain) }}
       - GF_SMTP_FROM_NAME=Grafana
@@ -36,6 +38,7 @@ services:
       - GF_DATABASE_HOST=postgresql:5432
       - GF_DATABASE_NAME=grafana
       - GF_DATABASE_USER={{ vault_postgresql_user | default('homelab') }}
+      # ✅ Use DB password file for Grafana DB connection
       - GF_DATABASE_PASSWORD__FILE=/run/secrets/GF_DATABASE_PASSWORD
       - GF_DATABASE_SSL_MODE=verify-full
       - GF_SESSION_PROVIDER=postgres

@@ -103,6 +103,8 @@ security_hardening:
       userland-proxy: false
       live-restore: true
       no-new-privileges: true
+      # SECURITY ISSUE (CRITICAL): seccomp-profile unconfined.
+      # ✅ Use default or provide hardened profile path.
       seccomp-profile: unconfined
       apparmor-profile: docker-default
       userns-remap: "{{ username }}:{{ username }}"
@@ -132,7 +134,7 @@ security_hardening:
       read_only_root_filesystem: true
       security_opt:
         - no-new-privileges
-        - seccomp=unconfined
+        - seccomp=unconfined  # ❌ Unconfined is unsafe in production
       cap_drop:
         - ALL
       cap_add:

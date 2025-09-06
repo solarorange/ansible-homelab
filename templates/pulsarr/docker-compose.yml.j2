@@ -15,8 +15,9 @@ services:
       - {{ docker_dir }}/pulsarr/config:/config
       - {{ docker_dir }}/pulsarr/data:/data
       - {{ logs_dir }}/pulsarr:/logs
-    ports:
-      - "8080:8080"
+    # NETWORK: Prefer Traefik ingress; avoid direct host port exposure.
+    # ports:
+    #   - "8080:8080"
     restart: unless-stopped
     networks:
       - traefik_network

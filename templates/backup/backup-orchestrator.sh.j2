@@ -194,7 +194,9 @@ backup_redis() {
 backup_mariadb() {
     local backup_file="{{ backup_dir }}/mariadb-$(date +%Y%m%d-%H%M%S).sql"
     
-    docker exec mariadb mysqldump -u root -p{{ vault_mariadb_root_password }} --all-databases > "$backup_file" 2>/dev/null || {
+    # SECURITY: Avoid exposing DB password in process args. Use env var scoped to the command.
+    docker exec -e MYSQL_PWD="{{ vault_mariadb_root_password }}" mariadb \
+        mysqldump -u root --all-databases > "$backup_file" 2>/dev/null || {
         log "Failed to backup MariaDB"
         return 1
     }

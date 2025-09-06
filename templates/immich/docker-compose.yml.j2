@@ -17,6 +17,7 @@ services:
       - TZ={{ timezone }}
       - DB_HOSTNAME=immich-postgres
       - DB_USERNAME=postgres
+      # ✅ DB and JWT secrets via file mounts
       - DB_PASSWORD__FILE=/run/secrets/POSTGRES_PASSWORD
       - DB_DATABASE_NAME=immich
       - REDIS_HOSTNAME=immich-redis
@@ -140,6 +141,8 @@ services:
   immich-redis:
     image: redis:alpine
     container_name: immich-redis
+    # SECURITY: Avoid exposing password via process args; redis supports requirepass via conf file.
+    # ✅ RECOMMENDED: mount a redis.conf with 'requirepass' instead of shell cat.
     command: ["sh", "-c", "exec redis-server --requirepass \"$(cat /run/secrets/REDIS_PASSWORD)\"" ]
     volumes:
       - {{ docker_dir }}/immich/redis:/data

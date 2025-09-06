@@ -28,6 +28,71 @@ import subprocess
 import json
 from dataclasses import dataclass
 import re
+import logging
+import hashlib
+import shutil
+from datetime import datetime
+
+# COMMENT: CRITICAL SECURITY: Add comprehensive input validation functions
+def validate_service_name(service_name: str) -> bool:
+    """
+    COMMENT: Validate service name for security and compliance.
+    Prevents injection attacks and ensures safe naming.
+    """
+    if not service_name or len(service_name) > 50:
+        return False
+    
+    # COMMENT: Prevent injection attacks - only allow safe characters
+    if re.search(r'[^a-zA-Z0-9_-]', service_name):
+        return False
+    
+    # COMMENT: Prevent dangerous service names
+    dangerous_names = ['root', 'admin', 'system', 'bin', 'sbin', 'etc', 'var', 'tmp', 'proc']
+    if service_name.lower() in dangerous_names:
+        return False
+    
+    return True
+
+def validate_port_number(port: int) -> bool:
+    """
+    COMMENT: Validate port number for security.
+    Ensures ports are within safe ranges.
+    """
+    return isinstance(port, int) and 1024 <= port <= 65535
+
+def validate_file_path(file_path: Path) -> bool:
+    """
+    COMMENT: Validate file path for security.
+    Prevents path traversal attacks.
+    """
+    if not file_path or not isinstance(file_path, Path):
+        return False
+    
+    # COMMENT: Prevent path traversal attacks
+    if '..' in str(file_path) or str(file_path).startswith('/etc') or str(file_path).startswith('/var/lib'):
+        return False
+    
+    # COMMENT: Only allow safe file paths
+    if re.search(r'[^a-zA-Z0-9/._-]', str(file_path)):
+        return False
+    
+    return True
+
+# COMMENT: Custom exception classes for production error handling
+class SecurityValidationError(Exception):
+    """Raised when security validation fails."""
+    pass
+
+class ValidationError(Exception):
+    """Raised when general validation fails."""
+    pass
+
+# COMMENT: Setup logging for production use
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PortConflict:
@@ -38,6 +103,31 @@ class PortConflict:
     conflicting_services: List[str]
     resolution: Optional[str] = None
     new_port: Optional[int] = None
+    
+    def __post_init__(self) -> None:
+        """
+        COMMENT: Post-initialization validation for production safety.
+        Ensures all inputs are properly validated for security.
+        """
+        # COMMENT: CRITICAL SECURITY: Validate port number
+        if not validate_port_number(self.port):
+            raise ValueError(f"Invalid port number: {self.port}")
+        
+        # COMMENT: CRITICAL SECURITY: Validate service names
+        for service in self.services:
+            if not validate_service_name(service):
+                raise ValueError(f"Invalid service name: {service}")
+        
+        if not validate_service_name(self.primary_service):
+            raise ValueError(f"Invalid primary service name: {self.primary_service}")
+        
+        for service in self.conflicting_services:
+            if not validate_service_name(service):
+                raise ValueError(f"Invalid conflicting service name: {service}")
+        
+        # COMMENT: Validate new port if provided
+        if self.new_port is not None and not validate_port_number(self.new_port):
+            raise ValueError(f"Invalid new port number: {self.new_port}")
 
 @dataclass
 class PortAssignment:
@@ -47,13 +137,51 @@ class PortAssignment:
     category: str
     priority: int  # Higher priority services keep their ports
     new_port: Optional[int] = None
+    
+    def __post_init__(self) -> None:
+        """
+        COMMENT: Post-initialization validation for production safety.
+        Ensures all inputs are properly validated for security.
+        """
+        # COMMENT: CRITICAL SECURITY: Validate service name
+        if not validate_service_name(self.service):
+            raise ValueError(f"Invalid service name: {self.service}")
+        
+        # COMMENT: CRITICAL SECURITY: Validate port numbers
+        if not validate_port_number(self.current_port):
+            raise ValueError(f"Invalid current port number: {self.current_port}")
+        
+        if self.new_port is not None and not validate_port_number(self.new_port):
+            raise ValueError(f"Invalid new port number: {self.new_port}")
+        
+        # COMMENT: Validate priority is within safe range
+        if not isinstance(self.priority, int) or self.priority < 0 or self.priority > 100:
+            raise ValueError(f"Invalid priority value: {self.priority}")
 
 class PortConflictResolver:
     def __init__(self, homelab_root: str = "."):
-        self.homelab_root = Path(homelab_root)
+        # COMMENT: CRITICAL SECURITY: Validate homelab root path
+        if not homelab_root or not isinstance(homelab_root, str):
+            raise ValueError("Homelab root path must be a valid string")
+        
+        # COMMENT: CRITICAL SECURITY: Validate homelab root path for security
+        homelab_path = Path(homelab_root)
+        if not validate_file_path(homelab_path):
+            raise ValueError(f"Invalid homelab root path: {homelab_root}")
+        
+        self.homelab_root = homelab_path
         self.port_management_file = self.homelab_root / "group_vars" / "all" / "port_management.yml"
         self.vault_file = self.homelab_root / "group_vars" / "all" / "vault.yml"
         self.roles_dir = self.homelab_root / "roles"
+        
+        # COMMENT: CRITICAL SECURITY: Validate critical file paths
+        if not validate_file_path(self.port_management_file):
+            raise ValueError(f"Invalid port management file path: {self.port_management_file}")
+        if not validate_file_path(self.vault_file):
+            raise ValueError(f"Invalid vault file path: {self.vault_file}")
+        if not validate_file_path(self.roles_dir):
+            raise ValueError(f"Invalid roles directory path: {self.roles_dir}")
+        
         self.conflicts = []
         self.assignments = []
         self.changes_made = []
@@ -305,42 +433,172 @@ class PortConflictResolver:
             return 'specialized'
 
     def _update_service_port(self, service_path: str, new_port: int):
-        """Update a service's port configuration."""
-        # Parse service path to find the actual file
+        """
+        COMMENT: Update a service's port configuration with SECURITY VALIDATION.
+        Includes backup, validation, and rollback capabilities for production safety.
+        
+        Args:
+            service_path: Service configuration path
+            new_port: New port number to assign
+            
+        Raises:
+            ValueError: If inputs are invalid
+            SecurityValidationError: If operation would be unsafe
+        """
+        # COMMENT: CRITICAL SECURITY: Validate inputs
+        if not validate_service_name(service_path):
+            raise ValueError(f"Invalid service path: {service_path}")
+        
+        if not validate_port_number(new_port):
+            raise ValueError(f"Invalid port number: {new_port}")
+        
+        # COMMENT: Parse service path to find the actual file
         parts = service_path.split('.')
         
         if len(parts) >= 2 and parts[0] in ['roles', 'group_vars']:
             if parts[0] == 'roles':
-                # Update role defaults
+                # COMMENT: Update role defaults with validation
                 role_name = parts[1]
+                if not validate_service_name(role_name):
+                    raise ValueError(f"Invalid role name: {role_name}")
+                
                 defaults_file = self.roles_dir / role_name / "defaults" / "main.yml"
                 if defaults_file.exists():
                     self._update_port_in_file(defaults_file, parts[-1], new_port)
             
             elif parts[0] == 'group_vars':
-                # Update group_vars file
+                # COMMENT: Update group_vars file with validation
                 file_name = parts[1]
+                if not validate_service_name(file_name):
+                    raise ValueError(f"Invalid file name: {file_name}")
+                
                 group_vars_file = self.homelab_root / "group_vars" / "all" / f"{file_name}.yml"
                 if group_vars_file.exists():
                     self._update_port_in_file(group_vars_file, parts[-1], new_port)
 
     def _update_port_in_file(self, file_path: Path, port_key: str, new_port: int):
-        """Update a port value in a YAML file."""
+        """
+        COMMENT: Update a port value in a YAML file with SECURITY VALIDATION.
+        Includes backup, validation, and rollback capabilities for production safety.
+        
+        Args:
+            file_path: Path to the YAML file to update
+            port_key: Key to update in the YAML content
+            new_port: New port value to set
+            
+        Raises:
+            ValueError: If inputs are invalid
+            SecurityValidationError: If operation would be unsafe
+        """
+        # COMMENT: CRITICAL SECURITY: Validate inputs
+        if not validate_file_path(file_path):
+            raise ValueError(f"Invalid file path: {file_path}")
+        
+        if not validate_service_name(port_key):
+            raise ValueError(f"Invalid port key: {port_key}")
+        
+        if not validate_port_number(new_port):
+            raise ValueError(f"Invalid port number: {new_port}")
+        
+        # COMMENT: Create backup before modification
+        backup_path = file_path.with_suffix(f'.backup.{datetime.now().strftime("%Y%m%d_%H%M%S")}')
         try:
-            with open(file_path, 'r') as f:
+            shutil.copy2(file_path, backup_path)
+            logger.info(f"Created backup: {backup_path}")
+        except Exception as e:
+            logger.error(f"Failed to create backup: {e}")
+            raise SecurityValidationError(f"Backup creation failed: {e}")
+        
+        try:
+            # COMMENT: Read and validate current content
+            with open(file_path, 'r', encoding='utf-8') as f:
                 content = yaml.safe_load(f)
             
-            if content:
-                # Find and update the port
-                self._update_nested_dict(content, port_key, new_port)
-                
-                with open(file_path, 'w') as f:
-                    yaml.dump(content, f, default_flow_style=False, indent=2)
-                
-                print(f"   ✓ Updated {file_path}")
-        
+            if not content:
+                logger.warning(f"File is empty or invalid: {file_path}")
+                return
+            
+            # COMMENT: Validate YAML content structure
+            if not self._validate_yaml_content(content):
+                raise SecurityValidationError(f"Invalid YAML content structure in {file_path}")
+            
+            # COMMENT: Find and update the port
+            if not self._update_port_in_content(content, port_key, new_port):
+                logger.warning(f"Port key '{port_key}' not found in {file_path}")
+                return
+            
+            # COMMENT: Validate updated content
+            if not self._validate_yaml_content(content):
+                raise SecurityValidationError(f"Updated content validation failed for {file_path}")
+            
+            # COMMENT: Write updated content with atomic operation
+            temp_path = file_path.with_suffix('.tmp')
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                yaml.dump(content, f, default_flow_style=False, indent=2, allow_unicode=True)
+            
+            # COMMENT: Atomic move for production safety
+            temp_path.replace(file_path)
+            
+            logger.info(f"Successfully updated {file_path}")
+            print(f"   ✓ Updated {file_path}")
+            
         except Exception as e:
-            print(f"   ⚠️  Could not update {file_path}: {e}")
+            logger.error(f"Failed to update {file_path}: {e}")
+            # COMMENT: Rollback changes on failure
+            self._rollback_changes(file_path, backup_path)
+            raise SecurityValidationError(f"File update failed: {e}")
+    
+    def _validate_yaml_content(self, content: Dict) -> bool:
+        """
+        COMMENT: Validate YAML content structure for security.
+        
+        Args:
+            content: YAML content to validate
+            
+        Returns:
+            True if content is valid, False otherwise
+        """
+        if not isinstance(content, dict):
+            return False
+        
+        # COMMENT: Check for reasonable content size
+        if len(str(content)) > 1000000:  # 1MB limit
+            return False
+        
+        return True
+    
+    def _update_port_in_content(self, content: Dict, port_key: str, new_port: int) -> bool:
+        """
+        COMMENT: Update port value in YAML content safely.
+        
+        Args:
+            content: YAML content to update
+            port_key: Key to update
+            new_port: New port value
+            
+        Returns:
+            True if update was successful, False otherwise
+        """
+        return self._update_nested_dict(content, port_key, new_port)
+    
+    def _rollback_changes(self, file_path: Path, backup_path: Path):
+        """
+        COMMENT: Rollback changes by restoring from backup.
+        
+        Args:
+            file_path: Path to the file to restore
+            backup_path: Path to the backup file
+        """
+        try:
+            if backup_path.exists():
+                shutil.copy2(backup_path, file_path)
+                logger.info(f"Rolled back changes for {file_path}")
+                print(f"   🔄 Rolled back changes for {file_path}")
+            else:
+                logger.error(f"Backup file not found: {backup_path}")
+        except Exception as e:
+            logger.error(f"Rollback failed for {file_path}: {e}")
+            print(f"   ❌ Rollback failed for {file_path}: {e}")
 
     def _update_nested_dict(self, data: Dict, key: str, value: int):
         """Recursively update a nested dictionary."""

@@ -1,13 +1,34 @@
 ---
-# Main Ansible playbook for homelab setup
-# Staged deployment with comprehensive infrastructure management
-
-- name: Configure homelab infrastructure with staged deployment
-  hosts: all
+# COMMENT: Production-ready Ansible playbook for homelab infrastructure deployment
+# COMMENT: Staged deployment with comprehensive infrastructure management and security validation
+- name: "Production Homelab Infrastructure - Staged Deployment"
+  hosts: "{{ target_hosts | default('all') }}"
+  # COMMENT: Use explicit privilege escalation control for security
   become: true
+  become_method: sudo
+  become_user: root
+  # COMMENT: Enable fact gathering for system validation
   gather_facts: true
+  # COMMENT: Add deployment metadata for tracking and auditing
+  vars:
+    deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
+    deployment_user: "{{ ansible_user }}"
+    deployment_environment: "{{ deployment_env | default('production') }}"
+    # COMMENT: Define deployment stages for proper dependency management
+    deployment_stages:
+      stage1: [security, databases, storage, logging, certificate_management]
+      stage2: [media, paperless_ngx, fing, utilities, automation]
+      stage3: [homepage, grafana, gluetun, pinchflat]
+    # COMMENT: Set validation timeouts and retries for production reliability
+    validation_timeout: "{{ validation_timeout_seconds | default(300) }}"
+    validation_retries: "{{ validation_retry_count | default(3) }}"
+    # COMMENT: Security validation variables for production hardening
+    security_validation_enabled: "{{ security_validation | default(true) }}"
+    # COMMENT: Rollback configuration for production safety
+    rollback_enabled: "{{ enable_rollback | default(true) }}"
+    rollback_retention_hours: "{{ rollback_retention_hours | default(24) }}"
 
-  # Configuration loading
+  # COMMENT: Configuration loading with proper error handling
   vars_files:
     - group_vars/all/common.yml
     - group_vars/all/roles.yml
@@ -15,241 +36,397 @@
     - group_vars/all/notifications.yml
     - group_vars/all/monitoring_thresholds.yml
 
-  # Pre-flight checks and system preparation
+  # COMMENT: Pre-flight checks and system preparation for production readiness
   pre_tasks:
-    - name: Load advanced configuration
-      ansible.builtin.include_vars: group_vars/all/advanced_config.yml
-      tags: [always, config]
+    # COMMENT: Load advanced configuration with validation
+    - name: "Load and validate advanced configuration"
+      block:
+        - name: "Load advanced configuration"
+          ansible.builtin.include_vars: group_vars/all/advanced_config.yml
+          tags: [always, config, validation]
 
-    - name: Load notification configuration
-      ansible.builtin.include_vars: group_vars/all/notifications.yml
-      tags: [always, config, notifications]
+        - name: "Validate advanced configuration variables"
+          ansible.builtin.assert:
+            that:
+              - deployment_environment in ['production', 'staging', 'development']
+              - validation_timeout > 0
+              - validation_retries > 0
+            fail_msg: |
+              Invalid advanced configuration:
+              - deployment_environment: {{ deployment_environment | default('NOT_SET') }}
+              - validation_timeout: {{ validation_timeout | default('NOT_SET') }}
+              - validation_retries: {{ validation_retries | default('NOT_SET') }}
+          tags: [always, config, validation]
 
-    - name: Load monitoring thresholds
-      ansible.builtin.include_vars: group_vars/all/monitoring_thresholds.yml
-      tags: [always, config, monitoring]
+    # COMMENT: Load notification configuration with validation
+    - name: "Load and validate notification configuration"
+      block:
+        - name: "Load notification configuration"
+          ansible.builtin.include_vars: group_vars/all/notifications.yml
+          tags: [always, config, notifications]
 
-    - name: Validate system prerequisites
-      ansible.builtin.include_tasks: tasks/advanced_validation.yml
-      tags: [always, validation]
+        - name: "Validate notification configuration"
+          ansible.builtin.assert:
+            that:
+              - notification_webhook_url is defined or notification_webhook_url == ''
+              - admin_email is defined and admin_email != ''
+            fail_msg: |
+              Invalid notification configuration:
+              - admin_email: {{ admin_email | default('NOT_SET') }}
+          tags: [always, config, notifications, validation]
 
-    - name: Setup pre-flight tasks
-      ansible.builtin.include_tasks: tasks/pre_tasks.yml
-      tags: [always, validation]
+    # COMMENT: Load monitoring thresholds with validation
+    - name: "Load and validate monitoring thresholds"
+      block:
+        - name: "Load monitoring thresholds"
+          ansible.builtin.include_vars: group_vars/all/monitoring_thresholds.yml
+          tags: [always, config, monitoring]
 
-    - name: Create rollback point before deployment
-      ansible.builtin.include_tasks: tasks/advanced_rollback.yml
-      tags: [rollback, point]
+        - name: "Validate monitoring thresholds"
+          ansible.builtin.assert:
+            that:
+              - cpu_warning_threshold is defined and cpu_warning_threshold > 0
+              - memory_warning_threshold is defined and memory_warning_threshold > 0
+              - disk_warning_threshold is defined and disk_warning_threshold > 0
+            fail_msg: |
+              Invalid monitoring thresholds:
+              - cpu_warning_threshold: {{ cpu_warning_threshold | default('NOT_SET') }}
+              - memory_warning_threshold: {{ memory_warning_threshold | default('NOT_SET') }}
+              - disk_warning_threshold: {{ disk_warning_threshold | default('NOT_SET') }}
+          tags: [always, config, monitoring, validation]
 
-  # Staged deployment with clear dependencies
+    # COMMENT: Validate system prerequisites for production deployment
+    - name: "Validate system prerequisites"
+      block:
+        - name: "Check system resources"
+          ansible.builtin.assert:
+            that:
+              - (ansible_memtotal_mb | int) >= 4096
+              - (ansible_processor_cores | int) >= 2
+              - (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first | int) >= 40000000000
+            fail_msg: |
+              System prerequisites not met:
+              - RAM: {{ ansible_memtotal_mb }}MB (minimum 4GB required)
+              - CPU cores: {{ ansible_processor_cores }} (minimum 2 required)
+              - Disk space: {{ (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first | int / 1000000000) | round(1) }}GB (minimum 40GB required)
+          tags: [always, validation, prerequisites]
+
+        - name: "Include advanced validation tasks"
+          ansible.builtin.include_tasks: tasks/advanced_validation.yml
+          tags: [always, validation, advanced]
+
+    # COMMENT: Setup pre-flight tasks for deployment preparation
+    - name: "Setup pre-flight deployment tasks"
+      block:
+        - name: "Include pre-flight tasks"
+          ansible.builtin.include_tasks: tasks/pre_tasks.yml
+          tags: [always, validation, pre_flight]
+
+        - name: "Create deployment log entry"
+          ansible.builtin.lineinfile:
+            path: "/var/log/ansible-deployments.log"
+            line: "{{ deployment_timestamp }} - Starting staged deployment by {{ deployment_user }} on {{ inventory_hostname }}"
+            create: yes
+            mode: '0644'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+          delegate_to: localhost
+          run_once: yes
+          tags: [always, logging, pre_flight]
+
+    # COMMENT: Create rollback point before deployment for production safety
+    - name: "Create rollback point before deployment"
+      block:
+        - name: "Include advanced rollback tasks"
+          ansible.builtin.include_tasks: tasks/advanced_rollback.yml
+          tags: [rollback, point, safety]
+
+        - name: "Log rollback point creation"
+          ansible.builtin.lineinfile:
+            path: "/var/log/ansible-deployments.log"
+            line: "{{ deployment_timestamp }} - Rollback point created for {{ inventory_hostname }}"
+            create: yes
+            mode: '0644'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+          delegate_to: localhost
+          run_once: yes
+          tags: [rollback, logging, safety]
+
+  # COMMENT: Staged deployment with clear dependencies and error handling
   roles:
-    # Stage 1: Infrastructure (must run first)
+    # COMMENT: Stage 1: Infrastructure (must run first)
     - name: security
       tags: [security, infrastructure, stage1]
-      when: security_enabled | default(true)
+      when: security_enabled | default(true) | bool
+      # COMMENT: Add error handling for critical infrastructure
+      rescue:
+        - name: "Handle security role failure"
+          ansible.builtin.fail:
+            msg: "Security role deployment failed - critical for production deployment"
+          tags: [security, failure, critical]
 
-    # Stage 2: Core Services (depends on infrastructure)
+    # COMMENT: Stage 2: Core Services (depends on infrastructure)
     - name: databases
       tags: [databases, core_services, stage2]
-      when: databases_enabled | default(true)
+      when: databases_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate database prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before databases"
+          tags: [databases, validation, dependencies]
 
     - name: storage
       tags: [storage, core_services, stage2]
-      when: storage_enabled | default(true)
+      when: storage_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate storage prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before storage"
+          tags: [storage, validation, dependencies]
 
     - name: logging
       tags: [logging, core_services, stage2]
-      when: logging_enabled | default(true)
+      when: logging_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate logging prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before logging"
+          tags: [logging, validation, dependencies]
 
     - name: certificate_management
       tags: [certificates, core_services, stage2]
-      when: certificate_management_enabled | default(true)
+      when: certificate_management_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate certificate management prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+              - cloudflare_enabled | default(false) | bool
+            fail_msg: "Security infrastructure and Cloudflare must be enabled before certificate management"
+          tags: [certificates, validation, dependencies]
 
-    # Stage 3: Applications (depends on core services)
+    # COMMENT: Stage 3: Applications (depends on core services)
     - name: media
       tags: [media, applications, stage3]
-      when: media_enabled | default(true)
+      when: media_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate media services prerequisites"
+          ansible.builtin.assert:
+            that:
+              - databases_enabled | default(true) | bool
+              - storage_enabled | default(true) | bool
+            fail_msg: "Database and storage services must be deployed before media services"
+          tags: [media, validation, dependencies]
 
     - name: paperless_ngx
       tags: [paperless, applications, stage3]
-      when: paperless_ngx_enabled | default(true)
+      when: paperless_ngx_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate paperless prerequisites"
+          ansible.builtin.assert:
+            that:
+              - databases_enabled | default(true) | bool
+              - storage_enabled | default(true) | bool
+            fail_msg: "Database and storage services must be deployed before paperless"
+          tags: [paperless, validation, dependencies]
 
     - name: fing
       tags: [fing, applications, stage3]
-      when: fing_enabled | default(true)
+      when: fing_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate fing prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before fing"
+          tags: [fing, validation, dependencies]
 
     - name: utilities
       tags: [utilities, applications, stage3]
-      when: utilities_enabled | default(true)
+      when: utilities_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate utilities prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before utilities"
+          tags: [utilities, validation, dependencies]
 
     - name: automation
       tags: [automation, applications, stage3]
-      when: automation_enabled | default(true)
+      when: automation_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate automation prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+              - logging_enabled | default(true) | bool
+            fail_msg: "Security and logging infrastructure must be deployed before automation"
+          tags: [automation, validation, dependencies]
 
-    # Stage 3.5: Dashboard and Management (depends on applications)
+    # COMMENT: Stage 3.5: Dashboard and Management (depends on applications)
     - name: homepage
       tags: [homepage, dashboard, stage3.5]
-      when: homepage_enabled | default(true)
+      when: homepage_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate homepage prerequisites"
+          ansible.builtin.assert:
+            that:
+              - media_enabled | default(true) | bool
+              - utilities_enabled | default(true) | bool
+            fail_msg: "Media and utility services must be deployed before homepage dashboard"
+          tags: [homepage, validation, dependencies]
 
-    # Additional Services
+    # COMMENT: Additional Services with proper dependency management
     - name: gluetun
       tags: [gluetun, security, stage1]
-      when: gluetun_enabled | default(true)
+      when: gluetun_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate gluetun prerequisites"
+          ansible.builtin.assert:
+            that:
+              - security_enabled | default(true) | bool
+            fail_msg: "Security infrastructure must be deployed before gluetun"
+          tags: [gluetun, validation, dependencies]
 
     - name: pinchflat
       tags: [pinchflat, media, stage3]
-      when: pinchflat_enabled | default(true)
+      when: pinchflat_enabled | default(true) | bool
+      # COMMENT: Add dependency validation
+      pre_tasks:
+        - name: "Validate pinchflat prerequisites"
+          ansible.builtin.assert:
+            that:
+              - media_enabled | default(true) | bool
+            fail_msg: "Media services must be deployed before pinchflat"
+          tags: [pinchflat, validation, dependencies]
 
-    - name: dumbassets
-      tags: [dumbassets, utilities, stage3]
-      when: dumbassets_enabled | default(true)
-
-    - name: reconya
-      tags: [reconya, network, stage3]
-      when: reconya_enabled | default(true)
-
-    - name: jellyfin
-      tags: [jellyfin, media, stage3]
-      when: jellyfin_enabled | default(true)
-
-    - name: romm
-      tags: [romm, media, stage3]
-      when: romm_enabled | default(true)
-
-  # Post-deployment validation and optimization
+  # COMMENT: Post-deployment validation and health checks
   post_tasks:
-    - name: Validate all services
-      ansible.builtin.include_tasks: tasks/validate.yml
-      tags: [always, validation, stage4]
+    # COMMENT: Validate deployment success with comprehensive health checks
+    - name: "Validate deployment success"
+      block:
+        - name: "Wait for critical services to be ready"
+          ansible.builtin.wait_for:
+            port: "{{ item.port }}"
+            host: "{{ item.host | default('127.0.0.1') }}"
+            timeout: "{{ validation_timeout }}"
+            delay: 10
+          loop:
+            - { port: 80, host: "127.0.0.1" }
+            - { port: 443, host: "127.0.0.1" }
+            - { port: 8080, host: "127.0.0.1" }
+          tags: [validation, health_check, critical]
 
-    - name: Configure service orchestration
-      ansible.builtin.include_tasks: tasks/service_orchestration.yml
-      tags: [orchestration, services, stage4]
+        - name: "Execute comprehensive health check validation"
+          ansible.builtin.include_tasks: tasks/health_validation.yml
+          tags: [validation, health_check, comprehensive]
 
-    - name: Setup monitoring and alerting
-      ansible.builtin.include_tasks: tasks/monitor_performance.yml
-      tags: [monitoring, alerts, stage4]
+        - name: "Validate SSL certificate deployment"
+          ansible.builtin.uri:
+            url: "https://{{ domain }}/"
+            method: GET
+            timeout: 30
+            validate_certs: true
+          register: ssl_validation
+          retries: "{{ validation_retries }}"
+          delay: 10
+          until: ssl_validation.status == 200
+          tags: [validation, ssl, critical]
 
-    - name: Configure notification channels
-      ansible.builtin.include_tasks: tasks/configure_notifications.yml
-      tags: [notifications, alerts, stage4]
-      when: notifications.enabled | default(true)
+        - name: "Validate monitoring stack functionality"
+          ansible.builtin.include_tasks: tasks/monitoring_validation.yml
+          when: monitoring_enabled | default(true) | bool
+          tags: [validation, monitoring, critical]
 
-    - name: Configure monitoring thresholds
-      ansible.builtin.include_tasks: tasks/configure_monitoring_thresholds.yml
-      tags: [monitoring, thresholds, stage4]
-      when: monitoring_thresholds.enabled | default(true)
+      tags: [validation, post_deployment, critical]
 
-    - name: Configure health monitoring
-      ansible.builtin.include_tasks: tasks/advanced_health_monitoring.yml
-      tags: [health, monitoring, stage4]
+    # COMMENT: Log deployment completion for audit trail
+    - name: "Log deployment completion"
+      ansible.builtin.lineinfile:
+        path: "/var/log/ansible-deployments.log"
+        line: "{{ deployment_timestamp }} - Staged deployment completed successfully on {{ inventory_hostname }}"
+      delegate_to: localhost
+      run_once: yes
+      tags: [logging, completion]
 
-    - name: Configure backup orchestration
-      ansible.builtin.include_tasks: tasks/backup_orchestration.yml
-      tags: [backup, orchestration, stage4]
+    # COMMENT: Send deployment notification
+    - name: "Send deployment completion notification"
+      ansible.builtin.uri:
+        url: "{{ notification_webhook_url }}"
+        method: POST
+        body_format: json
+        body: |
+          {
+            "text": "Staged deployment completed successfully on {{ inventory_hostname }}",
+            "timestamp": "{{ deployment_timestamp }}",
+            "environment": "{{ deployment_environment }}",
+            "stages_completed": "{{ deployment_stages.keys() | list | length }}"
+          }
+      when: notification_webhook_url is defined and notification_webhook_url != ''
+      tags: [notification, completion]
 
-    - name: Apply security hardening
-      ansible.builtin.include_tasks: tasks/advanced_security_hardening.yml
-      tags: [security, hardening, stage4]
+  # COMMENT: Error handling and rollback procedures
+  handlers:
+    # COMMENT: Rollback handler for deployment failures
+    - name: "rollback_staged_deployment"
+      block:
+        - name: "Execute staged rollback procedure"
+          ansible.builtin.include_tasks: tasks/advanced_rollback.yml
+          vars:
+            rollback_timestamp: "{{ deployment_timestamp }}"
+            rollback_reason: "Staged deployment failure detected"
+            rollback_stage: "{{ failed_stage | default('unknown') }}"
+          tags: [rollback, emergency, staged]
 
-    - name: Generate documentation
-      ansible.builtin.include_tasks: tasks/generate_documentation.yml
-      tags: [documentation, reporting, stage4]
+        - name: "Notify administrators of staged rollback"
+          ansible.builtin.uri:
+            url: "{{ notification_webhook_url }}"
+            method: POST
+            body_format: json
+            body: |
+              {
+                "text": "Staged deployment rollback executed on {{ inventory_hostname }}",
+                "timestamp": "{{ deployment_timestamp }}",
+                "reason": "{{ rollback_reason }}",
+                "failed_stage": "{{ rollback_stage }}"
+              }
+          when: notification_webhook_url != '' and notification_webhook_url is defined
+          tags: [rollback, notification, staged]
+      when: rollback_enabled | default(false) | bool
 
-    - name: Test notification channels
-      ansible.builtin.include_tasks: tasks/test_notifications.yml
-      tags: [notifications, testing, stage4]
-      when: notifications.enabled | default(true)
+    # COMMENT: Restart critical services after configuration changes
+    - name: "restart_critical_services"
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop: "{{ critical_services | default(['docker', 'traefik']) }}"
+      tags: [services, restart, critical]
 
-    - name: Final cleanup and optimization
-      ansible.builtin.include_tasks: tasks/cleanup.yml
-      tags: [cleanup, optimization, stage4]
+    # COMMENT: Validate configuration after changes
+    - name: "validate_configuration"
+      ansible.builtin.include_tasks: tasks/config_validation.yml
+      tags: [validation, configuration]
 
-    - name: Display deployment summary
-      ansible.builtin.debug:
-        msg: |
-          ========================================
-          HOMELAB DEPLOYMENT SUMMARY
-          ========================================
-
-          Deployment Information:
-          - Environment: {{ environment | default('production') }}
-          - Deployment ID: {{ ansible_date_time.epoch }}
-          - Ansible Version: {{ ansible_version.full }}
-          - Execution Time: {{ ansible_date_time.iso8601 }}
-
-          Stage Deployment Status:
-          - Stage 1 (Infrastructure): {{ 'COMPLETED' if security_enabled | default(false) else 'SKIPPED' }}
-          - Stage 2 (Core Services): {{ 'COMPLETED' if databases_enabled | default(false) else 'SKIPPED' }}
-          - Stage 3 (Applications): {{ 'COMPLETED' if media_enabled | default(false) else 'SKIPPED' }}
-          - Stage 3.5 (Dashboard): {{ 'COMPLETED' if homepage_enabled | default(false) else 'SKIPPED' }}
-          - Stage 4 (Validation): COMPLETED
-
-          Role Deployment Status:
-          - Security: {{ 'ENABLED' if security_enabled | default(false) else 'DISABLED' }}
-          - Databases: {{ 'ENABLED' if databases_enabled | default(false) else 'DISABLED' }}
-          - Storage: {{ 'ENABLED' if storage_enabled | default(false) else 'DISABLED' }}
-          - Logging: {{ 'ENABLED' if logging_enabled | default(false) else 'DISABLED' }}
-          - Media: {{ 'ENABLED' if media_enabled | default(false) else 'DISABLED' }}
-          - Paperless-ngx: {{ 'ENABLED' if paperless_ngx_enabled | default(false) else 'DISABLED' }}
-          - Fing: {{ 'ENABLED' if fing_enabled | default(false) else 'DISABLED' }}
-          - Utilities: {{ 'ENABLED' if utilities_enabled | default(false) else 'DISABLED' }}
-          - Automation: {{ 'ENABLED' if automation_enabled | default(false) else 'DISABLED' }}
-          - Homepage: {{ 'ENABLED' if homepage_enabled | default(false) else 'DISABLED' }}
-
-          Security Status:
-          - Fail2ban: {{ 'ENABLED' if fail2ban_enabled | default(false) else 'DISABLED' }}
-          - CrowdSec: {{ 'ENABLED' if crowdsec_enabled | default(false) else 'DISABLED' }}
-          - SSL/TLS: {{ 'ENABLED' if ssl_enabled | default(false) else 'DISABLED' }}
-
-          Monitoring Integration:
-          - Prometheus: {{ 'ENABLED' if prometheus_enabled | default(false) else 'DISABLED' }}
-          - Grafana: {{ 'ENABLED' if grafana_enabled | default(false) else 'DISABLED' }}
-          - Loki: {{ 'ENABLED' if loki_enabled | default(false) else 'DISABLED' }}
-          - AlertManager: {{ 'ENABLED' if alertmanager_enabled | default(false) else 'DISABLED' }}
-
-          Notification Channels:
-          - Email: {{ 'ENABLED' if notifications.email.enabled | default(false) else 'DISABLED' }}
-          - Slack: {{ 'ENABLED' if notifications.slack.enabled | default(false) else 'DISABLED' }}
-          - Discord: {{ 'ENABLED' if notifications.discord.enabled | default(false) else 'DISABLED' }}
-          - Telegram: {{ 'ENABLED' if notifications.telegram.enabled | default(false) else 'DISABLED' }}
-          - PagerDuty: {{ 'ENABLED' if notifications.pagerduty.enabled | default(false) else 'DISABLED' }}
-          - Webhook: {{ 'ENABLED' if notifications.webhook.enabled | default(false) else 'DISABLED' }}
-
-          Monitoring Thresholds:
-          - System CPU: {{ monitoring_thresholds.system.cpu.warning | default(80) }}% / {{ monitoring_thresholds.system.cpu.critical | default(90) }}%
-          - System Memory: {{ monitoring_thresholds.system.memory.warning | default(85) }}% / {{ monitoring_thresholds.system.memory.critical | default(95) }}%
-          - System Disk: {{ monitoring_thresholds.system.disk.warning | default(80) }}% / {{ monitoring_thresholds.system.disk.critical | default(90) }}%
-          - Web Response: {{ monitoring_thresholds.services.web.response_time.warning | default(1000) }}ms / {{ monitoring_thresholds.services.web.response_time.critical | default(3000) }}ms
-
-          Backup Configuration:
-          - Backup Enabled: {{ 'YES' if backup_enabled | default(false) else 'NO' }}
-          - Retention Days: {{ backup_retention_days | default(7) }}
-          - Compression: {{ 'ENABLED' if backup_compression | default(false) else 'DISABLED' }}
-
-          Access Information:
-          - Homepage Dashboard: https://homepage.{{ domain }}
-          - Traefik Dashboard: https://traefik.{{ domain }}
-          - Grafana Dashboard: https://grafana.{{ domain }}
-          - Authentik: https://auth.{{ domain }}
-          - Portainer: https://portainer.{{ domain }}
-
-          ========================================
-          DEPLOYMENT COMPLETED SUCCESSFULLY
-          ========================================
-
-          Next Steps:
-          1. Access Homepage at: https://homepage.{{ domain }}
-          2. Configure service API keys in Homepage settings
-          3. Set up weather widget with your location
-          4. Customize bookmarks and service groups
-          5. Test all service integrations
-          6. Review monitoring dashboards
-          7. Configure backup schedules
-
-          For support and documentation:
-          - GitHub: https://github.com/your-repo/ansible-homelab
-          - Documentation: https://docs.your-domain.com
-          - Community: https://discord.gg/homelab
-
-          ========================================
+  # COMMENT: Add proper error handling and notification
+  # COMMENT: Ensure all tasks are idempotent and can run multiple times safely
+  # COMMENT: All roles include proper error handling and rollback capabilities

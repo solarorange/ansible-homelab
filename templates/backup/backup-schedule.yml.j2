@@ -159,6 +159,7 @@ storage:
       host: "{{ vault_backup_sftp_host | default('') }}"
       port: "{{ vault_backup_sftp_port | default(22) }}"
       username: "{{ vault_backup_sftp_username | default('') }}"
+      # SECURITY: Avoid inline SFTP password; prefer SSH keys or secret files.
       password: "{{ vault_backup_sftp_password | default('') }}"
       path: "{{ vault_backup_sftp_path | default('/backups') }}"
 
@@ -177,6 +178,7 @@ notifications:
     smtp_server: "{{ vault_backup_smtp_server | default('') }}"
     smtp_port: "{{ vault_backup_smtp_port | default(587) }}"
     username: "{{ vault_backup_smtp_username | default('') }}"
+    # SECURITY: Avoid inline SMTP password; use secret files if possible.
     password: "{{ vault_backup_smtp_password | default('') }}"
     from_address: "{{ vault_backup_from_address | default('backup@' + domain) }}"
     to_address: "{{ vault_backup_to_address | default('admin@' + domain) }}"

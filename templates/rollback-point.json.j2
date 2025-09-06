@@ -1,62 +1,147 @@
 {
-  "rollback_id": "{{ rollback_timestamp }}",
-  "deployment_info": {
-    "timestamp": "{{ ansible_date_time.iso8601 }}",
-    "deployment_id": "{{ ansible_date_time.epoch }}",
-    "ansible_version": "{{ ansible_version.full }}",
-    "target_host": "{{ inventory_hostname }}",
-    "domain": "{{ domain }}"
-  },
-  "system_info": {
-    "architecture": "{{ ansible_architecture }}",
-    "os_family": "{{ ansible_os_family }}",
-    "os_version": "{{ ansible_os_version }}",
-    "kernel": "{{ ansible_kernel }}",
-    "cpu_cores": "{{ ansible_processor_cores }}",
-    "memory_total": "{{ ansible_memtotal_mb }}MB",
-    "disk_available": "{{ available_disk_gb.stdout }}GB"
-  },
-  "network_info": {
-    "ip_address": "{{ ansible_default_ipv4.address }}",
-    "hostname": "{{ ansible_hostname }}",
-    "domain": "{{ domain }}"
-  },
-  "docker_info": {
-    "docker_version": "{{ docker_version.stdout }}",
-    "docker_storage_driver": "{{ docker_storage_driver.stdout }}",
-    "docker_root": "{{ docker_root }}"
-  },
-  "enabled_services": {
-    "security_enabled": {{ security_enabled | default(false) | tojson }},
-    "databases_enabled": {{ databases_enabled | default(false) | tojson }},
-    "storage_enabled": {{ storage_enabled | default(false) | tojson }},
-    "logging_enabled": {{ logging_enabled | default(false) | tojson }},
-    "media_enabled": {{ media_enabled | default(false) | tojson }},
-    "automation_enabled": {{ automation_enabled | default(false) | tojson }},
-    "utilities_enabled": {{ utilities_enabled | default(false) | tojson }},
-    "paperless_ngx_enabled": {{ paperless_ngx_enabled | default(false) | tojson }},
-    "fing_enabled": {{ fing_enabled | default(false) | tojson }}
-  },
-  "configuration": {
-    "docker_dir": "{{ docker_dir }}",
-    "data_dir": "{{ data_dir }}",
-    "config_dir": "{{ config_dir }}",
-    "backup_dir": "{{ backup_dir }}",
-    "logs_dir": "{{ logs_dir }}"
-  },
-  "backup_files": {
-    "config_backup": "{{ backup_dir }}/rollback/config-backup-{{ rollback_timestamp }}.tar.gz",
-    "database_backups": []
-  },
-  "rollback_instructions": {
-    "description": "Rollback point created before deployment",
-    "rollback_script": "{{ backup_dir }}/rollback/rollback-execute.sh",
-    "rollback_command": "sudo {{ backup_dir }}/rollback/rollback-execute.sh {{ rollback_timestamp }}",
-    "verification_steps": [
-      "Check service status: docker ps",
-      "Verify network connectivity: ping 8.8.8.8",
-      "Check service health: {{ docker_dir }}/orchestration/health-check.sh",
-      "Review logs: tail -f {{ logs_dir }}/deployment.log"
-    ]
+  "rollback_point": {
+    "metadata": {
+      "timestamp": "{{ rollback_metadata.timestamp }}",
+      "epoch": "{{ rollback_metadata.epoch }}",
+      "hostname": "{{ rollback_metadata.hostname }}",
+      "environment": "{{ rollback_metadata.environment }}",
+      "user": "{{ rollback_metadata.user }}",
+      "deployment_type": "{{ rollback_metadata.deployment_type }}",
+      "services_count": "{{ rollback_metadata.services_count }}",
+      "backup_size_mb": "{{ rollback_metadata.backup_size_mb }}"
+    },
+    "system_state": {
+      "ansible_facts": {
+        "distribution": "{{ ansible_distribution | default('UNKNOWN') }}",
+        "distribution_version": "{{ ansible_distribution_version | default('UNKNOWN') }}",
+        "kernel": "{{ ansible_kernel | default('UNKNOWN') }}",
+        "architecture": "{{ ansible_architecture | default('UNKNOWN') }}",
+        "processor_cores": "{{ ansible_processor_cores | default(0) }}",
+        "memtotal_mb": "{{ ansible_memtotal_mb | default(0) }}",
+        "disks": "{{ ansible_devices | default({}) }}"
+      },
+      "docker_info": {
+        "version": "{{ docker_version | default('UNKNOWN') }}",
+        "api_version": "{{ docker_api_version | default('UNKNOWN') }}",
+        "go_version": "{{ docker_go_version | default('UNKNOWN') }}",
+        "os": "{{ docker_os | default('UNKNOWN') }}",
+        "arch": "{{ docker_arch | default('UNKNOWN') }}"
+      },
+      "network_info": {
+        "interfaces": "{{ ansible_interfaces | default([]) }}",
+        "default_ipv4": "{{ ansible_default_ipv4 | default({}) }}",
+        "dns": "{{ ansible_dns | default({}) }}"
+      }
+    },
+    "deployment_state": {
+      "enabled_services": "{{ enabled_services | default([]) }}",
+      "service_versions": "{{ service_versions | default({}) }}",
+      "configuration_files": "{{ configuration_files | default([]) }}",
+      "environment_variables": "{{ environment_variables | default({}) }}"
+    },
+    "backup_information": {
+      "backup_directory": "{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}",
+      "backup_timestamp": "{{ ansible_date_time.iso8601 }}",
+      "backup_type": "pre_deployment",
+      "backup_scope": "comprehensive",
+      "backup_encryption": "{{ backup_encryption_enabled | default(true) | bool }}",
+      "backup_compression": "{{ backup_compression_enabled | default(true) | bool }}"
+    },
+    "security_state": {
+      "firewall_status": "{{ firewall_status | default('UNKNOWN') }}",
+      "ssl_certificates": "{{ ssl_certificates | default([]) }}",
+      "user_permissions": "{{ user_permissions | default({}) }}",
+      "file_permissions": "{{ file_permissions | default({}) }}",
+      "security_services": "{{ security_services | default([]) }}"
+    },
+    "monitoring_state": {
+      "prometheus_status": "{{ prometheus_status | default('UNKNOWN') }}",
+      "grafana_status": "{{ grafana_status | default('UNKNOWN') }}",
+      "alertmanager_status": "{{ alertmanager_status | default('UNKNOWN') }}",
+      "loki_status": "{{ loki_status | default('UNKNOWN') }}",
+      "health_checks": "{{ health_checks | default([]) }}"
+    },
+    "rollback_procedures": {
+      "critical_services": [
+        "traefik",
+        "authentik",
+        "postgresql",
+        "redis",
+        "pihole"
+      ],
+      "important_services": [
+        "homeassistant",
+        "sonarr",
+        "radarr",
+        "nextcloud",
+        "portainer"
+      ],
+      "standard_services": [
+        "jellyfin",
+        "syncthing",
+        "samba",
+        "grafana",
+        "prometheus"
+      ],
+      "rollback_steps": [
+        "Stop all affected services",
+        "Restore configuration files",
+        "Restore environment files",
+        "Restart services in dependency order",
+        "Validate service health",
+        "Verify system functionality"
+      ],
+      "rollback_timeout": "{{ rollback_timeout_seconds | default(600) }}",
+      "rollback_retries": "{{ rollback_retry_count | default(3) }}"
+    },
+    "validation_checks": {
+      "pre_rollback": [
+        "Verify backup integrity",
+        "Check available disk space",
+        "Validate backup permissions",
+        "Confirm rollback timestamp",
+        "Review rollback reason"
+      ],
+      "post_rollback": [
+        "Verify critical services running",
+        "Check service health endpoints",
+        "Validate SSL certificates",
+        "Test network connectivity",
+        "Confirm data integrity"
+      ]
+    },
+    "notification_settings": {
+      "enabled": "{{ rollback_notification_enabled | default(true) | bool }}",
+      "webhook_url": "{{ vault_notification_webhook_url | default('') }}",
+      "email_enabled": "{{ rollback_email_notification | default(false) | bool }}",
+      "slack_enabled": "{{ rollback_slack_notification | default(false) | bool }}",
+      "telegram_enabled": "{{ rollback_telegram_notification | default(false) | bool }}"
+    },
+    "audit_information": {
+      "created_by": "{{ ansible_user }}",
+      "created_at": "{{ ansible_date_time.iso8601 }}",
+      "deployment_id": "{{ deployment_id | default('UNKNOWN') }}",
+      "change_reason": "{{ change_reason | default('Standard deployment') }}",
+      "risk_assessment": "{{ risk_assessment | default('LOW') }}",
+      "approval_required": "{{ approval_required | default(false) | bool }}"
+    },
+    "compatibility_matrix": {
+      "ansible_version": "{{ ansible_version | default('UNKNOWN') }}",
+      "python_version": "{{ ansible_python_version | default('UNKNOWN') }}",
+      "docker_compose_version": "{{ docker_compose_version | default('UNKNOWN') }}",
+      "supported_platforms": [
+        "Ubuntu 20.04+",
+        "Debian 11+",
+        "CentOS 8+",
+        "Rocky Linux 8+",
+        "AlmaLinux 8+"
+      ]
+    },
+    "documentation": {
+      "rollback_script": "{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/rollback.sh",
+      "rollback_log": "{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/rollback.log",
+      "configuration_backup": "{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/config-backup-{{ ansible_date_time.epoch }}.tar.gz",
+      "service_backup": "{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/service-backup-{{ ansible_date_time.epoch }}.tar.gz"
+    }
   }
 } 

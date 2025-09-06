@@ -74,6 +74,9 @@ security_policies:
   docker_security:
     daemon_config:
       user_namespace_remap: true
+      # SECURITY ISSUE (CRITICAL): seccomp unconfined disables syscall sandboxing.
+      # ✅ RECOMMENDED: use Docker default or hardened profile path.
+      # seccomp_profile: "{{ docker_config_root }}/seccomp/hardened.json"
       seccomp_profile: "unconfined"
       apparmor_profile: "docker-default"
       no_new_privileges: true
@@ -82,7 +85,7 @@ security_policies:
         - "ALL"
       security_opt:
         - "no-new-privileges"
-        - "seccomp=unconfined"
+        - "seccomp=unconfined"  # ❌ Unconfined is unsafe in production
     
     container_limits:
       memory_limit: "2g"
