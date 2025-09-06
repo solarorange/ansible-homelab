@@ -58,9 +58,9 @@ readonly SCRIPT_NAME="$(basename "$0")"
 readonly SCRIPT_VERSION="2.1.1"
 readonly SCRIPT_DIR_ABS="${SCRIPT_DIR}"
 readonly REPO_ROOT_ABS="${REPO_ROOT}"
-readonly LOG_FILE="/var/log/ansible-homelab-deployment.log"
-readonly PID_FILE="/var/run/${SCRIPT_NAME}.pid"
-readonly BACKUP_DIR="/var/backups/ansible-homelab"
+readonly LOG_FILE="${REPO_ROOT_ABS}/logs/ansible-homelab-deployment.log"
+readonly PID_FILE="${REPO_ROOT_ABS}/logs/${SCRIPT_NAME}.pid"
+readonly BACKUP_DIR="${REPO_ROOT_ABS}/backups"
 readonly CONFIG_DIR="${REPO_ROOT_ABS}/group_vars/all"
 readonly VAULT_PASSWORD_FILE="${REPO_ROOT_ABS}/.vault_password"
 
@@ -205,13 +205,16 @@ generate_secure_password() {
 validate_prerequisites() {
     log "INFO" "Validating deployment prerequisites"
     
-    # COMMENT: Check if running as root or with sudo
-    if [[ $EUID -ne 0 ]] && ! groups | grep -q sudo; then
+    # COMMENT: Check if running as root or with sudo (skip for validation mode)
+    if [[ "${VALIDATE_ONLY:-0}" -eq 0 ]] && [[ $EUID -ne 0 ]] && ! groups | grep -q sudo; then
         error_exit "This script must be run as root or with sudo privileges"
     fi
     
     # COMMENT: Check if required commands are available
-    local required_commands=("ansible" "ansible-playbook" "git" "docker" "docker-compose")
+    local required_commands=("ansible" "ansible-playbook" "git")
+    if [[ "${VALIDATE_ONLY:-0}" -eq 0 ]]; then
+        required_commands+=("docker" "docker-compose")
+    fi
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
             error_exit "Required command not found: $cmd"
@@ -221,7 +224,13 @@ validate_prerequisites() {
     # COMMENT: Check if Ansible version is compatible
     local ansible_version
     ansible_version=$(ansible --version | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1)
-    if [[ -z "$ansible_version" ]] || [[ $(echo "$ansible_version < 2.9" | bc -l 2>/dev/null || echo "0") -eq 1 ]]; then
+    if [[ -z "$ansible_version" ]]; then
+        error_exit "Could not determine Ansible version"
+    fi
+    # COMMENT: Simple version check - Ansible 2.9+ or 3.0+ or 4.0+ etc.
+    local major_version=$(echo "$ansible_version" | cut -d. -f1)
+    local minor_version=$(echo "$ansible_version" | cut -d. -f2)
+    if [[ "$major_version" -lt 2 ]] || [[ "$major_version" -eq 2 && "$minor_version" -lt 9 ]]; then
         error_exit "Ansible 2.9+ is required. Current version: $ansible_version"
     fi
     
@@ -279,7 +288,7 @@ setup_environment() {
     log "INFO" "Setting up deployment environment"
     
     # COMMENT: Create required directories
-    local directories=("$BACKUP_DIR" "/var/log/ansible-homelab" "/var/run/ansible-homelab")
+    local directories=("$BACKUP_DIR" "${REPO_ROOT_ABS}/logs" "${REPO_ROOT_ABS}/tmp")
     for dir in "${directories[@]}"; do
         mkdir -p "$dir"
         chmod 755 "$dir"

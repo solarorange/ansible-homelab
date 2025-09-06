@@ -18,20 +18,20 @@
     deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
     deployment_user: "{{ ansible_user }}"
     deployment_environment: "{{ deployment_env | default('production') }}"
-    
+
     # COMMENT: Rollback configuration with safety measures
     rollback_backup_dir: "/var/backups/ansible-homelab/rollback"
     rollback_confirm: "{{ rollback_confirm | default(false) | bool }}"
     rollback_timestamp: "{{ rollback_timestamp | default('') }}"
     rollback_reason: "{{ rollback_reason | default('Manual rollback') }}"
-    
+
     # COMMENT: Rollback safety configuration
     rollback_safety:
       enabled: "{{ rollback_safety_enabled | default(true) | bool }}"
       max_rollback_age_hours: "{{ max_rollback_age_hours | default(24) | int }}"
       require_confirmation: "{{ rollback_require_confirmation | default(true) | bool }}"
       backup_verification: "{{ rollback_backup_verification | default(true) | bool }}"
-    
+
     # COMMENT: Rollback timeout configuration
     rollback_timeout: "{{ rollback_timeout_seconds | default(600) }}"
     rollback_retries: "{{ rollback_retry_count | default(3) }}"
@@ -91,7 +91,7 @@
               - Exists: {{ backup_dir_check.stat.exists }}
               - Is Directory: {{ backup_dir_check.stat.isdir }}
               - Permissions: {{ backup_dir_check.stat.mode }}
-              
+
               Backup directory must exist, be a directory, and have secure permissions (700+).
           tags: [rollback, validation, security]
 
@@ -108,7 +108,7 @@
               Insufficient disk space for rollback operation:
               - Available: {{ available_disk_space.stdout }}GB
               - Required: 10GB minimum
-              
+
               Please free up disk space before continuing.
           tags: [rollback, validation, resources]
 
@@ -126,7 +126,7 @@
               Invalid rollback timestamp format:
               - Provided: {{ rollback_timestamp }}
               - Expected: ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
-              
+
               Please provide a valid rollback timestamp.
           when: rollback_timestamp != ''
           tags: [rollback, validation, timestamp]
@@ -158,7 +158,7 @@
               Rollback timestamp is too old for safety:
               - Rollback Age: {{ rollback_age_hours.stdout }} hours
               - Maximum Age: {{ rollback_safety.max_rollback_age_hours }} hours
-              
+
               Rollbacks older than {{ rollback_safety.max_rollback_age_hours }} hours are not allowed for safety reasons.
               Please use a more recent backup or contact system administrator.
           when: rollback_timestamp != '' and rollback_safety.enabled | bool
@@ -685,19 +685,19 @@
               ========================================
               ROLLBACK SUMMARY
               ========================================
-              
+
               Rollback Target: {{ inventory_hostname }}
               Rollback Timestamp: {{ deployment_timestamp }}
               Rollback To: {{ rollback_timestamp | default('LATEST') }}
               Environment: {{ deployment_environment }}
               Reason: {{ rollback_reason }}
-              
+
               Rollback Status: COMPLETED
               Services Restored: All requested services
               SSL Certificate: {{ 'VALID' if post_rollback_ssl_test.status == 200 else 'INVALID' }}
-              
+
               Rollback Report: /var/log/ansible-rollback/rollback_report_{{ deployment_timestamp }}.md
-              
+
               ========================================
           tags: [rollback, report, summary]
 

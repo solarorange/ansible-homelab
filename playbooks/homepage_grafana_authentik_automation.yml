@@ -18,7 +18,7 @@
     deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
     deployment_user: "{{ ansible_user }}"
     deployment_environment: "{{ deployment_env | default('production') }}"
-    
+
     # COMMENT: Enable automation for all services with validation
     homepage_automation_enabled: "{{ homepage_automation_enabled | default(true) | bool }}"
     grafana_automation_enabled: "{{ grafana_automation_enabled | default(true) | bool }}"
@@ -138,7 +138,7 @@
               Unsupported operating system or architecture:
               - OS Family: {{ ansible_os_family }}
               - Architecture: {{ ansible_architecture }}
-              
+
               Supported:
               - OS: Debian, RedHat
               - Architecture: x86_64, amd64, aarch64, arm64
@@ -156,7 +156,7 @@
               Insufficient disk space for deployment:
               - Available: {{ disk_space_check.stdout_lines[-1] }}
               - Required: 20GB minimum
-              
+
               Please free up disk space before continuing.
 
         - name: "Check system resources"
@@ -192,7 +192,7 @@
           - domain: {{ domain | default('NOT_SET') }}
           - username: {{ username | default('NOT_SET') }}
           - deployment_environment: {{ deployment_environment | default('NOT_SET') }}
-          
+
           Please check group_vars/all/vars.yml and ensure all required variables are set.
       tags: [always, validation, variables]
 
@@ -205,17 +205,17 @@
           - cloudflare_api_token is defined and cloudflare_api_token != ''
         fail_msg: |
           Cloudflare DNS automation is REQUIRED for SSL certificates.
-          
+
           Your group_vars/all/common.yml must have:
           cloudflare_enabled: true
           cloudflare_email: "your_email@domain.com"
           cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
-          
+
           Current values:
           cloudflare_enabled: {{ cloudflare_enabled | default('NOT_SET') }}
           cloudflare_email: {{ cloudflare_email | default('NOT_SET') }}
           cloudflare_api_token: {{ 'SET' if cloudflare_api_token is defined else 'NOT_SET' }}
-          
+
           Please update your configuration with valid Cloudflare credentials.
           The deployment will fail without proper DNS automation for SSL.
       tags: [always, validation, cloudflare, ssl]

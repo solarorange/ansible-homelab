@@ -1,0 +1,347 @@
+---
+# COMMENT: Production-ready Ansible playbook for seamless homelab deployment
+# COMMENT: Comprehensive error handling, security validation, and rollback capabilities
+- name: "Production Homelab Deployment - Seamless Setup"
+  hosts: "{{ target_hosts | default('all') }}"
+  # COMMENT: Start without privileges, escalate only where needed for security
+  become: false
+  # COMMENT: Enable fact gathering for system validation
+  gather_facts: true
+  # COMMENT: Control parallel execution for production stability
+  serial: "{{ serial | default(1) }}"
+  # COMMENT: Allow some failures in parallel execution with rollback
+  max_fail_percentage: "{{ max_fail_percentage | default(25) }}"
+  # COMMENT: Add deployment metadata for tracking and auditing
+  vars:
+    deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
+    deployment_user: "{{ ansible_user }}"
+    deployment_environment: "{{ deployment_env | default('production') }}"
+    backup_dir: "/var/backups/ansible/{{ deployment_timestamp }}"
+    notification_webhook_url: "{{ vault_notification_webhook_url | default('') }}"
+    # COMMENT: Define critical services that must be operational
+    critical_services:
+      - docker
+      - traefik
+      - monitoring_infrastructure
+    # COMMENT: Set validation timeouts and retries for production reliability
+    validation_timeout: "{{ validation_timeout_seconds | default(300) }}"
+    validation_retries: "{{ validation_retry_count | default(3) }}"
+    # COMMENT: Security validation variables for production hardening
+    security_validation_enabled: "{{ security_validation | default(true) }}"
+    privilege_escalation_required: "{{ require_privilege_escalation | default(true) }}"
+    # COMMENT: Rollback configuration for production safety
+    rollback_enabled: "{{ enable_rollback | default(true) }}"
+    rollback_retention_hours: "{{ rollback_retention_hours | default(24) }}"
+
+  # COMMENT: Pre-deployment validation tasks for production readiness
+  pre_tasks:
+    # COMMENT: Validate privilege requirements before any escalation
+    - name: "Validate user privileges and system requirements"
+      block:
+        - name: "Check sudo group membership"
+          ansible.builtin.command: id -nG
+          register: user_groups
+          changed_when: false
+          failed_when: false
+
+        - name: "Gather root filesystem free space (GB)"
+          ansible.builtin.command: df -BG --output=avail /
+          register: root_fs
+          changed_when: false
+          failed_when: false
+
+        - name: "Validate deployment prerequisites"
+          ansible.builtin.assert:
+            that:
+              # COMMENT: Check user has proper privileges
+              - (ansible_user_id == '0') or (user_groups is defined and 'sudo' in user_groups.stdout.split())
+              # COMMENT: Validate system resources meet minimum requirements
+              - (ansible_memtotal_mb | int) >= 4096
+              - (root_fs is defined and ((root_fs.stdout_lines[-1] | regex_replace('[^0-9]', '')) | int) >= 40)
+              - (ansible_processor_cores | int) >= 2
+              # COMMENT: Ensure proper Ansible configuration
+              - ansible_become_method is defined
+            fail_msg: |
+              Deployment prerequisites not met:
+              - User must have sudo privileges or be root
+              - Minimum 4GB RAM required ({{ ansible_memtotal_mb }}MB available)
+              - Minimum 40GB free on root filesystem
+              - Minimum 2 CPU cores required ({{ ansible_processor_cores }} available)
+          tags: [always, critical, validation]
+
+        # COMMENT: Validate required variables with proper error handling
+        - name: "Validate required deployment variables"
+          ansible.builtin.assert:
+            that:
+              - username is defined and username != ''
+              - domain is defined and domain != ''
+              - deployment_environment in ['production', 'staging', 'development']
+            fail_msg: |
+              Required variables are not properly defined:
+              - username: {{ username | default('NOT_SET') }}
+              - domain: {{ domain | default('NOT_SET') }}
+              - deployment_environment: {{ deployment_environment | default('NOT_SET') }}
+
+              Please check group_vars/all/vars.yml and ensure all required variables are set.
+          tags: [always, critical, validation]
+          notify: rollback_deployment
+
+        # COMMENT: CRITICAL: Validate Cloudflare DNS automation configuration for SSL
+        - name: "Validate Cloudflare DNS automation configuration"
+          ansible.builtin.assert:
+            that:
+              - cloudflare_enabled | default(false) | bool
+              - cloudflare_email is defined and cloudflare_email != ''
+              - cloudflare_api_token is defined and cloudflare_api_token != ''
+            fail_msg: |
+              Cloudflare DNS automation is REQUIRED for SSL certificates.
+
+              Your group_vars/all/common.yml must have:
+              cloudflare_enabled: true
+              cloudflare_email: "your_email@domain.com"
+              cloudflare_api_token: "{{ vault_cloudflare_api_token }}"
+
+              Current values:
+              cloudflare_enabled: {{ cloudflare_enabled | default('NOT_SET') }}
+              cloudflare_email: {{ cloudflare_email | default('NOT_SET') }}
+              cloudflare_api_token: {{ 'SET' if cloudflare_api_token is defined else 'NOT_SET' }}
+
+              Please update your configuration with valid Cloudflare credentials.
+              The deployment will fail without proper DNS automation for SSL.
+          tags: [always, critical, cloudflare, ssl]
+          notify: rollback_deployment
+
+        # COMMENT: Validate port conflicts before deployment to prevent conflicts
+        - name: "Validate port assignments and conflicts"
+          ansible.builtin.include_tasks: tasks/port_validation.yml
+          tags: [always, critical, validation]
+
+        # COMMENT: Create deployment log entry for audit trail
+        - name: "Create deployment log entry"
+          ansible.builtin.lineinfile:
+            path: "/var/log/ansible-deployments.log"
+            line: "{{ deployment_timestamp }} - Starting deployment by {{ deployment_user }} on {{ inventory_hostname }}"
+            create: yes
+            mode: '0644'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+          delegate_to: localhost
+          run_once: yes
+          tags: [always, logging]
+
+    # COMMENT: Setup prerequisites with explicit privilege escalation
+    - name: "Setup deployment prerequisites"
+      block:
+        - ansible.builtin.include_tasks: tasks/setup.yml
+        - ansible.builtin.include_tasks: tasks/logs_setup.yml
+      become: true
+      become_user: root
+      become_method: sudo
+      tags: [setup, always, prerequisites]
+      notify: rollback_deployment
+
+    # COMMENT: Create backup with proper permissions before deployment
+    - name: "Create deployment backup"
+      block:
+        - name: "Create backup directory with proper permissions"
+          ansible.builtin.file:
+            path: "{{ backup_dir }}"
+            state: directory
+            mode: '0755'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+          become: true
+
+        - name: "Create system backup before deployment"
+          ansible.builtin.include_tasks: tasks/backup.yml
+          vars:
+            backup_destination: "{{ backup_dir }}"
+          tags: [backup, always]
+      become: true
+      become_user: root
+      become_method: sudo
+      tags: [backup, always, safety]
+      notify: rollback_deployment
+
+  # COMMENT: Main deployment tasks with comprehensive error handling
+  tasks:
+    # COMMENT: Deploy core infrastructure with proper staging
+    - name: "Deploy core infrastructure"
+      block:
+        - name: "Deploy security infrastructure"
+          ansible.builtin.include_role:
+            name: security
+          tags: [security, infrastructure, stage1]
+          when: security_enabled | default(true) | bool
+
+        - name: "Deploy monitoring infrastructure"
+          ansible.builtin.include_role:
+            name: logging
+          tags: [monitoring, infrastructure, stage1]
+          when: logging_enabled | default(true) | bool
+
+        - name: "Deploy certificate management"
+          ansible.builtin.include_role:
+            name: certificate_management
+          tags: [certificates, infrastructure, stage1]
+          when: certificate_management_enabled | default(true) | bool
+
+      become: true
+      become_user: root
+      become_method: sudo
+      tags: [infrastructure, stage1]
+      notify: rollback_deployment
+
+    # COMMENT: Deploy application services with dependency management
+    - name: "Deploy application services"
+      block:
+        - name: "Deploy media services"
+          ansible.builtin.include_role:
+            name: media
+          tags: [media, applications, stage2]
+          when: media_enabled | default(true) | bool
+
+        - name: "Deploy utility services"
+          ansible.builtin.include_role:
+            name: utilities
+          tags: [utilities, applications, stage2]
+          when: utilities_enabled | default(true) | bool
+
+        - name: "Deploy automation services"
+          ansible.builtin.include_role:
+            name: automation
+          tags: [automation, applications, stage2]
+          when: automation_enabled | default(true) | bool
+
+      become: true
+      become_user: root
+      become_method: sudo
+      tags: [applications, stage2]
+      notify: rollback_deployment
+
+    # COMMENT: Deploy dashboard and management interfaces
+    - name: "Deploy dashboard and management"
+      block:
+        - name: "Deploy homepage dashboard"
+          ansible.builtin.include_role:
+            name: homepage
+          tags: [homepage, dashboard, stage3]
+          when: homepage_enabled | default(true) | bool
+
+        - name: "Deploy monitoring dashboards"
+          ansible.builtin.include_role:
+            name: grafana
+          tags: [grafana, dashboard, stage3]
+          when: grafana_enabled | default(true) | bool
+
+      become: true
+      become_user: root
+      become_method: sudo
+      tags: [dashboard, stage3]
+      notify: rollback_deployment
+
+  # COMMENT: Post-deployment validation and health checks
+  post_tasks:
+    # COMMENT: Validate deployment success with health checks
+    - name: "Validate deployment success"
+      block:
+        - name: "Wait for services to be ready"
+          ansible.builtin.wait_for:
+            port: "{{ item.port }}"
+            host: "{{ item.host | default('127.0.0.1') }}"
+            timeout: "{{ validation_timeout }}"
+            delay: 10
+          loop:
+            - { port: 80, host: "127.0.0.1" }
+            - { port: 443, host: "127.0.0.1" }
+            - { port: 8080, host: "127.0.0.1" }
+          tags: [validation, health_check]
+
+        - name: "Execute health check validation"
+          ansible.builtin.include_tasks: tasks/health_validation.yml
+          tags: [validation, health_check]
+
+        - name: "Validate SSL certificate deployment"
+          ansible.builtin.uri:
+            url: "https://{{ domain }}/"
+            method: GET
+            timeout: 30
+            validate_certs: true
+          register: ssl_validation
+          retries: "{{ validation_retries }}"
+          delay: 10
+          until: ssl_validation.status == 200
+          tags: [validation, ssl, critical]
+          notify: rollback_deployment
+
+    # COMMENT: Log deployment completion for audit trail
+    - name: "Log deployment completion"
+      ansible.builtin.lineinfile:
+        path: "/var/log/ansible-deployments.log"
+        line: "{{ deployment_timestamp }} - Deployment completed successfully on {{ inventory_hostname }}"
+      delegate_to: localhost
+      run_once: yes
+      tags: [logging, completion]
+
+  # COMMENT: Error handling and rollback procedures
+  handlers:
+    # COMMENT: Rollback handler for deployment failures
+    - name: "rollback_deployment"
+      block:
+        # COMMENT: Capture failure details for rollback context
+        - name: "Capture failure context for rollback"
+          ansible.builtin.set_fact:
+            rollback_error: |
+              {
+                "task_name": "{{ ansible_failed_task.name | default('Unknown task') }}",
+                "error_message": "{{ ansible_failed_result.msg | default('Unknown error') | regex_replace('password.*', 'password=***REDACTED***') | regex_replace('token.*', 'token=***REDACTED***') | regex_replace('secret.*', 'secret=***REDACTED***') | truncate(200) }}",
+                "module": "{{ ansible_failed_task.action | default('Unknown module') }}",
+                "host": "{{ inventory_hostname }}",
+                "timestamp": "{{ ansible_date_time.iso8601 }}",
+                "failed_stage": "{{ ansible_failed_task.tags | default([]) | join(', ') }}"
+              }
+          when: ansible_failed_task is defined
+
+        - name: "Execute rollback procedure"
+          ansible.builtin.include_tasks: tasks/rollback.yml
+          vars:
+            rollback_timestamp: "{{ deployment_timestamp }}"
+            rollback_reason: "Deployment failure detected"
+            rollback_error: "{{ rollback_error | default('{}') }}"
+            rollback_cause: "{{ rollback_error.task_name | default('Unknown task') }} failed: {{ rollback_error.error_message | default('Unknown error') }}"
+          tags: [rollback, emergency]
+
+        - name: "Notify administrators of rollback"
+          ansible.builtin.uri:
+            url: "{{ notification_webhook_url }}"
+            method: POST
+            body_format: json
+            body: |
+              {
+                "text": "Deployment rollback executed on {{ inventory_hostname }}",
+                "timestamp": "{{ deployment_timestamp }}",
+                "reason": "{{ rollback_cause | default('Deployment failure detected') }}",
+                "failed_task": "{{ rollback_error.task_name | default('Unknown') }}",
+                "error_details": "{{ rollback_error.error_message | default('Unknown error') }}",
+                "failed_stage": "{{ rollback_error.failed_stage | default('Unknown') }}"
+              }
+          when: notification_webhook_url != ''
+          tags: [rollback, notification]
+      when: rollback_enabled | default(false) | bool
+
+    # COMMENT: Restart critical services after configuration changes
+    - name: "restart_critical_services"
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop: "{{ critical_services }}"
+      tags: [services, restart]
+
+    # COMMENT: Validate configuration after changes
+    - name: "validate_configuration"
+      ansible.builtin.include_tasks: tasks/config_validation.yml
+      tags: [validation, configuration]
+
+  # COMMENT: Add proper error handling and notification
+  # COMMENT: Ensure all tasks are idempotent and can run multiple times safely

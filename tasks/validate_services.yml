@@ -22,11 +22,11 @@
       ansible.builtin.fail:
         msg: |
           Docker Compose validation failed for {{ item.item }}:
-          
+
           Error: {{ item.stderr | default('Unknown error') }}
           Return Code: {{ item.rc }}
           Service: {{ item.item }}
-          
+
           Please check the Docker Compose configuration for syntax errors.
       loop: "{{ compose_validation.results }}"
       when: item.rc != 0
@@ -53,10 +53,10 @@
       ansible.builtin.fail:
         msg: |
           Environment validation failed with security issues:
-          
+
           Error: {{ env_validation.stderr | default('Unknown error') }}
           Return Code: {{ env_validation.rc }}
-          
+
           Please check for:
           - Missing required environment variables
           - Insecure environment variable values
@@ -85,12 +85,12 @@
       ansible.builtin.fail:
         msg: |
           Port validation failed for {{ item.item.port }}:
-          
+
           Error: {{ item.msg | default('Unknown error') }}
           Host: {{ ansible_default_ipv4.address | default('127.0.0.1') }}
           Port: {{ item.item.port }}
           Timeout: {{ validation_timeout | default(60) }}
-          
+
           Please check:
           - Service is running and listening on the port
           - Firewall rules allow the connection
@@ -118,11 +118,11 @@
       ansible.builtin.fail:
         msg: |
           Endpoint validation failed for {{ item.item.url }}:
-          
+
           Status: {{ item.status | default('Unknown') }}
           Error: {{ item.msg | default('Unknown error') }}
           Response Time: {{ item.elapsed | default('Unknown') }}ms
-          
+
           Please check:
           - Service health endpoint is responding
           - Service is fully initialized
@@ -144,7 +144,7 @@
           echo "ERROR: PostgreSQL password not set"
           exit 1
         fi
-        
+
         PGPASSWORD="$PGPASSWORD" psql \
           -h "{{ ansible_default_ipv4.address | default('127.0.0.1') }}" \
           -U "{{ vault_postgresql_user | default('postgres') }}" \
@@ -165,10 +165,10 @@
       ansible.builtin.fail:
         msg: |
           PostgreSQL validation failed with security issues:
-          
+
           Error: {{ postgres_validation.stderr | default('Unknown error') }}
           Return Code: {{ postgres_validation.rc }}
-          
+
           Please check:
           - Database service is running
           - Credentials are correct and secure
@@ -183,7 +183,7 @@
           echo "ERROR: Redis password not set"
           exit 1
         fi
-        
+
         redis-cli \
           -h "{{ ansible_default_ipv4.address | default('127.0.0.1') }}" \
           -p "{{ redis_port | default(6379) }}" \
@@ -199,10 +199,10 @@
       ansible.builtin.fail:
         msg: |
           Redis validation failed with security issues:
-          
+
           Error: {{ redis_validation.stderr | default('Unknown error') }}
           Return Code: {{ redis_validation.rc }}
-          
+
           Please check:
           - Redis service is running
           - Authentication is configured correctly
@@ -235,18 +235,18 @@
       ansible.builtin.fail:
         msg: |
           Prometheus has unhealthy targets:
-          
+
           Total Targets: {{ prometheus_targets.json.targets | length }}
           Healthy Targets: {{ prometheus_targets.json.targets | selectattr('health', 'equalto', 'up') | list | length }}
           Unhealthy Targets: {{ prometheus_targets.json.targets | selectattr('health', 'equalto', 'down') | list | length }}
-          
+
           Unhealthy Targets:
           {% for target in prometheus_targets.json.targets %}
           {% if target.health != 'up' %}
           - {{ target.labels.instance | default('Unknown') }}: {{ target.health }} ({{ target.lastError | default('No error details') }})
           {% endif %}
           {% endfor %}
-          
+
           Please investigate unhealthy targets before continuing.
       when:
         - prometheus_targets.status == 200
@@ -273,10 +273,10 @@
       ansible.builtin.fail:
         msg: |
           Grafana has no configured datasources:
-          
+
           Status: {{ grafana_datasources.status | default('Unknown') }}
           Response: {{ grafana_datasources.json | default('No response') }}
-          
+
           Please check:
           - Grafana is properly configured
           - Datasources are added and configured
@@ -309,10 +309,10 @@
       ansible.builtin.fail:
         msg: |
           Traefik has no configured routers:
-          
+
           Status: {{ traefik_routers.status | default('Unknown') }}
           Response: {{ traefik_routers.json | default('No response') }}
-          
+
           Please check:
           - Traefik is properly configured
           - Services are registered with Traefik
@@ -339,10 +339,10 @@
       ansible.builtin.fail:
         msg: |
           Authentik validation failed with security issues:
-          
+
           Status: {{ authentik_validation.status | default('Unknown') }}
           Error: {{ authentik_validation.msg | default('Unknown error') }}
-          
+
           Please check:
           - Authentik service is running
           - Database connection is working
@@ -363,10 +363,10 @@
       ansible.builtin.fail:
         msg: |
           Firewall is not active:
-          
+
           Status: {{ firewall_status.status | default('Unknown') }}
           Rules: {{ firewall_status.rules | default('No rules') }}
-          
+
           Please check:
           - UFW is properly configured
           - Firewall rules are applied
@@ -405,10 +405,10 @@
       ansible.builtin.fail:
         msg: |
           Backup script is not executable:
-          
+
           Path: {{ docker_dir }}/backup/backup.sh
           Return Code: {{ backup_script_test.rc }}
-          
+
           Please check:
           - Backup script exists and is executable
           - Script permissions are correct
@@ -428,10 +428,10 @@
       ansible.builtin.fail:
         msg: |
           Backup test failed with security issues:
-          
+
           Error: {{ backup_test.stderr | default('Unknown error') }}
           Return Code: {{ backup_test.rc }}
-          
+
           Please check:
           - Backup script configuration
           - Required permissions and access

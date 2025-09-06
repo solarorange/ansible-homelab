@@ -70,11 +70,11 @@
       ansible.builtin.fail:
         msg: |
           Docker Compose backup failed for {{ item.item }}:
-          
+
           Error: {{ item.msg | default('Unknown error') }}
           Source: {{ docker_dir | default('/opt/services') }}/{{ item.item }}/docker-compose.yml
           Destination: {{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/{{ item.item }}-{{ ansible_date_time.epoch }}.yml
-          
+
           Please check:
           - File permissions and ownership
           - Available disk space
@@ -117,11 +117,11 @@
       ansible.builtin.fail:
         msg: |
           Environment file backup failed for {{ item.item }}:
-          
+
           Error: {{ item.msg | default('Unknown error') }}
           Source: {{ docker_dir | default('/opt/services') }}/{{ item.item }}/.env
           Destination: {{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/{{ item.item }}-env-{{ ansible_date_time.epoch }}.env
-          
+
           Please check:
           - File permissions and ownership
           - Available disk space
@@ -150,10 +150,10 @@
       ansible.builtin.fail:
         msg: |
           Service state backup failed:
-          
+
           Error: {{ service_state_backup.stderr | default('Unknown error') }}
           Return Code: {{ service_state_backup.rc }}
-          
+
           Please check:
           - Docker service is running
           - Docker Compose is available
@@ -180,10 +180,10 @@
       ansible.builtin.fail:
         msg: |
           System state backup failed:
-          
+
           Error: {{ system_state_backup.stderr | default('Unknown error') }}
           Return Code: {{ system_state_backup.rc }}
-          
+
           Please check:
           - System commands are available
           - Backup directory permissions
@@ -255,10 +255,10 @@
       ansible.builtin.fail:
         msg: |
           Rollback cleanup failed:
-          
+
           Error: {{ rollback_cleanup.stderr | default('Unknown error') }}
           Return Code: {{ rollback_cleanup.rc }}
-          
+
           Please check:
           - Backup directory permissions
           - Available disk space
@@ -280,10 +280,10 @@
       ansible.builtin.fail:
         msg: |
           Age-based rollback cleanup failed:
-          
+
           Error: {{ age_based_cleanup.stderr | default('Unknown error') }}
           Return Code: {{ age_based_cleanup.rc }}
-          
+
           Please check:
           - Backup directory permissions
           - Available disk space
@@ -300,14 +300,14 @@
     - name: "Validate rollback directory security with comprehensive checks"
       ansible.builtin.shell: |
         rollback_dir="{{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}"
-        
+
         # Check directory permissions
         dir_perms=$(stat -c "%a" "$rollback_dir")
         if [ "$dir_perms" != "750" ]; then
           echo "ERROR: Rollback directory has insecure permissions: $dir_perms (should be 750)"
           exit 1
         fi
-        
+
         # Check directory ownership
         dir_owner=$(stat -c "%U:%G" "$rollback_dir")
         expected_owner="{{ rollback_user | default(ansible_user) }}:{{ rollback_group | default(ansible_user) }}"
@@ -315,7 +315,7 @@
           echo "ERROR: Rollback directory has incorrect ownership: $dir_owner (should be $expected_owner)"
           exit 1
         fi
-        
+
         # Check file permissions
         find "$rollback_dir" -type f -exec stat -c "%a %n" {} \; | while read perms file; do
           if [[ "$perms" != "6"* ]] && [[ "$perms" != "7"* ]]; then
@@ -323,7 +323,7 @@
             exit 1
           fi
         done
-        
+
         echo "Rollback directory security validation passed"
       register: rollback_security_validation
       changed_when: false
@@ -333,10 +333,10 @@
       ansible.builtin.fail:
         msg: |
           Rollback security validation failed:
-          
+
           Error: {{ rollback_security_validation.stderr | default('Unknown error') }}
           Return Code: {{ rollback_security_validation.rc }}
-          
+
           Please check:
           - Directory permissions (should be 750)
           - Directory ownership (should be {{ rollback_user | default(ansible_user) }}:{{ rollback_group | default(ansible_user) }})
@@ -361,10 +361,10 @@
       Hostname: {{ ansible_hostname }}
       Environment: {{ deployment_environment | default('production') }}
       User: {{ ansible_user }}
-      
+
       Rollback Directory: {{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/
       Rollback Script: {{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/rollback.sh
-      
+
       Configuration:
       - Max Rollback Points: {{ rollback_config.max_rollback_points }}
       - Auto Rollback: {{ 'ENABLED' if rollback_config.auto_rollback_on_failure else 'DISABLED' }}
@@ -376,10 +376,10 @@
       - Retention Days: {{ rollback_config.rollback_retention_days }}
       - Security Checks: {{ 'YES' if rollback_config.rollback_security_checks else 'NO' }}
       - Audit Logging: {{ 'YES' if rollback_config.rollback_audit_logging else 'NO' }}
-      
+
       To rollback: {{ rollback_dir | default('/var/backups/ansible-homelab/rollback') }}/rollback.sh {{ ansible_date_time.epoch }}
-      
+
       Security Status: {{ 'PASSED' if rollback_security_validation.rc == 0 else 'FAILED' }}
-      
+
       ========================================
   tags: [rollback, summary, security, production]

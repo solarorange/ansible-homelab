@@ -1,0 +1,64 @@
+---
+# Proxmox Configuration Variables
+# These variables control the Proxmox VM deployment process
+
+# Proxmox API Configuration (from vault)
+proxmox_host: "{{ proxmox_host }}"
+proxmox_user: "{{ vault_service_user }}"
+proxmox_password: "{{ vault_service_password }}"
+proxmox_token_id: "{{ proxmox_token_id }}"
+proxmox_token_secret: "{{ proxmox_token_secret }}"
+proxmox_validate_certs: "{{ proxmox_validate_certs }}"
+
+# Proxmox Node Configuration
+proxmox_node: "{{ proxmox_node | default('pve') }}"
+proxmox_template_id: "{{ proxmox_template_id | default(9000) }}"
+proxmox_vmid: "{{ proxmox_vmid | default(100) }}"
+
+# VM Configuration
+vm_name: "{{ vm_name | default('homelab') }}"
+vm_memory: "{{ vm_memory | default(2048) }}"  # in MB
+vm_cores: "{{ vm_cores | default(2) }}"
+vm_disk: "{{ vm_disk | default(20) }}"  # in GB
+vm_network: "{{ vm_network | default('virtio,bridge=vmbr0') }}"
+vm_os_type: "{{ vm_os_type | default('l26') }}"
+vm_storage: "{{ vm_storage | default('local-lvm') }}"
+vm_ip: "{{ vm_ip | default('{{ ansible_default_ipv4.address }}') }}"
+
+# Resource Limits
+resource_limits:
+  memory:
+    min: "{{ resource_limits.memory.min | default(1024) }}"  # Minimum memory in MB
+    max: "{{ resource_limits.memory.max | default(8192) }}"  # Maximum memory in MB
+  cpu:
+    min: "{{ resource_limits.cpu.min | default(1) }}"     # Minimum CPU cores
+    max: "{{ resource_limits.cpu.max | default(8) }}"     # Maximum CPU cores
+  disk:
+    min: "{{ resource_limits.disk.min | default(10) }}"    # Minimum disk space in GB
+    max: "{{ resource_limits.disk.max | default(100) }}"   # Maximum disk space in GB
+
+# Network Configuration
+network_config:
+  bridge: "{{ network_config.bridge | default('vmbr0') }}"
+  vlan: "{{ network_config.vlan | default(omit) }}"
+  ip_config: "{{ network_config.ip_config | default('static') }}"  # or dhcp
+  gateway: "{{ network_config.gateway | default('{{ ansible_default_ipv4.address }}') }}"
+  dns_servers:
+    - "{{ network_config.dns_servers[0] | default('8.8.8.8') }}"
+    - "{{ network_config.dns_servers[1] | default('8.8.4.4') }}"
+
+# Backup Configuration
+backup_config:
+  enabled: "{{ backup_config.enabled | default(true) }}"
+  schedule: "{{ backup_config.schedule | default('0 2 * * *') }}"  # Daily at 2 AM
+  retention: "{{ backup_config.retention | default(7) }}"  # Keep backups for 7 days
+  compression: "{{ backup_config.compression | default(true) }}"
+  storage: "{{ backup_config.storage | default('local-backup') }}"
+
+# Monitoring Configuration
+monitoring_config:
+  enabled: "{{ monitoring_config.enabled | default(true) }}"
+  metrics_port: "{{ monitoring_config.metrics_port | default(9100) }}"
+  node_exporter: "{{ monitoring_config.node_exporter | default(true) }}"
+  prometheus: "{{ monitoring_config.prometheus | default(true) }}"
+  grafana: "{{ monitoring_config.grafana | default(true) }}"

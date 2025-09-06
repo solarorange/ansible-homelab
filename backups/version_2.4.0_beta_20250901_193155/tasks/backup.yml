@@ -411,17 +411,17 @@
       #!/bin/bash
       # Simple backup monitoring script
       set -euo pipefail
-      
+
       BACKUP_DIR="/var/backups"
       LOG_FILE="$BACKUP_DIR/logs/monitor-$(date +%Y%m%d).log"
-      
+
       log() {
           echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
       }
-      
+
       log "Backup monitoring started"
       log "Monitoring backup directory: $BACKUP_DIR"
-      
+
       # Check if backup directory exists
       if [ -d "$BACKUP_DIR" ]; then
           log "Backup directory exists"
@@ -429,17 +429,17 @@
           log "ERROR: Backup directory not found"
           exit 1
       fi
-      
+
       # Check storage space
       space_used=$(df "$BACKUP_DIR" | awk 'NR==2 {print $5}' | sed 's/%//' 2>/dev/null || echo "0")
       log "Storage space used: $space_used%"
-      
+
       if [ "$space_used" -ge 90 ] 2>/dev/null; then
           log "WARNING: Storage space is $space_used% full"
       else
           log "Storage space OK"
       fi
-      
+
       log "Backup monitoring completed"
     dest: "{{ backup_root_dir | default('/var/backups') }}/ansible/scripts/monitor.sh"
     mode: "0750"

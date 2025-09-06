@@ -18,12 +18,12 @@
     deployment_timestamp: "{{ ansible_date_time.iso8601 }}"
     deployment_user: "{{ ansible_user }}"
     deployment_environment: "{{ deployment_env | default('production') }}"
-    
+
     # COMMENT: Validation configuration with production timeouts
     validation_timeout: "{{ validation_timeout_seconds | default(300) }}"
     health_check_retries: "{{ health_check_retry_count | default(3) }}"
     health_check_delay: "{{ health_check_delay_seconds | default(10) }}"
-    
+
     # COMMENT: Validation thresholds for production deployment
     validation_thresholds:
       cpu_warning: "{{ cpu_warning_threshold | default(80) | int }}"
@@ -32,7 +32,7 @@
       memory_critical: "{{ memory_critical_threshold | default(95) | int }}"
       disk_warning: "{{ disk_warning_threshold | default(80) | int }}"
       disk_critical: "{{ disk_critical_threshold | default(90) | int }}"
-    
+
     # COMMENT: Service validation configuration
     service_validation:
       enabled: "{{ service_validation_enabled | default(true) | bool }}"
@@ -352,27 +352,27 @@
               ========================================
               VALIDATION SUMMARY
               ========================================
-              
+
               Deployment Target: {{ inventory_hostname }}
               Validation Timestamp: {{ deployment_timestamp }}
               Environment: {{ deployment_environment }}
-              
+
               System Resources:
               - CPU Usage: {{ cpu_usage.stdout }}% (Threshold: {{ validation_thresholds.cpu_critical }}%)
               - Memory Usage: {{ memory_usage.stdout }}% (Threshold: {{ validation_thresholds.memory_critical }}%)
               - Disk Usage: {{ disk_usage.stdout }}% (Threshold: {{ validation_thresholds.disk_critical }}%)
-              
+
               Service Health:
               - HTTP (Port 80): OK
               - HTTPS (Port 443): OK
               - Traefik (Port 8080): OK
-              
+
               SSL/TLS Status:
               - Certificate Valid: {{ 'YES' if ssl_validation.status == 200 else 'NO' }}
               - Expiration: {{ ssl_expiration.stdout_lines[-1] if ssl_expiration.stdout_lines else 'UNKNOWN' }}
-              
+
               Validation Report: /var/log/ansible-validation/system_validation_{{ deployment_timestamp }}.md
-              
+
               ========================================
           tags: [validation, report, summary]
 
