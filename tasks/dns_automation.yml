@@ -1,0 +1,74 @@
+---
+# DNS Automation Tasks
+# Automatically creates DNS records using Cloudflare API after deployment
+
+- name: "Install Python requests package for DNS automation"
+  ansible.builtin.package:
+    name: python3-pip
+    state: present
+  when: cloudflare_enabled | default(false) | bool
+  tags: [dns, automation, prerequisites]
+
+- name: "Install requests package via pip"
+  ansible.builtin.pip:
+    name: requests
+    state: present
+  when: cloudflare_enabled | default(false) | bool
+  tags: [dns, automation, prerequisites]
+
+- name: "Copy DNS automation script to target server"
+  ansible.builtin.copy:
+    src: scripts/automate_dns_setup.py
+    dest: /usr/local/bin/automate_dns_setup.py
+    mode: '0755'
+    owner: root
+    group: root
+  when: cloudflare_enabled | default(false) | bool
+  tags: [dns, automation, setup]
+
+- name: "Execute DNS automation via Cloudflare API"
+  ansible.builtin.command: "{{ python_interpreter }} /usr/local/bin/automate_dns_setup.py"
+  environment:
+    DOMAIN: "{{ domain }}"
+    SERVER_IP: "{{ server_ip }}"
+    CLOUDFLARE_EMAIL: "{{ cloudflare_email }}"
+    CLOUDFLARE_API_TOKEN: "{{ cloudflare_api_token }}"
+  register: dns_automation_result
+  failed_when: dns_automation_result.rc != 0
+  changed_when: "'DNS_CHANGED' in dns_automation_result.stdout"
+  when: 
+    - cloudflare_enabled | default(false) | bool
+    - domain is defined and domain != ''
+    - cloudflare_email is defined and cloudflare_email != ''
+    - cloudflare_api_token is defined and cloudflare_api_token != ''
+  tags: [dns, automation, deploy]
+
+- name: "Display DNS automation results"
+  ansible.builtin.debug:
+    msg: |
+      DNS Automation Results:
+      - Return Code: {{ dns_automation_result.rc }}
+      - Output: {{ dns_automation_result.stdout_lines | default([]) }}
+      - Errors: {{ dns_automation_result.stderr_lines | default([]) }}
+  when: 
+    - cloudflare_enabled | default(false) | bool
+    - dns_automation_result is defined
+  tags: [dns, automation, results]
+
+- name: "Validate DNS automation success"
+  ansible.builtin.assert:
+    that:
+      - dns_automation_result.rc == 0
+    success_msg: "DNS automation completed successfully"
+    fail_msg: |
+      DNS automation failed. Please check:
+      1. Cloudflare API token is valid
+      2. Domain is properly configured in Cloudflare
+      3. Network connectivity to Cloudflare API
+      
+      You can run DNS automation manually:
+      {{ python_interpreter }} /usr/local/bin/automate_dns_setup.py --domain {{ domain }} --server-ip {{ server_ip }} --cloudflare-email {{ cloudflare_email }} --cloudflare-api-token {{ cloudflare_api_token }}
+  when: 
+    - cloudflare_enabled | default(false) | bool
+    - dns_automation_result is defined
+  tags: [dns, automation, validation]

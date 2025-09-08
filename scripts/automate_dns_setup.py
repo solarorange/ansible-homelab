@@ -124,6 +124,7 @@ class CloudflareDNSAutomation:
                 if name != "@" and not name.endswith(self.domain):
                     display_name = f"{name}.{self.domain}"
                 print(f"✅ Created DNS record: {display_name} → {content}")
+                print("DNS_CHANGED")  # Marker for Ansible idempotency
                 return True
             else:
                 print(f"❌ Failed to create DNS record {name}: {result.get('errors', [])}")
@@ -160,6 +161,7 @@ class CloudflareDNSAutomation:
                 if name != "@" and not name.endswith(self.domain):
                     display_name = f"{name}.{self.domain}"
                 print(f"✅ Updated DNS record: {display_name} → {content}")
+                print("DNS_CHANGED")  # Marker for Ansible idempotency
                 return True
             else:
                 print(f"❌ Failed to update DNS record {name}: {result.get('errors', [])}")
@@ -307,20 +309,40 @@ class CloudflareDNSAutomation:
 
 def main():
     parser = argparse.ArgumentParser(description="Automate DNS record creation for homelab deployment")
-    parser.add_argument("--domain", required=True, help="Your domain name")
-    parser.add_argument("--server-ip", required=True, help="Your server IP address")
-    parser.add_argument("--cloudflare-email", required=True, help="Your Cloudflare email")
-    parser.add_argument("--cloudflare-api-token", required=True, help="Your Cloudflare API token")
+    parser.add_argument("--domain", help="Your domain name (can also be set via DOMAIN env var)")
+    parser.add_argument("--server-ip", help="Your server IP address (can also be set via SERVER_IP env var)")
+    parser.add_argument("--cloudflare-email", help="Your Cloudflare email (can also be set via CLOUDFLARE_EMAIL env var)")
+    parser.add_argument("--cloudflare-api-token", help="Your Cloudflare API token (can also be set via CLOUDFLARE_API_TOKEN env var)")
     parser.add_argument("--validate-only", action="store_true", help="Only validate existing DNS records")
     
     args = parser.parse_args()
     
+    # Get values from args or environment variables
+    domain = args.domain or os.getenv('DOMAIN')
+    server_ip = args.server_ip or os.getenv('SERVER_IP')
+    cloudflare_email = args.cloudflare_email or os.getenv('CLOUDFLARE_EMAIL')
+    cloudflare_api_token = args.cloudflare_api_token or os.getenv('CLOUDFLARE_API_TOKEN')
+    
+    # Validate required parameters
+    if not domain:
+        print("❌ Error: Domain is required. Set via --domain argument or DOMAIN environment variable")
+        sys.exit(1)
+    if not server_ip:
+        print("❌ Error: Server IP is required. Set via --server-ip argument or SERVER_IP environment variable")
+        sys.exit(1)
+    if not cloudflare_email:
+        print("❌ Error: Cloudflare email is required. Set via --cloudflare-email argument or CLOUDFLARE_EMAIL environment variable")
+        sys.exit(1)
+    if not cloudflare_api_token:
+        print("❌ Error: Cloudflare API token is required. Set via --cloudflare-api-token argument or CLOUDFLARE_API_TOKEN environment variable")
+        sys.exit(1)
+    
     # Initialize automation
     automation = CloudflareDNSAutomation(
-        api_token=args.cloudflare_api_token,
-        email=args.cloudflare_email,
-        domain=args.domain,
-        server_ip=args.server_ip
+        api_token=cloudflare_api_token,
+        email=cloudflare_email,
+        domain=domain,
+        server_ip=server_ip
     )
     
     if args.validate_only:

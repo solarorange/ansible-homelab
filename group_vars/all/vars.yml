@@ -4,6 +4,8 @@ puid: '{{ lookup(''env'', ''HOMELAB_PUID'') | default(''1000'') }}'
 pgid: '{{ lookup(''env'', ''HOMELAB_PGID'') | default(''1000'') }}'
 ip_address: '{{ lookup(''env'', ''HOMELAB_IP_ADDRESS'') | default(''{{ ansible_default_ipv4.address
   }}'') }}'
+server_ip: '{{ lookup(''env'', ''HOMELAB_SERVER_IP'') | default(''{{ ansible_default_ipv4.address }}'') }}'
+python_interpreter: '{{ lookup(''env'', ''HOMELAB_PYTHON_INTERPRETER'') | default(''/usr/bin/python3'') }}'
 timezone: '{{ lookup(''env'', ''HOMELAB_TIMEZONE'') | default(''America/New_York'')
   }}'
 plex_server_ip: '{{ lookup(''env'', ''PLEX_SERVER_IP'') | default(''{{ ansible_default_ipv4.address
@@ -47,6 +49,10 @@ subdomains:
   n8n: n8n
   vault: vault
   vaultwarden: passwords
+  dashdot: dashdot
+  heimdall: heimdall
+  homarr: homarr
+  mqtt: mqtt
   wireguard: vpn
   pihole: dns
   nginx_proxy_manager: proxy
@@ -176,6 +182,16 @@ media_enabled: true
 automation_enabled: true
 backup_enabled: true
 development_enabled: true
+
+# Automation Services
+home_assistant_enabled: true
+zigbee2mqtt_enabled: true
+node_red_enabled: true
+n8n_enabled: true
+
+# Database Services
+databases_postgresql_enabled: true
+databases_mariadb_enabled: true
 security_enhanced: '{{ lookup(''env'', ''SECURITY_ENHANCED'') | default(''true'')
   | bool }}'
 verify_deployment: true
@@ -186,19 +202,19 @@ docker_networks:
   - name: homelab
     driver: bridge
     ipam_config:
-      - subnet: '{{ ansible_default_ipv4.address }}/16'
-        gateway: '{{ ansible_default_ipv4.address }}'
+      - subnet: '{{ ansible_default_ipv4.network }}/24'
+        gateway: '{{ ansible_default_ipv4.gateway }}'
   - name: monitoring
     driver: bridge
     internal: true
     ipam_config:
-      - subnet: '{{ ansible_default_ipv4.address }}/16'
-        gateway: '{{ ansible_default_ipv4.address }}'
+      - subnet: '10.10.1.0/24'
+        gateway: '10.10.1.1'
   - name: media
     driver: bridge
     ipam_config:
-      - subnet: '{{ ansible_default_ipv4.address }}/16'
-    gateway: '{{ ansible_default_ipv4.address }}'
+      - subnet: '10.10.2.0/24'
+        gateway: '10.10.2.1'
 traefik_pilot_token: ''
 traefik_log_level: INFO
 traefik_access_logs: true
