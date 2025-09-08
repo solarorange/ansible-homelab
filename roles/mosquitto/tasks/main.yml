@@ -1,0 +1,69 @@
+---
+# Mosquitto - MQTT Broker
+# Lightweight MQTT message broker
+
+- name: "Validate mosquitto password is provided"
+  ansible.builtin.assert:
+    that:
+      - vault_mosquitto_password is defined
+      - vault_mosquitto_password != ''
+    fail_msg: "vault_mosquitto_password must be defined and not empty for security"
+    success_msg: "Mosquitto password validation passed"
+
+- name: "Create mosquitto data directory"
+  ansible.builtin.file:
+    path: "{{ mosquitto_data_dir }}"
+    state: directory
+    owner: "{{ mosquitto_uid }}"
+    group: "{{ mosquitto_gid }}"
+    mode: '0755'
+
+- name: "Create mosquitto config directory"
+  ansible.builtin.file:
+    path: "{{ mosquitto_config_dir }}"
+    state: directory
+    owner: "{{ mosquitto_uid }}"
+    group: "{{ mosquitto_gid }}"
+    mode: '0755'
+
+- name: "Create mosquitto configuration file"
+  ansible.builtin.template:
+    src: mosquitto.conf.j2
+    dest: "{{ mosquitto_config_dir }}/mosquitto.conf"
+    owner: "{{ mosquitto_uid }}"
+    group: "{{ mosquitto_gid }}"
+    mode: '0644'
+  notify: restart mosquitto
+
+- name: "Create mosquitto password file"
+  ansible.builtin.template:
+    src: passwd.j2
+    dest: "{{ mosquitto_config_dir }}/passwd"
+    owner: "{{ mosquitto_uid }}"
+    group: "{{ mosquitto_gid }}"
+    mode: '0600'
+  notify: restart mosquitto
+  no_log: true
+
+- name: "Create mosquitto docker-compose directory"
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/mosquitto"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+
+- name: "Create mosquitto docker-compose file"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/mosquitto/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  notify: restart mosquitto
+
+- name: "Start mosquitto container"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/mosquitto"
+    state: present
+  when: mosquitto_enabled | default(true)

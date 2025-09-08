@@ -1,0 +1,33 @@
+version: '3.8'
+
+networks:
+  homelab:
+    external: true
+
+services:
+  mosquitto:
+    image: "{{ mosquitto_image }}"
+    container_name: "{{ mosquitto_container_name }}"
+    restart: "{{ mosquitto_restart_policy }}"
+    user: "{{ mosquitto_user }}"
+    read_only: {{ mosquitto_read_only | lower }}
+    security_opt:
+      - no-new-privileges:{{ mosquitto_no_new_privileges | lower }}
+    cap_drop:
+      - ALL
+    volumes:
+      - "{{ mosquitto_data_dir }}:/mosquitto/data"
+      - "{{ mosquitto_config_dir }}:/mosquitto/config"
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+{% for key, value in mosquitto_environment.items() %}
+      - {{ key }}={{ value }}
+{% endfor %}
+    networks:
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.mosquitto.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mosquitto.entrypoints=mqtt"
+      - "traefik.tcp.services.mosquitto.loadbalancer.server.port={{ mosquitto_port }}"
+      - "traefik.docker.network=homelab"

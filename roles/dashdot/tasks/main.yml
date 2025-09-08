@@ -1,0 +1,26 @@
+---
+# Dashdot - System Dashboard
+# Lightweight system monitoring dashboard
+
+- name: "Create dashdot data directory"
+  ansible.builtin.file:
+    path: "{{ dashdot_data_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+
+- name: "Create dashdot docker-compose file"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/dashdot/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  notify: restart dashdot
+
+- name: "Start dashdot container"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/dashdot"
+    state: present
+  when: dashdot_enabled | default(true)

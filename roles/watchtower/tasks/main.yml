@@ -1,0 +1,18 @@
+---
+# Watchtower - Automatic Container Updates
+# Automatically updates running Docker containers
+
+- name: "Create watchtower docker-compose file"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/watchtower/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  notify: restart watchtower
+
+- name: "Start watchtower container"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/watchtower"
+    state: present
+  when: watchtower_enabled | default(true)

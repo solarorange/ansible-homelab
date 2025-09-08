@@ -1,0 +1,40 @@
+---
+# Heimdall Configuration
+
+# Service Information
+heimdall_service_name: "heimdall"
+heimdall_container_name: "{{ heimdall_service_name }}"
+heimdall_image: "lscr.io/linuxserver/heimdall:latest"
+heimdall_version: "latest"
+
+# Network Configuration
+# Use non-privileged port to avoid conflicts with Traefik on port 80
+# Map to port 80 via reverse proxy if needed
+heimdall_port: 8080
+heimdall_external_port: "{{ heimdall_port }}"
+heimdall_protocol: "http"
+heimdall_host: "{{ ansible_default_ipv4.address }}"
+heimdall_url: "{{ heimdall_protocol }}://{{ heimdall_host }}:{{ heimdall_port }}"
+
+# Domain Configuration
+heimdall_subdomain: "heimdall"
+heimdall_domain: "{{ heimdall_subdomain }}.{{ domain }}"
+heimdall_external_url: "https://{{ heimdall_domain }}"
+
+# Data Directories
+heimdall_data_dir: "{{ data_dir }}/heimdall"
+
+# Service Configuration
+heimdall_enabled: true
+heimdall_restart_policy: "unless-stopped"
+
+# Security Configuration
+heimdall_user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+heimdall_read_only: true
+heimdall_no_new_privileges: true
+
+# Environment Variables
+heimdall_environment:
+  PUID: "{{ puid | default(1000) }}"
+  PGID: "{{ pgid | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"

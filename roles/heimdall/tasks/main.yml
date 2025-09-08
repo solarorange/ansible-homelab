@@ -1,0 +1,34 @@
+---
+# Heimdall - Application Dashboard
+# Simple dashboard for all your web applications
+
+- name: "Create heimdall data directory"
+  ansible.builtin.file:
+    path: "{{ heimdall_data_dir }}"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+
+- name: "Create heimdall docker-compose directory"
+  ansible.builtin.file:
+    path: "{{ docker_dir }}/heimdall"
+    state: directory
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0755'
+
+- name: "Create heimdall docker-compose file"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_dir }}/heimdall/docker-compose.yml"
+    owner: "{{ username }}"
+    group: "{{ username }}"
+    mode: '0644'
+  notify: restart heimdall
+
+- name: "Start heimdall container"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_dir }}/heimdall"
+    state: present
+  when: heimdall_enabled | default(true)

@@ -1,0 +1,40 @@
+---
+# Homarr Configuration
+
+# Service Information
+homarr_service_name: "homarr"
+homarr_container_name: "{{ homarr_service_name }}"
+homarr_image: "ghcr.io/ajnart/homarr:latest"
+homarr_version: "latest"
+
+# Network Configuration
+homarr_port: 7575
+homarr_external_port: "{{ homarr_port }}"
+homarr_protocol: "http"
+homarr_host: "{{ ansible_default_ipv4.address }}"
+homarr_url: "{{ homarr_protocol }}://{{ homarr_host }}:{{ homarr_port }}"
+
+# Domain Configuration
+homarr_subdomain: "homarr"
+homarr_domain: "{{ homarr_subdomain }}.{{ domain }}"
+homarr_external_url: "https://{{ homarr_domain }}"
+
+# Data Directories
+homarr_data_dir: "{{ data_dir }}/homarr"
+
+# Service Configuration
+homarr_enabled: true
+homarr_restart_policy: "unless-stopped"
+
+# Security Configuration
+homarr_user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+# Set to false to allow Homarr to write to its directories (logs, cache, config, tmp)
+# If you want read-only root filesystem, ensure writable bind/volume mounts are configured
+homarr_read_only: false
+homarr_no_new_privileges: true
+
+# Environment Variables
+homarr_environment:
+  PUID: "{{ puid | default(1000) }}"
+  PGID: "{{ pgid | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"

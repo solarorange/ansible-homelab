@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  watchtower:
+    image: "{{ watchtower_image }}"
+    container_name: "{{ watchtower_container_name }}"
+    restart: "{{ watchtower_restart_policy }}"
+    user: "{{ watchtower_user }}"
+    read_only: {{ watchtower_read_only | lower }}
+    security_opt:
+      - no-new-privileges:{{ watchtower_no_new_privileges | lower }}
+    cap_drop:
+      - ALL
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+{% for key, value in watchtower_environment.items() %}
+      - {{ key }}={{ value }}
+{% endfor %}
+{% if watchtower_notifications_enabled and watchtower_notification_url %}
+      - WATCHTOWER_NOTIFICATION_URL={{ watchtower_notification_url }}
+      - WATCHTOWER_NOTIFICATIONS_LEVEL={{ watchtower_notification_level | default('info') }}
+{% endif %}
+    command: --interval {{ watchtower_interval }}

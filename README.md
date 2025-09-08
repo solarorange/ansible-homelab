@@ -2,7 +2,7 @@
 
 **🚀 Production-Ready Homelab Automation Platform**
 
-A comprehensive, enterprise-grade homelab automation solution built with Ansible, Docker, and modern DevOps practices. **Now with 30+ services, zero hardcoded secrets, production-ready security, and enhanced DNS automation!**
+A comprehensive, enterprise-grade homelab automation solution built with Ansible, Docker, and modern DevOps practices. **Now with 88+ services, zero hardcoded secrets, production-ready security, and enhanced DNS automation!**
 
 ## 🎉 **v3.0.0 Major Release - Enhanced DNS Automation**
 
@@ -17,10 +17,10 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-brightgreen)](https://github.com/solarorange/ansible_homelab)
 [![Security](https://img.shields.io/badge/Security-Hardened-red)](https://github.com/solarorange/ansible_homelab)
-[![Services](https://img.shields.io/badge/Services-60+-blue)](https://github.com/solarorange/ansible_homelab)
+[![Services](https://img.shields.io/badge/Services-88+-blue)](https://github.com/solarorange/ansible_homelab)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/solarorange/ansible_homelab)
 
-## 🎯 **Comprehensive Service Stack (60+ Services)**
+## 🎯 **Comprehensive Service Stack (88+ Services)**
 
 ### 🔐 **Security & Authentication (6 Services)**
 - **Authentik** - Enterprise identity provider with SSO
@@ -49,7 +49,7 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 - **Samba** - File sharing and network storage
 - **Syncthing** - File synchronization
 
-### 📺 **Media Services (16 Services)**
+### 📺 **Media Services (24 Services)**
 - **Sonarr** - TV show management and automation
 - **Radarr** - Movie management and automation
 - **Lidarr** - Music management and automation
@@ -58,44 +58,54 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 - **Bazarr** - Subtitle management
 - **Jellyfin** - Media server with transcoding
 - **Emby** - Alternative media server
+- **Plex** - Premium media server
 - **Overseerr** - Media requests and discovery
 - **Tautulli** - Media statistics and monitoring
 - **ErsatzTV** - Live TV streaming service
 - **Audiobookshelf** - Audiobook management
 - **Komga** - Comic book management
-- **Calibre-web** - E-book management
+- **Calibre** - E-book management
 - **Tdarr** - Media transcoding automation
+- **Unmanic** - Media processing automation
 - **SABnzbd** - Usenet downloader
-
-### 📸 **Photo & Media Management (2 Services)**
-- **Immich** - AI-powered photo management with facial recognition
+- **qBittorrent** - BitTorrent client
+- **Deluge** - Alternative BitTorrent client
+- **Transmission** - Lightweight BitTorrent client
+- **rTorrent** - Command-line BitTorrent client
+- **Immich** - AI-powered photo management
 - **File Browser** - Web-based file manager
 
-### 🔗 **Knowledge & Productivity (6 Services)**
+### 🔗 **Knowledge & Productivity (10 Services)**
 - **Linkwarden** - Bookmark and knowledge management
 - **Paperless-ngx** - Document management and OCR
 - **BookStack** - Wiki and documentation platform
 - **Vaultwarden** - Self-hosted password manager (Bitwarden alternative)
 - **MinIO** - S3-compatible object storage
 - **Harbor** - Container registry
+- **GitLab** - Git repository management
+- **Code Server** - Web-based VS Code
+- **Dumbassets** - Asset management system
+- **Paperless** - Document management
 
 ### 🤖 **Automation & Development (6 Services)**
 - **n8n** - Powerful workflow automation platform
 - **Node-RED** - IoT and automation flows
 - **Home Assistant** - Smart home automation
-- **GitLab** - Git repository management
-- **Code Server** - Web-based VS Code
 - **Portainer** - Docker container management
-
-### 🔧 **Utilities & Management (8 Services)**
-- **Homepage** - Service dashboard and monitoring
 - **Watchtower** - Automatic container updates
+- **Mosquitto** - MQTT message broker
+
+### 🔧 **Utilities & Management (10 Services)**
+- **Homepage** - Service dashboard and monitoring
 - **Health Checks** - Comprehensive service monitoring
 - **Kopia** - Cross-platform backup solution
 - **Gluetun** - VPN client for containers
 - **Pinchflat** - Media server management
 - **Fing** - Network device discovery and monitoring
 - **ROMM** - Retro game management and emulation
+- **Uptime Kuma** - Uptime monitoring
+- **Guacamole** - Remote desktop gateway
+- **Requestrr** - Media request management
 
 ### 🌐 **Network Services (3 Services)**
 - **Pi-hole** - DNS ad-blocking and network management

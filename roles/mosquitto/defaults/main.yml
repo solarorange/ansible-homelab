@@ -1,0 +1,50 @@
+---
+# Mosquitto Configuration
+
+# Service Information
+mosquitto_service_name: "mosquitto"
+mosquitto_container_name: "{{ mosquitto_service_name }}"
+mosquitto_image: "eclipse-mosquitto:2.0"
+mosquitto_version: "2.0"
+
+# Network Configuration
+mosquitto_port: 1883
+mosquitto_ws_port: 9001
+mosquitto_external_port: "{{ mosquitto_port }}"
+mosquitto_protocol: "mqtt"
+mosquitto_host: "{{ ansible_default_ipv4.address }}"
+mosquitto_url: "{{ mosquitto_protocol }}://{{ mosquitto_host }}:{{ mosquitto_port }}"
+
+# Domain Configuration
+mosquitto_subdomain: "mqtt"
+mosquitto_domain: "{{ mosquitto_subdomain }}.{{ domain }}"
+mosquitto_external_url: "mqtts://{{ mosquitto_domain }}"
+
+# Data Directories
+mosquitto_data_dir: "{{ data_dir }}/mosquitto"
+mosquitto_config_dir: "{{ mosquitto_data_dir }}/config"
+
+# Service Configuration
+mosquitto_enabled: true
+mosquitto_restart_policy: "unless-stopped"
+
+# Security Configuration
+mosquitto_user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+mosquitto_read_only: false
+mosquitto_no_new_privileges: true
+
+# Container runtime user/group (Mosquitto typically runs as UID/GID 1883)
+mosquitto_uid: "{{ mosquitto_uid | default('1883') }}"
+mosquitto_gid: "{{ mosquitto_gid | default('1883') }}"
+
+# Authentication
+mosquitto_auth_enabled: true
+mosquitto_username: "{{ vault_mosquitto_username | default('mqtt') }}"
+# Password must be provided via vault_mosquitto_password - no default for security
+mosquitto_password: "{{ vault_mosquitto_password }}"
+
+# Environment Variables
+mosquitto_environment:
+  PUID: "{{ puid | default(1000) }}"
+  PGID: "{{ pgid | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"

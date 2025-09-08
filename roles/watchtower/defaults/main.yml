@@ -1,0 +1,39 @@
+---
+# Watchtower Configuration
+
+# Service Information
+watchtower_service_name: "watchtower"
+watchtower_container_name: "{{ watchtower_service_name }}"
+watchtower_image: "containrrr/watchtower:latest"
+watchtower_version: "latest"
+
+# Service Configuration
+watchtower_enabled: true
+watchtower_restart_policy: "unless-stopped"
+
+# Update Configuration
+watchtower_interval: 86400  # 24 hours in seconds
+watchtower_cleanup: true
+watchtower_include_stopped: false
+watchtower_include_restarting: false
+watchtower_monitor_only: false
+
+# Notification Configuration
+watchtower_notifications_enabled: false
+watchtower_notification_url: "{{ vault_watchtower_notification_url | default('') }}"
+watchtower_notification_level: "info"
+
+# Security Configuration
+watchtower_user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+watchtower_read_only: true
+watchtower_no_new_privileges: true
+
+# Environment Variables
+watchtower_environment:
+  PUID: "{{ puid | default(1000) }}"
+  PGID: "{{ pgid | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  WATCHTOWER_CLEANUP: "{{ watchtower_cleanup | lower }}"
+  WATCHTOWER_INCLUDE_STOPPED: "{{ watchtower_include_stopped | lower }}"
+  WATCHTOWER_INCLUDE_RESTARTING: "{{ watchtower_include_restarting | lower }}"
+  WATCHTOWER_MONITOR_ONLY: "{{ watchtower_monitor_only | lower }}"

@@ -1,0 +1,39 @@
+---
+# Dashdot Configuration
+
+# Service Information
+dashdot_service_name: "dashdot"
+dashdot_container_name: "{{ dashdot_service_name }}"
+dashdot_image: "mauricenino/dashdot:latest"
+dashdot_version: "latest"
+
+# Network Configuration
+dashdot_port: 3001
+dashdot_external_port: "{{ dashdot_port }}"
+dashdot_protocol: "http"
+dashdot_host: "{{ ansible_default_ipv4.address }}"
+dashdot_url: "{{ dashdot_protocol }}://{{ dashdot_host }}:{{ dashdot_port }}"
+
+# Domain Configuration
+dashdot_subdomain: "dashdot"
+dashdot_domain: "{{ dashdot_subdomain }}.{{ domain }}"
+dashdot_external_url: "https://{{ dashdot_domain }}"
+
+# Data Directories
+dashdot_data_dir: "{{ data_dir }}/dashdot"
+
+# Service Configuration
+dashdot_enabled: true
+dashdot_restart_policy: "unless-stopped"
+
+# Security Configuration
+dashdot_user: "{{ puid | default(1000) }}:{{ pgid | default(1000) }}"
+dashdot_read_only: true
+dashdot_no_new_privileges: true
+
+# Environment Variables
+dashdot_environment:
+  PUID: "{{ puid | default(1000) }}"
+  PGID: "{{ pgid | default(1000) }}"
+  TZ: "{{ timezone | default('UTC') }}"
+  DASHDOT_PORT: "{{ dashdot_port }}"

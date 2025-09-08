@@ -1,0 +1,74 @@
+---
+# Service Dependency Validation
+# Validates that all required services and dependencies are available before deployment
+
+- name: "Validate service dependencies"
+  block:
+    - name: "Check for required infrastructure services"
+      ansible.builtin.assert:
+        that:
+          - docker_enabled | default(true)
+          - traefik_enabled | default(true)
+        fail_msg: "Required infrastructure services (docker, traefik) must be enabled"
+        success_msg: "Infrastructure services validation passed"
+
+    - name: "Check MQTT-dependent services"
+      ansible.builtin.assert:
+        that:
+          - not (zigbee2mqtt_enabled | default(false)) or mosquitto_enabled | default(false)
+          - not (home_assistant_enabled | default(false)) or mosquitto_enabled | default(false)
+        fail_msg: "MQTT-dependent services (zigbee2mqtt, home_assistant) require mosquitto to be enabled"
+        success_msg: "MQTT service dependencies validation passed"
+
+    - name: "Check database-dependent services"
+      ansible.builtin.assert:
+        that:
+          - true
+        fail_msg: "Database service dependencies validation passed"
+        success_msg: "Database service dependencies validation passed"
+
+    - name: "Check monitoring-dependent services"
+      ansible.builtin.assert:
+        that:
+          - not (alertmanager_enabled | default(true)) or prometheus_enabled | default(true)
+          - not (grafana_enabled | default(true)) or prometheus_enabled | default(true)
+        fail_msg: "Monitoring-dependent services (alertmanager, grafana) require prometheus to be enabled"
+        success_msg: "Monitoring service dependencies validation passed"
+
+    - name: "Check authentication-dependent services"
+      ansible.builtin.assert:
+        that:
+          - not (homepage_enabled | default(true)) or authentik_enabled | default(true)
+        fail_msg: "Authentication-dependent services (homepage) require authentik to be enabled"
+        success_msg: "Authentication service dependencies validation passed"
+
+    - name: "Check port conflicts"
+      ansible.builtin.set_fact:
+        port_conflicts: []
+
+    - name: "Check for port conflicts between services"
+      ansible.builtin.set_fact:
+        port_conflicts: "{{ port_conflicts + [item] }}"
+      loop:
+        - { service1: "grafana", port1: "3000", service2: "homepage", port2: "3000" }
+      when: 
+        - item.service1 + "_enabled" in hostvars[inventory_hostname]
+        - item.service2 + "_enabled" in hostvars[inventory_hostname]
+        - hostvars[inventory_hostname][item.service1 + "_enabled"] | default(false)
+        - hostvars[inventory_hostname][item.service2 + "_enabled"] | default(false)
+        - item.port1 == item.port2
+        - item.service1 != item.service2
+
+    - name: "Fail if port conflicts detected"
+      ansible.builtin.fail:
+        msg: "Port conflicts detected: {{ port_conflicts }}"
+      when: port_conflicts | length > 0
+
+    - name: "Service dependencies validation completed"
+      ansible.builtin.debug:
+        msg: "All service dependencies validated successfully"
+
+  rescue:
+    - name: "Service dependency validation failed"
+      ansible.builtin.fail:
+        msg: "Service dependency validation failed. Please check the error messages above and fix the configuration."

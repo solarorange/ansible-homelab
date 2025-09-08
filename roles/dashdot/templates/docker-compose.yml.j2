@@ -1,0 +1,37 @@
+version: '3.8'
+
+networks:
+  homelab:
+    external: true
+
+services:
+  dashdot:
+    image: "{{ dashdot_image }}"
+    container_name: "{{ dashdot_container_name }}"
+    restart: "{{ dashdot_restart_policy }}"
+    user: "{{ dashdot_user }}"
+    read_only: {{ dashdot_read_only | lower }}
+    security_opt:
+      - "no-new-privileges:{{ dashdot_no_new_privileges | lower }}"
+    cap_drop:
+      - ALL
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/etc/os-release:/host/etc/os-release:ro"
+      - "/etc/hostname:/host/etc/hostname:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+{% for key, value in dashdot_environment.items() %}
+      - {{ key }}={{ value }}
+{% endfor %}
+    networks:
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashdot.rule=Host(`{{ dashdot_domain }}`)"
+      - "traefik.http.routers.dashdot.tls=true"
+      - "traefik.http.routers.dashdot.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dashdot.loadbalancer.server.port={{ dashdot_port }}"
+      - "traefik.docker.network=homelab"
