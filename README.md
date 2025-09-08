@@ -1,8 +1,19 @@
-# 🏠 Ansible Homelab v2.0
+# 🏠 Ansible Homelab v3.0
 
 **🚀 Production-Ready Homelab Automation Platform**
 
-A comprehensive, enterprise-grade homelab automation solution built with Ansible, Docker, and modern DevOps practices. **Now with 30+ services, zero hardcoded secrets, and production-ready security!**
+A comprehensive, enterprise-grade homelab automation solution built with Ansible, Docker, and modern DevOps practices. **Now with 30+ services, zero hardcoded secrets, production-ready security, and enhanced DNS automation!**
+
+## 🎉 **v3.0.0 Major Release - Enhanced DNS Automation**
+
+**🔒 Security & Reliability Improvements:**
+- **Enhanced DNS Automation** - Secrets now securely managed via environment variables
+- **True Idempotency** - Proper change detection with DNS_CHANGED markers
+- **Configurable Python Interpreter** - Support for virtual environments and custom paths
+- **Production-Ready Error Handling** - Improved validation and failure detection
+- **Flexible Configuration** - Server IP and interpreter paths configurable via environment variables
+
+**📖 See [RELEASE_NOTES_v3.0.0.md](RELEASE_NOTES_v3.0.0.md) for complete details on the DNS automation overhaul.**
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-brightgreen)](https://github.com/solarorange/ansible_homelab)
 [![Security](https://img.shields.io/badge/Security-Hardened-red)](https://github.com/solarorange/ansible_homelab)
