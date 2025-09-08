@@ -17,39 +17,95 @@ A comprehensive, enterprise-grade homelab automation solution built with Ansible
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-brightgreen)](https://github.com/solarorange/ansible_homelab)
 [![Security](https://img.shields.io/badge/Security-Hardened-red)](https://github.com/solarorange/ansible_homelab)
-[![Services](https://img.shields.io/badge/Services-30+-blue)](https://github.com/solarorange/ansible_homelab)
+[![Services](https://img.shields.io/badge/Services-60+-blue)](https://github.com/solarorange/ansible_homelab)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/solarorange/ansible_homelab)
 
-## 🎯 **Comprehensive Service Stack (30+ Services)**
+## 🎯 **Comprehensive Service Stack (60+ Services)**
 
-### 🏠 **Complete Homelab Platform**
-- 📸 **Immich** - AI-powered photo management with facial recognition
-- 🔗 **Linkwarden** - Bookmark and knowledge management system
-- 🤖 **n8n** - Powerful workflow automation platform
-- 🧠 **Pezzo** - AI prompt management and optimization
-- 🔍 **Reconya** - Network reconnaissance and monitoring
-- 🔐 **Vaultwarden** - Self-hosted password manager (Bitwarden alternative)
-- 📺 **ErsatzTV** - Live TV streaming service
-- 📦 **DumbAssets** - Asset management and organization system
-- 🎮 **ROMM** - Retro game management and emulation
-- 📚 **Paperless-ngx** - Document management and OCR
-- 🔍 **Fing** - Network device discovery and monitoring
-- 🎬 **Jellyfin** - Media server with transcoding
-- 🎵 **Lidarr** - Music management and automation
-- 📖 **Readarr** - Book management and automation
-- 🔍 **Prowlarr** - Indexer management
-- 🎬 **Bazarr** - Subtitle management
-- 🎬 **Tdarr** - Media transcoding automation
-- 🎬 **Unmanic** - Media file processing
-- 🖥️ **Guacamole** - Remote desktop gateway
-- 📊 **Uptime Kuma** - Uptime monitoring
-- 🏠 **Home Assistant** - Smart home automation
-- 📡 **Mosquitto** - MQTT broker
-- 🔗 **Zigbee2MQTT** - Zigbee bridge
-- 🔄 **Node-RED** - IoT automation flows
-- 📊 **Dashdot** - System dashboard
-- 🏠 **Heimdall** - Application dashboard
-- 📊 **Homarr** - Service dashboard
+### 🔐 **Security & Authentication (6 Services)**
+- **Authentik** - Enterprise identity provider with SSO
+- **Traefik** - Reverse proxy with automatic SSL/TLS
+- **CrowdSec** - Real-time intrusion detection and prevention
+- **Fail2ban** - Advanced brute force protection
+- **Vault** - Secrets management and encryption
+- **Wireguard** - VPN server and client management
+
+### 📊 **Monitoring & Observability (8 Services)**
+- **Prometheus** - Metrics collection and storage
+- **Grafana** - Advanced visualization and dashboards
+- **Loki** - Log aggregation and analysis
+- **AlertManager** - Intelligent alert routing and notification
+- **Telegraf** - Metrics collection agent
+- **Blackbox Exporter** - Endpoint monitoring
+- **Promtail** - Log shipping agent
+- **InfluxDB** - Time-series database for metrics
+
+### 🗄️ **Databases & Storage (7 Services)**
+- **PostgreSQL** - Primary relational database
+- **Redis** - High-performance caching and sessions
+- **MariaDB/MySQL** - Alternative relational databases
+- **Elasticsearch** - Search and analytics engine
+- **Nextcloud** - File sharing and collaboration
+- **Samba** - File sharing and network storage
+- **Syncthing** - File synchronization
+
+### 📺 **Media Services (16 Services)**
+- **Sonarr** - TV show management and automation
+- **Radarr** - Movie management and automation
+- **Lidarr** - Music management and automation
+- **Readarr** - Book management and automation
+- **Prowlarr** - Indexer management
+- **Bazarr** - Subtitle management
+- **Jellyfin** - Media server with transcoding
+- **Emby** - Alternative media server
+- **Overseerr** - Media requests and discovery
+- **Tautulli** - Media statistics and monitoring
+- **ErsatzTV** - Live TV streaming service
+- **Audiobookshelf** - Audiobook management
+- **Komga** - Comic book management
+- **Calibre-web** - E-book management
+- **Tdarr** - Media transcoding automation
+- **SABnzbd** - Usenet downloader
+
+### 📸 **Photo & Media Management (2 Services)**
+- **Immich** - AI-powered photo management with facial recognition
+- **File Browser** - Web-based file manager
+
+### 🔗 **Knowledge & Productivity (6 Services)**
+- **Linkwarden** - Bookmark and knowledge management
+- **Paperless-ngx** - Document management and OCR
+- **BookStack** - Wiki and documentation platform
+- **Vaultwarden** - Self-hosted password manager (Bitwarden alternative)
+- **MinIO** - S3-compatible object storage
+- **Harbor** - Container registry
+
+### 🤖 **Automation & Development (6 Services)**
+- **n8n** - Powerful workflow automation platform
+- **Node-RED** - IoT and automation flows
+- **Home Assistant** - Smart home automation
+- **GitLab** - Git repository management
+- **Code Server** - Web-based VS Code
+- **Portainer** - Docker container management
+
+### 🔧 **Utilities & Management (8 Services)**
+- **Homepage** - Service dashboard and monitoring
+- **Watchtower** - Automatic container updates
+- **Health Checks** - Comprehensive service monitoring
+- **Kopia** - Cross-platform backup solution
+- **Gluetun** - VPN client for containers
+- **Pinchflat** - Media server management
+- **Fing** - Network device discovery and monitoring
+- **ROMM** - Retro game management and emulation
+
+### 🌐 **Network Services (3 Services)**
+- **Pi-hole** - DNS ad-blocking and network management
+- **Nginx Proxy Manager** - Web server and reverse proxy
+- **Fing** - Network device discovery and monitoring
+
+### 📊 **Additional Dashboards (3 Services)**
+- **Dashdot** - System dashboard
+- **Heimdall** - Application dashboard
+- **Homarr** - Service dashboard
 
 ### 🔐 **Security Enhancements**
 - ✅ **Zero Hardcoded Secrets** - All credentials managed via Ansible Vault
@@ -226,116 +282,6 @@ After integration, access all your servers at:
 
 **📖 Documentation:** [External Server Integration Guide](docs/EXTERNAL_SERVER_INTEGRATION.md) - Complete guide and examples
 
-## 🏗️ **Complete Service Stack (30+ Services)**
-
-> 📋 **See [CURRENT_SERVICE_STACK.md](CURRENT_SERVICE_STACK.md) for the complete service inventory and setup process.**
-
-### 🔐 **Security & Authentication (6 Services)**
-- **Authentik** - Enterprise identity provider with SSO
-- **Traefik** - Reverse proxy with automatic SSL/TLS
-- **CrowdSec** - Real-time intrusion detection and prevention
-- **Fail2ban** - Advanced brute force protection
-- **Vault** - Secrets management and encryption
-- **Wireguard** - VPN server and client management
-
-### 📊 **Monitoring & Observability (8 Services)**
-- **Prometheus** - Metrics collection and storage
-- **Grafana** - Advanced visualization and dashboards
-- **Loki** - Log aggregation and analysis
-- **AlertManager** - Intelligent alert routing and notification
-- **Telegraf** - Metrics collection agent
-- **Blackbox Exporter** - Endpoint monitoring
-- **Promtail** - Log shipping agent
-- **Reconya** - Network reconnaissance and monitoring
-
-### 🗄️ **Databases & Storage (6 Services)**
-- **PostgreSQL** - Primary relational database
-- **Redis** - High-performance caching and sessions
-- **InfluxDB** - Time-series database for metrics
-- **MariaDB/MySQL** - Alternative relational databases
-- **Elasticsearch** - Search and analytics engine
-- **MinIO** - S3-compatible object storage
-
-### 📺 **Media Services (14 Services)**
-- **Sonarr** - TV show management and automation
-- **Radarr** - Movie management and automation
-- **Lidarr** - Music management and automation
-- **Readarr** - Book management and automation
-- **Prowlarr** - Indexer management
-- **Bazarr** - Subtitle management
-- **Jellyfin** - Media server with transcoding
-- **Emby** - Alternative media server
-- **Overseerr** - Media requests and discovery
-- **Tautulli** - Media statistics and monitoring
-- **ErsatzTV** - Live TV streaming service
-- **Audiobookshelf** - Audiobook management
-- **Komga** - Comic book management
-- **Calibre-web** - E-book management
-
-### 📸 **Photo & Media Management**
-- **Immich** - AI-powered photo management with facial recognition
-- **File Browser** - Web-based file manager
-- **MinIO** - S3-compatible object storage
-
-### 🔗 **Knowledge & Productivity (6 Services)**
-- **Linkwarden** - Bookmark and knowledge management
-- **Paperless-ngx** - Document management and OCR
-- **BookStack** - Wiki and documentation platform
-- **Nextcloud** - File sharing and collaboration
-- **Immich** - AI-powered photo management
-- **Filebrowser** - Web-based file manager
-
-### 🤖 **Automation & Development (7 Services)**
-- **n8n** - Powerful workflow automation platform
-- **Node-RED** - IoT and automation flows
-- **Home Assistant** - Smart home automation
-- **GitLab** - Git repository management
-- **Harbor** - Container registry
-- **Code Server** - Web-based VS Code
-- **ROMM** - Retro game management and emulation
-
-### 🧠 **AI & Machine Learning (1 Service)**
-- **Pezzo** - AI prompt management and optimization
-
-### 🔧 **Utilities & Management (8 Services)**
-- **Portainer** - Docker container management
-- **Homepage** - Service dashboard and monitoring
-- **Watchtower** - Automatic container updates
-- **Health Checks** - Comprehensive service monitoring
-- **DumbAssets** - Asset management and organization
-- **Fing** - Network device discovery and monitoring
-- **MinIO** - S3-compatible object storage
-- **Vaultwarden** - Self-hosted password manager
-
-### 🌐 **Network Services (3 Services)**
-- **Pi-hole** - DNS ad-blocking and network management
-- **Nginx Proxy Manager** - Web server and reverse proxy
-- **Fing** - Network device discovery and monitoring
-
-### 💾 **Backup & Storage (4 Services)**
-- **Kopia** - Cross-platform backup solution
-- **Duplicati** - Backup client with encryption
-- **Samba** - File sharing and network storage
-- **Syncthing** - File synchronization
-
-### 🎮 **Gaming & Entertainment (1 Service)**
-- **ROMM** - Retro game management and emulation
-
-### 🏠 **Smart Home & IoT (4 Services)**
-- **Home Assistant** - Smart home automation
-- **Mosquitto** - MQTT broker
-- **Zigbee2MQTT** - Zigbee bridge
-- **Node-RED** - IoT automation flows
-
-### 📊 **Additional Dashboards (3 Services)**
-- **Dashdot** - System dashboard
-- **Heimdall** - Application dashboard
-- **Homarr** - Service dashboard
-
-### 🔧 **Additional Utilities (3 Services)**
-- **Guacamole** - Remote desktop gateway
-- **Uptime Kuma** - Uptime monitoring
-- **Requestrr** - Media request management
 
 ## 🏗️ **Production-Ready Architecture**
 
